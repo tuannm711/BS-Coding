@@ -23,7 +23,7 @@ export default function UpdatesTab() {
   return (
     <div className="settings-tab updates-tab">
       <p className="settings-hint">
-        Meow checks for updates from GitHub Releases on startup.
+        Bs checks for updates from GitHub Releases on startup.
       </p>
       <div className="settings-actions">
         <button className="btn" disabled={busy} onClick={() => void check()}>

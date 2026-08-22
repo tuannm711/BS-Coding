@@ -1,4 +1,4 @@
-# Meow Coding — Compaction: Surface Failures + Auto-Compact When Idle — Design
+# BS Coding — Compaction: Surface Failures + Auto-Compact When Idle — Design
 
 Ngày: 2026-08-17 · Trạng thái: đã duyệt với user · Bước: sau systematic-debugging
 
@@ -28,7 +28,7 @@ Ngày: 2026-08-17 · Trạng thái: đã duyệt với user · Bước: sau syst
     giữ logic hiện tại; khi `compactTranscript` trả null → `this.deps.onEvent({ type:
     'compaction-failed', agentId })`.
   - `run()` gọi `this.compactIfOverThreshold(signal)` ở đầu step (như cũ).
-- `main/meow-agent-manager.ts`:
+- `main/bs-agent-manager.ts`:
   - Track `lastUsageByAgent = Map<agentId, MessageTokens>` trong `onUsage`.
   - `private compacting = Set<agentId>()` + `lastCompactionAt = Map<agentId, number>`.
   - Timer: khởi tạo 1 interval 20s (khi có agent) — mỗi tick, với mỗi agent trong runners:
@@ -48,7 +48,7 @@ Ngày: 2026-08-17 · Trạng thái: đã duyệt với user · Bước: sau syst
 |---|---|
 | `src/shared/types.ts` | event `compaction-failed` |
 | `src/main/agent/loop.ts` | public method + emit fail |
-| `src/main/meow-agent-manager.ts` | timer idle + locks |
+| `src/main/bs-agent-manager.ts` | timer idle + locks |
 | `src/renderer/src/components/chat/ChatPanel.tsx` | handle fail → chip |
 | `src/renderer/src/styles.css` | `.chat-compacted.failed` |
 

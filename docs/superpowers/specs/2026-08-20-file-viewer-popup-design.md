@@ -5,10 +5,10 @@ Status: Approved (user: ok)
 
 ## Problem
 
-Khi agent (Meow agent / opencode / Claude Code...) trả lời trong chat, các đường dẫn
+Khi agent (BS agent / opencode / Claude Code...) trả lời trong chat, các đường dẫn
 file — dạng markdown link `[text](path)` hoặc inline code `` `path` `` — chỉ hiển thị
 dạng text thường, không mở xem được. Người dùng muốn bấm vào path để mở file dạng
-text (md, txt, ts, json...) trong một cửa sổ popup riêng của Meow với markdown được
+text (md, txt, ts, json...) trong một cửa sổ popup riêng của BS với markdown được
 render (cho `.md`) hoặc text thô (cho text khác).
 
 ## Scope
@@ -31,7 +31,7 @@ render (cho `.md`) hoặc text thô (cho text khác).
 6. Đóng popup: nút Close hoặc phím Escape.
 7. Mở lại cùng một file khi popup đã mở → focus cửa sổ cũ, không mở trùng.
 8. Security: renderer không đụng fs; mọi đọc file đi qua main process qua IPC.
-9. Thông báo lỗi từ main dùng tiếng Việt, prefix `[meow]` (đúng convention AGENTS.md).
+9. Thông báo lỗi từ main dùng tiếng Việt, prefix `[bs]` (đúng convention AGENTS.md).
 
 ## Design
 
@@ -87,7 +87,7 @@ Cập nhật `AgentApi` type tương ứng.
 - **`FileOpen`**: nhận `{ path, root }`.
   - Resolve: `const abs = path.resolve(root, relOrAbs)` — dùng `path.resolve` cho cả
     path tuyệt đối lẫn tương đối.
-  - Không tồn tại → `Notification` tiếng Việt: `[meow] Không tìm thấy file: <path>`.
+  - Không tồn tại → `Notification` tiếng Việt: `[bs] Không tìm thấy file: <path>`.
   - Là text file (đuôi thuộc danh sách text, hoặc không đuôi/đuôi lạ → đọc thử, phát
     hiện NUL byte = binary) → mở popup (bên dưới).
   - Không phải text (pdf/docx/xlsx/zip/ảnh...) → `shell.openPath(abs)`.
@@ -99,7 +99,7 @@ Cập nhật `AgentApi` type tương ứng.
     (cùng bundle render, không cần entry riêng).
   - `closed` → xoá khỏi map.
 - **`FileViewerGetContent`**: `fs.readFile` với giới hạn ~5MB (quá → trả lỗi
-  `[meow] File quá lớn để xem trực tiếp`). Trả `FileContentResult`.
+  `[bs] File quá lớn để xem trực tiếp`). Trả `FileContentResult`.
 - **`FileViewerOpenInEditor`**: dùng lại `openInEditor()` có sẵn.
 - **`FileViewerShowInFolder`**: `shell.showItemInFolder(path)`.
 - Ngoài ra không thay đổi gì khác ở main.
@@ -171,7 +171,7 @@ binary → `shell.openPath`.
   - Click inline code path `.ts` → popup text thô.
   - Click lại file đang mở → focus cửa sổ cũ.
   - Click path `.pdf`/`.png` → mở app mặc định OS.
-  - Click path không tồn tại → notification `[meow]`.
+  - Click path không tồn tại → notification `[bs]`.
   - Nút Open in VS Code / Reveal in Folder / Copy / Raw-Markdown toggle.
   - Escape đóng popup.
 - Không ảnh hưởng e2e (không đổi flow chính) → không bắt buộc `npm run e2e`.

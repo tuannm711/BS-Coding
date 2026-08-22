@@ -1,7 +1,7 @@
 # AGENTS.md — tests/e2e
 
 Playwright end-to-end smoke tests that launch the real Electron app (`_electron.launch({ args: ['.'] })`)
-with a temp `MEOW_USER_DATA`. Run after `npm run build` via `npm run e2e`; single file:
+with a temp `BS_USER_DATA`. Run after `npm run build` via `npm run e2e`; single file:
 `npx playwright test tests/e2e/<file>.spec.ts`.
 
 ## Key files

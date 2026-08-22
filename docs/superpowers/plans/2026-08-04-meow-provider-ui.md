@@ -1,8 +1,8 @@
-# Meow Coding — Redesign Provider + Model (Provider popup + auto-sync + grouped model search)
+# BS Coding — Redesign Provider + Model (Provider popup + auto-sync + grouped model search)
 
 **Goal:** (1) Thay Settings bằng nút **Providers** → popup danh sách provider đã connected + tìm provider để kết nối (chỉ nhập key, hệ thống auto-sync models từ models.dev, tự điền baseUrl); (2) click provider connected → xem models; (3) khung chat hiển thị nút **tên model đã chọn**, click → popup danh sách model **group theo provider + search input**.
 
-**Phạm vi:** `src/shared/types.ts`, `src/main/models-catalog.ts`, `src/main/meow-agent-manager.ts`, `src/main/index.ts`, `src/shared/ipc.ts`, `src/preload/index.ts`, `Sidebar.tsx`, `ProvidersDialog.tsx` (mới, thay SettingsDialog), `ModelPicker.tsx` (redesign), `styles.css`, tests.
+**Phạm vi:** `src/shared/types.ts`, `src/main/models-catalog.ts`, `src/main/bs-agent-manager.ts`, `src/main/index.ts`, `src/shared/ipc.ts`, `src/preload/index.ts`, `Sidebar.tsx`, `ProvidersDialog.tsx` (mới, thay SettingsDialog), `ModelPicker.tsx` (redesign), `styles.css`, tests.
 
 ---
 
@@ -19,8 +19,8 @@ export interface CatalogProviderSummary { id: string; name: string; api?: string
 
 ### manager
 - `listProviderCatalog(): Promise<CatalogProviderSummary[]>`.
-- `connectProvider(id, apiKey, baseUrl?): Promise<MeowSettings>` — fetch catalog; models = catalog[id].models; baseUrl = user ?? catalog[id].api; ghi vào settings (thay/thêm provider); defaultProvider = existing nếu còn, else id; `saveSettings` (reload); trả settings.
-- `disconnectProvider(id): Promise<MeowSettings>` — xóa khỏi settings; save; trả settings.
+- `connectProvider(id, apiKey, baseUrl?): Promise<BsSettings>` — fetch catalog; models = catalog[id].models; baseUrl = user ?? catalog[id].api; ghi vào settings (thay/thêm provider); defaultProvider = existing nếu còn, else id; `saveSettings` (reload); trả settings.
+- `disconnectProvider(id): Promise<BsSettings>` — xóa khỏi settings; save; trả settings.
 
 ### IPC (4 chỗ + test)
 - `ProviderCatalog: 'provider:catalog'` → `listProviderCatalog()`.

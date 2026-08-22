@@ -24,7 +24,7 @@ export const REVIEW_COMMAND: Command = {
     'suggested improvements. Do not modify files.'
 }
 
-// System commands are dispatched in main (meow-agent-manager.ts runCommand)
+// System commands are dispatched in main (bs-agent-manager.ts runCommand)
 // instead of being resolved into a prompt sent to the LLM.
 export const NEW_COMMAND: Command = {
   name: 'new',
@@ -210,7 +210,7 @@ export class CommandStore {
 
 export function projectCommands(projectDir?: string): Command[] {
   if (!projectDir) return []
-  const dir = path.join(projectDir, '.meow', 'commands')
+  const dir = path.join(projectDir, '.bs', 'commands')
   if (!existsSync(dir)) return []
   const out: Command[] = []
   for (const entry of readdirSync(dir)) {

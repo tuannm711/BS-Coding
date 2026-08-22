@@ -1,4 +1,4 @@
-# Meow Coding — Group A: Undo/Redo, Tool Truncation, Compaction nâng cao, Rename Title: Kế hoạch
+# BS Coding — Group A: Undo/Redo, Tool Truncation, Compaction nâng cao, Rename Title: Kế hoạch
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -25,7 +25,7 @@ auto-continue + prune, rename session title.
   undo/redo xử lý ngay trong manager với snapshot store, không cần field riêng — snapshot store đã có agentId).
 - Migration: thêm field mặc định `[]` trong `normalize()`.
 
-## 3. Undo/Redo logic (`src/main/meow-agent-manager.ts`)
+## 3. Undo/Redo logic (`src/main/bs-agent-manager.ts`)
 
 - `undo(agentId)`:
   - stop turn đang chạy (như createSession).
@@ -53,7 +53,7 @@ auto-continue + prune, rename session title.
 - `compact.ts`: thêm `pruneToolOutputs(items, cfg)` — tool output cũ (turn >= 2, không phải `skill`) vượt
   `PRUNE_PROTECT = 40000` tokens → xoá `output` thay `[Old tool result content cleared]`; chỉ áp dụng nếu
   reclaimable >= `PRUNE_MINIMUM = 20000`.
-- Config: `compaction.prune` (bool, default true) trong `MeowCompactionConfig` (+ normalize + settings).
+- Config: `compaction.prune` (bool, default true) trong `BSCompactionConfig` (+ normalize + settings).
 
 ## 6. Rename session (`src/shared`, manager, renderer)
 
@@ -75,7 +75,7 @@ auto-continue + prune, rename session title.
 - `message.test.ts` — truncation service.
 - `loop.test.ts` — auto-continue giới hạn, prune.
 - `ipc-contract.test.ts` — 3 channel/method mới.
-- `meow-agent-manager.test.ts` — undo/redo xoá transcript, rename.
+- `bs-agent-manager.test.ts` — undo/redo xoá transcript, rename.
 - e2e: giữ nguyên hoặc thêm rename smoke.
 
 ## 9. Verify

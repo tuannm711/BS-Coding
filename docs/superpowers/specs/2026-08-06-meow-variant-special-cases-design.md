@@ -1,4 +1,4 @@
-# Meow Coding — Port OpenCode Variant Special-Cases (variants()): Design Spec
+# BS Coding — Port OpenCode Variant Special-Cases (variants()): Design Spec
 
 Ngày: 2026-08-06 · Trạng thái: chờ duyệt
 
@@ -7,13 +7,13 @@ Ngày: 2026-08-06 · Trạng thái: chờ duyệt
 Variant picker hiện chỉ sinh variants từ `reasoning_options` (`type === 'effort'`) trong catalog
 (`reasoningEffortValues`). Opencode có **2 nguồn** sinh variants:
 
-1. `reasoningVariants(model)` — từ `reasoning_options` (effort/toggle/budget). Meow đã có.
+1. `reasoningVariants(model)` — từ `reasoning_options` (effort/toggle/budget). BS đã có.
 2. `variants(model)` — hardcoded special-case theo `model.id` + `provider.npm`
-   (`packages/opencode/src/provider/transform.ts:721-1149`). **Meow thiếu.**
+   (`packages/opencode/src/provider/transform.ts:721-1149`). **BS thiếu.**
 
 Kết quả: minimax (MiniMax-M3, `reasoning_options: [{type:"toggle"}]`, npm=`@ai-sdk/anthropic`) không
-hiện variant nào trong meow, trong khi opencode hiện `none`/`thinking`. deepseek-v4-flash (npm=
-`@ai-sdk/openai-compatible`) hiện `[low,medium,high,max]` trong opencode nhưng meow chỉ ra
+hiện variant nào trong bs, trong khi opencode hiện `none`/`thinking`. deepseek-v4-flash (npm=
+`@ai-sdk/openai-compatible`) hiện `[low,medium,high,max]` trong opencode nhưng bs chỉ ra
 `[low,high,max]` (thiếu `medium`).
 
 Mục tiêu: port hàm `variants()` của opencode thành module TS thuần `src/main/model-variants.ts`, thay
@@ -46,13 +46,13 @@ Tham chiếu: opencode `packages/opencode/src/provider/transform.ts:721-1149` (`
 - Catalog: lưu `variants` descriptor per model (pre-built từ `reasoningVariants ?? variants`).
 - Snapshot: lưu raw fields; `mapProviders` tính descriptor tại parse time.
 - `llm.ts`: bỏ `providerOptionsFor`; `LlmStreamOptions` nhận `variantOptions?: StreamProviderOptions`; merge thẳng.
-- `loop.ts` / `meow-agent-manager.ts`: pass descriptor qua `variantOptions`.
+- `loop.ts` / `bs-agent-manager.ts`: pass descriptor qua `variantOptions`.
 - Picker / `getAvailableVariants`: `Object.keys(descriptors)`.
-- Tests: unit cho `model-variants.ts` (minimax-m3, deepseek-v4, gpt-5.x, anthropic, google), mở rộng `llm-variant.test.ts`, `models-catalog.test.ts`, `meow-agent-manager.test.ts`.
+- Tests: unit cho `model-variants.ts` (minimax-m3, deepseek-v4, gpt-5.x, anthropic, google), mở rộng `llm-variant.test.ts`, `models-catalog.test.ts`, `bs-agent-manager.test.ts`.
 
 **Không làm:**
-- Bedrock / Vertex / SAP / Copilot-specific providers (không có trong catalog meow dùng; fallback openai-compatible).
-- Port `options()` / request-body merging của opencode (meow dùng AI SDK providerOptions, không raw body).
+- Bedrock / Vertex / SAP / Copilot-specific providers (không có trong catalog bs dùng; fallback openai-compatible).
+- Port `options()` / request-body merging của opencode (bs dùng AI SDK providerOptions, không raw body).
 - Plugin layer cho variants.
 - Đổi provider routing trong `createLlm` sang npm-based (giữ provider string).
 
@@ -136,7 +136,7 @@ Bỏ `providerOptionsFor` + `ANTHROPIC_THINKING_BUDGET`. `stream`:
 
 ## 5. Port các nhánh của `variants()` (transform.ts:721-1149)
 
-Chỉ port các nhánh khớp npm có trong catalog meow (`@ai-sdk/anthropic`, `@ai-sdk/google`, `@ai-sdk/openai-compatible`, `@openrouter/ai-sdk-provider`, `@ai-sdk/groq`, `@ai-sdk/mistral`, `@ai-sdk/xai`, `@ai-sdk/cerebras`, `@ai-sdk/togetherai`, `@ai-sdk/deepinfra`, `@ai-sdk/cohere`, `@ai-sdk/azure`, `@ai-sdk/openai`). Các npm không support → `{}`.
+Chỉ port các nhánh khớp npm có trong catalog bs (`@ai-sdk/anthropic`, `@ai-sdk/google`, `@ai-sdk/openai-compatible`, `@openrouter/ai-sdk-provider`, `@ai-sdk/groq`, `@ai-sdk/mistral`, `@ai-sdk/xai`, `@ai-sdk/cerebras`, `@ai-sdk/togetherai`, `@ai-sdk/deepinfra`, `@ai-sdk/cohere`, `@ai-sdk/azure`, `@ai-sdk/openai`). Các npm không support → `{}`.
 
 ### 5a. Special-cases theo model id (line 728-799)
 
@@ -230,7 +230,7 @@ Mỗi variant descriptor là `StreamProviderOptions` đã namespace theo npm:
 { openaiCompatible: { reasoning: { effort: 'high' } } }     // body mang raw reasoning
 ```
 
-Lưu ý: meow dùng AI SDK providerOptions, không phải raw request body như opencode. Các variant `body`
+Lưu ý: bs dùng AI SDK providerOptions, không phải raw request body như opencode. Các variant `body`
 của opencode (`{thinking:...}`, `{reasoningEffort:...}`, `{reasoning:{effort}}`) được bọc namespace
 providerOptions phù hợp: `@ai-sdk/anthropic` → `{anthropic: body}`, `@ai-sdk/google` → `{google: body}`,
 `@ai-sdk/openai-compatible`/`@ai-sdk/groq`/`@ai-sdk/mistral`/`@ai-sdk/xai`/etc → `{openaiCompatible: body}`,
@@ -258,12 +258,12 @@ shape → bỏ qua và refetch. Xử lý trong `loadCache` (kiểm tra field `ra
 | `src/main/models-snapshot.json` | regen (raw fields) |
 | `src/main/agent/llm.ts` | sửa: bỏ providerOptionsFor, nhận `variantOptions` |
 | `src/main/agent/loop.ts` | sửa: `LoopDeps.variantOptions` |
-| `src/main/meow-agent-manager.ts` | sửa: resolve descriptor tại register, allowedVariants = Object.keys |
+| `src/main/bs-agent-manager.ts` | sửa: resolve descriptor tại register, allowedVariants = Object.keys |
 | `scripts/regen-models-snapshot.mjs` | sửa: lưu raw fields + npm |
 | `tests/unit/model-variants.test.ts` | thêm mới |
 | `tests/unit/models-catalog.test.ts` | sửa |
 | `tests/unit/llm-variant.test.ts` | sửa |
-| `tests/unit/meow-agent-manager.test.ts` | sửa |
+| `tests/unit/bs-agent-manager.test.ts` | sửa |
 
 ## 9. Xử lý lỗi
 

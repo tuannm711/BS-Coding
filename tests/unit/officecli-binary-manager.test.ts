@@ -17,7 +17,7 @@ vi.mock('node:child_process', () => ({ spawnSync: spawnSyncMock }))
 let dir = ''
 
 function makeDir(): string {
-  dir = mkdtempSync(path.join(tmpdir(), 'meow-officecli-'))
+  dir = mkdtempSync(path.join(tmpdir(), 'bs-officecli-'))
   return dir
 }
 

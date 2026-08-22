@@ -101,10 +101,10 @@ describe('TrayManager', () => {
     })
     expect(manager).not.toBeNull()
     expect(trayCtor).toHaveBeenCalledTimes(1)
-    expect(trayInstance.setToolTip).toHaveBeenCalledWith('Meow Coding')
+    expect(trayInstance.setToolTip).toHaveBeenCalledWith('BS Coding')
     expect(trayInstance.setContextMenu).toHaveBeenCalledTimes(1)
     const template = captureMenu()
-    expect(template.map(t => t.label)).toContain('Show Meow Coding')
+    expect(template.map(t => t.label)).toContain('Show BS Coding')
     expect(template.map(t => t.label)).toContain('Exit')
     expect(template.some(t => t.type === 'separator')).toBe(true)
   })
@@ -186,7 +186,7 @@ describe('TrayManager', () => {
       onQuit: () => {}
     })
     const template = captureMenu()
-    const showItem = template.find(t => t.label === 'Show Meow Coding') as { click?: () => void }
+    const showItem = template.find(t => t.label === 'Show BS Coding') as { click?: () => void }
     showItem?.click?.()
     expect(showMock).toHaveBeenCalledTimes(1)
     expect(focusMock).toHaveBeenCalledTimes(1)

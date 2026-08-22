@@ -1,11 +1,11 @@
-# Plan: Browser Navigate Luôn Mở Tab Mới Trong Meow Group
+# Plan: Browser Navigate Luôn Mở Tab Mới Trong BS Group
 
 Spec: `docs/superpowers/specs/2026-08-12-browser-navigate-new-tab-design.md`
 Ngày: 2026-08-12
 
 ## Mục tiêu
 
-- `navigate` luôn mở tab nền mới trong group "Meow", bỏ qua `tabId` — không bao giờ chuyển hướng
+- `navigate` luôn mở tab nền mới trong group "BS", bỏ qua `tabId` — không bao giờ chuyển hướng
   tab đang mở.
 - `defaultTabId()` ưu tiên `workingTabId` trước, tab active chỉ là fallback — mọi lệnh mặc định
   không đụng tab user nếu đã có tab làm việc.
@@ -24,7 +24,7 @@ verify là `npm run typecheck` + `npm test` + manual smoke.
 
 ---
 
-## Task 1: `navigate` luôn mở tab mới trong group "Meow"
+## Task 1: `navigate` luôn mở tab mới trong group "BS"
 
 **File:** `src/browser-extension/background.ts`
 
@@ -54,7 +54,7 @@ case 'openTab': {
   let group: { groupId?: number; groupTitle?: string } = {}
   if (tab.id != null) {
     try {
-      group = await addToMeowGroup(tab.id)
+      group = await addToBSGroup(tab.id)
     } catch {
       /* group creation failed; the tab itself is still open */
     }
@@ -69,11 +69,11 @@ case 'openTab': {
   `^https?://`).
 - Lấy `windowId` từ `lastFocusedWindowId()`, tạo tab với `active: false`.
 - `persistWorkingTab(tab.id ?? null)`.
-- `addToMeowGroup(tab.id)` bọc try/catch im lặng.
+- `addToBSGroup(tab.id)` bọc try/catch im lặng.
 - `send({ ok: true, data: { id: tab.id, tabId: tab.id, url: tab.url, ...group } })`.
 - **Không** đọc `params.tabId`, **không** gọi `chrome.tabs.update`.
 
-**Commit:** `feat(browser): navigate always opens a new tab in the Meow group`
+**Commit:** `feat(browser): navigate always opens a new tab in the BS group`
 
 ---
 
@@ -140,7 +140,7 @@ Không đổi gì khác — các lệnh `reload`/`read`/`click`/`type`/`select`/
 thành:
 
 ```
-'Open a URL in a new background tab of an existing Chrome window, grouped under "Meow". ' +
+'Open a URL in a new background tab of an existing Chrome window, grouped under "BS". ' +
 'Never navigates or hijacks an existing tab. Returns a tabId you can pass as the tabId ' +
 'argument of other browser_* tools to act on that tab.'
 ```
@@ -163,7 +163,7 @@ Chạy:
 Manual smoke (cần Chrome thật + extension load unpacked từ `out/browser-extension` sau
 `npm run build:extension`):
 1. Mở tab bất kỳ user đang xem (VD: Gmail).
-2. Gọi `browser_navigate` tới URL bất kỳ → xuất hiện tab nền mới trong group "Meow";
+2. Gọi `browser_navigate` tới URL bất kỳ → xuất hiện tab nền mới trong group "BS";
    tab user **không bị** chuyển hướng.
 3. Gọi `browser_read` không kèm `tabId` → snapshot của **tab mới** (working tab), không phải tab user.
 4. Đóng tab mới → gọi `browser_read` → fallback tab active, không crash.

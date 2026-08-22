@@ -1,10 +1,10 @@
-# Meow Coding — Todo List Collapse/Expand — Design
+# BS Coding — Todo List Collapse/Expand — Design
 
 Ngày: 2026-08-17 · Trạng thái: đã duyệt với user · Bước: sau brainstorm
 
 ## 1. Mục tiêu
 
-Thêm nút collapse/expand cho TODO LIST trong chat panel (native agent Meow). Collapsed chỉ hiện
+Thêm nút collapse/expand cho TODO LIST trong chat panel (native agent BS). Collapsed chỉ hiện
 header + count `x/y`; expanded hiển thị đầy đủ list như hiện tại (in-place, cùng kích thước box,
 không đổi layout feed/input).
 

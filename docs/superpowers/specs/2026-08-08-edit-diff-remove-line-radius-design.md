@@ -1,4 +1,4 @@
-# Meow Coding — Remove border-radius on edit diff lines : Design Spec
+# BS Coding — Remove border-radius on edit diff lines : Design Spec
 
 Ngày: 2026-08-08 · Trạng thái: chờ duyệt
 

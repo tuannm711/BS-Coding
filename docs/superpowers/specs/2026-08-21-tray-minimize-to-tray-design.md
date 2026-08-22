@@ -5,7 +5,7 @@ Status: Approved (user confirmed design before writing this spec)
 
 ## Goal
 
-When the user closes the main window (X button), Meow Coding should not quit —
+When the user closes the main window (X button), BS Coding should not quit —
 it should keep running in the background with an icon in the system tray
 (Windows: right side of the taskbar; macOS: menu bar; Linux: system indicator).
 The user can reopen the window from the tray; quitting for real happens only via
@@ -49,7 +49,7 @@ icon asset. No IPC contract, preload or renderer changes needed.
     PNG, macOS uses a template image for auto light/dark, Linux uses the PNG).
   - macOS: set `tray.setImage` with a `xxxTemplate.png` naming convention
     (template image → adapts to menu bar theme).
-- Tooltip: `Meow Coding`.
+- Tooltip: `BS Coding`.
 - If tray creation throws (rare on headless/some Linux setups), log the error
   and keep the old behavior (close = quit). Never trap the user in a state
   where the window is hidden but there is no way to reopen it.
@@ -59,11 +59,11 @@ icon asset. No IPC contract, preload or renderer changes needed.
 - Left-click on tray icon: toggle window visibility (hidden → show+focus;
   visible → hide).
 - Context menu:
-  - **Show Meow Coding** — restore window (unminimize + show + focus).
+  - **Show BS Coding** — restore window (unminimize + show + focus).
   - Separator.
   - **Exit** — `app.quit()`.
 - Exit goes through the existing `before-quit` cleanup (stop git poll, dispose
-  meow agent, flush traces, close browser bridge, dispose remote, stop PTYs).
+  bs agent, flush traces, close browser bridge, dispose remote, stop PTYs).
 
 ### 3. Intercept window close
 
@@ -87,8 +87,8 @@ icon asset. No IPC contract, preload or renderer changes needed.
 ### 4. One-time notification
 
 - First time the window is hidden to tray, show a system notification:
-  - Title: `Meow Coding`
-  - Body: `[meow] Meow Coding vẫn đang chạy ngầm, click icon tray để mở lại.`
+  - Title: `BS Coding`
+  - Body: `[bs] BS Coding vẫn đang chạy ngầm, click icon tray để mở lại.`
   - Click → restore window.
 - Persist the "already shown" flag in `userData/tray-notified` (existence of
   the file = shown). Write it with `writeFileSync` after the first show.

@@ -1,6 +1,6 @@
 # AGENTS.md — src/renderer/src/components/settings
 
-The Settings dialog: a tabbed screen editing the whole `meow.json`-backed `MeowSettings` object.
+The Settings dialog: a tabbed screen editing the whole `bs.json`-backed `BsSettings` object.
 Reads via `window.api.getSettings()`, saves via `saveSettings(settings)`; changes propagate to the
 main process config.
 
@@ -21,6 +21,6 @@ main process config.
 
 ## Conventions
 
-- `MeowSettings` shape lives in `src/shared/types.ts`; adding a setting touches shared types + `src/main/agent/config.ts` normalize + this dialog.
+- `BsSettings` shape lives in `src/shared/types.ts`; adding a setting touches shared types + `src/main/agent/config.ts` normalize + this dialog.
 - Edits go through `patch()` on a draft — nothing writes until Save; `saveSettings` returns the normalized settings.
 - UI labels are English.

@@ -1,10 +1,10 @@
-# Meow Coding — Pre-install Superpowers skills
+# BS Coding — Pre-install Superpowers skills
 
-**Goal:** Cài sẵn bộ skill **Superpowers** (obra/superpowers — opencode plugin) vào app để agent native "meow" luôn có thể gọi qua tool `skill` (chỉ cần gọi tên là dùng được). Mỗi skill là file `.md` frontmatter `name/description` — đúng format meow đang load (`collectSkills`).
+**Goal:** Cài sẵn bộ skill **Superpowers** (obra/superpowers — opencode plugin) vào app để agent native "bs" luôn có thể gọi qua tool `skill` (chỉ cần gọi tên là dùng được). Mỗi skill là file `.md` frontmatter `name/description` — đúng format bs đang load (`collectSkills`).
 
 **Nguồn:** `https://github.com/obra/superpowers/tree/main/skills/<name>/SKILL.md` — 14 skill: brainstorming, dispatching-parallel-agents, executing-plans, finishing-a-development-branch, receiving-code-review, requesting-code-review, subagent-driven-development, systematic-debugging, test-driven-development, using-git-worktrees, using-superpowers, verification-before-completion, writing-plans, writing-skills.
 
-**Phạm vi:** `resources/skills/*.md` (mới, bundle), `src/main/agent/skill.ts`, `src/main/agent/tools/skill.ts`, `src/main/agent/tools/registry.ts`, `src/main/meow-agent-manager.ts`, `src/main/index.ts`, tests.
+**Phạm vi:** `resources/skills/*.md` (mới, bundle), `src/main/agent/skill.ts`, `src/main/agent/tools/skill.ts`, `src/main/agent/tools/registry.ts`, `src/main/bs-agent-manager.ts`, `src/main/index.ts`, tests.
 
 ---
 
@@ -14,13 +14,13 @@
 - Download 14 `SKILL.md` → `resources/skills/<name>.md` (giữ nguyên nội dung + frontmatter).
 
 ### skill.ts
-`collectSkills(cwd, userSkillsDir, builtinSkillsDir?)` — thêm thư mục builtin (giữa project `.meow/skills` và userSkillsDir; user override builtin).
+`collectSkills(cwd, userSkillsDir, builtinSkillsDir?)` — thêm thư mục builtin (giữa project `.bs/skills` và userSkillsDir; user override builtin).
 
 ### tools/skill.ts + registry.ts
 `createSkillTool(getUserSkillsDir, getBuiltinSkillsDir?)`; `DefaultToolsOptions` thêm `getBuiltinSkillsDir`.
 
 ### manager + main
-- `MeowAgentManagerDeps.builtinSkillsDir?`; `register()`: `collectSkills(agent.cwd, userSkillsDir, builtinSkillsDir)`.
+- `BsAgentManagerDeps.builtinSkillsDir?`; `register()`: `collectSkills(agent.cwd, userSkillsDir, builtinSkillsDir)`.
 - `main/index.ts`: `builtinSkillsDir = path.join(app.getAppPath(), 'resources', 'skills')`, truyền vào `createDefaultTools` + deps.
 
 ### Hệ quả

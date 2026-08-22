@@ -1,10 +1,10 @@
-# Meow Coding — Group B: Slash Commands, Cost/Stats, File Watcher: Design Spec
+# BS Coding — Group B: Slash Commands, Cost/Stats, File Watcher: Design Spec
 
 Ngày: 2026-08-05 · Trạng thái: chờ duyệt
 
 ## 1. Mục tiêu
 
-Mang nhóm tính năng "vừa, cần spec kỹ" từ opencode sang meow-coding (desktop):
+Mang nhóm tính năng "vừa, cần spec kỹ" từ opencode sang bs-coding (desktop):
 
 1. **Slash commands + prompt templates** — `/init`, `/review`, custom commands, template variables.
 2. **Cost/usage tracking + stats** — cost/token theo session/model, hiển thị UI.
@@ -25,7 +25,7 @@ Theo quyết định brainstorm: **bám sát opencode**, bỏ các command thu�
 ### 3.1 Slash commands + prompt templates
 - **Model data**: `Command { name, description, template, agent?, model? }`.
 - **Store**: `userData/commands.json` (giống templates.json) + built-in `/init`, `/review`.
-  Ngoài ra load từ `project/.meow/commands/*.md` (frontmatter name/description + body template).
+  Ngoài ra load từ `project/.bs/commands/*.md` (frontmatter name/description + body template).
 - **Template variables**: `$1..$N` (slurp remainder), `$ARGUMENTS`, `@path` → expandReferences (đã có),
   `` !`cmd` `` → chạy shell lấy output.
 - **Resolver**: `resolveCommandTemplate(template, args)` trong `src/main/agent/commands.ts` (mới).
@@ -63,7 +63,7 @@ Theo quyết định brainstorm: **bám sát opencode**, bỏ các command thu�
 - `src/main/agent/usage.ts` (mới) — cost calc.
 - `src/main/agent/session.ts` — `usage` field + aggregate.
 - `src/main/agent/loop.ts` — tính cost ở done event.
-- `src/main/meow-agent-manager.ts` + `src/main/index.ts` — IPC `commands:list/save/remove`, `stats:get`, event `context:changed`.
+- `src/main/bs-agent-manager.ts` + `src/main/index.ts` — IPC `commands:list/save/remove`, `stats:get`, event `context:changed`.
 - `src/shared/{ipc,types}.ts` — channel + method + types (`Command`, `UsageSummary`, `ContextChangedEvent`).
 - `src/preload/index.ts`.
 - `src/renderer/.../ChatInput.tsx`, `ChatPanel.tsx`, `SettingsDialog` (commands tab), `StatusBar`.

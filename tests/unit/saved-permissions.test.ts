@@ -10,7 +10,7 @@ let saved: SavedPermissions
 const project = 'D:\\GitHub\\some-project'
 
 beforeEach(() => {
-  dir = mkdtempSync(path.join(tmpdir(), 'meow-saved-perm-'))
+  dir = mkdtempSync(path.join(tmpdir(), 'bs-saved-perm-'))
   saved = new SavedPermissions(createJsonStore<SavedPermission>(path.join(dir, 'permissions.json')))
 })
 

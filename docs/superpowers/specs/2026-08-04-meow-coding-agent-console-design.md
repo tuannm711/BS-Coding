@@ -1,4 +1,4 @@
-# Meow Coding — Desktop Agent Console: Design Spec
+# BS Coding — Desktop Agent Console: Design Spec
 
 Ngày: 2026-08-04 · Trạng thái: chờ duyệt
 
@@ -116,7 +116,7 @@ tập trung trong `src/shared` — sau này có thể port sang Tauri mà không
 ## 9. Cấu trúc thư mục
 
 ```
-meow-coding/
+bs-coding/
   src/
     main/        # Electron main: pty-manager, workspace-store, template-manager,
                  # log-manager, git-status-service, alert-service, app-lifecycle

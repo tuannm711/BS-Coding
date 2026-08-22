@@ -1,10 +1,10 @@
-# Meow Coding — OfficeCLI Integration (native tool `office`) : Design Spec
+# BS Coding — OfficeCLI Integration (native tool `office`) : Design Spec
 
 Ngày: 2026-08-08 · Trạng thái: chờ duyệt
 
 ## 1. Mục tiêu
 
-Cho native Meow agent tạo/sửa Word (.docx), Excel (.xlsx), PowerPoint (.pptx) bằng cách gọi
+Cho native BS agent tạo/sửa Word (.docx), Excel (.xlsx), PowerPoint (.pptx) bằng cách gọi
 [OfficeCLI](https://github.com/iOfficeAI/OfficeCLI) (Apache-2.0, single binary, không cần cài
 Office). Agent điều khiển document thông qua một native tool mới `office` trong tool registry:
 spawn one-shot subprocess `officecli`, trả output JSON về agent.
@@ -28,7 +28,7 @@ engine, pivot, HTML rendering engine) — không thực tế khi reimplement tro
 ## 3. Kiến trúc / luồng dữ liệu
 
 ```
-Native Meow agent
+Native BS agent
   └─ office tool (src/main/agent/tools/office.ts)
        └─ OfficeCliBinary (src/main/officecli/binary-manager.ts)
             ├─ PATH (đã có officecli)
@@ -65,7 +65,7 @@ Native Meow agent
 | `src/main/agent/tools/office.ts` | mới | `officeTool`: `ToolDefinition`, schema zod, spawn + tree-kill timeout. |
 | `src/main/agent/tools/registry.ts` | sửa | `createDefaultTools(opts)` thêm `getUserDataDir?`; khởi tạo office tool. |
 | `src/main/index.ts` | sửa | Truyền `getUserDataDir: () => app.getPath('userData')`. |
-| `src/main/agent/config.ts` | sửa | Thêm `office: 'ask'` vào `DEFAULT_MEOW_CONFIG.permission`. |
+| `src/main/agent/config.ts` | sửa | Thêm `office: 'ask'` vào `DEFAULT_BS_CONFIG.permission`. |
 | `tests/unit/officecli-binary-manager.test.ts` | mới | Mock fetch; asset selection, fallback, checksum. |
 | `tests/unit/office-tool.test.ts` | mới | Mock binary; spawn args, `--json`, timeout, mapping lỗi. |
 
@@ -75,7 +75,7 @@ Native Meow agent
 - officecli exit ≠ 0 → trả `error` chứa stdout/stderr (OfficeCLI trả JSON structured error kèm
   `code`/`suggestion` khi `--json`).
 - Timeout → `tree-kill` cả process tree, trả `error` timeout (giống `bash.ts`).
-- Cwd không tồn tại → fallback về home + note `[meow]` (giống `bash.ts`).
+- Cwd không tồn tại → fallback về home + note `[bs]` (giống `bash.ts`).
 
 ## 6. Kiểm thử
 
@@ -88,7 +88,7 @@ Native Meow agent
 
 ## 7. Tiêu chí thành công
 
-- Agent Meow có tool `office`; gọi được `officecli create/set/add/get` tạo & sửa file .docx/.xlsx/.pptx
+- Agent BS có tool `office`; gọi được `officecli create/set/add/get` tạo & sửa file .docx/.xlsx/.pptx
   trong project.
 - Khi máy chưa cài officecli, lần đầu gọi tool tự tải binary về `userData/officecli/` và dùng được.
 - Permission `office` mặc định `ask`; có thể đổi trong Settings → Permissions.

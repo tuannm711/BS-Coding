@@ -4,7 +4,7 @@ Ngày: 2026-08-17 · Trạng thái: approved
 
 ## Vấn đề
 
-Người dùng nhận thấy làm việc với Meow Coding tiêu tốn nhiều token hơn opencode
+Người dùng nhận thấy làm việc với BS Coding tiêu tốn nhiều token hơn opencode
 trên cùng model. Phân tích so sánh với source opencode (`provider/transform.ts`,
 `session/overflow.ts`, `session/compaction.ts`) tìm ra các điểm khác biệt.
 
@@ -14,7 +14,7 @@ trên cùng model. Phân tích so sánh với source opencode (`provider/transfo
    `cacheControl` cho Anthropic. opencode đặt `cacheControl: {type:"ephemeral"}`
    trên 2 system messages + 2 messages cuối mỗi request → phần prefix ổn định
    được đọc từ cache (0.1× thay vì 1.0× input price). Với session dài nhiều tool
-   call, meow trả full input price mỗi turn.
+   call, bs trả full input price mỗi turn.
 2. **Usage/cost ghi thiếu** — `onUsage` hardcode `cacheRead: 0, cacheWrite: 0`;
    `toMessageTokens` bỏ `cacheCreationInputTokens` → UI hiển thị token/cost không
    phản ánh cache (kể cả khi cache tồn tại).
@@ -48,7 +48,7 @@ trên cùng model. Phân tích so sánh với source opencode (`provider/transfo
 - `shared/types.ts`: thêm `cacheWrite?: number` vào `MessageTokens`.
 - `llm.ts` `toMessageTokens`: map `cacheCreationInputTokens` → `cacheWrite`
   (hiện đang bỏ qua); `SdkUsage` thêm `cacheCreationInputTokens`.
-- `meow-agent-manager.ts`:
+- `bs-agent-manager.ts`:
   - `onUsage`: dùng `tokens.cacheRead ?? 0`, `tokens.cacheWrite ?? 0` thay vì hardcode 0.
   - `computeCost`: truyền đủ `input/output/cacheRead/cacheWrite` vào `calcCost`
     (hàm đã hỗ trợ cacheRead/cacheWrite pricing).

@@ -1,10 +1,10 @@
-# Meow Coding — Group A: Undo/Redo, Tool Truncation, Compaction nâng cao, Rename Title: Design Spec
+# BS Coding — Group A: Undo/Redo, Tool Truncation, Compaction nâng cao, Rename Title: Design Spec
 
 Ngày: 2026-08-05 · Trạng thái: chờ duyệt
 
 ## 1. Mục tiêu
 
-Mang nhóm tính năng "nhanh, ít rủi ro" từ opencode sang meow-coding (desktop):
+Mang nhóm tính năng "nhanh, ít rủi ro" từ opencode sang bs-coding (desktop):
 
 1. **Undo/Redo theo turn** + **snapshot history UI** — undo từng turn agent, redo, xem lịch sử snapshot.
 2. **Tool output truncation service** — output tool quá ngưỡng ghi ra file, gửi head/tail preview cho model.
@@ -37,7 +37,7 @@ Mang nhóm tính năng "nhanh, ít rủi ro" từ opencode sang meow-coding (des
 - **Flow**: trong `toLlmMessages` (hoặc trước khi build messages), nếu tool output > ngưỡng:
   - Ghi toàn bộ ra `userData/truncation/<agentId>-<toolId>.txt`.
   - Gửi cho model: head (vài KB) + `\n[Output truncated to N bytes; full output at <path>]\n` + tail (vài KB).
-- **Config**: `tool_output.maxBytes`/`maxLines` trong meow.json (mặc định opencode).
+- **Config**: `tool_output.maxBytes`/`maxLines` trong bs.json (mặc định opencode).
 - **Retention**: dọn file cũ > 7 ngày khi app khởi động (mỗi agent? một lần toàn cục).
 
 ### 3.3 Compaction auto-continue + prune
@@ -58,11 +58,11 @@ Mang nhóm tính năng "nhanh, ít rủi ro" từ opencode sang meow-coding (des
 - `src/main/agent/message.ts` — tool truncation service.
 - `src/main/agent/config.ts` — `tool_output` + `compaction.prune` config.
 - `src/main/agent/truncation.ts` (mới) — ghi/đọc file truncation + retention cleanup.
-- `src/main/meow-agent-manager.ts` + `src/main/index.ts` — IPC `chat:undo`, `chat:redo`, `session:rename`.
+- `src/main/bs-agent-manager.ts` + `src/main/index.ts` — IPC `chat:undo`, `chat:redo`, `session:rename`.
 - `src/shared/{ipc,types}.ts` — channel + method + types.
 - `src/preload/index.ts` — triển khai.
 - `src/renderer/.../ChatPanel.tsx`, `SessionBar.tsx`, `PaneHeader.tsx` — UI undo/redo + rename.
-- Tests: `session-store`, `snapshot`, `message` (truncation), `loop` (auto-continue/prune), `ipc-contract`, `meow-agent-manager`.
+- Tests: `session-store`, `snapshot`, `message` (truncation), `loop` (auto-continue/prune), `ipc-contract`, `bs-agent-manager`.
 
 ## 5. Xử lý lỗi
 

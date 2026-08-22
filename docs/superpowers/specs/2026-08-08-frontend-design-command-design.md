@@ -1,10 +1,10 @@
-# Meow Coding — Slash command `/frontend-design` : Design Spec
+# BS Coding — Slash command `/frontend-design` : Design Spec
 
 Ngày: 2026-08-08 · Trạng thái: chờ duyệt
 
 ## 1. Mục tiêu
 
-Thêm built-in slash command `/frontend-design` cho native Meow agent, tương tự Claude Code: gõ
+Thêm built-in slash command `/frontend-design` cho native BS agent, tương tự Claude Code: gõ
 `/frontend-design <yêu cầu>` → command dispatch request tới skill `frontend-design` (đã bundle trong
 `resources/skills/`) để agent load skill qua tool `skill` và làm theo nghiêm túc.
 
@@ -26,7 +26,7 @@ Chỉ làm 1 command (`frontend-design`), không sinh hàng loạt cho 5 skill �
 Renderer: gõ "/frontend-design redesign landing"
   └─ window.api.listCommands(cwd) → menu "/" hiển thị command (đã có)
   └─ window.api.runCommand(agentId, 'frontend-design', args)
-       └─ MeowAgentManager.runCommand → CommandStore.get('frontend-design')
+       └─ BsAgentManager.runCommand → CommandStore.get('frontend-design')
             └─ resolveCommand(template, args) → expand shell + @references
                  └─ prompt gửi LLM: "Use the `frontend-design` skill ... User request: redesign landing"
                       └─ agent gọi skill tool('frontend-design') → load nội dung từ resources/skills/frontend-design

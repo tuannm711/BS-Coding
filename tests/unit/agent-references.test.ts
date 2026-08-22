@@ -7,7 +7,7 @@ import { referenceHints } from '../../src/main/agent/references'
 let dir: string
 
 beforeEach(() => {
-  dir = mkdtempSync(path.join(tmpdir(), 'meow-ref-'))
+  dir = mkdtempSync(path.join(tmpdir(), 'bs-ref-'))
 })
 
 afterEach(() => rmSync(dir, { recursive: true, force: true }))

@@ -1,4 +1,4 @@
-# Changelog — Meow Coding v0.25.6 → v0.25.7
+# Changelog — BS Coding v0.25.6 → v0.25.7
 
 ## 🚀 New Features
 

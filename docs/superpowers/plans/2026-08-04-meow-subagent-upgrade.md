@@ -1,4 +1,4 @@
-# Meow Coding — Nâng cấp sub-agent theo superpowers (mirror opencode)
+# BS Coding — Nâng cấp sub-agent theo superpowers (mirror opencode)
 
 **Goal:** Làm lại sub-agent theo đúng cách opencode (đã học từ `D:\GitHub\opencode-1.18.11\packages\opencode\src\tool\task.ts` + `session/processor.ts` + `tool/task.txt`):
 - `task` tool params giống opencode: `description`, `prompt`, `subagent_type`, `task_id` (resume).

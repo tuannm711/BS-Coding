@@ -27,7 +27,7 @@ function walkUp(startDir: string, collect: (dir: string) => void): void {
 // parameter exists for tests; production always uses homedir().
 export function globalInstructionFiles(homeDir: string = homedir()): InstructionFile[] {
   const candidates = [
-    path.join(homeDir, '.config', 'meow', 'AGENTS.md'),
+    path.join(homeDir, '.config', 'bs', 'AGENTS.md'),
     path.join(homeDir, '.claude', 'CLAUDE.md')
   ]
   for (const p of candidates) {

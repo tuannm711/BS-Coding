@@ -1,4 +1,4 @@
-# Meow Coding — Studio Dark: Instrument Panel — Plan
+# BS Coding — Studio Dark: Instrument Panel — Plan
 
 **Goal:** Redesign toàn app sang Studio Dark theo spec `docs/superpowers/specs/2026-08-07-studio-dark-redesign-design.md`.
 Giữ nguyên class name / logic component; chỉ đổi style + font + theme terminal.

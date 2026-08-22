@@ -1,4 +1,4 @@
-# Meow Coding — Trace không lag: Implementation Plan
+# BS Coding — Trace không lag: Implementation Plan
 
 Ngày: 2026-08-17 · Spec: `docs/superpowers/specs/2026-08-17-trace-no-lag-design.md`
 
@@ -18,7 +18,7 @@ App bị lag/đứng do trace ghi **đồng bộ** (`appendFileSync` từng even
 |---|---|
 | `src/main/agent/trace-store.ts` | Buffer + flush async, write chain, `read` async, `flushAll` |
 | `src/main/index.ts` | Bỏ `onTrace` send; `flushAll` trước khi quit |
-| `src/main/meow-agent-manager.ts` | Flush nhanh khi `done`/`error` (để trace kịp bền) |
+| `src/main/bs-agent-manager.ts` | Flush nhanh khi `done`/`error` (để trace kịp bền) |
 | `src/renderer/src/components/trace/TracePanel.tsx` | Bỏ live subscription/batching; reload khi agent xong |
 | `tests/unit/agent-trace-store.test.ts` | Cập nhật cho async read/flush |
 | `tests/unit/agent-trace-manager.test.ts` | Fake trace thêm `flush` |
@@ -83,12 +83,12 @@ Hằng số: `const FLUSH_INTERVAL_MS = 1000`, `const FLUSH_BATCH = 64`.
 
 File: `src/main/index.ts`
 
-- Xóa `onTrace: (e) => win?.webContents.send(Channels.EventTrace, e)` khỏi `new MeowAgentManager(...)`
+- Xóa `onTrace: (e) => win?.webContents.send(Channels.EventTrace, e)` khỏi `new BsAgentManager(...)`
   (chỉ còn `trace: this.traces`). Bỏ import `Channels.EventTrace` nếu không còn dùng `Channels` ở chỗ khác
   (kiểm tra trước khi xóa import — `Channels` dùng rất nhiều trong file, đừng xóa nhầm).
-- Trong `app.on('before-quit', ...)` chain, thêm flush sau `mainApp.meowAgent.dispose()`:
+- Trong `app.on('before-quit', ...)` chain, thêm flush sau `mainApp.bsAgent.dispose()`:
   ```ts
-  void mainApp.meowAgent.dispose()
+  void mainApp.bsAgent.dispose()
     .then(() => mainApp.traces.flushAll())
     .then(() => mainApp.browserBridge.close())
     .then(() => mainApp.pty.stopAll().finally(() => app.exit(0)))
@@ -96,7 +96,7 @@ File: `src/main/index.ts`
 
 ## Task 3 — Manager: flush nhanh khi run kết thúc
 
-File: `src/main/meow-agent-manager.ts`
+File: `src/main/bs-agent-manager.ts`
 
 - Trong `writeTrace`, ở case `'done'` và `'error'` (sau `emitTrace(...)`), thêm:
   ```ts

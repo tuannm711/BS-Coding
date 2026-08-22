@@ -4,15 +4,15 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 
 test('chat feed scrollbar reflects the full transcript (no content-visibility collapse)', async () => {
-  const userData = mkdtempSync(path.join(tmpdir(), 'meow-scroll-'))
-  const project = mkdtempSync(path.join(tmpdir(), 'meow-scroll-project-'))
+  const userData = mkdtempSync(path.join(tmpdir(), 'bs-scroll-'))
+  const project = mkdtempSync(path.join(tmpdir(), 'bs-scroll-project-'))
   try {
-    const agentId = 'e2e-meow'
+    const agentId = 'e2e-bs'
     const workspaces = [{
       projectPath: project,
       name: 'Scroll Test',
       agents: [
-        { id: agentId, name: 'meow', templateId: 'meow', cwd: project, kind: 'native' }
+        { id: agentId, name: 'bs', templateId: 'bs', cwd: project, kind: 'native' }
       ]
     }]
     writeFileSync(path.join(userData, 'workspaces.json'), JSON.stringify(workspaces, null, 2))
@@ -46,7 +46,7 @@ test('chat feed scrollbar reflects the full transcript (no content-visibility co
 
     const app = await electron.launch({
       args: ['.'],
-      env: { ...process.env as Record<string, string>, MEOW_USER_DATA: userData }
+      env: { ...process.env as Record<string, string>, BS_USER_DATA: userData }
     })
     const window = await app.firstWindow()
     try {

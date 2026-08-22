@@ -1,4 +1,4 @@
-# Meow Coding — Context Compaction (theo model opencode): Design Spec
+# BS Coding — Context Compaction (theo model opencode): Design Spec
 
 Ngày: 2026-08-05 · Trạng thái: chờ duyệt
 
@@ -34,7 +34,7 @@ Tham khảo source opencode `D:\GitHub\opencode-1.18.11` (`packages/opencode/src
 
 ## 2. Mục tiêu
 
-Cập nhật Meow để **bỏ char-based pruning làm cơ chế chính**, thay bằng **token-based compaction
+Cập nhật BS để **bỏ char-based pruning làm cơ chế chính**, thay bằng **token-based compaction
 kiểu opencode**:
 
 1. **Token estimation** thay vì char count: `estimateTokens(text) = round(len / 4)`.
@@ -64,7 +64,7 @@ kiểu opencode**:
 | Overflow sau turn | Dùng `tokens.total` từ `finish` part để báo overflow cho turn kế (chỉ ước lượng khi thiếu usage) |
 | Fallback an toàn | `maxContextTokens` khi catalog không có limit; compaction thất bại → giữ nguyên transcript (không bẻ gãy turn) |
 | Config mới | `compaction: { auto, buffer, keepTokens, tailTurns, toolOutputMaxChars }` + `maxContextTokens` |
-| Legacy | Bỏ `maxContextChars` hoàn toàn (field cũ trong meow.json bị bỏ qua) |
+| Legacy | Bỏ `maxContextChars` hoàn toàn (field cũ trong bs.json bị bỏ qua) |
 
 ## 4. Kiến trúc / luồng dữ liệu
 
@@ -82,13 +82,13 @@ Thay đổi file:
 - `src/main/agent/token.ts` (mới) — `estimateTokens`, `estimateUsage`.
 - `src/main/agent/compact.ts` — `selectHeadTail`, `serializeItems`, `buildCompactionPrompt`,
   `COMPACTION_SYSTEM`, `compactTranscript`; **xoá `pruneTranscript`**.
-- `src/main/agent/config.ts` — `MeowCompactionConfig`, `maxContextTokens`, merge/settings.
+- `src/main/agent/config.ts` — `BSCompactionConfig`, `maxContextTokens`, merge/settings.
 - `src/main/agent/loop.ts` — `LoopDeps` thêm `compaction`, `contextTokens`, `replaceItems`,
   `onEvent` event `compacted`; gọi `maybeCompact`; toolOutputMaxChars.
 - `src/main/agent/message.ts` — `toLlmMessages(items, opts)` truncate tool output + render summary.
 - `src/main/agent/session.ts` — thêm `replaceItems(id, items)`.
 - `src/main/models-catalog.ts` — giữ `limit` từ models.dev trong `CatalogModel`.
-- `src/main/meow-agent-manager.ts` — resolve context limit, pass `compaction`, `replaceItems`.
+- `src/main/bs-agent-manager.ts` — resolve context limit, pass `compaction`, `replaceItems`.
 - `src/shared/types.ts` — event `compacted`; `CatalogModel.limit`.
 - `src/renderer/.../ChatPanel.tsx` — xử lý event `compacted` (hiển thị notice + reload transcript).
 

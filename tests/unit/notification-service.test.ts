@@ -22,9 +22,9 @@ describe('NotificationService', () => {
 
   it('shows a notification when the window is not focused', () => {
     const svc = new NotificationService(() => false)
-    svc.notify({ title: '[meow] Test', body: 'body', agentId: 'a1' })
+    svc.notify({ title: '[bs] Test', body: 'body', agentId: 'a1' })
     expect(showMock).toHaveBeenCalledTimes(1)
-    expect(showMock).toHaveBeenCalledWith('[meow] Test', 'body')
+    expect(showMock).toHaveBeenCalledWith('[bs] Test', 'body')
   })
 
   it('skips the notification when the window is focused', () => {

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { MeowAgentManager } from '../../src/main/meow-agent-manager'
+import { BsAgentManager } from '../../src/main/bs-agent-manager'
 import { SessionStore } from '../../src/main/agent/session'
 import type { StoredSession } from '../../src/main/agent/session'
 import type { JsonStore } from '../../src/main/json-store'
@@ -16,8 +16,8 @@ import type { TraceStore } from '../../src/main/agent/trace-store'
 import type { TraceEvent } from '../../src/shared/types'
 import type { AgentConfig } from '../../src/shared/types'
 
-const MEOW_AGENT: AgentConfig = {
-  id: 'a1', name: 'meow', templateId: 'meow', cwd: '/proj', kind: 'native'
+const BS_AGENT: AgentConfig = {
+  id: 'a1', name: 'bs', templateId: 'bs', cwd: '/proj', kind: 'native'
 }
 
 interface FakeTrace {
@@ -40,8 +40,8 @@ function makeTrace(): FakeTrace & Pick<TraceStore, 'append' | 'delete' | 'flush'
 }
 
 async function makeManager(opts: { trace?: boolean } = {}) {
-  const cfgDir = mkdtempSync(path.join(tmpdir(), 'meow-trace-mgr-'))
-  writeFileSync(path.join(cfgDir, 'meow.json'), JSON.stringify({
+  const cfgDir = mkdtempSync(path.join(tmpdir(), 'bs-trace-mgr-'))
+  writeFileSync(path.join(cfgDir, 'bs.json'), JSON.stringify({
     provider: { test: { apiKey: 'sk-test', models: ['test-model'] } },
     model: 'test',
     ...(opts.trace === false ? {} : { trace: { enabled: true } })
@@ -63,8 +63,8 @@ async function makeManager(opts: { trace?: boolean } = {}) {
     save: (next) => permEntries.splice(0, permEntries.length, ...next)
   })
   const trace = makeTrace()
-  const manager = new MeowAgentManager({
-    configPath: path.join(cfgDir, 'meow.json'),
+  const manager = new BsAgentManager({
+    configPath: path.join(cfgDir, 'bs.json'),
     store,
     trace: trace as unknown as TraceStore,
     snapshots,
@@ -77,10 +77,10 @@ async function makeManager(opts: { trace?: boolean } = {}) {
   return { manager, store, trace, cfgDir }
 }
 
-describe('MeowAgentManager trace wiring', () => {
+describe('BsAgentManager trace wiring', () => {
   it('skips trace writes when trace is disabled (default)', async () => {
     const { manager, trace } = await makeManager({ trace: false })
-    manager.addAgent(MEOW_AGENT)
+    manager.addAgent(BS_AGENT)
     manager.newSession('a1')
     manager.setOnEvent(() => {})
 
@@ -93,7 +93,7 @@ describe('MeowAgentManager trace wiring', () => {
 
   it('writes trace events for chat events with turn attribution', async () => {
     const { manager, trace } = await makeManager()
-    manager.addAgent(MEOW_AGENT)
+    manager.addAgent(BS_AGENT)
     const sessionId = manager.newSession('a1').id
     manager.setOnEvent(() => {})
 
@@ -123,7 +123,7 @@ describe('MeowAgentManager trace wiring', () => {
 
   it('increments the turn counter on each real turn', async () => {
     const { manager, trace } = await makeManager()
-    manager.addAgent(MEOW_AGENT)
+    manager.addAgent(BS_AGENT)
     manager.newSession('a1')
     manager.setOnEvent(() => {})
     // The stub LLM streams text + finish, so each send() is one complete turn.
@@ -135,7 +135,7 @@ describe('MeowAgentManager trace wiring', () => {
 
   it('coalesces text deltas into a single full assistant message before a tool call', async () => {
     const { manager, trace } = await makeManager()
-    manager.addAgent(MEOW_AGENT)
+    manager.addAgent(BS_AGENT)
     manager.newSession('a1')
     manager.setOnEvent(() => {})
     const emit = (e: never) => (manager as unknown as { onEvent: (e: never) => void }).onEvent(e)
@@ -157,7 +157,7 @@ describe('MeowAgentManager trace wiring', () => {
 
   it('coalesces reasoning and text deltas into one message with both', async () => {
     const { manager, trace } = await makeManager()
-    manager.addAgent(MEOW_AGENT)
+    manager.addAgent(BS_AGENT)
     manager.newSession('a1')
     manager.setOnEvent(() => {})
     const emit = (e: never) => (manager as unknown as { onEvent: (e: never) => void }).onEvent(e)
@@ -175,7 +175,7 @@ describe('MeowAgentManager trace wiring', () => {
 
   it('deletes trace files when a session is deleted', async () => {
     const { manager, trace } = await makeManager()
-    manager.addAgent(MEOW_AGENT)
+    manager.addAgent(BS_AGENT)
     const sessionId = manager.newSession('a1').id
     manager.deleteSession('a1', sessionId)
     expect(trace.deleted).toContain(sessionId)
@@ -183,7 +183,7 @@ describe('MeowAgentManager trace wiring', () => {
 
   it('deletes trace files for all sessions when an agent is removed', async () => {
     const { manager, trace } = await makeManager()
-    manager.addAgent(MEOW_AGENT)
+    manager.addAgent(BS_AGENT)
     const s1 = manager.newSession('a1').id
     const s2 = manager.newSession('a1').id
     manager.removeAgent('a1')

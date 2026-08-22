@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Wire Windows Authenticode signing (via Azure Trusted Signing) into the build so `Meow.Coding.Setup.*.exe` and the portable `.exe` stop showing Windows SmartScreen's "Unknown publisher" warning — without breaking local/unsigned builds before Azure is configured.
+**Goal:** Wire Windows Authenticode signing (via Azure Trusted Signing) into the build so `BS.Coding.Setup.*.exe` and the portable `.exe` stop showing Windows SmartScreen's "Unknown publisher" warning — without breaking local/unsigned builds before Azure is configured.
 
 **Architecture:** Move the electron-builder config out of `package.json`'s `build` field (which is JSON, so it cannot hold a signing *function*) into `electron-builder.ts`, matching how the reference project opencode does it (opencode's own file happens to be named `electron-builder.config.ts`, but that name is NOT what electron-builder actually auto-discovers — see Global Constraints; they likely invoke it with an explicit `--config` flag we don't have visibility into, or it doesn't matter for their build. Ours must use electron-builder's real auto-discovered name, `electron-builder.ts`, or the config is silently ignored). Add a `win.signtoolOptions.sign` hook that shells out to a new `scripts/sign-windows.ps1`, itself modeled on opencode's `script/sign-windows.ps1`: it self-guards to a clean no-op unless it's running in GitHub Actions with Azure Trusted Signing credentials present, so `npm run dist`/`dist:dir` locally and any CI run before Azure is set up keep producing unsigned builds exactly as today. CI (`.github/workflows/build.yml`) gets an `azure/login` step (OIDC, no long-lived secret) before packaging and a post-package signature verification step, both gated on the same secrets being present.
 
@@ -152,8 +152,8 @@ async function signWindows(configuration: { path: string }): Promise<void> {
 }
 
 const config: Configuration = {
-  appId: 'com.meow.coding',
-  productName: 'Meow Coding',
+  appId: 'com.bs.coding',
+  productName: 'BS Coding',
   icon: 'moew-coding-logo.png',
   directories: {
     output: 'release'
@@ -183,7 +183,7 @@ const config: Configuration = {
     ],
     icon: 'build/icons',
     category: 'Development',
-    maintainer: 'Meow Coding'
+    maintainer: 'BS Coding'
   },
   mac: {
     target: [
@@ -218,7 +218,7 @@ Expected: build succeeds (exit 0), and the log's `loaded configuration` line now
 
 - [ ] **Step 8: Verify a local dir build still produces an unpacked app**
 
-Run (PowerShell): `Test-Path "release/win-unpacked/Meow Coding.exe"`
+Run (PowerShell): `Test-Path "release/win-unpacked/BS Coding.exe"`
 
 Expected: `True`. Since `GITHUB_ACTIONS` is not set locally, `signWindows` invoked `sign-windows.ps1`, which no-op'd per Step 3's guard — confirming the sign hook doesn't block or break an ordinary local build.
 
@@ -306,7 +306,7 @@ Replace the `build:` job with:
           }
       - uses: actions/upload-artifact@v4
         with:
-          name: meow-${{ matrix.os }}
+          name: bs-${{ matrix.os }}
           path: |
             release/*.exe
             release/*.dmg
@@ -332,7 +332,7 @@ Expected: prints `YAML OK`.
 ```markdown
 # Windows Code Signing
 
-`Meow.Coding.Setup.*.exe` and the portable build are signed in CI using
+`BS.Coding.Setup.*.exe` and the portable build are signed in CI using
 [Azure Trusted Signing](https://learn.microsoft.com/en-us/azure/trusted-signing/overview),
 the same approach the reference project ([opencode](https://github.com/anomalyco/opencode))
 uses for its desktop app. Signing is what stops Windows SmartScreen from
@@ -370,12 +370,12 @@ implementation, and `.github/workflows/build.yml` for how CI invokes it.
    - Azure Portal → "App registrations" → New registration.
    - Under "Certificates & secrets" → "Federated credentials", add one
      for GitHub Actions: entity type "Branch", org `stardust-bytes`,
-     repo `meow-coding`, branch matching your release trigger (e.g. the
+     repo `bs-coding`, branch matching your release trigger (e.g. the
      branch tags are cut from).
    - Grant this app "Trusted Signing Certificate Profile Signer" role on
      the certificate profile from step 2.
 4. **Add these repo secrets** (Settings → Secrets and variables →
-   Actions) in `stardust-bytes/meow-coding`:
+   Actions) in `tuannm711/BS-Coding`:
    - `AZURE_CLIENT_ID` — the App Registration's Application (client) ID.
    - `AZURE_TENANT_ID` — your Azure AD tenant ID.
    - `AZURE_SUBSCRIPTION_ID` — the subscription containing the Trusted
@@ -405,5 +405,5 @@ git commit -m "ci: sign Windows builds with Azure Trusted Signing when configure
 
 1. Push a `v*` tag to trigger `build.yml`.
 2. In the Actions run, confirm the `windows-latest` leg's "Azure login for Windows code signing" and "Verify Windows code signature" steps both ran and succeeded (not skipped).
-3. Download the released `Meow.Coding.Setup.*.exe`, right-click → Properties → Digital Signatures tab, and confirm a valid signature with a real publisher name is present (not "Unknown publisher").
+3. Download the released `BS.Coding.Setup.*.exe`, right-click → Properties → Digital Signatures tab, and confirm a valid signature with a real publisher name is present (not "Unknown publisher").
 4. Run the installer on a clean Windows machine/VM that has never downloaded this app before, and note whether SmartScreen still appears — if it does, that's expected reputation-building behavior (see `docs/windows-code-signing.md`), not a bug in this implementation.

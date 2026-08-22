@@ -6,7 +6,7 @@ import { ensureExtensionInstalled } from '../../src/main/browser/chrome-launcher
 
 describe('ensureExtensionInstalled', () => {
   it('re-syncs the target even when the manifest version matches, so files added without a version bump still propagate', () => {
-    const root = mkdtempSync(path.join(tmpdir(), 'meow-ext-'))
+    const root = mkdtempSync(path.join(tmpdir(), 'bs-ext-'))
     const source = path.join(root, 'source')
     const target = path.join(root, 'target')
     mkdirSync(source, { recursive: true })
@@ -25,7 +25,7 @@ describe('ensureExtensionInstalled', () => {
   })
 
   it('does nothing when the source directory does not exist', () => {
-    const root = mkdtempSync(path.join(tmpdir(), 'meow-ext-'))
+    const root = mkdtempSync(path.join(tmpdir(), 'bs-ext-'))
     const source = path.join(root, 'does-not-exist')
     const target = path.join(root, 'target')
     mkdirSync(target, { recursive: true })
@@ -36,7 +36,7 @@ describe('ensureExtensionInstalled', () => {
   })
 
   it('creates the target directory when it does not exist yet', () => {
-    const root = mkdtempSync(path.join(tmpdir(), 'meow-ext-'))
+    const root = mkdtempSync(path.join(tmpdir(), 'bs-ext-'))
     const source = path.join(root, 'source')
     const target = path.join(root, 'target')
     mkdirSync(source, { recursive: true })

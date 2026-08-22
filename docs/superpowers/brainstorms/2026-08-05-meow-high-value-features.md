@@ -1,11 +1,11 @@
-# Meow Coding — Brainstorm: Nhóm tính năng giá trị cao từ opencode
+# BS Coding — Brainstorm: Nhóm tính năng giá trị cao từ opencode
 
 Ngày: 2026-08-05 · Trạng thái: chờ duyệt · Bước: brainstorm (trước spec)
 
 ## Mục tiêu
 
 Chọn và khoanh phạm vi các tính năng từ nhóm "giá trị cao" (xem `notes/2026-08-05-opencode-feature-diff.md`)
-để mang sang meow-coding, phù hợp bản chất **desktop multi-agent manager** (không phải CLI/TUI).
+để mang sang bs-coding, phù hợp bản chất **desktop multi-agent manager** (không phải CLI/TUI).
 
 ## Các ứng viên & đánh giá nhanh
 
@@ -13,7 +13,7 @@ Chọn và khoanh phạm vi các tính năng từ nhóm "giá trị cao" (xem `n
 - **Giá trị**: cao — user hay dùng `/init`, `/review`; mở ra hệ thống custom command.
 - **Chi phí**: vừa — cần `commands` store + resolver template + IPC + UI input (gõ `/` autocomplete).
 - **Rủi ro**: phạm vi dễ phình; nên bắt đầu bằng 2 built-in (`/init`, `/review`) + custom command từ file/folder.
-- **Câu hỏi brainstorm**: lưu commands ở đâu (userData hay project `.meow/commands`)? Có cần `$1..$N`/`@path` ngay không?
+- **Câu hỏi brainstorm**: lưu commands ở đâu (userData hay project `.bs/commands`)? Có cần `$1..$N`/`@path` ngay không?
 
 ### 2. Undo/redo + snapshot history UI
 - **Giá trị**: rất cao — coding agent không undo được là gap khó chịu nhất; snapshot đã có sẵn.

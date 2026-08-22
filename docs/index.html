@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Meow Coding — Run multiple coding agents, side by side</title>
-  <meta name="description" content="Meow Coding is a desktop app for running multiple CLI coding agents — opencode, Claude Code, aider, and more — side by side in parallel terminal panes inside a single window." />
+  <title>BS Coding — Run multiple coding agents, side by side</title>
+  <meta name="description" content="BS Coding is a desktop app for running multiple CLI coding agents — opencode, Claude Code, aider, and more — side by side in parallel terminal panes inside a single window." />
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -23,7 +23,7 @@
             ink: '#0a0c12',
             'ink-soft': '#10131c',
             accent: '#a78bfa',
-            meow: '#f59e0b',
+            bs: '#f59e0b',
             term: '#4ade80',
           },
           boxShadow: {
@@ -132,14 +132,14 @@
       <nav class="mx-auto flex max-w-6xl items-center justify-between px-5 py-4 sm:px-8" aria-label="Main">
         <a href="#" class="flex items-center gap-2.5 text-[15px] font-bold tracking-tight text-white">
           <span class="text-xl" aria-hidden="true">🐱</span>
-          Meow&nbsp;Coding
+          BS&nbsp;Coding
         </a>
         <div class="hidden items-center gap-7 text-sm text-slate-300 sm:flex">
           <a href="#features" class="transition-colors hover:text-white">Features</a>
           <a href="#screenshot" class="transition-colors hover:text-white">Screenshot</a>
           <a href="#sources" class="transition-colors hover:text-white">Sources</a>
         </div>
-        <a href="https://github.com/stardust-bytes/meow-coding"
+        <a href="https://github.com/tuannm711/BS-Coding"
            class="rounded-lg border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-white transition hover:border-accent/60 hover:bg-white/10">
           View on GitHub
         </a>
@@ -159,25 +159,25 @@
       </h1>
 
       <p class="mx-auto mt-6 max-w-2xl text-base leading-relaxed text-slate-400 sm:text-lg">
-        Meow Coding is a desktop app for running opencode, Claude Code, aider — or any CLI agent on
+        BS Coding is a desktop app for running opencode, Claude Code, aider — or any CLI agent on
         your <span class="font-mono text-sm text-slate-300">PATH</span> — in parallel terminal panes
-        inside a single window. It also ships a built-in native Meow agent with chat UI, tools,
+        inside a single window. It also ships a built-in native BS agent with chat UI, tools,
         sessions, and skills.
       </p>
 
       <!-- terminal line: the signature element -->
       <div class="glass mx-auto mt-9 inline-flex max-w-full items-center gap-2 overflow-hidden rounded-lg px-4 py-2.5 font-mono text-[13px] text-slate-300 shadow-glow sm:text-sm">
         <span class="select-none text-term">$</span>
-        <span class="whitespace-nowrap text-slate-300">meow --agent opencode --agent claude --agent aider</span>
+        <span class="whitespace-nowrap text-slate-300">bs --agent opencode --agent claude --agent aider</span>
         <span class="h-4 w-2 bg-accent cursor-blink" aria-hidden="true"></span>
       </div>
 
       <div class="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
-        <a href="https://github.com/stardust-bytes/meow-coding"
+        <a href="https://github.com/tuannm711/BS-Coding"
            class="w-full rounded-lg bg-gradient-to-r from-violet-500 to-violet-600 px-7 py-3 text-sm font-semibold text-white shadow-glow transition hover:from-violet-400 hover:to-violet-500 sm:w-auto">
           Get started on GitHub
         </a>
-        <a href="https://github.com/stardust-bytes/meow-coding/releases"
+        <a href="https://github.com/tuannm711/BS-Coding/releases"
            class="w-full rounded-lg border border-white/15 bg-white/5 px-7 py-3 text-sm font-semibold text-slate-200 transition hover:border-white/30 hover:bg-white/10 sm:w-auto">
           Download releases
         </a>
@@ -196,8 +196,8 @@
     <section id="screenshot" class="relative mx-auto max-w-6xl px-5 py-14 sm:px-8">
       <div class="reveal glass relative overflow-hidden rounded-2xl p-2 shadow-glow-amber">
         <img
-          src="./meow-app-screen.png"
-          alt="Meow Coding — multiple CLI coding agents running side by side in terminal panes"
+          src="./bs-app-screen.png"
+          alt="BS Coding — multiple CLI coding agents running side by side in terminal panes"
           class="w-full rounded-xl border border-white/5"
           loading="lazy"
           width="1408"
@@ -206,7 +206,7 @@
         <div class="pointer-events-none absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-ink/60 to-transparent" aria-hidden="true"></div>
       </div>
       <p class="mt-4 text-center text-sm text-slate-500">
-        Multi-agent panes · native Meow chat · skills · cost tracking — all in one window.
+        Multi-agent panes · native BS chat · skills · cost tracking — all in one window.
       </p>
     </section>
 
@@ -232,7 +232,7 @@
 
         <div class="reveal glass group rounded-xl p-6 transition hover:border-accent/40 hover:bg-white/[0.06]">
           <div class="flex h-11 w-11 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500/25 to-amber-500/15 text-lg" aria-hidden="true">🐈</div>
-          <h3 class="mt-4 text-lg font-semibold text-white">Native Meow agent</h3>
+          <h3 class="mt-4 text-lg font-semibold text-white">Native BS agent</h3>
           <p class="mt-2 text-sm leading-relaxed text-slate-400">
             A first-party agent with chat UI, streaming output, markdown rendering, tool-call cards,
             image attachments, and undo/redo.
@@ -319,14 +319,14 @@
     <footer class="relative mt-8 border-t border-white/10">
       <div class="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-5 py-8 text-sm text-slate-500 sm:flex-row sm:px-8">
         <p class="flex items-center gap-2">
-          <span aria-hidden="true">🐱</span> Meow Coding · open source
+          <span aria-hidden="true">🐱</span> BS Coding · open source
         </p>
         <p>
-          <a href="https://github.com/stardust-bytes/meow-coding" class="transition-colors hover:text-white">GitHub</a>
+          <a href="https://github.com/tuannm711/BS-Coding" class="transition-colors hover:text-white">GitHub</a>
           <span class="mx-2 text-slate-700">·</span>
-          <a href="https://github.com/stardust-bytes/meow-coding/releases" class="transition-colors hover:text-white">Releases</a>
+          <a href="https://github.com/tuannm711/BS-Coding/releases" class="transition-colors hover:text-white">Releases</a>
         </p>
-        <p>Built with <span class="text-meow" aria-hidden="true">♥</span><span class="sr-only">love</span> · <span id="year"></span></p>
+        <p>Built with <span class="text-bs" aria-hidden="true">♥</span><span class="sr-only">love</span> · <span id="year"></span></p>
       </div>
     </footer>
   </div>

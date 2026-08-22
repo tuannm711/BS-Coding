@@ -11,7 +11,7 @@
 
 **Architecture:** Terminal session đi qua `PtyManager` (đã có) với `PtySession.kind = 'terminal'`;
 main route data/exit của terminal sang `EventPtyData`/`EventTerminalExit` và **bỏ qua** toàn bộ
-logic agent (logs, alerts, setState, hint "[meow] Agent thoát..."). Renderer merge terminal thành
+logic agent (logs, alerts, setState, hint "[bs] Agent thoát..."). Renderer merge terminal thành
 pane "agent ảo" (`kind: 'pty'`) nên `XtermHost`/input/resize chạy nguyên xi. Terminal pane chỉ có
 menu **Zoom + Close terminal**. Đóng khi: shell exit, user Close, đổi workspace, thoát app.
 
@@ -226,7 +226,7 @@ Commit: `feat(main): terminal shell resolution helper`
    ```ts
    ipcMain.handle(Channels.ProjectOpenFolder, async (_e, projectPath: string) => {
      const err = await shell.openPath(projectPath)
-     if (err) console.error('[meow] open folder failed:', err)
+     if (err) console.error('[bs] open folder failed:', err)
    })
    ipcMain.handle(Channels.TerminalOpen, (_e, cwd: string) => mainApp.openTerminal(cwd))
    ipcMain.handle(Channels.TerminalClose, (_e, id: string) => mainApp.closeTerminal(id))

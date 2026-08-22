@@ -36,7 +36,7 @@ export function createOfficeTool(deps: OfficeToolDeps): ToolDefinition {
       const fallbackCwd = existsSync(ctx.cwd) ? ctx.cwd : homedir()
       const usedFallback = fallbackCwd !== ctx.cwd
       const note = usedFallback
-        ? `[meow] working dir "${ctx.cwd}" khong ton tai, chay tu "${fallbackCwd}".\n`
+        ? `[bs] working dir "${ctx.cwd}" khong ton tai, chay tu "${fallbackCwd}".\n`
         : ''
       let binary: string
       try {

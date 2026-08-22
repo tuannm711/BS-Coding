@@ -1,4 +1,4 @@
-# Meow Coding — Move Settings Button to Sidebar Footer — Design
+# BS Coding — Move Settings Button to Sidebar Footer — Design
 
 Ngày: 2026-08-17 · Trạng thái: đã duyệt với user · Bước: sau brainstorm
 

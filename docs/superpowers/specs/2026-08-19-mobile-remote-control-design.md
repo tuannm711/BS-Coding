@@ -1,10 +1,10 @@
-# Meow Coding — Remote Control từ Mobile App (chat với agent + quản lý phiên): Design Spec
+# BS Coding — Remote Control từ Mobile App (chat với agent + quản lý phiên): Design Spec
 
 Ngày: 2026-08-19 · Trạng thái: chờ duyệt
 
 ## 0. Tóm tắt nhu cầu
 
-Người dùng muốn điều khiển app desktop Meow Coding từ xa bằng một **app mobile native**
+Người dùng muốn điều khiển app desktop BS Coding từ xa bằng một **app mobile native**
 (Android + iOS) khi không ở cạnh máy. Phạm vi đã chốt qua brainstorming:
 
 - **Gửi lệnh/prompt cho agent** — chat từ xa, xem agent trả lời realtime.
@@ -20,11 +20,11 @@ Người dùng muốn điều khiển app desktop Meow Coding từ xa bằng m�
 ┌──────────────┐   WSS (outbound)   ┌───────────────────┐   WSS (outbound)   ┌──────────────────┐
 │ Desktop app  │ ─────────────────▶ │  Relay Server     │ ◀───────────────── │  Mobile app      │
 │ (Electron)   │   (tls wss://)     │  (Node, VPS)      │   (tls wss://)     │  (React Native)  │
-│ Meow Coding  │                    │  ws/uWebSockets   │                    │                  │
+│ BS Coding  │                    │  ws/uWebSockets   │                    │                  │
 └──────────────┘                    └───────────────────┘                    └──────────────────┘
    │                                                        │
    ▼                                                        ▼
-MeowAgentManager /                    không thấy dữ liệu thật — chỉ định tuyến
+BsAgentManager /                    không thấy dữ liệu thật — chỉ định tuyến
 WorkspaceStore / PTY                  (forward tin nhắn giữa 2 đầu, không lưu)
 ```
 
@@ -39,7 +39,7 @@ WorkspaceStore / PTY                  (forward tin nhắn giữa 2 đầu, khôn
 
 ## 2. Thành phần mới
 
-### 2.1 Relay server (repo/folder mới: `server/` hoặc repo riêng `meow-relay`)
+### 2.1 Relay server (repo/folder mới: `server/` hoặc repo riêng `bs-relay`)
 
 - Node.js + `ws` (hoặc `uWebSockets.js` nếu cần hiệu năng). Không dùng framework nặng.
 - Chạy sau reverse proxy có TLS (Caddy/nginx) trên VPS, hoặc tự terminate TLS bằng cert.
@@ -67,8 +67,8 @@ WorkspaceStore / PTY                  (forward tin nhắn giữa 2 đầu, khôn
   5. Desktop có thể thu hồi toàn bộ phiên tin cậy (nút "Đăng xuất thiết bị từ xa").
 - Nhận `cmd` từ relay → gọi vào các service main hiện có:
   - `WorkspaceStore` → list workspace.
-  - `MeowAgentManager` → `listAgents`, `listSessions`, `createSession`, `switchSession`, `renameSession`.
-  - Chat: gửi prompt vào agent session qua cơ chế có sẵn của `meow-agent-manager`, subscribe event
+  - `BsAgentManager` → `listAgents`, `listSessions`, `createSession`, `switchSession`, `renameSession`.
+  - Chat: gửi prompt vào agent session qua cơ chế có sẵn của `bs-agent-manager`, subscribe event
     `chat:*` (stream token / transcript) rồi forward lên relay.
 - Mọi `cmd` đều đi qua **gate phạm vi an toàn** (mục 4).
 
@@ -81,7 +81,7 @@ WorkspaceStore / PTY                  (forward tin nhắn giữa 2 đầu, khôn
 - **Tái sử dụng type có sẵn** từ `src/shared/types.ts` (`SessionSummary`, `WorkspaceSummary`, `ChatMessage`...)
   — không định nghĩa lại.
 
-### 2.4 Mobile app (repo mới `meow-mobile`)
+### 2.4 Mobile app (repo mới `bs-mobile`)
 
 - **React Native** (đề xuất) — cùng TypeScript + React với codebase hiện tại; có thể share type bằng
   package/shared subpath (hoặc copy script sinh từ `src/shared`).
@@ -108,7 +108,7 @@ Phone: lưu token (Keychain/Keystore), vào màn Agents
 
 ```
 Phone: cmd chat:send { agentId, sessionId, text }
-Relay: forward → Desktop: gate phạm vi an toàn → gọi MeowAgentManager chat
+Relay: forward → Desktop: gate phạm vi an toàn → gọi BsAgentManager chat
 Desktop: events chat:stream (token) → relay → phone hiện realtime
 Desktop: chat:done (kết thúc turn, kèm usage/todo) → phone cập nhật transcript
 ```
@@ -154,12 +154,12 @@ vào phải: bật thêm tùy chọn riêng + xác nhận popup trên desktop t�
 src/main/remote/
   remote-relay-client.ts   // WS outbound + reconnect + heartbeat
   remote-pairing.ts        // sinh/xác thực mã, phát hành/thu hồi session token
-  remote-commands.ts       // map command name → handler (gọi WorkspaceStore/MeowAgentManager)
+  remote-commands.ts       // map command name → handler (gọi WorkspaceStore/BsAgentManager)
   remote-safety.ts         // safety gate + settings
 src/shared/remote-types.ts // envelope + command/event types
 server/                    // relay server (Node + ws), triển khai độc lập
   index.ts, config.ts, README.md
-meow-mobile/               // React Native app (repo riêng khi vào plan)
+bs-mobile/               // React Native app (repo riêng khi vào plan)
 ```
 
 IPC thêm vào `src/shared/ipc.ts`: `RemoteGetStatus`, `RemoteSetEnabled`, `RemoteGetPairingCode`,

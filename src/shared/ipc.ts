@@ -1,7 +1,7 @@
 import type {
   AgentConfig, AgentState, ArtifactEntry, CatalogProviderSummary, ChatEvent, ChatMessage, ChatTranscriptItem, Command,
   ContextChangedEvent, ContextInfo, DirEntry, FileContentResult, FileSuggestion, FileViewerPayload,
-  GitStatus, ImageAttachment, McpServerStatus, MeowSettings, ModelRef, NewAgentInput, PromptResponse,
+  GitStatus, ImageAttachment, McpServerStatus, BsSettings, ModelRef, NewAgentInput, PromptResponse,
   SessionSummary, StatsSummary, Template, TerminalInfo, TodoItem, TraceEvent, TraceSummary, UpdaterStatusEvent, WorkspaceRuntime, WorkspaceSummary
 } from './types'
 import type { BrowserStatusInfo, PairingInfo } from './browser-types'
@@ -160,8 +160,8 @@ export interface AgentApi {
   getProviderModels(): Promise<ModelRef[]>
   fetchProviderModels(providerId: string): Promise<string[]>
   listProviderCatalog(): Promise<CatalogProviderSummary[]>
-  connectProvider(providerId: string, apiKey: string, baseUrl?: string): Promise<MeowSettings>
-  disconnectProvider(providerId: string): Promise<MeowSettings>
+  connectProvider(providerId: string, apiKey: string, baseUrl?: string): Promise<BsSettings>
+  disconnectProvider(providerId: string): Promise<BsSettings>
   listTemplates(): Promise<Template[]>
   saveTemplate(template: Template): Promise<Template>
   removeTemplate(id: string): Promise<void>
@@ -203,8 +203,8 @@ export interface AgentApi {
   traceRead(sessionId: string): Promise<TraceEvent[]>
   traceDelete(sessionId: string): Promise<void>
   onTraceEvent(cb: (e: TraceEvent) => void): () => void
-  getSettings(): Promise<MeowSettings>
-  saveSettings(settings: MeowSettings): Promise<MeowSettings>
+  getSettings(): Promise<BsSettings>
+  saveSettings(settings: BsSettings): Promise<BsSettings>
   listCommands(projectPath: string): Promise<Command[]>
   saveCommand(command: Command): Promise<Command>
   removeCommand(name: string): Promise<void>

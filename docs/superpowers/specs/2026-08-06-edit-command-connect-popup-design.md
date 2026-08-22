@@ -1,4 +1,4 @@
-# Meow Coding — Edit Command + Connect Provider Popup — Design
+# BS Coding — Edit Command + Connect Provider Popup — Design
 
 Ngày: 2026-08-06 · Trạng thái: chờ duyệt · Bước: sau brainstorm (đã chốt thiết kế với user)
 

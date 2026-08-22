@@ -1,8 +1,8 @@
 # AGENTS.md — src/main/agent
 
-The native "Meow agent" core: the agent loop, LLM integration, config, sessions, permissions,
-commands, references, compaction and usage accounting. Orchestrated by `MeowAgentManager` in
-`src/main/meow-agent-manager.ts` (which lives one level up).
+The native "Bs agent" core: the agent loop, LLM integration, config, sessions, permissions,
+commands, references, compaction and usage accounting. Orchestrated by `BsAgentManager` in
+`src/main/bs-agent-manager.ts` (which lives one level up).
 
 ## Key files
 
@@ -11,7 +11,7 @@ commands, references, compaction and usage accounting. Orchestrated by `MeowAgen
 | `loop.ts` | `SessionRunner`: the agent turn loop — streams LLM output, executes tool calls, handles permissions/aborts, emits `ChatEvent`s. The heart of the agent. |
 | `llm.ts` | `LlmClient` interface + `createLlm` factory (Anthropic / OpenAI-compatible). |
 | `message.ts` | `toLlmMessages`: converts stored transcript (user/assistant/tool items, incl. image parts) into AI-SDK model messages; `toToolDefinition` wraps tools. |
-| `config.ts` | Loads `meow.json` + env; `MeowConfig` / `ResolvedAgentConfig`; `loadMeowConfig`, `resolveAgentConfig`, `settingsToConfig`/`configToSettings`, `writeMeowConfig`; defaults (tokens, compaction, notifications, lsp). |
+| `config.ts` | Loads `bs.json` + env; `BsConfig` / `ResolvedAgentConfig`; `loadBsConfig`, `resolveAgentConfig`, `settingsToConfig`/`configToSettings`, `writeBsConfig`; defaults (tokens, compaction, notifications, lsp). |
 | `session.ts` | `SessionStore`: persists sessions + transcript items to `sessions.json`; create/list/switch/delete/rename; title inference. |
 | `permission.ts` | Permission rules (allow/ask/deny) + matcher used by `decidePermission`. |
 | `commands.ts` | Slash commands: built-ins (init/review/sp-*) + user store (`commands.json`) + `resolveCommand`/`expandReferences`-aware templates. |

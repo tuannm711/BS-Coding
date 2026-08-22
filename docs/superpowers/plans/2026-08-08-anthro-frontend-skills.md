@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Nhúng 5 skill front-end/design từ `anthropics/skills` (Apache-2.0) vào `resources/skills/<name>/` để native Meow agent load qua tool `skill`, giống superpowers. Copy nguyên vẹn, không sửa code runtime.
+**Goal:** Nhúng 5 skill front-end/design từ `anthropics/skills` (Apache-2.0) vào `resources/skills/<name>/` để native BS agent load qua tool `skill`, giống superpowers. Copy nguyên vẹn, không sửa code runtime.
 
 **Architecture:** Tận dụng pipeline skill có sẵn (`collectSkills` → system prompt + `skill` tool + `extraResources`). Việc duy nhất là đặt 5 thư mục skill (SKILL.md + LICENSE.txt + assets) vào `resources/skills/` và mở rộng test guard. Không đổi `skill.ts`, registry, manager, index.ts, config, packaging.
 
@@ -34,7 +34,7 @@
 
 - [ ] **Step 1: Sparse-clone repo anthropics/skills vào thư mục tạm**
 
-PowerShell (từ thư mục repo meow):
+PowerShell (từ thư mục repo bs):
 
 ```powershell
 $tmp = Join-Path $env:TEMP 'anthro-skills-clone'

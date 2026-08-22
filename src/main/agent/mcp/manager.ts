@@ -49,7 +49,7 @@ export class McpManager {
     for (const [name, cfg] of Object.entries(servers)) {
       try {
         const client = new Client(
-          { name: 'meow-coding', version: '0.1.0' },
+          { name: 'bs-coding', version: '0.1.0' },
           {
             capabilities: {
               roots: {

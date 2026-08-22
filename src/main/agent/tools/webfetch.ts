@@ -20,7 +20,7 @@ export const webfetchTool: ToolDefinition = {
       const res = await fetch(url, {
         signal: controller.signal,
         redirect: 'follow',
-        headers: { 'user-agent': 'meow-coding/0.1' }
+        headers: { 'user-agent': 'bs-coding/0.1' }
       })
       if (!res.ok) return { error: `webfetch: HTTP ${res.status} for ${url}` }
       const contentType = res.headers.get('content-type') ?? ''

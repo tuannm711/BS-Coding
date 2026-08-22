@@ -1,6 +1,6 @@
 # Windows Code Signing
 
-`Meow.Coding.Setup.*.exe` and the portable build are signed in CI using
+`BS.Coding.Setup.*.exe` and the portable build are signed in CI using
 [Azure Trusted Signing](https://learn.microsoft.com/en-us/azure/trusted-signing/overview),
 the same approach the reference project ([opencode](https://github.com/anomalyco/opencode))
 uses for its desktop app. Signing is what stops Windows SmartScreen from
@@ -39,22 +39,22 @@ implementation, and `.github/workflows/build.yml` for how CI invokes it.
    - `.github/workflows/build.yml` only runs on `v*` tag pushes (see its
      `on: push: tags: ['v*']` trigger), never on branch pushes. On a tag
      push, GitHub's OIDC token subject is
-     `repo:stardust-bytes/meow-coding:ref:refs/tags/v1.2.3`, so the
+     `repo:tuannm711/BS-Coding:ref:refs/tags/v1.2.3`, so the
      federated credential you create here **must be tag-scoped**, not
      branch-scoped — a "Branch" entity type will never match and every
      release will fail at the `azure/login` step with an opaque
      `AADSTS700213` error.
    - Under "Certificates & secrets" → "Federated credentials", add one
      for GitHub Actions: entity type "Tag", org `stardust-bytes`, repo
-     `meow-coding`, tag pattern `v*`. If the Azure Portal UI you see
+     `bs-coding`, tag pattern `v*`. If the Azure Portal UI you see
      doesn't offer a simple "Tag" entity type with wildcard support, use
      the "Other issuer" / custom option and set the subject identifier
      expression directly instead:
-     `claims['sub'] matches 'repo:stardust-bytes/meow-coding:ref:refs/tags/v*'`.
+     `claims['sub'] matches 'repo:tuannm711/BS-Coding:ref:refs/tags/v*'`.
    - Grant this app "Trusted Signing Certificate Profile Signer" role on
      the certificate profile from step 2.
 4. **Add these repo secrets** (Settings → Secrets and variables →
-   Actions) in `stardust-bytes/meow-coding`:
+   Actions) in `tuannm711/BS-Coding`:
    - `AZURE_CLIENT_ID` — the App Registration's Application (client) ID.
    - `AZURE_TENANT_ID` — your Azure AD tenant ID.
    - `AZURE_SUBSCRIPTION_ID` — the subscription containing the Trusted

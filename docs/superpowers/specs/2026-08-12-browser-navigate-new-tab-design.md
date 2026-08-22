@@ -1,4 +1,4 @@
-# Browser Navigate Luôn Mở Tab Mới Trong Meow Group — Design
+# Browser Navigate Luôn Mở Tab Mới Trong BS Group — Design
 
 Ngày: 2026-08-12
 Trạng thái: Approved
@@ -7,12 +7,12 @@ Trạng thái: Approved
 
 Hiện tại `browser_navigate` (lệnh `navigate` trong Chrome extension bridge) điều hướng **tab
 đang active / working tab** — tức là có thể chuyển hướng tab user đang xem, làm gián đoạn công việc
-của user trong Chrome. Yêu cầu: khi Meow mở web / navigate thì phải **mở tab mới trong Meow group**,
+của user trong Chrome. Yêu cầu: khi BS mở web / navigate thì phải **mở tab mới trong BS group**,
 tuyệt đối không chuyển hướng bất kỳ tab nào đang mở.
 
 ## Hành vi mục tiêu
 
-1. `navigate` luôn tạo **tab nền (background) mới** trong group "Meow" (title `Meow`, màu blue),
+1. `navigate` luôn tạo **tab nền (background) mới** trong group "BS" (title `BS`, màu blue),
    giống hệt `openTab` hiện tại — kể cả khi được gọi kèm `tabId` (tham số bị bỏ qua).
 2. Tab mới trở thành `workingTabId` (tab làm việc của agent).
 3. Khi agent đã có tab làm việc, **mọi lệnh mặc định** (không có `tabId`) ưu tiên `workingTabId`
@@ -28,7 +28,7 @@ tuyệt đối không chuyển hướng bất kỳ tab nào đang mở.
   - `const tab = await chrome.tabs.create({ url, windowId, active: false })` (windowId từ
     `lastFocusedWindowId()`, `active: false` để không focus Chrome).
   - `persistWorkingTab(tab.id)`.
-  - `addToMeowGroup(tab.id)` (bọc try/catch, fail im lặng như `openTab`).
+  - `addToBSGroup(tab.id)` (bọc try/catch, fail im lặng như `openTab`).
 - Response shape đổi thành `{ ok: true, data: { id, tabId, url, groupId, groupTitle } }`
   (cùng shape với `openTab`).
 - Tham số `tabId` nếu có: **bỏ qua**, không dùng.
@@ -61,7 +61,7 @@ Các lệnh bị ảnh hưởng (đều dùng `defaultTabId()` khi thiếu `tabI
 
 ### 3. Mô tả tool — `src/main/agent/tools/browser.ts`
 
-- `browser_navigate`: đổi description thành mở URL trong **tab nền mới** trong group "Meow",
+- `browser_navigate`: đổi description thành mở URL trong **tab nền mới** trong group "BS",
   không bao giờ điều hướng tab đang mở (để agent/LLM hiểu đúng hành vi mới).
 - `browser_open_tab`: giữ nguyên (đã đúng).
 
@@ -73,7 +73,7 @@ Các lệnh bị ảnh hưởng (đều dùng `defaultTabId()` khi thiếu `tabI
 | Chưa có tab làm việc + gọi `read`/`click`/... | Fallback tab active (như hiện tại) |
 | Tab làm việc bị đóng | `defaultTabId()` tự fallback, không crash |
 | Không có Chrome window | `chrome.tabs.create` tạo window mới (giống `openTab`) |
-| Group "Meow" chưa tồn tại | `addToMeowGroup` tạo group mới |
+| Group "BS" chưa tồn tại | `addToBSGroup` tạo group mới |
 | Group creation fail | Tab vẫn mở; response không có groupId (giống `openTab`) |
 
 ## Không thay đổi
@@ -88,7 +88,7 @@ Các lệnh bị ảnh hưởng (đều dùng `defaultTabId()` khi thiếu `tabI
 - `tests/unit/browser/agent-tools-browser.test.ts`: giữ test forward command + url validation cho
   `browser_navigate` (không có gì thay đổi ở tầng tool gọi `bridge.execute('navigate', { url })`).
 - Manual smoke (extension build + load unpacked):
-  1. `browser_navigate` tới một URL → mở tab nền mới trong group "Meow".
+  1. `browser_navigate` tới một URL → mở tab nền mới trong group "BS".
   2. Tab user đang xem **không bị** chuyển hướng.
   3. `browser_read` không kèm `tabId` → đọc chính tab mới (working tab), không đọc tab user.
   4. Đóng tab làm việc → `browser_read` fallback tab active, không crash.
@@ -97,5 +97,5 @@ Các lệnh bị ảnh hưởng (đều dùng `defaultTabId()` khi thiếu `tabI
 ## Ghi chú
 
 - Không đổi luồng pairing / heartbeat / snapshot.
-- Group "Meow" được tái sử dụng (không tạo group mới mỗi lần) — giữ nguyên logic `meowGroupId()`
-  trong `addToMeowGroup`.
+- Group "BS" được tái sử dụng (không tạo group mới mỗi lần) — giữ nguyên logic `bsGroupId()`
+  trong `addToBSGroup`.

@@ -1,4 +1,4 @@
-# Meow Coding — Browser Snapshot & Tab Management: Design Spec
+# BS Coding — Browser Snapshot & Tab Management: Design Spec
 
 Ngày: 2026-08-10 · Trạng thái: chờ duyệt
 
@@ -12,7 +12,7 @@ Cải tiến tính năng browser control (extension MV3 + BrowserBridge) theo ch
    Chrome, WebArena).
 2. **Không mở window Chrome mới từ hành động LLM**: tab mới luôn mở **background** trong window sẵn có;
    chỉ tạo window mới khi Chrome chưa có window nào.
-3. **Tab group "Meow"** như Claude Code: mọi tab LLM mở được nhóm vào 1 tab group để dễ quản lý.
+3. **Tab group "BS"** như Claude Code: mọi tab LLM mở được nhóm vào 1 tab group để dễ quản lý.
 4. **Screenshot tab ngầm full-page không cướp focus** (kiểu extension "full page screenshot"): chụp bằng
    CDP qua `chrome.debugger`, không đổi tab, không focus window.
 
@@ -37,7 +37,7 @@ Cải tiến tính năng browser control (extension MV3 + BrowserBridge) theo ch
 | Working tab | Background duy trì **working tab** (tab cuối agent mở qua `openTab` hoặc đọc qua `read`). Command không kèm `tabId` chạy trên working tab (không dựa vào active tab vì tab mở background). |
 | Screenshot | CDP qua `chrome.debugger`: attach tạm tab đích → `Page.enable` → `Page.captureScreenshot {format:'png', captureBeyondViewport:true}` → detach. Chụp **full-page**, kể cả tab ngầm, không đổi tab/focus. |
 | Mở tab | `openTab` mở tab **background** trong window sẵn có (window gần nhất được focus/active); chỉ `chrome.windows.create` khi không có window nào. |
-| Tab group | Tab LLM mở được đưa vào group duy nhất **"Meow"** (màu `blue`), tự tạo group nếu chưa có. `listTabs` trả kèm `groupId`/`groupTitle`. |
+| Tab group | Tab LLM mở được đưa vào group duy nhất **"BS"** (màu `blue`), tự tạo group nếu chưa có. `listTabs` trả kèm `groupId`/`groupTitle`. |
 | switchTab | Chỉ `tabs.update({active:true})` — **không** `windows.update({focused:true})` → không giật focus OS. |
 | Launcher | Bỏ `--new-window` khi spawn Chrome (`chrome.exe chrome://extensions`) → Chrome đang chạy sẽ mở tab trong window sẵn có; chỉ window mới khi Chrome chưa chạy. |
 | Permission manifest | Thêm `debugger`, `tabGroups`. |
@@ -57,7 +57,7 @@ LLM ── browser_click {ref: r4} ──▶ bridge ── WS ──▶ backgrou
 
 LLM ── browser_open_tab {url} ──▶ bridge ── WS ──▶ background:
         chọn window sẵn có → tabs.create({url, windowId, active:false})
-        → group "Meow" (tabs.group + tabGroups.update) → set working tab
+        → group "BS" (tabs.group + tabGroups.update) → set working tab
         → return {tabId, groupId}
 
 LLM ── browser_screenshot ──▶ background: debugger.attach(tabId)
@@ -128,9 +128,9 @@ Background `src/browser-extension/background.ts`:
 
 - **Chọn window**: `chrome.windows.getAll({populate:false})` → ưu tiên window đang `focused`, rồi window
   `lastFocused` mới nhất; nếu rỗng → `chrome.windows.create({url})`.
-- **openTab**: `tabs.create({url, windowId, active:false})` → thêm vào group Meow:
+- **openTab**: `tabs.create({url, windowId, active:false})` → thêm vào group BS:
   `tabIds=[tab.id]` → `tabs.group({tabIds})` (tự tạo group nếu chưa có id → groupId) →
-  `tabGroups.update(groupId, {title:'Meow', color:'blue'})`. Set working tab.
+  `tabGroups.update(groupId, {title:'BS', color:'blue'})`. Set working tab.
 - **workingTabId**: lưu biến trong background, set khi `openTab`, `read`, `openTab` thành công.
 - **listTabs**: query `chrome.tabs.query({})` + map groupId → title/color qua `chrome.tabGroups.get(id)`;
   trả `{id, title, url, active, windowId, groupId, groupTitle}`.
@@ -177,7 +177,7 @@ File `src/main/agent/tools/browser.ts`:
   `maxElements` = số node tối đa (mặc định 200).
 - `browser_click`/`browser_type`/`browser_select`: schema + `ref?: string`; run truyền `ref` qua params.
 - `browser_open_tab`: schema `{url}`; trả `{tabId, groupId, groupTitle}`; description: mở tab background
-  trong group "Meow" (không focus).
+  trong group "BS" (không focus).
 - `browser_list_tabs`: không đổi schema, output có thêm group info.
 - `browser_switch_tab`: description ghi rõ không focus window.
 - `browser_screenshot`: description ghi rõ chụp working tab full-page, không focus.
@@ -203,11 +203,11 @@ tests/unit/browser/  # a11y tree builder (mock DOM), ref map/resolution, backgro
   - ref gán ổn định theo thứ tự duyệt; resolve đúng; stale ref → lỗi.
   - cap node theo `maxElements` (mặc định 200, 0 = không giới hạn).
 - **Unit (background routing)**: mock `chrome.tabs`/`chrome.windows`/`chrome.tabGroups`/`chrome.debugger` —
-  test openTab chọn window sẵn có, tạo group "Meow", working tab fallback, screenshot CDP attach/detach.
+  test openTab chọn window sẵn có, tạo group "BS", working tab fallback, screenshot CDP attach/detach.
 - **Integration (bridge)**: giữ `tests/unit/browser/bridge.test.ts` hiện có; thêm test params `ref`/`tabId`
   được forward nguyên vẹn qua `execute`.
 - **Bắt buộc trước khi hoàn thành**: `npm run typecheck`, `npm test`, `npm run build:extension`.
-- **Manual** (ghi vào hướng dẫn): mở tab background trong group "Meow"; screenshot tab ngầm không focus;
+- **Manual** (ghi vào hướng dẫn): mở tab background trong group "BS"; screenshot tab ngầm không focus;
   read/click bằng ref trên page động (React app có card agent — nút Chat nay có trong snapshot).
 
 ## 13. Rủi ro & lưu ý
@@ -218,6 +218,6 @@ tests/unit/browser/  # a11y tree builder (mock DOM), ref map/resolution, backgro
   nhưng kém chính xác hơn.
 - Content script reload khi navigate → `Map<ref, Element>` reset → agent phải `read` lại (lỗi stale đã
   thiết kế để báo rõ).
-- Tab group chỉ nhóm tab do Meow mở — không động vào group/tab của user.
+- Tab group chỉ nhóm tab do BS mở — không động vào group/tab của user.
 - `maxElements` đổi nghĩa (số node thay vì số element) — cập nhật description tool + spec cũ.
 - Không phá vỡ `buildSpawnCommand` (Windows cmd shim) hay cơ chế `tree-kill` — nằm ngoài phạm vi này.

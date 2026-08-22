@@ -1,4 +1,4 @@
-# Meow Coding — Vibe P2: Auto-fix Loop + Session Export/Share — Implementation Plan
+# BS Coding — Vibe P2: Auto-fix Loop + Session Export/Share — Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -6,7 +6,7 @@
 1. **Auto-fix loop** — after the agent reports "done" in build mode, run a configured command (e.g. `npm test`); on failure, feed output back to the agent to fix, up to `maxRounds`.
 2. **Session export/share** — export a session to Markdown/JSON; import JSON back; share a summarized context to another agent's new session.
 
-**Architecture:** The auto-fix orchestrator lives **outside** the agent loop (in `MeowAgentManager.send`) so it never touches `MAX_STEPS`/compaction internals; each round is a system-style message in the transcript (`tool`-kind card) so the user sees and can Stop. Export/share reuse `StoredSession` (JSON store) — Markdown via `turndown`/manual render (check existing `MarkdownText` usage; export is plain text so no turndown needed).
+**Architecture:** The auto-fix orchestrator lives **outside** the agent loop (in `BsAgentManager.send`) so it never touches `MAX_STEPS`/compaction internals; each round is a system-style message in the transcript (`tool`-kind card) so the user sees and can Stop. Export/share reuse `StoredSession` (JSON store) — Markdown via `turndown`/manual render (check existing `MarkdownText` usage; export is plain text so no turndown needed).
 
 **Tech Stack:** Electron 41, React 19, TypeScript strict, `node:child_process` spawn, `tree-kill`, Vitest.
 
@@ -14,17 +14,17 @@
 
 ## File Map
 
-- Modify: `src/shared/types.ts` — `AutoFixSettings`, `MeowSettings.autoFix?`, `SessionExportResult`, `SessionShareResult`.
+- Modify: `src/shared/types.ts` — `AutoFixSettings`, `BsSettings.autoFix?`, `SessionExportResult`, `SessionShareResult`.
 - Modify: `src/shared/ipc.ts` — `Channels.AutoFixGet/Save` (nếu setting riêng; hoặc dùng `SettingsGet/Save` chung — chọn dùng chung `SettingsGet/Save`), `Channels.SessionExport`, `Channels.SessionImport`, `Channels.SessionShare`.
 - Modify: `src/main/agent/config.ts` — `AutoFixConfig`, `DEFAULT_AUTO_FIX`, normalize.
-- Modify: `src/main/meow-agent-manager.ts` — auto-fix orchestrator trong `send()`; `exportSession`, `importSession`, `shareSession` methods.
+- Modify: `src/main/bs-agent-manager.ts` — auto-fix orchestrator trong `send()`; `exportSession`, `importSession`, `shareSession` methods.
 - Create: `src/main/agent/auto-fix.ts` — `runAutoFixCommand(cwd, command, timeoutMs)` spawn wrapper (return `{code, output}`).
 - Modify: `src/main/agent/session.ts` — `exportMarkdown(session)`, `importFromJson(json)` helpers (hoặc để trong manager; chọn để trong manager để SessionStore thuần JSON).
 - Modify: `src/main/index.ts` — IPC handlers cho export/import/share.
 - Modify: `src/preload/index.ts` — AgentApi methods.
 - Modify: `src/renderer/src/components/chat/ChatPanel.tsx` — auto-fix card rendering (dùng ToolCallCard-style hoặc message system); SessionBar menu export/import/share.
 - Modify: `src/renderer/src/components/chat/SessionBar.tsx` — export/share dropdown + import button.
-- Test: `tests/unit/ipc-contract.test.ts`, `tests/unit/agent-config.test.ts`, new `tests/unit/auto-fix.test.ts`, `tests/unit/session-export.test.ts`, `tests/unit/meow-agent-manager.test.ts`.
+- Test: `tests/unit/ipc-contract.test.ts`, `tests/unit/agent-config.test.ts`, new `tests/unit/auto-fix.test.ts`, `tests/unit/session-export.test.ts`, `tests/unit/bs-agent-manager.test.ts`.
 
 ---
 
@@ -37,7 +37,7 @@
   - `tests/unit/agent-config.test.ts`:
 ```ts
   it('normalizes autoFix with defaults', () => {
-    const cfg = configToSettings({ ...DEFAULT_MEOW_CONFIG, autoFix: undefined })
+    const cfg = configToSettings({ ...DEFAULT_BS_CONFIG, autoFix: undefined })
     expect(cfg.autoFix).toEqual({ enabled: false, maxRounds: 3, command: '' })
   })
 ```
@@ -50,7 +50,7 @@ export interface AutoFixSettings {
   maxRounds: number
   command: string  // '' = vô hiệu hóa; VD 'npm test'
 }
-// MeowSettings thêm: autoFix?: AutoFixSettings
+// BsSettings thêm: autoFix?: AutoFixSettings
 ```
 - [ ] **Step 4: Implement config.ts** — `AutoFixConfig` + `DEFAULT_AUTO_FIX = { enabled: false, maxRounds: 3, command: '' }` + normalize + wire vào `configToSettings`/`settingsToConfig`.
 
@@ -113,7 +113,7 @@ export function runAutoFixCommand(cwd: string, command: string, timeoutMs = 60_0
 
 ## Task 3: Auto-fix — orchestrator in send()
 
-**Files:** `src/main/meow-agent-manager.ts`, test `tests/unit/meow-agent-manager.test.ts`
+**Files:** `src/main/bs-agent-manager.ts`, test `tests/unit/bs-agent-manager.test.ts`
 
 - [ ] **Step 1: Write failing test**
 ```ts
@@ -130,7 +130,7 @@ export function runAutoFixCommand(cwd: string, command: string, timeoutMs = 60_0
 
 - [ ] **Step 3: Implement** — trong `send()` sau `runner.run` thành công (không bị abort), trước `finally` kết thúc:
 ```ts
-const cfg = loadMeowConfig(this.deps.configPath)
+const cfg = loadBsConfig(this.deps.configPath)
 const autoFix = cfg.autoFix
 const mode = this.modes.get(agentId) ?? 'build'
 if (autoFix?.enabled && autoFix.command && mode === 'build' && !aborted) {
@@ -180,7 +180,7 @@ Note: cần cẩn thận — `runner.run` hiện được gọi 1 lần trong tr
 
 ## Task 5: Session export — Markdown + JSON
 
-**Files:** `src/main/meow-agent-manager.ts`, `src/main/index.ts`, `src/preload/index.ts`, `src/shared/ipc.ts`, test `tests/unit/session-export.test.ts`
+**Files:** `src/main/bs-agent-manager.ts`, `src/main/index.ts`, `src/preload/index.ts`, `src/shared/ipc.ts`, test `tests/unit/session-export.test.ts`
 
 - [ ] **Step 1: Write failing test** — `tests/unit/session-export.test.ts`:
 ```ts
@@ -211,10 +211,10 @@ exportSessionMarkdown(session: StoredSession): string {
 - [ ] **Step 4: IPC** — `Channels.SessionExport: 'session:export'`, `SessionImport: 'session:import'`; handler:
 ```ts
 ipcMain.handle(Channels.SessionExport, (_e, sessionId) => {
-  const session = mainApp.meowAgent.getSessionById(sessionId)
+  const session = mainApp.bsAgent.getSessionById(sessionId)
   return session ? { markdown: exportSessionMarkdown(session), json: JSON.stringify(session) } : null
 })
-ipcMain.handle(Channels.SessionImport, (_e, agentId, json: string) => mainApp.meowAgent.importSession(agentId, json))
+ipcMain.handle(Channels.SessionImport, (_e, agentId, json: string) => mainApp.bsAgent.importSession(agentId, json))
 ```
 - [ ] **Step 5: Run tests** → PASS.
 - [ ] **Step 6: Commit** — `git commit -m "agent: session export to markdown/json + import"`
@@ -223,7 +223,7 @@ ipcMain.handle(Channels.SessionImport, (_e, agentId, json: string) => mainApp.me
 
 ## Task 6: Session share — summarize context to another agent
 
-**Files:** `src/main/meow-agent-manager.ts`, `src/main/index.ts`, `src/preload/index.ts`, `src/shared/ipc.ts`, test `tests/unit/meow-agent-manager.test.ts`
+**Files:** `src/main/bs-agent-manager.ts`, `src/main/index.ts`, `src/preload/index.ts`, `src/shared/ipc.ts`, test `tests/unit/bs-agent-manager.test.ts`
 
 - [ ] **Step 1: Write failing test**
 ```ts
@@ -265,7 +265,7 @@ return this.summary(this.deps.store.get(targetSessionId)!)
   - **Export Markdown** → `window.api.exportSession(sessionId)` → `{markdown, json}` → tạo Blob download (renderer: `URL.createObjectURL` + `<a download>`).
   - **Export JSON** → tương tự với `json`.
   - **Import...** → `<input type=file accept=.json>` → `window.api.importSession(agentId, jsonText)` → reload sessions.
-  - **Share to agent...** → danh sách agent khác trong workspace (từ props) → `window.api.shareSession(sourceId, targetAgentId)` → thông báo thành công (system-style `[meow]` qua error event? dùng alert nhẹ — thêm `ChatEvent` type `notice` hoặc renderer toast. Chọn renderer-local toast đơn giản).
+  - **Share to agent...** → danh sách agent khác trong workspace (từ props) → `window.api.shareSession(sourceId, targetAgentId)` → thông báo thành công (system-style `[bs]` qua error event? dùng alert nhẹ — thêm `ChatEvent` type `notice` hoặc renderer toast. Chọn renderer-local toast đơn giản).
 - [ ] **Step 2: Manual check** — export md hiện đúng nội dung; import tạo session mới; share tạo session mới bên agent kia có context.
 - [ ] **Step 3: Commit** — `git commit -m "renderer: session export/import/share menu"`
 
@@ -274,7 +274,7 @@ return this.summary(this.deps.store.get(targetSessionId)!)
 ## Task 8: Final — full verification
 
 - [ ] **Step 1:** `npm run typecheck` — PASS.
-- [ ] **Step 2:** `npm test` — PASS (`auto-fix`, `session-export`, `agent-config`, `meow-agent-manager`, `ipc-contract`).
+- [ ] **Step 2:** `npm test` — PASS (`auto-fix`, `session-export`, `agent-config`, `bs-agent-manager`, `ipc-contract`).
 - [ ] **Step 3:** `npm run build && npm run e2e` — PASS.
 - [ ] **Step 4:** Manual smoke: auto-fix round fail→pass; export/import/share hoạt động.
 

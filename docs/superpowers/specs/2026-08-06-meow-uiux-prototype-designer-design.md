@@ -1,4 +1,4 @@
-# Meow Coding — UI/UX Prototype Designer (Figma Make style) : Design Spec
+# BS Coding — UI/UX Prototype Designer (Figma Make style) : Design Spec
 
 Ngày: 2026-08-06 · Trạng thái: chờ duyệt
 
@@ -7,7 +7,7 @@ Ngày: 2026-08-06 · Trạng thái: chờ duyệt
 Cho phép BA tạo prototype nghiệp vụ và giao diện (kiểu Figma Make) **trước khi viết code logic**.
 BA làm việc trong một cửa sổ riêng của app: **chat trái + preview phải**. Prototype được gen bởi một
 agent kind `design` thiên về UI/UX, tạo ra **app React + Vite thật, đa màn hình, dùng mock data**, và
-được lưu tại `<project>/docs/uiux-design/<name>/`. Khi code frontend thật, meow agent dev chỉ cần lấy
+được lưu tại `<project>/docs/uiux-design/<name>/`. Khi code frontend thật, bs agent dev chỉ cần lấy
 source prototype này dựng thành frontend thật bên ngoài.
 
 Khác biệt với mô tả ban đầu: "Figma Make" chính là cách Figma gen functional prototype + code và preview
@@ -21,7 +21,7 @@ bằng **app chạy thật** (không phải ảnh tĩnh) — ta bám sát cách 
 | Nơi chat | Chỉ trong cửa sổ Electron — browser ngoài không có contextBridge/IPC nên không chat được |
 | Framework prototype | React + Vite, full app đa màn hình (react-router + mock data trong `src/data/mock.ts`) |
 | Vị trí lưu | `<project>/docs/uiux-design/<name>/` (trong project đang mở) |
-| Chat engine | Dùng chung `MeowAgentManager` — agent kind `design` mới (kế thừa tools/undo/redo/session/cost/snapshot) |
+| Chat engine | Dùng chung `BsAgentManager` — agent kind `design` mới (kế thừa tools/undo/redo/session/cost/snapshot) |
 | Preview | App chạy thật qua **Vite dev server** (HMR tự cập nhật), panel phải là `<iframe>` load localhost |
 | Phân vai | Cửa sổ Electron = BA làm việc; Open in Browser = demo/xem toàn màn hình/DevTools |
 | Thêm agent design | Không thêm field UI; **suy từ template** "Design Prototype" (`kind: 'design'`), main tự đặt `cwd = docs/uiux-design/<name>` |
@@ -34,7 +34,7 @@ bằng **app chạy thật** (không phải ảnh tĩnh) — ta bám sát cách 
 ┌─────────────────────────────────────────────────────────────┐
 │  Electron — main process                                     │
 │  ┌───────────────┐   ┌─────────────────────────────┐        │
-│  │ MeowAgentManager                                   │      │
+│  │ BsAgentManager                                   │      │
 │  │  ├─ agent kind 'native'  (dev team, cwd = project) │      │
 │  │  └─ agent kind 'design'  (BA, cwd = docs/uiux-design/<name>)│
 │  └───────┬───────────────────────────────────────────┘        │
@@ -64,7 +64,7 @@ bằng **app chạy thật** (không phải ảnh tĩnh) — ta bám sát cách 
 **Agent design** (`AgentKind` mở rộng thêm `'design'`):
 - Template mặc định "Design Prototype" (`kind: 'design'`) trong `default-templates.ts`.
 - `AddAgentDialog` giữ nguyên — BA chọn template; main tự đặt cwd thư mục prototype.
-- `MeowAgentManager.register()`: agent kind `design` dùng system prompt riêng (thiên về UI prototyping:
+- `BsAgentManager.register()`: agent kind `design` dùng system prompt riêng (thiên về UI prototyping:
   React/Vite, mock data, đa màn hình) + `collectSkills` quét thêm thư mục design-skills riêng
   (chứa skill `ui-ux-pro-max`).
 - Tái sử dụng toàn bộ tools/snapshot/session/cost.
@@ -81,7 +81,7 @@ bằng **app chạy thật** (không phải ảnh tĩnh) — ta bám sát cách 
       App.tsx        → react-router, routes theo màn hình
       data/mock.ts   → mock data cho luồng nghiệp vụ
       pages/…        → từng màn hình (agent gen tiếp)
-    .meow/           → skills design riêng (ui-ux-pro-max)
+    .bs/           → skills design riêng (ui-ux-pro-max)
   ```
 - `npm install` lần đầu (hoặc dùng cache); agent sau đó chỉ gen code + routes.
 
@@ -101,8 +101,8 @@ Thêm vào `src/shared/ipc.ts` (`Channels` + `AgentApi`), triển khai ở main 
 ## 5. Xử lý lỗi
 
 - `npm run dev` fail (thiếu node_modules / port bận) → preview panel hiện thông báo tiếng Việt prefix
-  `[meow]` + hướng dẫn, không crash app. Port bận → Vite tự chọn port khác.
-- Agent design thiếu API key → thông báo `[meow]` trong chat panel (pattern sẵn có).
+  `[bs]` + hướng dẫn, không crash app. Port bận → Vite tự chọn port khác.
+- Agent design thiếu API key → thông báo `[bs]` trong chat panel (pattern sẵn có).
 - Scaffold lỗi (npm install fail) → hiện lỗi nhưng vẫn tạo thư mục rỗng để BA tự sửa.
 - Đóng cửa sổ prototype → stop preview server (tree-kill, không để process mồ côi); **không kill**
   agent design (giữ session/bối cảnh, giống agent dev).
@@ -123,7 +123,7 @@ Thêm vào `src/shared/ipc.ts` (`Channels` + `AgentApi`), triển khai ở main 
 - `src/main/index.ts` — tạo prototype window, handlers mới, khởi tạo PreviewServer.
 - `src/main/prototype-scaffold.ts` (mới) — scaffold React + Vite.
 - `src/main/prototype-preview-server.ts` (mới) — Vite dev server + HTTP server tĩnh.
-- `src/main/meow-agent-manager.ts` — system prompt design + design skills dir.
+- `src/main/bs-agent-manager.ts` — system prompt design + design skills dir.
 - `src/preload/index.ts` — expose method mới.
 - `src/renderer/src/App.tsx` — route `?view=prototype` render layout prototype.
 - `src/renderer/src/components/prototype/*` (mới) — `PrototypeWindow`, `PrototypeChatPanel` (tái dùng

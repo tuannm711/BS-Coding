@@ -35,7 +35,7 @@ gửi/dispatch command hay IPC contract.
 
 ### Giữ nguyên
 
-- Không đụng main process (`meow-agent-manager.ts`, `commands.ts`), preload, IPC contract.
+- Không đụng main process (`bs-agent-manager.ts`, `commands.ts`), preload, IPC contract.
 - Không đổi `MENTION_SPLIT_RE` / `.chat-mention`.
 - Không highlight slash trên bubble assistant (chỉ user).
 

@@ -4,10 +4,10 @@ import path from 'node:path'
 import os from 'node:os'
 
 const candidates = [
-  path.join(os.homedir(), 'AppData', 'Roaming', 'meow-coding'),
-  path.join(os.homedir(), 'AppData', 'Roaming', 'Meow Coding'),
-  path.join(os.homedir(), 'AppData', 'Local', 'meow-coding'),
-  path.join(os.homedir(), 'AppData', 'Local', 'Meow Coding')
+  path.join(os.homedir(), 'AppData', 'Roaming', 'bs-coding'),
+  path.join(os.homedir(), 'AppData', 'Roaming', 'BS Coding'),
+  path.join(os.homedir(), 'AppData', 'Local', 'bs-coding'),
+  path.join(os.homedir(), 'AppData', 'Local', 'BS Coding')
 ]
 const userDataDir = candidates.find(d => existsSync(path.join(d, 'chatgpt-web')))
 const statePath = userDataDir ? path.join(userDataDir, 'chatgpt-web', 'storage-state.json') : null

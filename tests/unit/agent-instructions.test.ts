@@ -9,7 +9,7 @@ let root: string
 let cwd: string
 
 beforeEach(() => {
-  root = mkdtempSync(path.join(tmpdir(), 'meow-inst-'))
+  root = mkdtempSync(path.join(tmpdir(), 'bs-inst-'))
   cwd = path.join(root, 'repo', 'src')
   mkdirSync(cwd, { recursive: true })
 })
@@ -61,19 +61,19 @@ describe('loadInstructions', () => {
 })
 
 describe('globalInstructionFiles', () => {
-  it('returns the meow global file when present', () => {
+  it('returns the bs global file when present', () => {
     const home = path.join(root, 'home')
-    mkdirSync(path.join(home, '.config', 'meow'), { recursive: true })
+    mkdirSync(path.join(home, '.config', 'bs'), { recursive: true })
     mkdirSync(path.join(home, '.claude'), { recursive: true })
-    writeFileSync(path.join(home, '.config', 'meow', 'AGENTS.md'), '# Global meow')
+    writeFileSync(path.join(home, '.config', 'bs', 'AGENTS.md'), '# Global bs')
     writeFileSync(path.join(home, '.claude', 'CLAUDE.md'), '# Global claude')
     const files = globalInstructionFiles(home)
     expect(files).toHaveLength(1)
-    expect(files[0].content).toBe('# Global meow')
-    expect(files[0].path).toBe(path.join(home, '.config', 'meow', 'AGENTS.md'))
+    expect(files[0].content).toBe('# Global bs')
+    expect(files[0].path).toBe(path.join(home, '.config', 'bs', 'AGENTS.md'))
   })
 
-  it('falls back to ~/.claude/CLAUDE.md when no meow AGENTS.md exists', () => {
+  it('falls back to ~/.claude/CLAUDE.md when no bs AGENTS.md exists', () => {
     const home = path.join(root, 'home')
     mkdirSync(path.join(home, '.claude'), { recursive: true })
     writeFileSync(path.join(home, '.claude', 'CLAUDE.md'), '# Claude global')

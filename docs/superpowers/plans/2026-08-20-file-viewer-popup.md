@@ -256,7 +256,7 @@ ipcMain.handle(Channels.FileOpen, async (_e, payload: FileViewerPayload) => {
     const st = await stat(abs)
     if (!st.isFile()) throw new Error(`Không phải file: ${payload.path}`)
   } catch {
-    new Notification({ title: 'Meow Coding', body: `[meow] Không tìm thấy file: ${payload.path}` }).show()
+    new Notification({ title: 'BS Coding', body: `[bs] Không tìm thấy file: ${payload.path}` }).show()
     return
   }
   const kind = isTextPath(abs)
@@ -502,12 +502,12 @@ in styles.css and use the real names; fallback values above are placeholders.
 1. `npm run typecheck` — fix errors.
 2. `npm test` — all pass (including new file-viewer tests).
 3. Manual smoke in `npm run dev`:
-   - Chat with Meow agent; ask it to write a `.md` file and mention path → click link →
+   - Chat with BS agent; ask it to write a `.md` file and mention path → click link →
      popup opens with rendered markdown.
    - Click inline-code path to a `.ts` file → popup with raw text.
    - Click again → same window focused, no duplicate.
    - Path to `.png`/`.pdf` → opens in OS app.
-   - Path that doesn't exist → `[meow] Không tìm thấy file: ...` notification.
+   - Path that doesn't exist → `[bs] Không tìm thấy file: ...` notification.
    - Toolbar buttons: Open in VS Code, Reveal in Folder, Copy, Raw/Markdown toggle.
    - Escape closes popup.
    - Links inside a rendered `.md` (relative to same root) open another popup.

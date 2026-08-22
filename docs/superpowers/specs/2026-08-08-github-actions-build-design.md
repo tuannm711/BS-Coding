@@ -1,4 +1,4 @@
-# Meow Coding — GitHub Actions CI: build & publish installers : Design Spec
+# BS Coding — GitHub Actions CI: build & publish installers : Design Spec
 
 Ngày: 2026-08-08 · Trạng thái: chờ duyệt
 
@@ -65,7 +65,7 @@ Không đổi `package.json`, code, IPC/preload/renderer.
 ## 7. Tiêu chí thành công
 
 - Push tag `v0.15.0` → GitHub Actions build 3 OS → Release `v0.15.0` có:
-  - Windows: `Meow Coding-0.15.0 Setup.exe` (NSIS) + portable `.exe`
+  - Windows: `BS Coding-0.15.0 Setup.exe` (NSIS) + portable `.exe`
   - macOS: `.dmg` + `.zip` (x64 + arm64)
   - Linux: `.AppImage` + `.deb`
 - Push `master`/PR → chạy test + build, không tạo Release.

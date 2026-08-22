@@ -93,7 +93,7 @@ describe('revert tool + file tools snapshot', () => {
   let store: SnapshotStore
 
   beforeEach(() => {
-    dir = mkdtempSync(path.join(tmpdir(), 'meow-snap-'))
+    dir = mkdtempSync(path.join(tmpdir(), 'bs-snap-'))
     store = makeStore().store
     ctx = { cwd: dir, ask: async () => null, agentId: 'a1', snapshots: store }
   })

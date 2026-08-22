@@ -1,19 +1,19 @@
-# Meow Coding
+# BS Coding
 
-**Meow Coding** is a desktop app for running multiple CLI coding agents side by side — opencode,
+**BS Coding** is a desktop app for running multiple CLI coding agents side by side — opencode,
 Claude Code, aider, and any other CLI agent you put on `PATH` — in parallel terminal panes inside a
-single window. It also ships a built-in **native "Meow" agent** with its own chat UI, tool registry,
+single window. It also ships a built-in **native "BS" agent** with its own chat UI, tool registry,
 sessions, permissions, and skill system.
 
 <p align="center">
-  <img src="media/meow-app-screen.png" alt="Meow Coding — multiple CLI coding agents in parallel panes" width="720">
+  <img src="media/bs-app-screen.png" alt="BS Coding — multiple CLI coding agents in parallel panes" width="720">
 </p>
 
 ## Highlights
 
 - **Multi-agent panes** — spawn several CLI coding agents in one window, each in its own terminal
   pane. Stop / restart / inject / zoom per pane; process trees are killed on exit (no orphans).
-- **Native Meow agent** — a first-party coding agent with chat UI, streaming output, markdown
+- **Native BS agent** — a first-party coding agent with chat UI, streaming output, markdown
   rendering, tool-call cards, image attachments, and undo/redo.
 - **Slash commands** — `/init`, `/review`, `/new`, `/frontend-design`, and Superpowers workflows
   (`/sp-*`), plus custom commands with `$1..$N`, `$ARGUMENTS`, `@path` references and `!`cmd``
@@ -37,7 +37,7 @@ sessions, permissions, and skill system.
 
 ## What it's based on (Sources)
 
-Meow Coding is built on open-source technology and openly credits its design influences:
+BS Coding is built on open-source technology and openly credits its design influences:
 
 - **opencode** — the native agent's feature set (slash commands, undo/redo, LSP diagnostics,
   compaction, cost tracking, MCP, skills) is modeled on opencode's architecture. See
@@ -59,7 +59,7 @@ Meow Coding is built on open-source technology and openly credits its design inf
 ### Workspaces & panes
 
 - Add git project folders as workspaces (persisted in `userData/workspaces.json`).
-- Launch agents from templates — defaults for **meow** (native), **opencode**, **claude code**,
+- Launch agents from templates — defaults for **bs** (native), **opencode**, **claude code**,
   and **aider**; add your own custom launch templates.
 - Per-pane status badge shows agent state, git branch, and dirty-file count.
 - Zoom a pane to full window; agents can run in the background.
@@ -71,7 +71,7 @@ Meow Coding is built on open-source technology and openly credits its design inf
   `browser` (drive a real Chrome profile), and `office`.
 - Permission rules per tool: `allow` / `ask` / `deny`, with "always allow" persistence.
 - Context compaction with auto-continue, prune, and tool-output truncation to stay within budget.
-- User tools loaded from `userData/tools`, and project `.meow/` directories for project-level
+- User tools loaded from `userData/tools`, and project `.bs/` directories for project-level
   commands, skills, and AGENTS.md instructions.
 - System prompt assembles AGENTS.md instructions, available skills, and workspace context.
 
@@ -89,7 +89,7 @@ Meow Coding is built on open-source technology and openly credits its design inf
   with backup/restore), quota view.
 - **API key vault**: provider API keys stored encrypted in the OS keychain (safeStorage) instead of
   plaintext in settings; `keyRef` resolves at runtime.
-- Quota monitoring with `[meow]` alerts when usage crosses 90% (5-minute cooldown).
+- Quota monitoring with `[bs]` alerts when usage crosses 90% (5-minute cooldown).
 
 ### UI & desktop
 
@@ -167,7 +167,7 @@ npm run dist:mac    # package macOS (dmg + zip; must run on macOS)
 
 GitHub Actions (`.github/workflows/build.yml`) builds Windows, macOS, and Linux installers on each
 push to `master` and on every `v*` tag. Tagged releases are published automatically — grab the
-latest installers from the [Releases](https://github.com/stardust-bytes/meow-coding/releases) page.
+latest installers from the [Releases](https://github.com/tuannm711/BS-Coding/releases) page.
 ```
 
 ## Testing

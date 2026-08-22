@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { CatalogProviderSummary, McpServerStatus, MeowSettings, Template } from '@shared/types'
+import type { CatalogProviderSummary, McpServerStatus, BsSettings, Template } from '@shared/types'
 import ProvidersTab from './ProvidersTab'
 import AgentsTab from './AgentsTab'
 import PermissionsTab from './PermissionsTab'
@@ -31,8 +31,8 @@ interface Props {
 
 export default function SettingsDialog({ onClose, projectPath, templates, onTemplatesChange }: Props) {
   const [tab, setTab] = useState<TabId>('providers')
-  const [draft, setDraft] = useState<MeowSettings | null>(null)
-  const [saved, setSaved] = useState<MeowSettings | null>(null)
+  const [draft, setDraft] = useState<BsSettings | null>(null)
+  const [saved, setSaved] = useState<BsSettings | null>(null)
   const [catalog, setCatalog] = useState<CatalogProviderSummary[]>([])
   const [mcpStatus, setMcpStatus] = useState<McpServerStatus[]>([])
   const [status, setStatus] = useState('')
@@ -77,7 +77,7 @@ export default function SettingsDialog({ onClose, projectPath, templates, onTemp
     return () => window.removeEventListener('keydown', onKey)
   }, [closeGuarded])
 
-  const patch = useCallback((patch: Partial<MeowSettings>) => {
+  const patch = useCallback((patch: Partial<BsSettings>) => {
     setDraft(prev => (prev ? { ...prev, ...patch } : prev))
   }, [])
 

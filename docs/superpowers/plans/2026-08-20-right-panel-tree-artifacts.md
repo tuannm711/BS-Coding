@@ -25,7 +25,7 @@ Implements spec: `docs/superpowers/specs/2026-08-20-right-panel-tree-artifacts-d
 | `src/main/agent/tools/edit.ts` | Record artifact after edit. |
 | `src/main/agent/tools/apply-patch.ts` | Record artifact after apply. |
 | `src/main/agent/loop.ts` | Wire `onArtifact` from deps into `ToolContext`. |
-| `src/main/meow-agent-manager.ts` | Accept `onArtifact` dep; pass to `SessionRunner`; expose to main app. |
+| `src/main/bs-agent-manager.ts` | Accept `onArtifact` dep; pass to `SessionRunner`; expose to main app. |
 | `src/renderer/src/App.tsx` | Mount `RightPanel`; localStorage state (open/tab/width); artifact event subscription. |
 | `src/renderer/src/components/TitleBar.tsx` | Panel toggle button (right side). |
 | `src/renderer/src/styles.css` | All panel/tab/tree/artifact/tooltip styles. |
@@ -81,9 +81,9 @@ Unit test `src/main/artifact-store.test.ts`: record creates entry; repeated reco
 3. `edit.ts`: file existed (edit) → `kind: 'edit'`.
 4. `apply-patch.ts`: after applying, for each touched file path: kind = `existsSync(full) ? 'edit' : 'create'` (checking post-op existence per the spec rule; for apply-patch, new files in the diff won't exist before).
    - Inspect how `apply-patch.ts` applies diffs (parsed file list) to know where to hook. Add the recording at the point where files are written.
-5. `agentName` resolution: keep `agentName: ''` at tool level; the `MeowAgentManager`/main app fills the real name from workspace config before storing (or store passes a resolver). Simplest: main `index.ts` resolves `agentName` from `workspace.agents` when forwarding.
+5. `agentName` resolution: keep `agentName: ''` at tool level; the `BsAgentManager`/main app fills the real name from workspace config before storing (or store passes a resolver). Simplest: main `index.ts` resolves `agentName` from `workspace.agents` when forwarding.
 6. `loop.ts`: in the `toolCtx` object literal add `onArtifact: (entry) => this.deps.onArtifact?.(entry)` — add `onArtifact?: (entry: ArtifactEntry) => void` to `SessionRunnerDeps` (find its interface near top of loop.ts).
-7. `meow-agent-manager.ts`: add `onArtifact?: (entry: ArtifactEntry) => void` to its `ManagerDeps`; pass into `new SessionRunner({ ..., onArtifact: (e) => this.deps.onArtifact?.(e) })`.
+7. `bs-agent-manager.ts`: add `onArtifact?: (entry: ArtifactEntry) => void` to its `ManagerDeps`; pass into `new SessionRunner({ ..., onArtifact: (e) => this.deps.onArtifact?.(e) })`.
 
 Verify: typecheck; existing tests pass.
 
@@ -101,7 +101,7 @@ Verify: typecheck; existing tests pass.
   - `Channels.DirList` → `listDir(absPath)` (guard: only allow paths inside `activeProject`; else throw).
   - `Channels.ArtifactsList` → `store.list(projectPath)`.
   - `Channels.ArtifactsClear` → `store.clear(projectPath)`.
-- Wire `meowAgent.setOnEvent`... no — wire `onArtifact` from `MeowAgentManager` deps: find where `MeowAgentManager` is constructed (index.ts) and pass `onArtifact: (e) => { resolve agentName; store.record(activeProject, e) }`.
+- Wire `bsAgent.setOnEvent`... no — wire `onArtifact` from `BsAgentManager` deps: find where `BsAgentManager` is constructed (index.ts) and pass `onArtifact: (e) => { resolve agentName; store.record(activeProject, e) }`.
   - The `ArtifactEntry` from tools has `path` relative to `ctx.cwd` (agent cwd = project root in practice) and `absPath`. Record with `projectPath = activeProject`; if `absPath` is outside project root, skip.
 
 Verify: `npm run typecheck`; `npm test` (dir-lister + artifact-store suites).
@@ -109,7 +109,7 @@ Verify: `npm run typecheck`; `npm test` (dir-lister + artifact-store suites).
 ## Task 6 — Renderer: App state + mount
 
 `src/renderer/src/App.tsx`:
-- State: `rightPanelOpen` (localStorage `meow.rightpanel.open`, default `'1'`), `rightPanelTab` (`'tree'|'artifacts'`, default `'tree'`), `rightPanelWidth` (default 280).
+- State: `rightPanelOpen` (localStorage `bs.rightpanel.open`, default `'1'`), `rightPanelTab` (`'tree'|'artifacts'`, default `'tree'`), `rightPanelWidth` (default 280).
 - `artifacts` state: `Record<projectPath, ArtifactEntry[]>`; subscribe `window.api.onArtifactsChanged` → set.
 - Pass to `<RightPanel>`: `open`, `tab`, `width`, `onToggle`, `onTabChange`, `onWidthChange`, `root={runtime?.workspace.projectPath ?? null}`, `artifacts={artifacts[runtime?.workspace.projectPath ?? ''] ?? []}`, `onClearArtifacts={() => projectPath && void window.api.clearArtifacts(projectPath)}`.
 - Render `<RightPanel>` after `<main>` inside `.app-body`, only when `open` — but keep tab nav hidden via CSS when closed (panel hidden entirely per spec; toggle removes it from layout: render conditionally).

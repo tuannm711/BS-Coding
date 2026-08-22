@@ -1,11 +1,11 @@
 import { useState } from 'react'
-import type { CatalogProviderSummary, MeowSettings } from '@shared/types'
+import type { CatalogProviderSummary, BsSettings } from '@shared/types'
 import Modal from './Modal'
 
 interface Props {
-  settings: MeowSettings
+  settings: BsSettings
   catalog: CatalogProviderSummary[]
-  onChange: (patch: Partial<MeowSettings>) => void
+  onChange: (patch: Partial<BsSettings>) => void
 }
 
 type ConnectModal =

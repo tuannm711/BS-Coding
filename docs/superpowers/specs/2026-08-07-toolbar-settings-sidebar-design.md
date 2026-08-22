@@ -4,7 +4,7 @@ Ngày: 2026-08-07 · Trạng thái: đã duyệt
 
 ## 1. Mục tiêu
 
-- Thêm nút **Settings** lên toolbar (title bar), ngay kế bên logo "Meow Coding", hiển thị trên mọi platform.
+- Thêm nút **Settings** lên toolbar (title bar), ngay kế bên logo "BS Coding", hiển thị trên mọi platform.
 - Đơn giản hoá header sidebar "Projects": bỏ menu "⋯" (Add project / Templates / Settings), chỉ còn nút text **"Add Project"**.
 - Chuyển **Templates** từ sidebar vào Settings (tab "Templates").
 
@@ -14,7 +14,7 @@ Ngày: 2026-08-07 · Trạng thái: đã duyệt
 
 `src/renderer/src/components/TitleBar.tsx`:
 - Thêm prop `onOpenSettings: () => void`.
-- Trong `.title-bar-brand`, sau `<span className="title-bar-title">Meow Coding</span>` thêm:
+- Trong `.title-bar-brand`, sau `<span className="title-bar-title">BS Coding</span>` thêm:
 
 ```tsx
 <button className="title-bar-toolbar-btn" onClick={onOpenSettings}>⚙ Settings</button>

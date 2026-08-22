@@ -51,7 +51,7 @@ describe('CommandStore', () => {
   let file: string
 
   beforeEach(() => {
-    dir = mkdtempSync(path.join(tmpdir(), 'meow-cmd-'))
+    dir = mkdtempSync(path.join(tmpdir(), 'bs-cmd-'))
     file = path.join(dir, 'commands.json')
   })
 
@@ -75,7 +75,7 @@ describe('CommandStore', () => {
   })
 
   it('frontend-design command resolves $ARGUMENTS into the skill dispatch prompt', async () => {
-    const dir = mkdtempSync(path.join(tmpdir(), 'meow-fd-'))
+    const dir = mkdtempSync(path.join(tmpdir(), 'bs-fd-'))
     try {
       const out = await resolveCommand(FRONTEND_DESIGN_COMMAND, 'redesign the landing page', {
         cwd: dir, commands: []
@@ -89,7 +89,7 @@ describe('CommandStore', () => {
   })
 
   it('superpowers commands resolve $ARGUMENTS into the skill dispatch prompt', async () => {
-    const dir = mkdtempSync(path.join(tmpdir(), 'meow-sp-'))
+    const dir = mkdtempSync(path.join(tmpdir(), 'bs-sp-'))
     try {
       const cmd = SUPERPOWERS_COMMANDS.find(c => c.name === 'sp-using-superpowers')
       expect(cmd).toBeDefined()
@@ -118,10 +118,10 @@ describe('CommandStore', () => {
 })
 
 describe('projectCommands', () => {
-  it('loads markdown commands with frontmatter from .meow/commands', () => {
-    const dir = mkdtempSync(path.join(tmpdir(), 'meow-projcmd-'))
+  it('loads markdown commands with frontmatter from .bs/commands', () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'bs-projcmd-'))
     try {
-      const cmds = path.join(dir, '.meow', 'commands')
+      const cmds = path.join(dir, '.bs', 'commands')
       mkdirSync(cmds, { recursive: true })
       writeFileSync(path.join(cmds, 'lint.md'), '---\nname: lint\ndescription: Run the linter\n---\nRun `npm run lint`\n')
       const list = projectCommands(dir)
@@ -133,8 +133,8 @@ describe('projectCommands', () => {
     }
   })
 
-  it('ignores .opencode/commands — project reads .meow only', () => {
-    const dir = mkdtempSync(path.join(tmpdir(), 'meow-opencode-cmd-'))
+  it('ignores .opencode/commands — project reads .bs only', () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'bs-opencode-cmd-'))
     try {
       const cmds = path.join(dir, '.opencode', 'commands')
       mkdirSync(cmds, { recursive: true })
@@ -153,11 +153,11 @@ describe('projectCommands', () => {
     }
   })
 
-  it('reads from .meow/commands only', () => {
-    const dir = mkdtempSync(path.join(tmpdir(), 'meow-meowcmd-'))
+  it('reads from .bs/commands only', () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'bs-bscmd-'))
     try {
-      const plural = path.join(dir, '.meow', 'commands')
-      const singular = path.join(dir, '.meow', 'command')
+      const plural = path.join(dir, '.bs', 'commands')
+      const singular = path.join(dir, '.bs', 'command')
       mkdirSync(plural, { recursive: true })
       mkdirSync(singular, { recursive: true })
       writeFileSync(path.join(plural, 'a.md'), '---\ndescription: a\n---\ntmpl a\n')
@@ -170,7 +170,7 @@ describe('projectCommands', () => {
   })
 
   it('returns [] without a commands dir', () => {
-    expect(projectCommands(mkdtempSync(path.join(tmpdir(), 'meow-nopj-')))).toEqual([])
+    expect(projectCommands(mkdtempSync(path.join(tmpdir(), 'bs-nopj-')))).toEqual([])
   })
 })
 
@@ -185,7 +185,7 @@ describe('uniqueCommands', () => {
 
 describe('resolveCommand end-to-end', () => {
   it('resolves template with args and references', async () => {
-    const dir = mkdtempSync(path.join(tmpdir(), 'meow-res-'))
+    const dir = mkdtempSync(path.join(tmpdir(), 'bs-res-'))
     try {
       writeFileSync(path.join(dir, 'note.txt'), 'hello world')
       const cmd = { name: 'readit', description: '', template: 'Read the file $1 and summarize: @$1' }

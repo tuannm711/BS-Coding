@@ -1,4 +1,4 @@
-# Meow Coding — Trace không lag (async trace store + bỏ live IPC): Design Spec
+# BS Coding — Trace không lag (async trace store + bỏ live IPC): Design Spec
 
 Ngày: 2026-08-17 · Trạng thái: chờ duyệt
 
@@ -48,7 +48,7 @@ process. Mục tiêu:
 - Trước khi quit: `await mainApp.traces.flushAll()`.
 - Giữ `traceRead` IPC — vẫn đọc từ file sau khi flush.
 
-### 4.3 `src/main/meow-agent-manager.ts`
+### 4.3 `src/main/bs-agent-manager.ts`
 
 - `writeTrace` giữ nguyên logic (gộp delta, tool-start/result, subagent, compaction...) — chỉ là ghi qua buffer async thay vì sync + send.
 

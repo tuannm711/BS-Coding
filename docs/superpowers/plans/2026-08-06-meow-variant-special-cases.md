@@ -2,13 +2,13 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Port opencode's second variant source (`variants()` special-case by model id + npm) so minimax-M3 shows `[Default, none, thinking]` and deepseek-v4-flash shows `[Default, low, medium, high, max]` in the meow picker.
+**Goal:** Port opencode's second variant source (`variants()` special-case by model id + npm) so minimax-M3 shows `[Default, none, thinking]` and deepseek-v4-flash shows `[Default, low, medium, high, max]` in the bs picker.
 
-**Architecture:** New pure-TS module `src/main/model-variants.ts` ports `variants()` + `reasoningVariants()` + helpers from opencode `transform.ts`, producing **variant descriptors** (`Record<variantId, StreamProviderOptions>`) pre-built and namespaced to the AI SDK providerOptions key meow's client uses. `models-catalog.ts` stores these descriptors; `llm.ts` drops `providerOptionsFor` string-switch and merges `variantOptions` directly.
+**Architecture:** New pure-TS module `src/main/model-variants.ts` ports `variants()` + `reasoningVariants()` + helpers from opencode `transform.ts`, producing **variant descriptors** (`Record<variantId, StreamProviderOptions>`) pre-built and namespaced to the AI SDK providerOptions key bs's client uses. `models-catalog.ts` stores these descriptors; `llm.ts` drops `providerOptionsFor` string-switch and merges `variantOptions` directly.
 
 **Tech Stack:** TypeScript strict, Vitest, AI SDK (`streamText` providerOptions), existing Electron app.
 
-**Spec:** `docs/superpowers/specs/2026-08-06-meow-variant-special-cases-design.md`
+**Spec:** `docs/superpowers/specs/2026-08-06-bs-variant-special-cases-design.md`
 
 **Opencode reference:** `D:\Git\GitHub\opencode\packages\opencode\src\provider\transform.ts` (lines cited inline).
 
@@ -16,15 +16,15 @@
 
 ## Key Design Decision (refines spec §6)
 
-Meow's `createLlm` routes clients by **provider string**: `'anthropic'` → `createAnthropic`, `'google'` → `createGoogleGenerativeAI`, else → `createOpenAICompatible`. The AI SDK providerOptions key must match the client. So descriptors are namespaced by **provider string** (not npm):
+BS's `createLlm` routes clients by **provider string**: `'anthropic'` → `createAnthropic`, `'google'` → `createGoogleGenerativeAI`, else → `createOpenAICompatible`. The AI SDK providerOptions key must match the client. So descriptors are namespaced by **provider string** (not npm):
 
-| providerId (meow) | client | providerOptions key |
+| providerId (bs) | client | providerOptions key |
 |---|---|---|
 | `anthropic` | createAnthropic | `anthropic` |
 | `google` | createGoogleGenerativeAI | `google` |
 | anything else (deepseek, minimax, ...) | createOpenAICompatible | `openaiCompatible` |
 
-Variant **semantics** (which ids exist, what body) still follow opencode's npm-based logic; only the outer namespace differs. For minimax (npm `@ai-sdk/anthropic`, providerId `minimax`), the body `{thinking:{type:'adaptive'}}` is wrapped as `{openaiCompatible: {thinking:{type:'adaptive'}}}` — matching the openai-compatible client meow builds. `sdkKey()` in opencode (transform.ts:42-94) confirms the `openaiCompatible` key is canonical for the openai-compatible SDK.
+Variant **semantics** (which ids exist, what body) still follow opencode's npm-based logic; only the outer namespace differs. For minimax (npm `@ai-sdk/anthropic`, providerId `minimax`), the body `{thinking:{type:'adaptive'}}` is wrapped as `{openaiCompatible: {thinking:{type:'adaptive'}}}` — matching the openai-compatible client bs builds. `sdkKey()` in opencode (transform.ts:42-94) confirms the `openaiCompatible` key is canonical for the openai-compatible SDK.
 
 ---
 
@@ -37,12 +37,12 @@ Variant **semantics** (which ids exist, what body) still follow opencode's npm-b
 | `src/main/models-snapshot.json` | Regenerated raw-shaped |
 | `src/main/agent/llm.ts` | Remove `providerOptionsFor` + budget map; add `variantOptions` |
 | `src/main/agent/loop.ts` | `LoopDeps.variantOptions` |
-| `src/main/meow-agent-manager.ts` | Resolve descriptor at register; `allowedVariants` = Object.keys |
+| `src/main/bs-agent-manager.ts` | Resolve descriptor at register; `allowedVariants` = Object.keys |
 | `scripts/regen-models-snapshot.mjs` | Raw-shaped output |
 | `tests/unit/model-variants.test.ts` (new) | Port tests |
 | `tests/unit/models-catalog.test.ts` | Update |
 | `tests/unit/llm-variant.test.ts` | Update |
-| `tests/unit/meow-agent-manager.test.ts` | Update |
+| `tests/unit/bs-agent-manager.test.ts` | Update |
 
 ---
 
@@ -1165,12 +1165,12 @@ git commit -m "feat(llm): merge variantOptions providerOptions, drop string-swit
 
 ---
 
-## Task 6: Update `loop.ts` + `meow-agent-manager.ts`
+## Task 6: Update `loop.ts` + `bs-agent-manager.ts`
 
 **Files:**
 - Modify: `src/main/agent/loop.ts`
-- Modify: `src/main/meow-agent-manager.ts`
-- Test: `tests/unit/meow-agent-manager.test.ts`
+- Modify: `src/main/bs-agent-manager.ts`
+- Test: `tests/unit/bs-agent-manager.test.ts`
 
 - [ ] **Step 1: `loop.ts` — `LoopDeps.variantOptions`**
 
@@ -1191,7 +1191,7 @@ In `run()`:
         })
 ```
 
-- [ ] **Step 2: `meow-agent-manager.ts`**
+- [ ] **Step 2: `bs-agent-manager.ts`**
 
 In `register()`, replace the clamp + variant pass:
 
@@ -1218,7 +1218,7 @@ And update `allowedVariantsFor` to use descriptor keys — it already returns `t
 ```ts
   private allowedVariantsFor(agent: AgentConfig): string[] {
     if (!this.deps.catalog) return []
-    const cfg = loadMeowConfig(this.deps.configPath)
+    const cfg = loadBsConfig(this.deps.configPath)
     const resolved = resolveAgentConfig(cfg, agent.name, this.deps.env, agent.model)
     if (!resolved.provider || !resolved.model) return []
     return Object.keys(this.modelVariants.get(`${resolved.provider}/${resolved.model}`) ?? {})
@@ -1244,7 +1244,7 @@ Import `VariantBody` type from `./model-variants`.
 
 - [ ] **Step 3: Update the manager test**
 
-In `tests/unit/meow-agent-manager.test.ts`, the `llmVariants` capture currently reads `request.variant`. Change to `request.variantOptions`:
+In `tests/unit/bs-agent-manager.test.ts`, the `llmVariants` capture currently reads `request.variant`. Change to `request.variantOptions`:
 
 ```ts
   const llmVariants: Array<Record<string, unknown> | undefined> = []
@@ -1256,9 +1256,9 @@ Update the two variant tests:
 
 ```ts
   it('setVariant passes a clamped variant descriptor to the llm stream', async () => {
-    const dir = mkdtempSync(path.join(tmpdir(), 'meow-var-stream-'))
+    const dir = mkdtempSync(path.join(tmpdir(), 'bs-var-stream-'))
     try {
-      const cfgPath = path.join(dir, 'meow.json')
+      const cfgPath = path.join(dir, 'bs.json')
       writeFileSync(cfgPath, JSON.stringify({
         provider: { test: { apiKey: 'sk-test', models: ['test-model'] } },
         model: 'test'
@@ -1292,9 +1292,9 @@ Update the two variant tests:
   })
 
   it('setVariant keeps an allow-listed value', async () => {
-    const dir = mkdtempSync(path.join(tmpdir(), 'meow-var-'))
+    const dir = mkdtempSync(path.join(tmpdir(), 'bs-var-'))
     try {
-      const cfgPath = path.join(dir, 'meow.json')
+      const cfgPath = path.join(dir, 'bs.json')
       writeFileSync(cfgPath, JSON.stringify({
         provider: { test: { apiKey: 'sk-test', models: ['test-model'] } },
         model: 'test'
@@ -1325,13 +1325,13 @@ Note: `manager.send` already awaits; `register()` being async is fine because `i
 
 - [ ] **Step 4: Run tests + typecheck**
 
-Run: `npx vitest run tests/unit/meow-agent-manager.test.ts` then `npm run typecheck`
+Run: `npx vitest run tests/unit/bs-agent-manager.test.ts` then `npm run typecheck`
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/main/agent/loop.ts src/main/meow-agent-manager.ts tests/unit/meow-agent-manager.test.ts
+git add src/main/agent/loop.ts src/main/bs-agent-manager.ts tests/unit/bs-agent-manager.test.ts
 git commit -m "feat(manager): resolve variant descriptor at register, pass via variantOptions"
 ```
 
@@ -1354,7 +1354,7 @@ Expected: PASS. Specifically:
 - `tests/unit/model-variants.test.ts` — 9 cases
 - `tests/unit/models-catalog.test.ts` — updated
 - `tests/unit/llm-variant.test.ts` — 4 cases
-- `tests/unit/meow-agent-manager.test.ts` — variant tests updated
+- `tests/unit/bs-agent-manager.test.ts` — variant tests updated
 
 - [ ] **Step 3: build + e2e**
 
@@ -1364,7 +1364,7 @@ Expected: build pass, 7 e2e pass.
 - [ ] **Step 4: manual check**
 
 Run: `npm run dev`
-With the user's `meow.json` (deepseek + minimax):
+With the user's `bs.json` (deepseek + minimax):
 - minimax/MiniMax-M3 agent → picker shows `[Default, none, thinking]`.
 - deepseek/deepseek-v4-flash → `[Default, low, medium, high, max]` (after snapshot has `medium` from variants() — note: with `reasoning_options` present, effort values win; deepseek-v4-flash has explicit effort `[low,high,max]` in catalog so it shows those, NOT medium. The `[low,medium,high,max]` case applies when reasoning_options is absent.)
 
@@ -1378,5 +1378,5 @@ If a provider's picker still empty, verify snapshot has `npm` + `reasoning` for 
 - [ ] No placeholder steps ("TBD", "implement later", "similar to").
 - [ ] Type consistency: `VariantBody = Record<string, unknown>` used everywhere; `variantOptions?: Record<string, unknown>` in `LlmStreamOptions` + `LoopDeps`; `getVariantOptions` returns `VariantBody | undefined`; `computeVariants` returns `VariantDescriptor | undefined`.
 - [ ] `register()` stays sync — variantOptions read from sync `modelVariants` map.
-- [ ] Namespace matches meow's client routing: `anthropic`→`anthropic`, `google`→`google`, else→`openaiCompatible`.
+- [ ] Namespace matches bs's client routing: `anthropic`→`anthropic`, `google`→`google`, else→`openaiCompatible`.
 - [ ] Commit messages match repo style.

@@ -217,7 +217,7 @@ In `createWindow()`, spread the platform config into the `BrowserWindow` constru
   win = new BrowserWindow({
     width: 1400,
     height: 900,
-    title: 'Meow Coding',
+    title: 'BS Coding',
     backgroundColor: '#1e1e1e',
     ...getWindowChromeOptions(process.platform),
     webPreferences: {
@@ -411,7 +411,7 @@ export default function TitleBar() {
     >
       <div className="title-bar-brand">
         <img src={logoMark} className="title-bar-logo" alt="" />
-        <span className="title-bar-title">Meow Coding</span>
+        <span className="title-bar-title">BS Coding</span>
       </div>
       {showCustomControls && (
         <div className="title-bar-controls">
@@ -536,7 +536,7 @@ Expected: builds without errors
 
 - [ ] **Step 3: Visual check on Windows (current environment)**
 
-Launch the built app and screenshot the title bar to confirm: logo + "Meow Coding" text render on the
+Launch the built app and screenshot the title bar to confirm: logo + "BS Coding" text render on the
 left, background color matches the sidebar (`#252526`), and the native Windows minimize/maximize/close
 buttons appear at the top-right on the same row (drawn by the OS via `titleBarOverlay`, not by our
 code — nothing to assert in the screenshot beyond "buttons are present and the row is one continuous

@@ -6,9 +6,9 @@ Spec: `docs/superpowers/specs/2026-08-21-steering-inject-queued-messages-design.
 
 ## Context for the engineer
 
-Meow Coding's native agent runs a `while(true)` step loop in
+BS Coding's native agent runs a `while(true)` step loop in
 `src/main/agent/loop.ts` (`SessionRunner.run()`). Today, messages sent while an
-agent is running go into a per-agent serial queue (`MeowAgentManager.queues`,
+agent is running go into a per-agent serial queue (`BsAgentManager.queues`,
 max 5) and only run as a **new turn** after the current turn finishes
 (`drainQueue`). This plan implements **steering** (opencode v2 style): pending
 messages are injected into the running turn at the **step boundary**, the step
@@ -19,7 +19,7 @@ Key files & facts:
 - `src/main/agent/loop.ts` — `LoopDeps` interface (line 17); `run()` loop with
   a clear step boundary after tool calls (`executeCall`) and before the next
   `while` iteration.
-- `src/main/meow-agent-manager.ts` — `queues` map + `send()/removeQueued()/
+- `src/main/bs-agent-manager.ts` — `queues` map + `send()/removeQueued()/
   editQueued()/drainQueue()/emitQueue()`; builds `SessionRunner` deps (~line
   815); `runTurn()` appends user message + emits `user-message`.
 - `src/main/agent/session.ts` — `SessionStore`; has `replaceItems()`, no
@@ -36,7 +36,7 @@ Key files & facts:
 2. In `run()`, at the step boundary: if steers exist, append each as a user
    message (reuse `runTurn`-style append + `user-message` emit), reset `steps
    = 0`, `continue`.
-3. Wire `takeSteers` in `MeowAgentManager` (drain `this.queues`), and extend
+3. Wire `takeSteers` in `BsAgentManager` (drain `this.queues`), and extend
    `removeQueued` to also remove an already-injected message from the
    transcript; emit a `message-removed` event.
 4. Add `SessionStore.removeMessage()`.
@@ -48,7 +48,7 @@ Key files & facts:
 | File | Responsibility |
 | --- | --- |
 | `src/main/agent/loop.ts` | `takeSteers` dep + injection at step boundary |
-| `src/main/meow-agent-manager.ts` | wire `takeSteers`, remove-injected-message, emit removed event |
+| `src/main/bs-agent-manager.ts` | wire `takeSteers`, remove-injected-message, emit removed event |
 | `src/main/agent/session.ts` | `removeMessage()` |
 | `src/shared/ipc.ts` | `EventMessageRemoved` channel + api method |
 | `src/shared/types.ts` | `MessageRemovedEvent` type |
@@ -148,9 +148,9 @@ Run `npx vitest run tests/unit/agent-loop-steering.test.ts` — green.
 
 Commit: `feat(loop): inject steered messages at step boundary`.
 
-## Task 4 — Wire MeowAgentManager + remove-injected + event
+## Task 4 — Wire BsAgentManager + remove-injected + event
 
-**File: `src/main/meow-agent-manager.ts`**
+**File: `src/main/bs-agent-manager.ts`**
 
 1. In the `SessionRunner` deps, add:
 ```ts

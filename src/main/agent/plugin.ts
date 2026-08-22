@@ -27,7 +27,7 @@ export async function loadUserTools(dirs: string[]): Promise<ToolDefinition[]> {
           run: mod.run
         })
       } catch (err) {
-        console.error(`[meow] failed to load user tool "${entry}":`, err)
+        console.error(`[bs] failed to load user tool "${entry}":`, err)
       }
     }
   }

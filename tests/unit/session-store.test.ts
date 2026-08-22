@@ -19,7 +19,7 @@ describe('SessionStore', () => {
   let file: string
 
   beforeEach(() => {
-    dir = mkdtempSync(path.join(tmpdir(), 'meow-sess-'))
+    dir = mkdtempSync(path.join(tmpdir(), 'bs-sess-'))
     file = path.join(dir, 'sessions.json')
   })
 

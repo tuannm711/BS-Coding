@@ -16,6 +16,9 @@ import SettingsDialog from './components/settings/SettingsDialog'
 import BrowserDialog from './components/BrowserDialog'
 import InstallGuideDialog from './components/InstallGuideDialog'
 import UpdateDialog from './components/UpdateDialog'
+import { migrateBrandStorage } from './brand-storage'
+
+migrateBrandStorage(window.localStorage)
 
 export interface PaneModel {
   agent: AgentConfig
@@ -39,11 +42,11 @@ export default function App() {
   const [upToDateOpen, setUpToDateOpen] = useState(false)
   const manualCheckRef = useRef(false)
   const [terminals, setTerminals] = useState<TerminalInfo[]>([])
-  const [rightOpen, setRightOpen] = useState(() => localStorage.getItem('meow.rightpanel.open') !== '0')
+  const [rightOpen, setRightOpen] = useState(() => localStorage.getItem('bs.rightpanel.open') !== '0')
   const [rightTab, setRightTab] = useState<'tree' | 'artifacts'>(() =>
-    localStorage.getItem('meow.rightpanel.tab') === 'artifacts' ? 'artifacts' : 'tree')
+    localStorage.getItem('bs.rightpanel.tab') === 'artifacts' ? 'artifacts' : 'tree')
   const [rightWidth, setRightWidth] = useState(() => {
-    const w = Number(localStorage.getItem('meow.rightpanel.width'))
+    const w = Number(localStorage.getItem('bs.rightpanel.width'))
     return Number.isFinite(w) && w >= 240 && w <= 600 ? w : 280
   })
   const [artifacts, setArtifacts] = useState<Record<string, ArtifactEntry[]>>({})
@@ -55,13 +58,13 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    localStorage.setItem('meow.rightpanel.open', rightOpen ? '1' : '0')
+    localStorage.setItem('bs.rightpanel.open', rightOpen ? '1' : '0')
   }, [rightOpen])
   useEffect(() => {
-    localStorage.setItem('meow.rightpanel.tab', rightTab)
+    localStorage.setItem('bs.rightpanel.tab', rightTab)
   }, [rightTab])
   useEffect(() => {
-    localStorage.setItem('meow.rightpanel.width', String(rightWidth))
+    localStorage.setItem('bs.rightpanel.width', String(rightWidth))
   }, [rightWidth])
 
   useEffect(() => {

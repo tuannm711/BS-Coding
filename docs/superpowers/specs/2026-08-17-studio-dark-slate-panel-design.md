@@ -1,4 +1,4 @@
-# Meow Coding — Studio Dark: Slate Panel — Design
+# BS Coding — Studio Dark: Slate Panel — Design
 
 Ngày: 2026-08-17 · Trạng thái: đã duyệt với user (2026-08-17) · Bước: sau brainstorm
 

@@ -1,4 +1,4 @@
-# Meow Coding — Agent Traceability Panel: Implementation Plan
+# BS Coding — Agent Traceability Panel: Implementation Plan
 
 Ngày: 2026-08-16 · Spec: `docs/superpowers/specs/2026-08-16-agent-traceability-panel-design.md`
 
@@ -25,7 +25,7 @@ trace thô cho agent PTY, event log JSONL per-session, và sửa attribution sub
 | `src/main/agent/trace-store.ts` | **tạo mới** | `TraceStore`: JSONL append/read/delete/list |
 | `src/main/agent/task.ts` | sửa | `agentId` thật (`sub-<type>-<id>`) + `parentTaskId` + `turn` |
 | `src/main/agent/loop.ts` | sửa | `LoopDeps.turn`, emit `turn` trong `ChatEvent` |
-| `src/main/meow-agent-manager.ts` | sửa | Ghi trace khi emit event; sửa `deleteSession`/`removeAgent` xóa trace file |
+| `src/main/bs-agent-manager.ts` | sửa | Ghi trace khi emit event; sửa `deleteSession`/`removeAgent` xóa trace file |
 | `src/main/index.ts` | sửa | `TraceStore` khởi tạo, IPC handlers, PTY `pty-run` trace, forward `EventTrace` |
 | `src/preload/index.ts` | sửa | Expose `traceList/read/delete/onTraceEvent` |
 | `src/renderer/src/components/Pane.tsx` | sửa | Tab Chat ↔ Trace state |
@@ -102,16 +102,16 @@ trace thô cho agent PTY, event log JSONL per-session, và sửa attribution sub
 
 ---
 
-## Task 4 — Ghi trace từ MeowAgentManager
+## Task 4 — Ghi trace từ BsAgentManager
 
-**Sửa `src/main/meow-agent-manager.ts`:**
-- `MeowAgentManagerDeps` thêm `trace?: TraceStore`.
+**Sửa `src/main/bs-agent-manager.ts`:**
+- `BsAgentManagerDeps` thêm `trace?: TraceStore`.
 - Trong `setOnEvent` callback: sau khi gọi `cb(e)`, gọi `this.deps.trace?.append(sessionId, normalizeChatEvent(e))` với `sessionId` = active session của `e.agentId`.
 - Helper `normalizeChatEvent(e: ChatEvent): Omit<TraceEvent,'seq'|'ts'>` — map `text-delta`→`message`, `tool-start/result`→`tool-start/result` (kèm `durationMs` đo từ `tool-start`→`tool-result` qua Map callId→ts), `turn-started`→`turn-started`, `subagent-event`→`subagent`, `compacted`→`compaction`, `error`/`done`/`usage` tương ứng.
 - **Turn counter:** thêm `turnCounters: Map<agentId, number>`; increment khi `turn-started`; truyền `turn` vào `SessionRunner` khi tạo (ở `startTurn`).
 - `deleteSession` + `removeAgent`: gọi `this.deps.trace?.delete(sessionId)` (deleteSession) và `trace.delete` cho mọi session của agent (removeAgent).
 
-**Test:** `tests/unit/agent-trace-store.test.ts` mở rộng hoặc test mới `tests/unit/agent-trace-manager.test.ts` — mock `MeowAgentManager` emit `ChatEvent` → assert `trace.append` được gọi với event đúng `agentId`/`turn`/`seq` tăng.
+**Test:** `tests/unit/agent-trace-store.test.ts` mở rộng hoặc test mới `tests/unit/agent-trace-manager.test.ts` — mock `BsAgentManager` emit `ChatEvent` → assert `trace.append` được gọi với event đúng `agentId`/`turn`/`seq` tăng.
 
 **Commit:** `feat(agent): write trace events from manager with turn counter`
 
@@ -121,7 +121,7 @@ trace thô cho agent PTY, event log JSONL per-session, và sửa attribution sub
 
 **Sửa `src/main/index.ts`:**
 - Khởi tạo `traces = new TraceStore(path.join(app.getPath('userData'), 'traces'))`.
-- Truyền `trace: traces` vào `MeowAgentManager` deps.
+- Truyền `trace: traces` vào `BsAgentManager` deps.
 - `registerIpcHandlers` thêm:
   - `Channels.TraceList` → `traces.listForAgent(agentId)`
   - `Channels.TraceRead` → `traces.read(sessionId)`
@@ -191,7 +191,7 @@ trace thô cho agent PTY, event log JSONL per-session, và sửa attribution sub
 
 ## Task 8 — Xóa trace khi xóa session + polish
 
-**Sửa `src/main/meow-agent-manager.ts`:** đã làm trong Task 4 — verify.
+**Sửa `src/main/bs-agent-manager.ts`:** đã làm trong Task 4 — verify.
 **Sửa renderer:** khi `SessionBar` đổi session → TracePanel reload (`sessionId` prop từ Pane → pass vào TracePanel; thay đổi → re-read).
 
 **Polish:**

@@ -1,4 +1,4 @@
-# Meow Coding — Hiển thị câu hỏi lựa chọn (multiple choice) theo opencode
+# BS Coding — Hiển thị câu hỏi lựa chọn (multiple choice) theo opencode
 
 **Goal:** Cho phép model hỏi câu hỏi **lựa chọn** và hiển thị các option để người dùng chọn (giống opencode), thay vì chỉ có ô nhập text. Tham khảo source opencode `D:\GitHub\opencode-1.18.11`:
 

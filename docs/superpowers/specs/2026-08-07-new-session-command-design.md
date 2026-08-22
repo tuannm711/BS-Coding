@@ -1,4 +1,4 @@
-# Meow Coding — `/new` command (new session) — Design
+# BS Coding — `/new` command (new session) — Design
 
 Ngày: 2026-08-07 · Trạng thái: chờ duyệt · Bước: sau brainstorm
 
@@ -10,12 +10,12 @@ mới, renderer reset view + reload session list.
 
 ## 2. Hiện trạng
 
-- Slash commands (built-in + user + project) được dispatch qua `MeowAgentManager.runCommand`
-  (`src/main/meow-agent-manager.ts:572`): resolve template → `send(agentId, text)` → gửi prompt cho LLM.
+- Slash commands (built-in + user + project) được dispatch qua `BsAgentManager.runCommand`
+  (`src/main/bs-agent-manager.ts:572`): resolve template → `send(agentId, text)` → gửi prompt cho LLM.
 - Command là model prompt-dispatch; **chưa có khái niệm "system command"** (hành động không gửi prompt).
 - Tạo session hiện chỉ qua UI: nút New session trong `SessionBar` → `ChatPanel.handleCreateSession`
   (`createSession` + `resetView` + `reloadSessions`).
-- Session tạo mới từ main: `MeowAgentManager.createSession` (`stop(agentId)` + `store.create` + set
+- Session tạo mới từ main: `BsAgentManager.createSession` (`stop(agentId)` + `store.create` + set
   active). Có wrapper public `newSession(agentId)`.
 
 ## 3. Thiết kế mới
@@ -44,7 +44,7 @@ export const NEW_COMMAND: Command = {
 
 ### 3c. `runCommand` dispatch
 
-`src/main/meow-agent-manager.ts` `runCommand`: sau khi tìm thấy command, nếu `command.type === 'system'`
+`src/main/bs-agent-manager.ts` `runCommand`: sau khi tìm thấy command, nếu `command.type === 'system'`
 thì dispatch handler (hiện chỉ có `new`):
 
 ```ts
@@ -75,9 +75,9 @@ có — **không** thêm channel/IPC method mới.
 |---|---|
 | `src/shared/types.ts` | `Command.type?`; `ChatEvent` thêm `session-created` |
 | `src/main/agent/commands.ts` | `NEW_COMMAND` builtin |
-| `src/main/meow-agent-manager.ts` | `runCommand` dispatch system command |
+| `src/main/bs-agent-manager.ts` | `runCommand` dispatch system command |
 | `src/renderer/src/components/chat/ChatPanel.tsx` | `applyEvent` xử lý `session-created` |
-| `tests/unit/meow-agent-manager.test.ts` | Test `/new` tạo session + emit event |
+| `tests/unit/bs-agent-manager.test.ts` | Test `/new` tạo session + emit event |
 
 ## 5. Không đổi
 

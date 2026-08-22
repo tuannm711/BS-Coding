@@ -7,14 +7,14 @@ describe('createChromeLauncher.showInstallGuide', () => {
     const send = vi.fn()
     const launcher = createChromeLauncher({
       getWindow: () => ({ webContents: { send } }) as never,
-      extensionDir: 'C:\\Users\\test\\AppData\\Roaming\\meow-coding\\browser-extension'
+      extensionDir: 'C:\\Users\\test\\AppData\\Roaming\\bs-coding\\browser-extension'
     })
 
     await launcher.showInstallGuide()
 
     expect(send).toHaveBeenCalledWith(
       Channels.EventBrowserOpenInstallGuide,
-      { extensionDir: 'C:\\Users\\test\\AppData\\Roaming\\meow-coding\\browser-extension' }
+      { extensionDir: 'C:\\Users\\test\\AppData\\Roaming\\bs-coding\\browser-extension' }
     )
   })
 

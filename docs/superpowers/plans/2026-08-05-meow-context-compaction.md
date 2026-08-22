@@ -1,4 +1,4 @@
-# Meow Coding — Context Compaction (theo model opencode): Kế hoạch triển khai
+# BS Coding — Context Compaction (theo model opencode): Kế hoạch triển khai
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -12,7 +12,7 @@ truncate tool output 2,000 ký tự. **Xoá hẳn `maxContextChars` + `pruneTran
 `packages/core/src/util/token.ts`.
 
 **Phạm vi:** `src/main/agent/{token,compact,config,loop,message,session}.ts`,
-`src/main/{models-catalog,meow-agent-manager}.ts`, `src/shared/types.ts`,
+`src/main/{models-catalog,bs-agent-manager}.ts`, `src/shared/types.ts`,
 `src/renderer/src/components/chat/ChatPanel.tsx`, tests.
 
 ---
@@ -31,9 +31,9 @@ truncate tool output 2,000 ký tự. **Xoá hẳn `maxContextChars` + `pruneTran
 
 ## 3. Config (`src/main/agent/config.ts`)
 
-- `MeowCompactionConfig { auto: boolean; buffer: number; keepTokens: number; tailTurns: number; toolOutputMaxChars: number }`.
-- `MeowConfig` thêm `maxContextTokens: number` (mặc định 200_000) + `compaction: MeowCompactionConfig`.
-- `DEFAULT_MEOW_CONFIG`: `compaction = { auto: true, buffer: 20_000, keepTokens: 8_000, tailTurns: 2, toolOutputMaxChars: 2_000 }`.
+- `BSCompactionConfig { auto: boolean; buffer: number; keepTokens: number; tailTurns: number; toolOutputMaxChars: number }`.
+- `BsConfig` thêm `maxContextTokens: number` (mặc định 200_000) + `compaction: BSCompactionConfig`.
+- `DEFAULT_BS_CONFIG`: `compaction = { auto: true, buffer: 20_000, keepTokens: 8_000, tailTurns: 2, toolOutputMaxChars: 2_000 }`.
 - `mergeDefaults`/`settingsToConfig` bỏ `maxContextChars`, merge `compaction` + `maxContextTokens`.
 
 ## 4. Compact module (`src/main/agent/compact.ts`)
@@ -49,7 +49,7 @@ truncate tool output 2,000 ký tự. **Xoá hẳn `maxContextChars` + `pruneTran
 
 ## 5. Loop (`src/main/agent/loop.ts`)
 
-- `LoopDeps` thêm: `compaction?: MeowCompactionConfig`, `maxContextTokens?: number`,
+- `LoopDeps` thêm: `compaction?: BSCompactionConfig`, `maxContextTokens?: number`,
   `replaceItems?: (items: TranscriptItem[]) => void`; **bỏ `maxContextChars`**.
 - Trong `run()`, đầu mỗi step: `await this.maybeCompact(signal)`.
 - `maybeCompact`: bỏ qua nếu `!auto || maxContextTokens<=0 || !replaceItems`; ước lượng
@@ -69,7 +69,7 @@ truncate tool output 2,000 ký tự. **Xoá hẳn `maxContextChars` + `pruneTran
 
 - Thêm `replaceItems(id: string, items: ChatTranscriptItem[]): void` (set items + touch updatedAt).
 
-## 8. Manager (`src/main/meow-agent-manager.ts`)
+## 8. Manager (`src/main/bs-agent-manager.ts`)
 
 - `register()`: resolve `contextTokens` từ `catalog.getModelLimit(provider, model)?.context ??
   cfg.maxContextTokens`; pass `compaction: cfg.compaction`, `replaceItems`.

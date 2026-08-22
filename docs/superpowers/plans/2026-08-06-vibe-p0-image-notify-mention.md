@@ -1,4 +1,4 @@
-# Meow Coding — Vibe P0: Image input, Background+Notify, @-mention UI — Implementation Plan
+# BS Coding — Vibe P0: Image input, Background+Notify, @-mention UI — Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -18,7 +18,7 @@
 - Modify: `src/shared/types.ts` — `ImageAttachment`, `ChatMessage.images?`, `BackgroundState`, `FileSuggestion`.
 - Modify: `src/shared/ipc.ts` — `Channels.FilesSuggest`, `Channels.AgentSetBackground`, `Channels.SessionExport`(dùng chung P2), `AgentApi` methods; `sendChat` signature + images.
 - Modify: `src/main/agent/message.ts` — `toLlmMessages` emits image parts for user messages.
-- Modify: `src/main/meow-agent-manager.ts` — `send(agentId, text, images?)`, background state, notify hooks.
+- Modify: `src/main/bs-agent-manager.ts` — `send(agentId, text, images?)`, background state, notify hooks.
 - Create: `src/main/notification-service.ts` — wraps Electron `Notification`; focus-window click handling; dedupe/spam guard.
 - Create: `src/main/file-suggest.ts` — glob-based `@` suggestions (limit 20, ignore node_modules/.git/out).
 - Modify: `src/main/agent/references.ts` — support `./` prefix and `@"path with space"` syntax.
@@ -29,7 +29,7 @@
 - Modify: `src/renderer/src/components/PaneHeader.tsx` — "run in background" toggle button.
 - Modify: `src/renderer/src/App.tsx` — background state map; badge strip when backgrounded.
 - Modify: `src/renderer/src/components/Sidebar.tsx` — collapsed badge indicators (optional, same state source).
-- Test: `tests/unit/ipc-contract.test.ts`, `tests/unit/agent-message.test.ts`, `tests/unit/agent-references.test.ts`, new `tests/unit/file-suggest.test.ts`, `tests/unit/notification-service.test.ts`, `tests/unit/meow-agent-manager.test.ts`.
+- Test: `tests/unit/ipc-contract.test.ts`, `tests/unit/agent-message.test.ts`, `tests/unit/agent-references.test.ts`, new `tests/unit/file-suggest.test.ts`, `tests/unit/notification-service.test.ts`, `tests/unit/bs-agent-manager.test.ts`.
 
 ---
 
@@ -123,7 +123,7 @@ export interface FileSuggestion {
 
 ## Task 3: Main — send() accepts images; toLlmMessages emits image parts
 
-**Files:** `src/main/agent/message.ts`, `src/main/meow-agent-manager.ts`, `tests/unit/agent-message.test.ts`, `tests/unit/meow-agent-manager.test.ts`
+**Files:** `src/main/agent/message.ts`, `src/main/bs-agent-manager.ts`, `tests/unit/agent-message.test.ts`, `tests/unit/bs-agent-manager.test.ts`
 
 - [ ] **Step 1: Write failing tests**
 
@@ -143,7 +143,7 @@ export interface FileSuggestion {
   })
 ```
 
-`tests/unit/meow-agent-manager.test.ts`:
+`tests/unit/bs-agent-manager.test.ts`:
 ```ts
   it('send() passes images into stored user message', async () => {
     // fake store.appendMessage capture; gọi manager.send('a1', 'hi', [img]); assert appendMessage nhận images
@@ -218,7 +218,7 @@ Lightbox: state `lightboxUrl` + overlay div (click → đóng).
 
 ## Task 6: Main — NotificationService + notify on needs-input / done
 
-**Files:** create `src/main/notification-service.ts`, `src/main/meow-agent-manager.ts`, `src/main/index.ts`, test `tests/unit/notification-service.test.ts`
+**Files:** create `src/main/notification-service.ts`, `src/main/bs-agent-manager.ts`, `src/main/index.ts`, test `tests/unit/notification-service.test.ts`
 
 - [ ] **Step 1: Write failing test** — `tests/unit/notification-service.test.ts`:
 ```ts
@@ -259,12 +259,12 @@ export class NotificationService {
   }
 }
 ```
-- [ ] **Step 4: Wire manager** — trong `MeowAgentManager`:
+- [ ] **Step 4: Wire manager** — trong `BsAgentManager`:
   - Constructor nhận thêm `notify?: NotificationService` (optional dep, default undefined → no-op).
-  - `awaitPrompt` set pendingPrompt xong → `this.deps.notify?.notify({title: '[meow] Cần bạn nhập', body: `${agent.name} đang chờ...`, agentId, onActivate: () => this.deps.onActivateAgent?.(agentId)})`.
-  - `setOnEvent` khi `e.type === 'done'` → notify `[meow] Hoàn thành` kèm reason/cost (nếu có); khi `e.type === 'error'` → `[meow] Lỗi`.
-- [ ] **Step 5: Wire index.ts** — tạo `new NotificationService(() => !win || !win.isFocused())`; truyền vào `MeowAgentManager` deps + `onActivateAgent` (focus window: `win.show(); win.focus()` — renderer sẽ tự mở pane qua `EventAgentBackground`/focus event).
-- [ ] **Step 6: Notifications config (spec §7)** — `src/shared/types.ts`: `NotificationsSettings { needsInput: boolean; onDone: boolean }`; `MeowSettings.notifications?`; `src/main/agent/config.ts`: `DEFAULT_NOTIFICATIONS = { needsInput: true, onDone: true }` + normalize + wire; `ContextTab.tsx` thêm row "Notifications" (2 toggle). Test: `agent-config.test.ts` normalize.
+  - `awaitPrompt` set pendingPrompt xong → `this.deps.notify?.notify({title: '[bs] Cần bạn nhập', body: `${agent.name} đang chờ...`, agentId, onActivate: () => this.deps.onActivateAgent?.(agentId)})`.
+  - `setOnEvent` khi `e.type === 'done'` → notify `[bs] Hoàn thành` kèm reason/cost (nếu có); khi `e.type === 'error'` → `[bs] Lỗi`.
+- [ ] **Step 5: Wire index.ts** — tạo `new NotificationService(() => !win || !win.isFocused())`; truyền vào `BsAgentManager` deps + `onActivateAgent` (focus window: `win.show(); win.focus()` — renderer sẽ tự mở pane qua `EventAgentBackground`/focus event).
+- [ ] **Step 6: Notifications config (spec §7)** — `src/shared/types.ts`: `NotificationsSettings { needsInput: boolean; onDone: boolean }`; `BsSettings.notifications?`; `src/main/agent/config.ts`: `DEFAULT_NOTIFICATIONS = { needsInput: true, onDone: true }` + normalize + wire; `ContextTab.tsx` thêm row "Notifications" (2 toggle). Test: `agent-config.test.ts` normalize.
 - [ ] **Step 7: Run tests** → PASS. Manual: minimize app, agent hỏi question → OS notification hiện; click → window focus. Tắt toggle `onDone` → không notify khi xong.
 - [ ] **Step 8: Commit** — `git commit -m "main: OS notifications when agent needs input or finishes (configurable)"`
 
@@ -272,14 +272,14 @@ export class NotificationService {
 
 ## Task 7: Background mode — per-agent badge strip
 
-**Files:** `src/main/meow-agent-manager.ts`, `src/main/index.ts`, `src/renderer/src/App.tsx`, `src/renderer/src/components/PaneHeader.tsx`, `src/renderer/src/components/PaneGrid.tsx`, `src/shared/ipc.ts` (đã có channel ở Task 2)
+**Files:** `src/main/bs-agent-manager.ts`, `src/main/index.ts`, `src/renderer/src/App.tsx`, `src/renderer/src/components/PaneHeader.tsx`, `src/renderer/src/components/PaneGrid.tsx`, `src/shared/ipc.ts` (đã có channel ở Task 2)
 
-- [ ] **Step 1: Main** — `MeowAgentManager.setBackground(agentId, background: boolean)`: lưu `Map<string, boolean>`; emit event mới qua `Channels.EventAgentBackground` (dùng `onEvent`? không — thêm method `setBackground` gọi `emitBackground` callback riêng hoặc dùng `EventChat` với type mới `background-changed`). Chọn: thêm vào `ChatEvent`:
+- [ ] **Step 1: Main** — `BsAgentManager.setBackground(agentId, background: boolean)`: lưu `Map<string, boolean>`; emit event mới qua `Channels.EventAgentBackground` (dùng `onEvent`? không — thêm method `setBackground` gọi `emitBackground` callback riêng hoặc dùng `EventChat` với type mới `background-changed`). Chọn: thêm vào `ChatEvent`:
 ```ts
   | { type: 'background-changed'; agentId: string; background: boolean }
 ```
-(index.ts `win.webContents.send(Channels.EventChat, e)` đã forward mọi ChatEvent → renderer nhận được qua `onChatEvent` — không cần channel mới. Nhưng spec §7 đã hứa `EventAgentBackground` — giữ channel mới cho rõ: index.ts gọi `mainApp.meowAgent.setBackground(...)` → callback `onBackgroundChange` set ở index.ts → `win.webContents.send(Channels.EventAgentBackground, ...)`. Chọn cách này.)
-- [ ] **Step 2: IPC handler** — `ipcMain.handle(Channels.AgentSetBackground, (_e, agentId, bg) => mainApp.meowAgent.setBackground(agentId, bg))`.
+(index.ts `win.webContents.send(Channels.EventChat, e)` đã forward mọi ChatEvent → renderer nhận được qua `onChatEvent` — không cần channel mới. Nhưng spec §7 đã hứa `EventAgentBackground` — giữ channel mới cho rõ: index.ts gọi `mainApp.bsAgent.setBackground(...)` → callback `onBackgroundChange` set ở index.ts → `win.webContents.send(Channels.EventAgentBackground, ...)`. Chọn cách này.)
+- [ ] **Step 2: IPC handler** — `ipcMain.handle(Channels.AgentSetBackground, (_e, agentId, bg) => mainApp.bsAgent.setBackground(agentId, bg))`.
 - [ ] **Step 3: Renderer App.tsx** — state `backgrounds: Record<string, boolean>`; subscribe `onAgentBackground`; PaneGrid render: nếu `backgrounds[agentId]` → thay pane content bằng **badge strip** (tên agent + status + cost chip + "click to open"); click → `setAgentBackground(agentId, false)`.
 - [ ] **Step 4: PaneHeader** — nút toggle "background" (icon), gọi `window.api.setAgentBackground`.
 - [ ] **Step 5: Manual check** — bật background → pane thu gọn thành badge, agent vẫn chạy (chat event vẫn đến), click badge → mở lại đầy đủ.
@@ -289,7 +289,7 @@ export class NotificationService {
 
 ## Task 8: @-mention — main file suggestions
 
-**Files:** create `src/main/file-suggest.ts`, `src/main/index.ts`, `src/main/meow-agent-manager.ts`, test `tests/unit/file-suggest.test.ts`, `tests/unit/ipc-contract.test.ts`
+**Files:** create `src/main/file-suggest.ts`, `src/main/index.ts`, `src/main/bs-agent-manager.ts`, test `tests/unit/file-suggest.test.ts`, `tests/unit/ipc-contract.test.ts`
 
 - [ ] **Step 1: Write failing test** — `tests/unit/file-suggest.test.ts`:
 ```ts
@@ -325,7 +325,7 @@ export async function suggestFiles(cwd: string, prefix: string): Promise<FileSug
   })
 }
 ```
-- [ ] **Step 4: IPC handler** — `src/main/index.ts`: `ipcMain.handle(Channels.FilesSuggest, (_e, agentId, prefix) => mainApp.meowAgent.suggestFiles(agentId, prefix))`; manager method `suggestFiles` lấy `agent.cwd` rồi gọi `suggestFiles(cwd, prefix)`.
+- [ ] **Step 4: IPC handler** — `src/main/index.ts`: `ipcMain.handle(Channels.FilesSuggest, (_e, agentId, prefix) => mainApp.bsAgent.suggestFiles(agentId, prefix))`; manager method `suggestFiles` lấy `agent.cwd` rồi gọi `suggestFiles(cwd, prefix)`.
 - [ ] **Step 5: Run tests** → PASS.
 - [ ] **Step 6: Commit** — `git commit -m "main: file suggestion for @ mentions"`
 
@@ -374,7 +374,7 @@ Giữ backward-compatible với `@path` không space; `./` prefix được `path
 ## Task 11: Final — full verification
 
 - [ ] **Step 1:** `npm run typecheck` — PASS.
-- [ ] **Step 2:** `npm test` — PASS (đặc biệt `agent-message`, `agent-references`, `file-suggest`, `notification-service`, `ipc-contract`, `meow-agent-manager`).
+- [ ] **Step 2:** `npm test` — PASS (đặc biệt `agent-message`, `agent-references`, `file-suggest`, `notification-service`, `ipc-contract`, `bs-agent-manager`).
 - [ ] **Step 3:** `npm run build && npm run e2e` — PASS (đụng IPC + UI chính).
 - [ ] **Step 4:** Manual smoke: paste ảnh → agent vision nhận; background badge + notification khi minimize; gõ `@` → dropdown + expand.
 - [ ] **Step 5:** Cập nhật `docs/superpowers/notes/` nếu cần ghi chú feature mới.

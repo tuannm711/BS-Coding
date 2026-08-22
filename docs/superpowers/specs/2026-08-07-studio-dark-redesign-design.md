@@ -1,4 +1,4 @@
-# Meow Coding — Studio Dark: Instrument Panel — Design
+# BS Coding — Studio Dark: Instrument Panel — Design
 
 Ngày: 2026-08-07 · Trạng thái: chờ duyệt · Bước: sau brainstorm (đã chốt hướng với user)
 

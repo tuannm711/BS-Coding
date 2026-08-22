@@ -1,18 +1,18 @@
-# Meow Coding — Message Queue (port từ opencode runtime.queue.ts) — Design
+# BS Coding — Message Queue (port từ opencode runtime.queue.ts) — Design
 
 Ngày: 2026-08-06 · Trạng thái: chờ duyệt · Bước: sau brainstorm (đã chốt thiết kế với user)
 
 ## 1. Mục tiêu
 
 Port tính năng **serial prompt queue** từ opencode (`packages/opencode/src/cli/cmd/run/runtime.queue.ts`)
-vào Meow Coding: user gõ message khi agent đang chạy → message được **xếp hàng** thay vì bị drop;
+vào BS Coding: user gõ message khi agent đang chạy → message được **xếp hàng** thay vì bị drop;
 queue drain **tuần tự từng turn**; message chờ hiển thị trong chat feed, có thể **xóa/edit** trước khi
 tới lượt.
 
-## 2. Hiện trạng meow-coding
+## 2. Hiện trạng bs-coding
 
 - `ChatInput.tsx`: textarea `disabled={running}` → user **không gõ được** khi agent đang chạy.
-- `meow-agent-manager.ts` `send()`: `if (this.running.has(agentId)) return` → message bị **drop** khi running.
+- `bs-agent-manager.ts` `send()`: `if (this.running.has(agentId)) return` → message bị **drop** khi running.
 
 ## 3. Thiết kế mới
 
@@ -27,7 +27,7 @@ tới lượt.
 
 ### Kiến trúc
 
-#### Main — `meow-agent-manager.ts`
+#### Main — `bs-agent-manager.ts`
 - Thêm `queues = new Map<string, QueuedMessage[]>()` (per-agent), `QueuedMessage = { id, text, images? }`.
 - `send(agentId, text, images?)`:
   - Nếu `running.has(agentId)` → `queue.length < 5` thì push + emit `queue-updated`; ngược lại emit error "queue full".
@@ -57,13 +57,13 @@ tới lượt.
 
 - `src/shared/types.ts` — `QueuedMessage`, `ChatEvent.queue-updated`
 - `src/shared/ipc.ts` — channels + AgentApi methods
-- `src/main/meow-agent-manager.ts` — queue logic + drain
+- `src/main/bs-agent-manager.ts` — queue logic + drain
 - `src/main/index.ts` — IPC handlers
 - `src/preload/index.ts` — expose API
 - `src/renderer/src/components/chat/ChatPanel.tsx` — queue UI + edit flow
 - `src/renderer/src/components/chat/ChatInput.tsx` — bỏ disabled, nhận editTarget
 - `src/renderer/src/styles.css` — badge `queued`
-- Tests: `tests/unit/ipc-contract.test.ts`, `tests/unit/meow-agent-manager.test.ts` (queue), e2e
+- Tests: `tests/unit/ipc-contract.test.ts`, `tests/unit/bs-agent-manager.test.ts` (queue), e2e
 
 ## 5. Giới hạn / quyết định
 

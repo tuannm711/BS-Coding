@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { decidePermission, PLAN_RULES } from '../../src/main/agent/permission'
-import { DEFAULT_MEOW_CONFIG } from '../../src/main/agent/config'
+import { DEFAULT_BS_CONFIG } from '../../src/main/agent/config'
 import type { PermissionRule } from '../../src/main/agent/config'
 
 const noSaved = () => false
@@ -27,12 +27,12 @@ describe('decidePermission (build mode)', () => {
   })
 
   it('allows the question tool without a separate permission prompt', () => {
-    expect(decidePermission('build', DEFAULT_MEOW_CONFIG.permission, noSaved, 'question')).toBe('allow')
+    expect(decidePermission('build', DEFAULT_BS_CONFIG.permission, noSaved, 'question')).toBe('allow')
   })
 
   it('allows browser tools by default in build mode', () => {
-    expect(decidePermission('build', DEFAULT_MEOW_CONFIG.permission, noSaved, 'browser_click')).toBe('allow')
-    expect(decidePermission('build', DEFAULT_MEOW_CONFIG.permission, noSaved, 'browser_navigate')).toBe('allow')
+    expect(decidePermission('build', DEFAULT_BS_CONFIG.permission, noSaved, 'browser_click')).toBe('allow')
+    expect(decidePermission('build', DEFAULT_BS_CONFIG.permission, noSaved, 'browser_navigate')).toBe('allow')
   })
 })
 

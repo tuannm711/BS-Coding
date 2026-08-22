@@ -15,11 +15,11 @@ import type { ToolContext } from '../../src/main/agent/tools/types'
 let dir: string
 const ctx: ToolContext = {
   cwd: '',
-  ask: async (q) => (q.question === 'what is your name?' ? 'meow' : null)
+  ask: async (q) => (q.question === 'what is your name?' ? 'bs' : null)
 }
 
 beforeEach(() => {
-  dir = mkdtempSync(path.join(tmpdir(), 'meow-tools-'))
+  dir = mkdtempSync(path.join(tmpdir(), 'bs-tools-'))
   ctx.cwd = dir
 })
 
@@ -180,7 +180,7 @@ describe('todowrite', () => {
 describe('question', () => {
   it('returns the user answer via ctx.ask', async () => {
     const r = await questionTool.run({ question: 'what is your name?' }, ctx)
-    expect(r.output).toContain('meow')
+    expect(r.output).toContain('bs')
   })
 
   it('forwards options to ctx.ask and returns the selected label', async () => {

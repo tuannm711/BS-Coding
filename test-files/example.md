@@ -1,6 +1,6 @@
 # File Viewer Test — Markdown
 
-Đây là file markdown để test tính năng **xem file popup** của Meow.
+Đây là file markdown để test tính năng **xem file popup** của BS.
 
 ## Heading cấp 2
 
@@ -17,7 +17,7 @@
 
 ```js
 // Code block với syntax highlight (nếu có)
-const greeting = 'Hello Meow!'
+const greeting = 'Hello BS!'
 console.log(greeting)
 ```
 

@@ -1,4 +1,4 @@
-# Meow Coding — Sidebar Collapse to Icon Rail — Design
+# BS Coding — Sidebar Collapse to Icon Rail — Design
 
 Ngày: 2026-08-17 · Trạng thái: đã duyệt với user · Bước: sau brainstorm
 
@@ -14,13 +14,13 @@ giúp tiết kiệm màn hình khi làm việc sâu. Trạng thái được nh�
   tooltip hiện tên đầy đủ; click mở project; active project highlight accent. Chỉ còn nút expand
   (Add Project ẩn khi rail vì không có chỗ).
 - **Expanded**: hiển thị full list như hiện tại.
-- **Persist**: `localStorage` key `meow.sidebar.collapsed` (`'1'`/`'0'`), khởi tạo state từ đó.
+- **Persist**: `localStorage` key `bs.sidebar.collapsed` (`'1'`/`'0'`), khởi tạo state từ đó.
 - Local state trong Sidebar, không IPC.
 
 ## 3. Thiết kế chi tiết
 
 - `Sidebar.tsx`:
-  - `const [collapsed, setCollapsed] = useState(() => localStorage.getItem('meow.sidebar.collapsed') === '1')`
+  - `const [collapsed, setCollapsed] = useState(() => localStorage.getItem('bs.sidebar.collapsed') === '1')`
   - `useEffect` persist khi đổi.
   - Header: thêm `<button className="sidebar-toggle" title={collapsed ? 'Expand' : 'Collapse'}>`
     chevron SVG; xoay -180° khi collapsed.

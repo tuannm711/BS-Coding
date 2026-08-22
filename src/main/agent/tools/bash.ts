@@ -44,7 +44,7 @@ export const bashTool: ToolDefinition = {
     const fallbackCwd = existsSync(ctx.cwd) ? ctx.cwd : homedir()
     const usedFallback = fallbackCwd !== ctx.cwd
     const note = usedFallback
-      ? `[meow] working dir "${ctx.cwd}" khong ton tai, chay tu "${fallbackCwd}".\n`
+      ? `[bs] working dir "${ctx.cwd}" khong ton tai, chay tu "${fallbackCwd}".\n`
       : ''
     const resolved = buildShellCommand(command, fallbackCwd)
     return new Promise<ToolRunResult>(resolve => {
@@ -138,7 +138,7 @@ function whichPath(name: string): string | null {
 // Mirrors opencode: on Windows prefer Git Bash so unix commands and the
 // superpowers shell scripts (bash) work. Falls back to cmd.exe.
 function gitBashPath(): string | null {
-  if (process.env.MEOW_GIT_BASH_PATH) return process.env.MEOW_GIT_BASH_PATH
+  if (process.env.BS_GIT_BASH_PATH) return process.env.BS_GIT_BASH_PATH
   const systemDrive = process.env.SystemDrive ?? 'C:'
   const candidates: string[] = [
     path.join(systemDrive, 'Program Files', 'Git', 'bin', 'bash.exe'),

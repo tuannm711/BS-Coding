@@ -1,7 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { Channels } from '../shared/ipc'
 import type { ArtifactsChangedEvent } from '../shared/ipc'
-import type { ChatEvent, Command, ContextChangedEvent, FileViewerPayload, ImageAttachment, MeowSettings, NewAgentInput, PromptResponse, Template, TraceEvent, UpdaterStatusEvent } from '../shared/types'
+import type { ChatEvent, Command, ContextChangedEvent, FileViewerPayload, ImageAttachment, BsSettings, NewAgentInput, PromptResponse, Template, TraceEvent, UpdaterStatusEvent } from '../shared/types'
 import type { AgentApi, AgentConfigEvent, AgentStateEvent, BrowserInstallGuideEvent, GitStatusEvent, PtyDataEvent, TerminalExitEvent, WindowMaximizedChangeEvent } from '../shared/ipc'
 import type { BrowserStatusInfo } from '../shared/browser-types'
 import type { RemoteStatus } from '../shared/remote-types'
@@ -114,7 +114,7 @@ const api: AgentApi = {
   traceDelete: (sessionId: string) => ipcRenderer.invoke(Channels.TraceDelete, sessionId),
   onTraceEvent: (cb: (e: TraceEvent) => void) => subscribe(Channels.EventTrace, cb),
   getSettings: () => ipcRenderer.invoke(Channels.SettingsGet),
-  saveSettings: (settings: MeowSettings) => ipcRenderer.invoke(Channels.SettingsSave, settings),
+  saveSettings: (settings: BsSettings) => ipcRenderer.invoke(Channels.SettingsSave, settings),
   listCommands: (projectPath: string) => ipcRenderer.invoke(Channels.CommandList, projectPath),
   saveCommand: (command: Command) => ipcRenderer.invoke(Channels.CommandSave, command),
   removeCommand: (name: string) => ipcRenderer.invoke(Channels.CommandRemove, name),

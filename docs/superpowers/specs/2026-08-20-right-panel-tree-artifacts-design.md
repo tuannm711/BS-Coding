@@ -29,11 +29,11 @@ width is adjustable by dragging; open state, active tab and width persist.
   - Linux (`frame: false`, custom controls): before `.title-bar-controls`.
   - macOS (`hiddenInset`): far right (traffic lights are on the left).
   - Button: panel icon (VSCode-style), tooltip "Show Panel"/"Hide Panel".
-- Persistence (localStorage, following the existing `meow.sidebar.collapsed`
+- Persistence (localStorage, following the existing `bs.sidebar.collapsed`
   pattern):
-  - `meow.rightpanel.open` — `'1'`/`'0'`
-  - `meow.rightpanel.tab` — `'tree'` | `'artifacts'`
-  - `meow.rightpanel.width` — px number
+  - `bs.rightpanel.open` — `'1'`/`'0'`
+  - `bs.rightpanel.tab` — `'tree'` | `'artifacts'`
+  - `bs.rightpanel.width` — px number
 
 ## Tab nav (vertical)
 
@@ -94,7 +94,7 @@ interface ArtifactEntry {
    - `edit` and `apply-patch` tools → record (apply-patch can add new files).
    - Kind rule (all sources, incl. watcher fallback): `create` if the file does
      not exist after the operation, else `edit`.
-   - Wired: `SessionRunner` deps → `MeowAgentManager` → main app `ArtifactStore`.
+   - Wired: `SessionRunner` deps → `BsAgentManager` → main app `ArtifactStore`.
    - `ctx.agentId` identifies the agent; agent name resolved from the workspace
      agent config.
 
@@ -141,11 +141,11 @@ interface ArtifactEntry {
 - `src/main/artifact-store.ts` — **new**: per-project artifact collection +
   dedupe + clear
 - `src/main/index.ts` — IPC handlers, wire `ArtifactStore`, forward
-  `onArtifact` from `MeowAgentManager`, watcher fallback attribution
+  `onArtifact` from `BsAgentManager`, watcher fallback attribution
 - `src/main/agent/tools/types.ts` — `ToolContext.onArtifact`
 - `src/main/agent/tools/write.ts`, `edit.ts`, `apply-patch.ts` — record entries
 - `src/main/agent/loop.ts` — pass `onArtifact` from deps into `ToolContext`
-- `src/main/meow-agent-manager.ts` — accept `onArtifact` dep, forward to main
+- `src/main/bs-agent-manager.ts` — accept `onArtifact` dep, forward to main
 - `src/renderer/src/App.tsx` — mount `RightPanel`, state from localStorage
 - `src/renderer/src/components/RightPanel.tsx` — **new**: tabs + resize + header
 - `src/renderer/src/components/RightPanelTree.tsx` — **new**: directory tree

@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Meow Browser Bridge",
+  "name": "Bs Browser Bridge",
   "version": "0.3.4",
-  "description": "Bridge giữa Meow Coding và Chrome: cho phép agent đọc/thao tác trang trên profile Chrome thật.",
+  "description": "Bridge giữa BS Coding và Chrome: cho phép agent đọc/thao tác trang trên profile Chrome thật.",
   "permissions": ["tabs", "scripting", "storage", "debugger", "tabGroups", "alarms"],
   "host_permissions": ["<all_urls>"],
   "background": {
@@ -16,7 +16,7 @@
   },
   "action": {
     "default_popup": "popup.html",
-    "default_title": "Meow Browser Bridge",
+    "default_title": "Bs Browser Bridge",
     "default_icon": {
       "16": "icons/16x16.png",
       "32": "icons/32x32.png",

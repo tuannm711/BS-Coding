@@ -1,4 +1,4 @@
-# Meow Coding — Dọn dữ liệu khi xoá agent + fix removeWorkspace buffers: Kế hoạch triển khai
+# BS Coding — Dọn dữ liệu khi xoá agent + fix removeWorkspace buffers: Kế hoạch triển khai
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -21,7 +21,7 @@ và buffers renderer — tránh dữ liệu mồ côi tích luỹ. Đồng thờ
 ### 3. `src/main/alert-service.ts`
 - Thêm `clear(agentId)` dùng lại `clearTimer`.
 
-### 4. `src/main/meow-agent-manager.ts`
+### 4. `src/main/bs-agent-manager.ts`
 - `removeAgent(agentId)` bổ sung `this.deps.store.deleteForAgent(agentId)`.
 
 ### 5. `src/main/index.ts`
@@ -38,7 +38,7 @@ và buffers renderer — tránh dữ liệu mồ côi tích luỹ. Đồng thờ
 
 - `session-store.test.ts`: `deleteForAgent` xoá đúng agent, giữ agent khác.
 - `log-manager.test.ts`: `remove` xoá file + tolerate missing file.
-- `meow-agent-manager.test.ts`: `removeAgent` xoá sessions của agent.
+- `bs-agent-manager.test.ts`: `removeAgent` xoá sessions của agent.
 - `alert-service.test.ts`: `clear` dừng idle timer.
 
 ## Verify

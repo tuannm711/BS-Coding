@@ -33,7 +33,7 @@ describe('GitStatusService.get', () => {
   let dir: string
 
   beforeEach(() => {
-    dir = mkdtempSync(path.join(tmpdir(), 'meow-git-'))
+    dir = mkdtempSync(path.join(tmpdir(), 'bs-git-'))
     execFileSync('git', ['init', '-q', '--initial-branch=main'], { cwd: dir })
     execFileSync('git', ['config', 'user.email', 't@t'], { cwd: dir })
     execFileSync('git', ['config', 'user.name', 't'], { cwd: dir })
@@ -42,7 +42,7 @@ describe('GitStatusService.get', () => {
   afterEach(() => rmSync(dir, { recursive: true, force: true }))
 
   it('returns null when not a git repo', async () => {
-    const notRepo = mkdtempSync(path.join(tmpdir(), 'meow-git-nr-'))
+    const notRepo = mkdtempSync(path.join(tmpdir(), 'bs-git-nr-'))
     try {
       const result = await new GitStatusService().get(notRepo)
       expect(result).toBeNull()

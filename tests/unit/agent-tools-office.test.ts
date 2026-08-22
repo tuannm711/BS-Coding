@@ -19,7 +19,7 @@ afterEach(() => {
 })
 
 function ctx(): ToolContext {
-  dir = mkdtempSync(path.join(tmpdir(), 'meow-office-tool-'))
+  dir = mkdtempSync(path.join(tmpdir(), 'bs-office-tool-'))
   return { cwd: dir, ask: async () => null }
 }
 
@@ -82,7 +82,7 @@ describe('office tool', () => {
     expect(gotSignal).toBe(ac.signal)
   })
 
-  it('prepends a [meow] note when falling back from a missing cwd', async () => {
+  it('prepends a [bs] note when falling back from a missing cwd', async () => {
     const tool = createOfficeTool({
       resolveBinary: async () => 'officecli',
       spawnFn: (() => fakeChild({ stdout: 'out' })) as never
@@ -90,7 +90,7 @@ describe('office tool', () => {
     const c = ctx()
     c.cwd = path.join(c.cwd, 'does-not-exist')
     const r = await tool.run({ args: ['create', 'x.pptx'] }, c)
-    expect(r.output).toMatch(/\[meow\] working dir/)
+    expect(r.output).toMatch(/\[bs\] working dir/)
   })
 
   it('reports a nonzero exit with stdout and stderr', async () => {

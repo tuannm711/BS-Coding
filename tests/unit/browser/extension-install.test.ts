@@ -8,8 +8,8 @@ let src: string
 let dst: string
 
 beforeEach(() => {
-  src = mkdtempSync(path.join(tmpdir(), 'meow-ext-src-'))
-  dst = mkdtempSync(path.join(tmpdir(), 'meow-ext-dst-'))
+  src = mkdtempSync(path.join(tmpdir(), 'bs-ext-src-'))
+  dst = mkdtempSync(path.join(tmpdir(), 'bs-ext-dst-'))
 })
 
 afterEach(() => {

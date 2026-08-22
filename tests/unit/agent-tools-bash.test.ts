@@ -6,7 +6,7 @@ import { execFileSync } from 'node:child_process'
 import { bashTool, buildShellCommand } from '../../src/main/agent/tools/bash'
 import type { ToolContext } from '../../src/main/agent/tools/types'
 
-let dir = mkdtempSync(path.join(tmpdir(), 'meow-bash-'))
+let dir = mkdtempSync(path.join(tmpdir(), 'bs-bash-'))
 const ctx: ToolContext = { cwd: dir, ask: async () => null }
 
 function cleanup() {
@@ -49,8 +49,8 @@ async function assertProcessGoneByMarker(marker: string, attempts = 15, delayMs 
 
 describe('bash tool', () => {
   it('runs a command and captures output', async () => {
-    const r = await bashTool.run({ command: process.platform === 'win32' ? 'echo MEOW_OK' : 'echo MEOW_OK' }, ctx)
-    expect(r.output).toContain('MEOW_OK')
+    const r = await bashTool.run({ command: process.platform === 'win32' ? 'echo BS_OK' : 'echo BS_OK' }, ctx)
+    expect(r.output).toContain('BS_OK')
   }, 20000)
 
   it('reports a nonzero exit as an error with output', async () => {
@@ -107,7 +107,7 @@ describe('bash tool', () => {
   }, 20000)
 
   it('keeps embedded quotes intact (runs in the working directory)', async () => {
-    const dir = mkdtempSync(path.join(tmpdir(), 'meow-cd-'))
+    const dir = mkdtempSync(path.join(tmpdir(), 'bs-cd-'))
     try {
       if (process.platform === 'win32') {
         const c = buildShellCommand('echo OK_CD', dir)
@@ -124,19 +124,19 @@ describe('bash tool', () => {
 
   it('runs unix commands through git bash on windows', async () => {
     if (process.platform !== 'win32') return
-    const dir = mkdtempSync(path.join(tmpdir(), 'meow-cd-'))
+    const dir = mkdtempSync(path.join(tmpdir(), 'bs-cd-'))
     try {
       const r = await bashTool.run({ command: `ls "${dir}" > /dev/null && echo LS_OK` }, { cwd: dir, ask: async () => null })
       expect(r.output).toContain('LS_OK')
       const pwd = await bashTool.run({ command: 'pwd' }, { cwd: dir, ask: async () => null })
-      expect(pwd.output).toMatch(/meow-cd-|\\meow-cd-/)
+      expect(pwd.output).toMatch(/bs-cd-|\\bs-cd-/)
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }
   }, 20000)
 
   it('falls back to an existing cwd when the project dir is missing', async () => {
-    const missing = path.join(tmpdir(), 'meow-missing-dir-' + Date.now())
+    const missing = path.join(tmpdir(), 'bs-missing-dir-' + Date.now())
     const r = await bashTool.run(
       { command: process.platform === 'win32' ? 'echo OK_FALLBACK' : 'echo OK_FALLBACK' },
       { cwd: missing, ask: async () => null }
@@ -147,7 +147,7 @@ describe('bash tool', () => {
 
   it('runs the bundled superpowers SDD scripts (git bash)', async () => {
     if (process.platform !== 'win32') return
-    const dir = mkdtempSync(path.join(tmpdir(), 'meow-sdd-'))
+    const dir = mkdtempSync(path.join(tmpdir(), 'bs-sdd-'))
     try {
       execFileSync('git', ['init', '-q'], { cwd: dir })
       execFileSync('git', ['config', 'user.email', 't@t'], { cwd: dir })

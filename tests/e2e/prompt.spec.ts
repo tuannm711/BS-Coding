@@ -4,14 +4,14 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 
 async function launchPrompt() {
-  const userData = mkdtempSync(path.join(tmpdir(), 'meow-ud-'))
-  const project = mkdtempSync(path.join(tmpdir(), 'meow-e2e-'))
+  const userData = mkdtempSync(path.join(tmpdir(), 'bs-ud-'))
+  const project = mkdtempSync(path.join(tmpdir(), 'bs-e2e-'))
   writeFileSync(path.join(userData, 'workspaces.json'), JSON.stringify([{
     projectPath: project,
     name: 'E2E',
-    agents: [{ id: 'a1', name: 'meow', templateId: 'meow', cwd: project, kind: 'native' }]
+    agents: [{ id: 'a1', name: 'bs', templateId: 'bs', cwd: project, kind: 'native' }]
   }]))
-  const app = await electron.launch({ args: ['.'], env: { ...process.env as Record<string, string>, MEOW_USER_DATA: userData } })
+  const app = await electron.launch({ args: ['.'], env: { ...process.env as Record<string, string>, BS_USER_DATA: userData } })
   const window = await app.firstWindow()
   await window.locator('.project-row').click()
   await expect(window.locator('.chat-panel')).toBeVisible()
@@ -47,14 +47,14 @@ test('keyboard 1 triggers allow when panel focused', async () => {
 })
 
 async function launchQuestion() {
-  const userData = mkdtempSync(path.join(tmpdir(), 'meow-ud-'))
-  const project = mkdtempSync(path.join(tmpdir(), 'meow-e2e-'))
+  const userData = mkdtempSync(path.join(tmpdir(), 'bs-ud-'))
+  const project = mkdtempSync(path.join(tmpdir(), 'bs-e2e-'))
   writeFileSync(path.join(userData, 'workspaces.json'), JSON.stringify([{
     projectPath: project,
     name: 'E2E',
-    agents: [{ id: 'a1', name: 'meow', templateId: 'meow', cwd: project, kind: 'native' }]
+    agents: [{ id: 'a1', name: 'bs', templateId: 'bs', cwd: project, kind: 'native' }]
   }]))
-  const app = await electron.launch({ args: ['.'], env: { ...process.env as Record<string, string>, MEOW_USER_DATA: userData } })
+  const app = await electron.launch({ args: ['.'], env: { ...process.env as Record<string, string>, BS_USER_DATA: userData } })
   const window = await app.firstWindow()
   await window.locator('.project-row').click()
   await expect(window.locator('.chat-panel')).toBeVisible()

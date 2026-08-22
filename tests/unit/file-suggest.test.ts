@@ -7,7 +7,7 @@ import { suggestFiles } from '../../src/main/file-suggest'
 let dir: string
 
 beforeEach(() => {
-  dir = mkdtempSync(path.join(tmpdir(), 'meow-suggest-'))
+  dir = mkdtempSync(path.join(tmpdir(), 'bs-suggest-'))
   mkdirSync(path.join(dir, 'src', 'deep', 'nested'), { recursive: true })
   mkdirSync(path.join(dir, 'node_modules'), { recursive: true })
   writeFileSync(path.join(dir, 'src', 'a.ts'), 'x')

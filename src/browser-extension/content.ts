@@ -2,8 +2,8 @@ import type { BrowserCommandName } from '../../src/shared/browser-types'
 
 declare global {
   interface XMLHttpRequest {
-    __meowMethod?: string
-    __meowUrl?: string
+    __bsMethod?: string
+    __bsUrl?: string
   }
 }
 
@@ -171,14 +171,14 @@ XMLHttpRequest.prototype.open = function (
   this: XMLHttpRequest, method: string, url: string | URL, async: boolean = true,
   username?: string | null, password?: string | null
 ): void {
-  this.__meowMethod = method
-  this.__meowUrl = String(url)
+  this.__bsMethod = method
+  this.__bsUrl = String(url)
   origOpen.call(this, method, url, async, username, password)
 }
 XMLHttpRequest.prototype.send = function (this: XMLHttpRequest, body?: Document | XMLHttpRequestBodyInit | null): void {
   const start = performance.now()
   this.addEventListener('loadend', () => {
-    sendEvent('network', { method: this.__meowMethod, url: this.__meowUrl, status: this.status, ms: Math.round(performance.now() - start), ts: Date.now() })
+    sendEvent('network', { method: this.__bsMethod, url: this.__bsUrl, status: this.status, ms: Math.round(performance.now() - start), ts: Date.now() })
   })
   origSend.call(this, body)
 }
@@ -220,7 +220,7 @@ chrome.runtime.onMessage.addListener((msg: CmdRequest, _sender, sendResponse) =>
 
 // Keep the MV3 service worker alive while a page is open so its WebSocket to the app
 // survives Chrome's idle suspension (otherwise the bridge drops to "not connected").
-const keepalivePort = chrome.runtime.connect({ name: 'meow-keepalive' })
+const keepalivePort = chrome.runtime.connect({ name: 'bs-keepalive' })
 keepalivePort.onDisconnect.addListener(() => {
-  if (!chrome.runtime.lastError) void chrome.runtime.connect({ name: 'meow-keepalive' })
+  if (!chrome.runtime.lastError) void chrome.runtime.connect({ name: 'bs-keepalive' })
 })

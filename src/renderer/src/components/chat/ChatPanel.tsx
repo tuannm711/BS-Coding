@@ -180,8 +180,8 @@ function ChatPanel({ agentId, cwd, mode = 'build', variant, onModeChange, onVari
       const detail = (e as CustomEvent<{ agentId: string }>).detail
       if (detail?.agentId === agentId) { refreshVariants(); loadContextInfo() }
     }
-    window.addEventListener('meow:model-changed', onModelChanged)
-    return () => window.removeEventListener('meow:model-changed', onModelChanged)
+    window.addEventListener('bs:model-changed', onModelChanged)
+    return () => window.removeEventListener('bs:model-changed', onModelChanged)
   }, [agentId, refreshVariants, loadContextInfo])
 
   useEffect(() => {
@@ -824,7 +824,7 @@ if (e.type === 'usage') {
           }
           return <div key={item.id} className="chat-error">{item.text}</div>
         })}
-        {running && <div className="chat-running">Meow is working…</div>}
+        {running && <div className="chat-running">Bs is working…</div>}
         {queue.length > 0 && (
           <div className="chat-queue">
             {queue.map(q => (
@@ -858,7 +858,7 @@ if (e.type === 'usage') {
             {pendingPrompt.promptType === 'permission' ? (
               <>
                 <div className="chat-prompt-text">
-                  Meow wants to run <code>{pendingPrompt.call?.tool}</code>:
+                  Bs wants to run <code>{pendingPrompt.call?.tool}</code>:
                 </div>
                 <div className="chat-prompt-actions">
                   {permissionActions.map((a, i) => (

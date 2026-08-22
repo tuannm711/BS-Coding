@@ -1,4 +1,4 @@
-# Meow Coding — Group C: LSP + Diagnostics: Kế hoạch
+# BS Coding — Group C: LSP + Diagnostics: Kế hoạch
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -30,7 +30,7 @@
 - `write.ts`, `edit.ts`, `apply-patch.ts`: sau khi ghi, gọi `diagnosticsFor(file)` (didOpen+didChange+didSave,
   chờ `publishDiagnostics` timeout `lsp.diagnosticsTimeoutMs` default 3000) → thêm vào output:
   `[LSP] <path>:<line>:<col>: <message>` (tối đa 5).
-- Config `lsp: { enabled: true, servers: {...}, diagnosticsTimeoutMs: 3000 }` (meow.json).
+- Config `lsp: { enabled: true, servers: {...}, diagnosticsTimeoutMs: 3000 }` (bs.json).
 
 ## 4. Tool `lsp` (`src/main/agent/tools/lsp.ts`, mới)
 
@@ -39,7 +39,7 @@
 
 ## 5. Manager wiring
 
-- `meow-agent-manager.ts`: `lsp = new LspManager()`; `ensure` khi native agent cần; cung cấp `lsp` tool
+- `bs-agent-manager.ts`: `lsp = new LspManager()`; `ensure` khi native agent cần; cung cấp `lsp` tool
   (thêm vào `runnerTools`); đóng khi agent removed.
 - `index.ts`: lifecycle theo workspace (cùng file watcher).
 

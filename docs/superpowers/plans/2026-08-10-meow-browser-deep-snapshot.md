@@ -8,7 +8,7 @@
 
 **Tech Stack:** Chrome MV3 extension (TS, esbuild), `@types/chrome` (`chrome.debugger.sendCommand` is generic), Vitest (node env, fake objects + fake timers).
 
-**Spec:** `docs/superpowers/specs/2026-08-10-meow-browser-deep-snapshot-design.md`
+**Spec:** `docs/superpowers/specs/2026-08-10-bs-browser-deep-snapshot-design.md`
 
 ---
 
@@ -852,11 +852,11 @@ git commit -m "feat(agent): browser_read mode param (interactive/full) for deep 
 ## Task 6: Docs + full verification
 
 **Files:**
-- Modify: `docs/superpowers/specs/2026-08-10-meow-browser-deep-snapshot-design.md`
+- Modify: `docs/superpowers/specs/2026-08-10-bs-browser-deep-snapshot-design.md`
 
 - [ ] **Step 1: Add one clarification line to the spec's tool table**
 
-In `docs/superpowers/specs/2026-08-10-meow-browser-deep-snapshot-design.md`, §9 `browser_read` bullet, append the selector note so it matches the implemented tool:
+In `docs/superpowers/specs/2026-08-10-bs-browser-deep-snapshot-design.md`, §9 `browser_read` bullet, append the selector note so it matches the implemented tool:
 
 `browser_read {selector?, mode?, maxElements?}` → trả tree text + page summary. (`selector` chỉ giữ vì tương thích schema; snapshot thực hiện qua CDP toàn trang.)
 
@@ -868,7 +868,7 @@ Expected: all pass. Report the exact test counts.
 - [ ] **Step 3: Commit**
 
 ```bash
-git add docs/superpowers/specs/2026-08-10-meow-browser-deep-snapshot-design.md
+git add docs/superpowers/specs/2026-08-10-bs-browser-deep-snapshot-design.md
 git commit -m "docs: clarify deep snapshot read tool surface"
 ```
 
