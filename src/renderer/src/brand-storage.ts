@@ -4,7 +4,7 @@ const KEYS = ['rightpanel.open', 'rightpanel.tab', 'rightpanel.width', 'sidebar.
 
 export function migrateBrandStorage(storage: StorageLike): void {
   for (const suffix of KEYS) {
-    const legacyKey = `bs.${suffix}`
+    const legacyKey = `meow.${suffix}`
     const bsKey = `bs.${suffix}`
     const legacyValue = storage.getItem(legacyKey)
     if (storage.getItem(bsKey) === null && legacyValue !== null) storage.setItem(bsKey, legacyValue)

@@ -16,6 +16,9 @@ import SettingsDialog from './components/settings/SettingsDialog'
 import BrowserDialog from './components/BrowserDialog'
 import InstallGuideDialog from './components/InstallGuideDialog'
 import UpdateDialog from './components/UpdateDialog'
+import { migrateBrandStorage } from './brand-storage'
+
+migrateBrandStorage(window.localStorage)
 
 export interface PaneModel {
   agent: AgentConfig

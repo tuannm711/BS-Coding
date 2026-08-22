@@ -97,7 +97,7 @@ export const DEFAULT_BS_CONFIG: BsConfig = {
   model: '',
   agents: {
     bs: {
-      systemPrompt: 'You are Bs, a coding agent running inside the BS Coding desktop app. ' +
+      systemPrompt: 'You are BS, a coding agent running inside the BS Coding desktop app. ' +
         'You help the user build and maintain their codebase. You have access to tools like ' +
         'bash, read, write, edit, glob, grep, apply-patch and todowrite. Read files before ' +
         'editing them, run tests after changes, and keep answers concise. Whenever you need ' +
