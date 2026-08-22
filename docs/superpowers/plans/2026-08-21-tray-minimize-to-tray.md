@@ -6,7 +6,7 @@ Spec: `docs/superpowers/specs/2026-08-21-tray-minimize-to-tray-design.md`
 
 ## Context for the engineer
 
-Meow Coding is an Electron app. The main process lives in `src/main/index.ts`
+BS Coding is an Electron app. The main process lives in `src/main/index.ts`
 (799 lines, app bootstrap: `MainApp` class + `createWindow()` + IPC handlers +
 `whenReady` + `before-quit` cleanup + `window-all-closed`). There is currently
 **no tray** — closing the window (X) destroys it, `window-all-closed` fires,
@@ -21,7 +21,7 @@ Key facts about the codebase:
 - `win` is a module-level `let win: BrowserWindow | null` in `src/main/index.ts`.
 - `createWindow()` (line ~484) sets up the window, `win.on('closed')` nulls it.
 - `before-quit` (line ~765) does `event.preventDefault()` + cleanup chain
-  (`stopGitPoll` → `meowAgent.dispose` → `traces.flushAll` → `browserBridge.close`
+  (`stopGitPoll` → `bsAgent.dispose` → `traces.flushAll` → `browserBridge.close`
   → `remote.dispose` → `pty.stopAll().finally(() => app.exit(0))`), guarded by a
   module-level `cleaningUp` flag.
 - `app.whenReady()` (line ~753) calls `registerIpcHandlers()`, `createWindow()`,
@@ -85,7 +85,7 @@ vi.mock('electron', () => ({
 
 Test cases (hermetic; flag file in a temp dir via `mkdtempSync`):
 
-1. **Creates tray with tooltip and context menu**: `new TrayManager({ userDataDir, getWindow })` → `trayInstance.setToolTip` called with `'Meow Coding'`, `trayInstance.setContextMenu` called once; menu template contains a "Show Meow Coding" item and an "Exit" item.
+1. **Creates tray with tooltip and context menu**: `new TrayManager({ userDataDir, getWindow })` → `trayInstance.setToolTip` called with `'BS Coding'`, `trayInstance.setContextMenu` called once; menu template contains a "Show BS Coding" item and an "Exit" item.
 2. **Click on tray shows hidden window**: tray `on('click', cb)` captured; window hidden → click → `showMock` + `focusMock` called.
 3. **Click on tray hides visible window**: window visible → click → `hideMock` called.
 4. **`hideWindow()` shows one-time notification only the first time**: with empty temp dir → first `hideWindow()` calls `showMock` and creates `tray-notified` file; second `hideWindow()` does not call `showMock`.
@@ -135,10 +135,10 @@ Behavior:
   - macOS: `nativeImage.createFromPath(...)` + `setTemplateImage(true)` so it
     adapts to menu bar theme; Windows/Linux: plain PNG path.
   - `new Tray(image)` inside try/catch; on throw, log
-    `console.error('[meow] tray creation failed:', err)` and return `null`
+    `console.error('[bs] tray creation failed:', err)` and return `null`
     (fallback: close = quit, never trap the user).
-  - `tray.setToolTip('Meow Coding')`.
-  - Build context menu: `[ { label: 'Show Meow Coding', click: showWindow }, { type: 'separator' }, { label: 'Exit', click: opts.onQuit } ]` via `Menu.buildFromTemplate`.
+  - `tray.setToolTip('BS Coding')`.
+  - Build context menu: `[ { label: 'Show BS Coding', click: showWindow }, { type: 'separator' }, { label: 'Exit', click: opts.onQuit } ]` via `Menu.buildFromTemplate`.
   - `tray.on('click', () => this.toggleWindow())`.
   - Store `getWindow`, `onQuit`, `userDataDir`, tray ref.
 - `toggleWindow()`: `const win = getWindow(); if (!win) return`; if visible →
@@ -146,7 +146,7 @@ Behavior:
 - `hideWindow()`: hide via same logic as toggle's hide branch, then one-time
   notification:
   - Flag path: `path.join(userDataDir, 'tray-notified')`.
-  - If `!existsSync(flag)`: `new Notification({ title: 'Meow Coding', body: '[meow] Meow Coding vẫn đang chạy ngầm, click icon tray để mở lại.' })`, click → show window, `show()`, then `writeFileSync(flag, '1')`.
+  - If `!existsSync(flag)`: `new Notification({ title: 'BS Coding', body: '[bs] BS Coding vẫn đang chạy ngầm, click icon tray để mở lại.' })`, click → show window, `show()`, then `writeFileSync(flag, '1')`.
   - Subsequent hides silent.
 - Private `showWindow()` helper shared by menu/click/notification.
 

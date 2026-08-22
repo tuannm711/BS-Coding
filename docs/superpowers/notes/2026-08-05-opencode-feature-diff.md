@@ -1,13 +1,13 @@
-# Meow Coding — Feature Diff với opencode 1.18.11 (ghi chú)
+# BS Coding — Feature Diff với opencode 1.18.11 (ghi chú)
 
-Ngày: 2026-08-05 · Nguồn: `D:\GitHub\opencode-1.18.11` vs `D:\GitHub\meow-coding`
+Ngày: 2026-08-05 · Nguồn: `D:\GitHub\opencode-1.18.11` vs `D:\GitHub\bs-coding`
 
-Đây là ghi chú toàn bộ những tính năng opencode có mà meow-coding chưa có (hoặc có ở mức khác),
+Đây là ghi chú toàn bộ những tính năng opencode có mà bs-coding chưa có (hoặc có ở mức khác),
 được thu thập từ exploration 2 codebase. Dùng làm tài liệu tham chiếu cho các phiên brainstorm/spec sau.
 
 ---
 
-## 1. Đã có ở meow (tương đương opencode)
+## 1. Đã có ở bs (tương đương opencode)
 
 - Compaction token-based + overflow detection + tool output truncation (2k).
 - Subagent (task), revert/snapshot, permission ask/allow/deny + always, plan mode.
@@ -16,7 +16,7 @@ Ngày: 2026-08-05 · Nguồn: `D:\GitHub\opencode-1.18.11` vs `D:\GitHub\meow-co
 
 ## 2. Nhóm GIÁ TRỊ CAO — chưa có, nên mang sang (candidate brainstorm)
 
-| # | Feature | Tham chiếu opencode | Meow hiện tại |
+| # | Feature | Tham chiếu opencode | BS hiện tại |
 |---|---|---|---|
 | 1 | Slash commands + prompt templates (`/init`, `/review`, custom, `$1..$N`, `@path`, `` !`cmd` ``, MCP prompts/skills thành commands) | `command/index.ts`, `command/template/*`, `config/command.ts` | Không có gì |
 | 2 | Undo/redo + snapshot history UI (revert/unrevert theo message) | `session/revert.ts`, TUI `messages_undo/redo` | Chỉ revert tool toàn bộ, không undo từng message |

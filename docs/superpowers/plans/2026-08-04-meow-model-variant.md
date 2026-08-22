@@ -1,4 +1,4 @@
-# Meow Coding — Model level / variant selector (theo opencode)
+# BS Coding — Model level / variant selector (theo opencode)
 
 **Goal:** Cho phép chọn "cấp độ" của model (`low | medium | high | max`) cho agent native, giống opencode `--variant` (reasoning effort). Tham khảo opencode `D:\GitHub\opencode-1.18.11`:
 
@@ -6,7 +6,7 @@
 - CLI `--variant` (model variant — provider-specific reasoning effort).
 - Lưu theo session (`setAgentModel`), hiển thị ở chọn model.
 
-**Phạm vi:** `src/shared/types.ts`, `src/shared/ipc.ts`, `src/preload/index.ts`, `src/main/index.ts`, `src/main/meow-agent-manager.ts`, `src/main/agent/loop.ts`, `src/main/agent/llm.ts`, renderer `Pane.tsx`/`ChatPanel.tsx`/`styles.css`, tests.
+**Phạm vi:** `src/shared/types.ts`, `src/shared/ipc.ts`, `src/preload/index.ts`, `src/main/index.ts`, `src/main/bs-agent-manager.ts`, `src/main/agent/loop.ts`, `src/main/agent/llm.ts`, renderer `Pane.tsx`/`ChatPanel.tsx`/`styles.css`, tests.
 
 ---
 
@@ -25,7 +25,7 @@
 ### loop.ts
 `LoopDeps.variant?: ModelVariant`; truyền vào `llm.stream(...)`.
 
-### meow-agent-manager.ts
+### bs-agent-manager.ts
 `variants` theo `agent.variant` (đọc từ AgentConfig). `setVariant(agentId, variant)`: cập nhật agent + rebuild runner nếu đang không chạy (giống `setMode`). `register()`: `variant: agent.variant`.
 
 ### IPC
@@ -38,7 +38,7 @@
 
 ## Kiểm thử
 - ipc-contract: `setAgentVariant`.
-- meow-agent-manager: `setVariant` cập nhật agent config + rebuild runner.
+- bs-agent-manager: `setVariant` cập nhật agent config + rebuild runner.
 - `npm run typecheck`, `npm test`, `npm run build && npm run e2e`.
 
 ---

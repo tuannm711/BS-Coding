@@ -1,8 +1,8 @@
-# Meow Coding — Sync model list thật từ models.dev (giống opencode connector)
+# BS Coding — Sync model list thật từ models.dev (giống opencode connector)
 
 **Goal:** Thay vì người dùng tự gõ tên model (dễ sai, VD "deepseek-chat"), sync **danh sách model thật** của provider từ models.dev — giống opencode fetch catalog (`https://models.dev/api.json`, cache 5 phút). Tham khảo `D:\GitHub\opencode-1.18.11\packages\core\src\models-dev.ts`.
 
-**Phạm vi:** `src/main/models-catalog.ts` (mới), `src/main/meow-agent-manager.ts`, `src/main/index.ts`, `src/shared/ipc.ts`, `src/preload/index.ts`, `SettingsDialog.tsx`, tests.
+**Phạm vi:** `src/main/models-catalog.ts` (mới), `src/main/bs-agent-manager.ts`, `src/main/index.ts`, `src/shared/ipc.ts`, `src/preload/index.ts`, `SettingsDialog.tsx`, tests.
 
 ---
 

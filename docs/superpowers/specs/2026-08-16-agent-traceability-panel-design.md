@@ -1,4 +1,4 @@
-# Meow Coding — Agent Traceability Panel: Design Spec
+# BS Coding — Agent Traceability Panel: Design Spec
 
 Ngày: 2026-08-16 · Trạng thái: chờ duyệt
 
@@ -75,7 +75,7 @@ type TraceEvent =
   - Subagent: `sub-<subagentType>-<taskId>` (sửa hardcode `'sub'` trong `task.ts`)
 - Subagent có `parentTaskId` → cây cha-con dựng được từ log.
 - `turn` counter dùng chung cho agent cha và subagent của nó (deepseek style: subtool nằm trong turn
-  của cha). **Sở hữu turn counter:** `MeowAgentManager` (native) duy trì `turnCounter` cho từng session,
+  của cha). **Sở hữu turn counter:** `BsAgentManager` (native) duy trì `turnCounter` cho từng session,
   increment khi `turn-started`; subagent (qua `task.ts`) đọc turn hiện tại từ parent context thay vì
   tự đếm. `SessionRunner` (loop.ts) hiện chưa có turn field — thêm `turn: number` vào `LoopDeps`,
   truyền từ manager. Agent PTY không dùng turn (chỉ `pty-run`).
@@ -94,7 +94,7 @@ src/main/agent/trace-store.ts  ← TRACE_STORE (mới, ~120 dòng)
 
 ### 5.2 Luồng
 
-1. `MeowAgentManager` (native) — sau mỗi `onEvent` hiện có, gọi
+1. `BsAgentManager` (native) — sau mỗi `onEvent` hiện có, gọi
    `traceStore.append(sessionId, normalize(e))`; sửa `task.ts` truyền `agentId` thật
    (`sub-<type>-<id>`) + `parentTaskId`, ghi thẳng vào trace store khi subagent emit.
 2. Agent PTY — `index.ts` hook sẵn `pty:data`/`exit` → ghi `pty-run` event
@@ -188,7 +188,7 @@ Inspector (bên phải, khi chọn 1 event):
 
 ### 8.3 Integration tests
 
-7. `agent-trace-store` ghi khi `MeowAgentManager` emit event (mock LLM)
+7. `agent-trace-store` ghi khi `BsAgentManager` emit event (mock LLM)
 8. PTY `pty-run` event được ghi khi pty start/exit (mở rộng `pty-manager.test.ts`)
 
 ### 8.4 E2E (Playwright) — nếu cần

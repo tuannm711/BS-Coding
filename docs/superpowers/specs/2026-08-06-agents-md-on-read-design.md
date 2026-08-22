@@ -1,4 +1,4 @@
-# Meow Coding — Auto-attach AGENTS.md when the LLM reads files (opencode-style) — Design
+# BS Coding — Auto-attach AGENTS.md when the LLM reads files (opencode-style) — Design
 
 Ngày: 2026-08-06 · Trạng thái: chờ duyệt · Bước: sau brainstorm (đã chốt thiết kế với user)
 
@@ -32,7 +32,7 @@ nhận sẵn tất cả nội dung trong mỗi message.
 
 ### 3b. System prompt chỉ còn pointer
 
-- `meow-agent-manager.ts` `register()`: `system:` = `resolved.systemPrompt + modeNote + SKILL_LIST + INSTRUCTION_POINTER`.
+- `bs-agent-manager.ts` `register()`: `system:` = `resolved.systemPrompt + modeNote + SKILL_LIST + INSTRUCTION_POINTER`.
 - `INSTRUCTION_POINTER` (tiếng Anh, trong `instructions.ts`):
   > "Project rules live in AGENTS.md files. When you read or edit a file, relevant AGENTS.md files
   > (walking up from that file to the repo root) are attached automatically. Read @AGENTS.md at the
@@ -55,7 +55,7 @@ nhận sẵn tất cả nội dung trong mỗi message.
 | `src/main/agent/tools/read.ts` | Trả về path file đã đọc (qua toolCtx callback `onFileRead`) |
 | `src/main/agent/tools/edit.ts` | Tương tự |
 | `src/main/agent/tools/types.ts` | Thêm `onFileRead?: (path: string) => void` vào `ToolContext` |
-| `src/main/meow-agent-manager.ts` | `system:` dùng pointer thay vì nhồi instructions |
+| `src/main/bs-agent-manager.ts` | `system:` dùng pointer thay vì nhồi instructions |
 | Tests | `agent-loop.test.ts` (attach khi read), `agent-instructions.test.ts` (pointer), `agent-message.test.ts` |
 
 ## 5. Kiểm thử

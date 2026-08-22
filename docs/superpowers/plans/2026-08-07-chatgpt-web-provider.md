@@ -2,17 +2,17 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add an isolated, opt-in "chatgpt-web" provider that lets the native `meow` agent chat and call tools through a real, logged-in ChatGPT web session (Playwright browser automation), without touching the behavior of the existing anthropic/google/openai-compatible providers.
+**Goal:** Add an isolated, opt-in "chatgpt-web" provider that lets the native `bs` agent chat and call tools through a real, logged-in ChatGPT web session (Playwright browser automation), without touching the behavior of the existing anthropic/google/openai-compatible providers.
 
-**Architecture:** A new self-contained module `src/main/chatgpt-web/` owns everything specific to this mechanism (session persistence, browser automation, prompt compilation, response parsing). It exposes exactly one thing to the rest of the app: a `ChatGptWebLlmClient` that implements the existing `LlmClient` interface from `src/main/agent/llm.ts`. `meow-agent-manager.ts` gets a single new branch that constructs this client instead of `createLlm()` when `provider === 'chatgpt-web'`. `playwright-core` is only ever imported lazily (inside async functions), so the dependency has zero cost when the feature is off.
+**Architecture:** A new self-contained module `src/main/chatgpt-web/` owns everything specific to this mechanism (session persistence, browser automation, prompt compilation, response parsing). It exposes exactly one thing to the rest of the app: a `ChatGptWebLlmClient` that implements the existing `LlmClient` interface from `src/main/agent/llm.ts`. `bs-agent-manager.ts` gets a single new branch that constructs this client instead of `createLlm()` when `provider === 'chatgpt-web'`. `playwright-core` is only ever imported lazily (inside async functions), so the dependency has zero cost when the feature is off.
 
 **Tech Stack:** TypeScript, `playwright-core` (browser automation, system Chrome — no bundled browser download), `turndown` (already a dependency, HTML→Markdown), Vitest for unit tests.
 
 ## Global Constraints
 
 - Spec: `docs/superpowers/specs/2026-08-07-chatgpt-web-provider-design.md` — every task below implements one numbered section of it.
-- Do not modify `src/main/agent/llm.ts`, `src/main/agent/config.ts`, or `AgentConfig`/`MeowConfig` schemas. `provider` stays a free string; `'chatgpt-web'` is just a new valid value.
-- The only edits to existing files are: `src/main/meow-agent-manager.ts` (one branch + one list append), `src/shared/ipc.ts`, `src/shared/types.ts`, `src/preload/index.ts`, `src/main/index.ts`, `src/renderer/src/components/settings/SettingsDialog.tsx`, `tests/unit/ipc-contract.test.ts`, `package.json`.
+- Do not modify `src/main/agent/llm.ts`, `src/main/agent/config.ts`, or `AgentConfig`/`BsConfig` schemas. `provider` stays a free string; `'chatgpt-web'` is just a new valid value.
+- The only edits to existing files are: `src/main/bs-agent-manager.ts` (one branch + one list append), `src/shared/ipc.ts`, `src/shared/types.ts`, `src/preload/index.ts`, `src/main/index.ts`, `src/renderer/src/components/settings/SettingsDialog.tsx`, `tests/unit/ipc-contract.test.ts`, `package.json`.
 - `playwright-core` goes in `dependencies` (runtime, not dev) but is only reachable via dynamic `import()` inside `src/main/chatgpt-web/browser-login.ts` and `src/main/chatgpt-web/browser-worker.ts`. No other file imports it, directly or transitively, at module load time.
 - Feature defaults to **off** (`enabled: false`) and `defaultProvider` must never be auto-set to `'chatgpt-web'`.
 - v1 scope: full tool-calling support via a prompt-based `tool_call` fenced-block protocol (parsed after the ChatGPT turn fully completes — see Task 7 note on why this plan does not attempt token-level streaming for this provider). No "full mode" MCP tunnel, no local HTTP server — everything runs in-process.
@@ -336,8 +336,8 @@ const bashTool: ToolDefinition = {
 
 describe('compileChatGptWebPrompt', () => {
   it('includes the system prompt verbatim', () => {
-    const prompt = compileChatGptWebPrompt({ system: 'You are meow.', messages: [], tools: [] })
-    expect(prompt).toContain('You are meow.')
+    const prompt = compileChatGptWebPrompt({ system: 'You are bs.', messages: [], tools: [] })
+    expect(prompt).toContain('You are bs.')
   })
 
   it('includes the tool_call fenced-block protocol instructions', () => {
@@ -1081,7 +1081,7 @@ git commit -m "feat: add chatgpt-web manual login flow"
 
 **Interfaces:**
 - Consumes: `LlmClient`, `LlmStreamOptions`, `LlmStreamPart` from `src/main/agent/llm.ts`; `compileChatGptWebPrompt` from Task 4; `parseChatGptWebResponse` from Task 5; `resolveChatGptWebEffort` from Task 2; `runChatGptWebTurn`, `CHATGPT_WEB_TAB_LIMITER` from Task 7; `ChatGptWebSessionStore` from Task 3.
-- Produces: `export function createChatGptWebLlmClient(store: ChatGptWebSessionStore): LlmClient`. Used by Task 12 (`meow-agent-manager.ts`).
+- Produces: `export function createChatGptWebLlmClient(store: ChatGptWebSessionStore): LlmClient`. Used by Task 12 (`bs-agent-manager.ts`).
 
 - [x] **Step 1: Write the failing test**
 
@@ -1224,7 +1224,7 @@ git commit -m "feat: add chatgpt-web LlmClient implementation"
 
 **Interfaces:**
 - Consumes: `ChatGptWebSessionStore` from Task 3, `getChatGptWebModelRefs` from Task 2.
-- Produces: `export class ChatGptWebManager { constructor(configDir: string); getStatus(): ChatGptWebStatus; setEnabled(enabled: boolean): ChatGptWebStatus; login(): Promise<ChatGptWebStatus>; logout(): ChatGptWebStatus; getModelRefsIfActive(): ModelRef[] }`. Used by Task 11 (IPC wiring) and Task 12 (`meow-agent-manager.ts`).
+- Produces: `export class ChatGptWebManager { constructor(configDir: string); getStatus(): ChatGptWebStatus; setEnabled(enabled: boolean): ChatGptWebStatus; login(): Promise<ChatGptWebStatus>; logout(): ChatGptWebStatus; getModelRefsIfActive(): ModelRef[] }`. Used by Task 11 (IPC wiring) and Task 12 (`bs-agent-manager.ts`).
 - `ChatGptWebStatus` is defined in Task 11 (`src/shared/types.ts`); this task defines it locally first and Task 11 re-exports the shared one — to avoid a forward dependency, define `ChatGptWebStatus` in `manager.ts` in this task, then Task 11 moves it to `src/shared/types.ts` and updates the import (called out explicitly in Task 11 Step 1).
 
 - [x] **Step 1: Write the failing test**
@@ -1433,7 +1433,7 @@ In `src/main/index.ts`, add the import (alongside the other manager imports near
 import { ChatGptWebManager } from './chatgpt-web/manager'
 ```
 
-Add a property to `MainApp` (alongside `templates`, before `meowAgent`, around line 47):
+Add a property to `MainApp` (alongside `templates`, before `bsAgent`, around line 47):
 
 ```typescript
   chatGptWeb = new ChatGptWebManager(path.join(app.getPath('userData'), 'chatgpt-web'))
@@ -1487,11 +1487,11 @@ git commit -m "feat: wire chatgpt-web status/login/logout IPC channels"
 
 ---
 
-### Task 12: Integrate into `meow-agent-manager.ts`
+### Task 12: Integrate into `bs-agent-manager.ts`
 
 **Files:**
-- Modify: `src/main/meow-agent-manager.ts`
-- Modify: `tests/unit/meow-agent-manager.test.ts`
+- Modify: `src/main/bs-agent-manager.ts`
+- Modify: `tests/unit/bs-agent-manager.test.ts`
 
 **Interfaces:**
 - Consumes: `ChatGptWebManager` from Task 10, `createChatGptWebLlmClient` from Task 9, `CHATGPT_WEB_PROVIDER_ID` from Task 2.
@@ -1499,11 +1499,11 @@ git commit -m "feat: wire chatgpt-web status/login/logout IPC channels"
 
 - [x] **Step 1: Read the existing test file's dependency-injection pattern**
 
-Open `tests/unit/meow-agent-manager.test.ts` and find how `deps.createLlm` is stubbed for existing tests (it's passed into the `MeowAgentManagerDeps` object at manager construction). Follow the exact same pattern for the new `deps.chatGptWeb` / `deps.createChatGptWebLlmClient`.
+Open `tests/unit/bs-agent-manager.test.ts` and find how `deps.createLlm` is stubbed for existing tests (it's passed into the `BsAgentManagerDeps` object at manager construction). Follow the exact same pattern for the new `deps.chatGptWeb` / `deps.createChatGptWebLlmClient`.
 
 - [x] **Step 2: Write the failing tests**
 
-Add to `tests/unit/meow-agent-manager.test.ts` (adjust the exact setup helper name/import list to match what the file already uses for constructing a `MeowAgentManager` in other tests in this file):
+Add to `tests/unit/bs-agent-manager.test.ts` (adjust the exact setup helper name/import list to match what the file already uses for constructing a `BsAgentManager` in other tests in this file):
 
 ```typescript
 import { CHATGPT_WEB_PROVIDER_ID } from '../../src/main/chatgpt-web/model-catalog'
@@ -1535,12 +1535,12 @@ Adjust `makeManager({...})` / `addAgentForTest({...})` to whatever the file's ac
 
 - [x] **Step 3: Run tests to verify they fail**
 
-Run: `npx vitest run tests/unit/meow-agent-manager.test.ts`
+Run: `npx vitest run tests/unit/bs-agent-manager.test.ts`
 Expected: FAIL — `deps.chatGptWeb`/`deps.createChatGptWebLlmClient` not recognized, or `createLlm` still called.
 
 - [x] **Step 4: Implement**
 
-In `src/main/meow-agent-manager.ts`:
+In `src/main/bs-agent-manager.ts`:
 
 Add imports near the top (alongside the existing `createLlm` import, line 10-11):
 
@@ -1561,7 +1561,7 @@ Update `getProviderModels()` (line 473-479) to append chatgpt-web models:
 
 ```typescript
   getProviderModels(): ModelRef[] {
-    const cfg = loadMeowConfig(this.deps.configPath)
+    const cfg = loadBsConfig(this.deps.configPath)
     const refs: ModelRef[] = []
     for (const [provider, p] of Object.entries(cfg.provider)) {
       for (const model of p.models) refs.push({ provider, model })
@@ -1589,7 +1589,7 @@ In `src/main/chatgpt-web/manager.ts`, add a method to `ChatGptWebManager`:
   }
 ```
 
-Then in `meow-agent-manager.ts`, call it as `(this.deps.createChatGptWebLlmClient ?? ((m: ChatGptWebManager) => createChatGptWebLlmClient(m.getSessionStore())))(this.deps.chatGptWeb as ChatGptWebManager)`. Simplify by defining a small local wrapper at the top of the file instead of inlining that expression:
+Then in `bs-agent-manager.ts`, call it as `(this.deps.createChatGptWebLlmClient ?? ((m: ChatGptWebManager) => createChatGptWebLlmClient(m.getSessionStore())))(this.deps.chatGptWeb as ChatGptWebManager)`. Simplify by defining a small local wrapper at the top of the file instead of inlining that expression:
 
 ```typescript
 function defaultCreateChatGptWebLlmClient(manager: ChatGptWebManager) {
@@ -1599,7 +1599,7 @@ function defaultCreateChatGptWebLlmClient(manager: ChatGptWebManager) {
 
 and use `(this.deps.createChatGptWebLlmClient ?? defaultCreateChatGptWebLlmClient)(this.deps.chatGptWeb as ChatGptWebManager)` in `register()`.
 
-Finally, in `src/main/index.ts` (Task 11 already added `chatGptWeb = new ChatGptWebManager(...)` to `MainApp`), pass it into the `MeowAgentManager` constructor call (around line 61, alongside `configPath`/`store`/`tools`):
+Finally, in `src/main/index.ts` (Task 11 already added `chatGptWeb = new ChatGptWebManager(...)` to `MainApp`), pass it into the `BsAgentManager` constructor call (around line 61, alongside `configPath`/`store`/`tools`):
 
 ```typescript
     chatGptWeb: this.chatGptWeb,
@@ -1607,7 +1607,7 @@ Finally, in `src/main/index.ts` (Task 11 already added `chatGptWeb = new ChatGpt
 
 - [x] **Step 5: Run tests to verify they pass**
 
-Run: `npx vitest run tests/unit/meow-agent-manager.test.ts`
+Run: `npx vitest run tests/unit/bs-agent-manager.test.ts`
 Expected: PASS, including the two new tests and every pre-existing test in the file (anthropic/google/openai-compatible paths unaffected).
 
 Run the full unit suite to confirm no regressions elsewhere:
@@ -1617,7 +1617,7 @@ Expected: all tests PASS.
 - [x] **Step 6: Commit**
 
 ```bash
-git add src/main/meow-agent-manager.ts src/main/chatgpt-web/manager.ts src/main/index.ts tests/unit/meow-agent-manager.test.ts
+git add src/main/bs-agent-manager.ts src/main/chatgpt-web/manager.ts src/main/index.ts tests/unit/bs-agent-manager.test.ts
 git commit -m "feat: resolve chatgpt-web provider to ChatGptWebLlmClient in agent manager"
 ```
 
@@ -1846,7 +1846,7 @@ each release that touches this feature.
    for the exact error.
 
 ## 3. First turn (text only)
-1. In the chat panel, pick an agent using the native `meow` template, open the
+1. In the chat panel, pick an agent using the native `bs` template, open the
    model picker, and select `chatgpt-web / medium`.
 2. Send a simple prompt ("what's 2+2?"). A headless Chrome should launch
    briefly; the answer should appear in the chat panel once ChatGPT finishes
@@ -1903,6 +1903,6 @@ Follow `docs/chatgpt-web-smoke-test.md` end to end at least once before consider
 > 1. **Fresh install + login.** Open Settings → "Login ChatGPT Web". A visible Chrome opens; sign in manually; close it. Verify both userData/chatgpt-web/storage-state.json and userData/chatgpt-web/browser-profile/Cookies exist.
 > 2. **Headless chat turn.** Send a message through the chatgpt-web provider. Chat flow opens a headless Chrome; response returns normally.
 > 3. **Profile survives missing JSON.** Delete storage-state.json, keep browser-profile/. Send another message — it still works (browser-profile is the source of truth; ephemeral context loads from it).
-> 4. **Fallback to visible on Cloudflare.** Corrupt browser-profile/Cookies (e.g., empty it). Send a message — a visible Chrome window pops up + the renderer toast "[meow] Cloudflare cần xác minh. Vui lòng giải trong cửa sổ Chrome vừa mở." Solve the challenge; chat resumes.
+> 4. **Fallback to visible on Cloudflare.** Corrupt browser-profile/Cookies (e.g., empty it). Send a message — a visible Chrome window pops up + the renderer toast "[bs] Cloudflare cần xác minh. Vui lòng giải trong cửa sổ Chrome vừa mở." Solve the challenge; chat resumes.
 > 5. **Logout wipes everything.** Logout from Settings. Verify both storage-state.json and browser-profile/ are deleted.
 > 6. **Re-login creates fresh profile.** Login again from Settings. Verify a new browser-profile/ is created and the chat flow works.

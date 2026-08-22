@@ -1,10 +1,10 @@
-# Meow Coding — Opencode-style references & slash args : Design Spec
+# BS Coding — Opencode-style references & slash args : Design Spec
 
 Ngày: 2026-08-08 · Trạng thái: chờ duyệt
 
 ## 1. Mục tiêu
 
-Điều chỉnh hành vi reference (`@file`, `@AGENTS.md`) và slash command của native Meow agent theo
+Điều chỉnh hành vi reference (`@file`, `@AGENTS.md`) và slash command của native BS agent theo
 đúng cách opencode làm, để:
 
 1. **`$ARGUMENTS` giữ nguyên format** — nội dung sau slash không bị flatten (mất newline/thụt lề/code
@@ -38,7 +38,7 @@ Renderer ChatPanel.send():
   m = /^\/(\S+)(?:\s+([\s\S]*))?$/.exec(trimmed)
   window.api.runCommand(agentId, m[1], m[2] ?? '')          ← raw string
 
-Main MeowAgentManager.runCommand(agentId, name, args: string)
+Main BsAgentManager.runCommand(agentId, name, args: string)
   └─ resolveCommand(command, args, {cwd, commands})
        ├─ resolveCommandTemplate: $ARGUMENTS → args (nguyên trạng)
        │                         $1..$n → tokenize quote-aware
@@ -73,7 +73,7 @@ system prompt, kèm yêu cầu user (nguyên trạng) trong user message.
 | `src/main/agent/commands.ts` | `resolveCommandTemplate` nhận raw string; `$ARGUMENTS` nguyên trạng; `$1..$n` quote-aware tokenize; bỏ `expandReferences` trong `resolveCommand`. |
 | `src/main/agent/references.ts` | Bỏ cap cho AGENTS.md/CLAUDE.md; file thường cap 50KB + hint `use the read tool with offset`; chuẩn hóa hằng số. |
 | `src/main/agent/instructions.ts` | Không đổi logic (hàm có sẵn được dùng); có thể thêm helper `isInstructionFile` nếu cần dùng chung. |
-| `src/main/meow-agent-manager.ts` | `runCommand` type `args: string`; system prompt dùng `instructionsText(loadInstructions(...))` thay `INSTRUCTION_POINTER`. |
+| `src/main/bs-agent-manager.ts` | `runCommand` type `args: string`; system prompt dùng `instructionsText(loadInstructions(...))` thay `INSTRUCTION_POINTER`. |
 | `src/main/agent/tools/read.ts` | Giữ offset/limit + hint phân trang (đã có); chỉ kiểm tra nhất quán với cap mới. |
 
 ## 5. Chi tiết kỹ thuật
@@ -83,7 +83,7 @@ system prompt, kèm yêu cầu user (nguyên trạng) trong user message.
 - `$ARGUMENTS` → thay bằng `args` nguyên trạng (giữ newline, thụt lề, code block).
 - `$N` (N ≥ 1) → tokenize `args` bằng regex quote-aware:
   `/(?:[^\s"']+|"[^"]*"|'[^']*')/g`; placeholder có chỉ số cao nhất được tham chiếu vẫn slurp phần
-  còn lại của args (giữ behavior cũ của meow).
+  còn lại của args (giữ behavior cũ của bs).
 - Không có placeholder trong template → không đổi (chỉ `$ARGUMENTS` mới thay).
 
 ### 5.2 Cap dung lượng trong `expandReferences`

@@ -1,8 +1,8 @@
-# Meow Coding — Settings Screen: Kế hoạch triển khai
+# BS Coding — Settings Screen: Kế hoạch triển khai
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Tạo màn hình Settings tabbed đẩy toàn bộ `meow.json` vào UI (providers, agents, permission,
+**Goal:** Tạo màn hình Settings tabbed đẩy toàn bộ `bs.json` vào UI (providers, agents, permission,
 mcp, context). Mỗi tab chỉnh 1 nhóm; nút Save duy nhất áp dụng draft.
 
 ---
@@ -16,9 +16,9 @@ mcp, context). Mỗi tab chỉnh 1 nhóm; nút Save duy nhất áp dụng draft.
   export interface CompactionSettings { auto: boolean; buffer: number; keepTokens: number; tailTurns: number; toolOutputMaxChars: number }
   export interface AgentSettings { name: string; systemPrompt: string; provider?: string; model?: string }
   ```
-- Mở rộng `MeowSettings`:
+- Mở rộng `BsSettings`:
   ```ts
-  export interface MeowSettings {
+  export interface BsSettings {
     providers: ProviderSettings[]
     defaultProvider: string
     agents: AgentSettings[]
@@ -37,7 +37,7 @@ mcp, context). Mỗi tab chỉnh 1 nhóm; nút Save duy nhất áp dụng draft.
 - Dùng shared `PermissionRule`/`CompactionSettings`; xoá type local trùng.
 - `McpServerConfig` import từ `mcp/manager` → giữ (đã cùng shape), hoặc alias sang shared.
 
-## 3. Manager (`src/main/meow-agent-manager.ts`)
+## 3. Manager (`src/main/bs-agent-manager.ts`)
 
 - `connectProvider`/`disconnectProvider`: dùng `this.getSettings()` làm base rồi chỉ sửa
   `providers`/`defaultProvider`, giữ các field khác (tránh mất agents/mcp/context khi save).
@@ -49,7 +49,7 @@ mcp, context). Mỗi tab chỉnh 1 nhóm; nút Save duy nhất áp dụng draft.
   - Load `getSettings()` vào draft; state `tab`, `draft`, `status`, `saving`.
   - Save → `saveSettings(draft)` → `status` thành công; các tab khác đọc draft prop.
 - `settings/ProvidersTab.tsx` (mới): port UI từ `ProvidersDialog` (catalog, connect, disconnect, models, MCP status) — giữ class cũ `.providers-dialog`? Không: dùng container mới nhưng giữ các class con `.provider-*`, `.mcp-status` để e2e ổn.
-- `settings/AgentsTab.tsx` (mới): list agent (name readonly, systemPrompt textarea); không xoá `meow`.
+- `settings/AgentsTab.tsx` (mới): list agent (name readonly, systemPrompt textarea); không xoá `bs`.
 - `settings/PermissionsTab.tsx` (mới): rows tool + select allow/ask/deny + add/remove.
 - `settings/McpTab.tsx` (mới): rows server name + command/args/url/env + add/remove; hiển thị `getMcpStatus()`.
 - `settings/ContextTab.tsx` (mới): inputs `maxContextTokens`, compaction fields.
@@ -59,9 +59,9 @@ mcp, context). Mỗi tab chỉnh 1 nhóm; nút Save duy nhất áp dụng draft.
 
 ## 5. Tests
 
-- `agent-config.test.ts`: round-trip full `MeowSettings` ↔ `MeowConfig`.
-- `meow-agent-manager.test.ts`: `getSettings`/`saveSettings` giữ agents/permission/mcp/context.
-- `ipc-contract.test.ts`: khớp `MeowSettings` mở rộng.
+- `agent-config.test.ts`: round-trip full `BsSettings` ↔ `BsConfig`.
+- `bs-agent-manager.test.ts`: `getSettings`/`saveSettings` giữ agents/permission/mcp/context.
+- `ipc-contract.test.ts`: khớp `BsSettings` mở rộng.
 - `e2e/smoke.spec.ts`: mở Settings (menu "Settings") → tab Providers → connect deepseek → Save → đóng.
 
 ## 6. Verify

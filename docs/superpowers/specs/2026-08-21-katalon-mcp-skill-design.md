@@ -1,28 +1,28 @@
-# Katalon Studio MCP + Skill integration (Meow Coding native agent)
+# Katalon Studio MCP + Skill integration (BS Coding native agent)
 
 Date: 2026-08-21
 Status: Approved by user (2026-08-21)
 
 ## Goal
 
-Cho phép native Meow agent trong Meow Coding tự động viết và chạy test script trên
+Cho phép native BS agent trong BS Coding tự động viết và chạy test script trên
 Katalon Studio local (Web UI, API, Mobile) thông qua:
 
 1. **Katalon Studio MCP server** — server MCP mà Katalon Studio ≥ 11.1.0 tự host
    (mặc định port `33699`, không auth, tất cả tools bật khi GUI mở; hoặc host qua CLI
    standalone khi đóng GUI).
-2. **Skill `katalon-studio`** — skill markdown (định dạng skill chuẩn của Meow:
+2. **Skill `katalon-studio`** — skill markdown (định dạng skill chuẩn của BS:
    frontmatter `name` + `description`) hướng dẫn agent cách thao tác đúng trên
    Katalon Studio.
 
 ## Bối cảnh đã xác minh
 
-- Meow Coding đã có sẵn hạ tầng: `McpManager` (`src/main/agent/mcp/manager.ts`) hỗ trợ
+- BS Coding đã có sẵn hạ tầng: `McpManager` (`src/main/agent/mcp/manager.ts`) hỗ trợ
   MCP server dạng stdio command hoặc HTTP URL; Settings UI (McpTab) để thêm server;
-  `syncTools()` trong `src/main/meow-agent-manager.ts` kết nối mọi server trong
-  `mcp` section của `userData/meow.json` và expose tools cho agent loop.
+  `syncTools()` trong `src/main/bs-agent-manager.ts` kết nối mọi server trong
+  `mcp` section của `userData/bs.json` và expose tools cho agent loop.
 - Skill loader (`src/main/agent/skill.ts`) nạp skill markdown từ:
-  `<cwd>/.meow/skills/`, `userData/skills/` (global), và `resources/skills/` (builtin).
+  `<cwd>/.bs/skills/`, `userData/skills/` (global), và `resources/skills/` (builtin).
 - Katalon Studio MCP (local): tự host tại `localhost:33699`, mỗi server gắn với **một
   project Katalon**; muốn đổi project phải khởi động lại server. Có nút **Copy** trong
   Preferences để lấy JSON cấu hình chính xác.
@@ -32,8 +32,8 @@ Katalon Studio local (Web UI, API, Mobile) thông qua:
 ## Quyết định (đã được user duyệt)
 
 - Dùng **Katalon Studio MCP local** (không dùng True Platform cloud).
-- Agent đích: **native Meow agent**.
-- Viết **skill `katalon-studio` mới** cho Meow, đặt tại **global**
+- Agent đích: **native BS agent**.
+- Viết **skill `katalon-studio` mới** cho BS, đặt tại **global**
   `userData/skills/katalon-studio/SKILL.md` (dùng được cho mọi project).
 - Tùy chọn: thêm server **docs MCP** `https://mcp.katalon.com/mcp` (free, không auth)
   để agent tra cứu tài liệu Katalon chính xác khi cần.
@@ -45,7 +45,7 @@ Katalon Studio local (Web UI, API, Mobile) thông qua:
 | Bước | Chi tiết |
 |---|---|
 | 1 | Mở Katalon Studio → Preferences → Katalon → AI Configuration → Katalon Studio MCP → đảm bảo status **Running** (port mặc định `33699`), bấm **Copy** lấy JSON cấu hình. |
-| 2 | Meow Coding → Settings → MCP tab → thêm server tên `katalon-studio`, URL lấy từ JSON đã copy (dạng `http://localhost:33699/...`). |
+| 2 | BS Coding → Settings → MCP tab → thêm server tên `katalon-studio`, URL lấy từ JSON đã copy (dạng `http://localhost:33699/...`). |
 | 3 | (Tùy chọn) Thêm server `katalon-docs` với URL `https://mcp.katalon.com/mcp`. |
 | 4 | Save → `syncTools()` kết nối → MCP tools xuất hiện, trạng thái connected trong Settings. |
 
@@ -55,7 +55,7 @@ Ràng buộc:
 
 ### Phần 2 — Skill `katalon-studio`
 
-File: `userData/skills/katalon-studio/SKILL.md` (có thể copy sang `.meow/skills/`
+File: `userData/skills/katalon-studio/SKILL.md` (có thể copy sang `.bs/skills/`
 của từng project nếu muốn travel cùng project).
 
 Nội dung:
@@ -85,7 +85,7 @@ Nội dung:
 
 ## Ngoài scope
 
-- Không sửa code nguồn Meow Coding (chỉ dùng hạ tầng có sẵn).
+- Không sửa code nguồn BS Coding (chỉ dùng hạ tầng có sẵn).
 - Không tích hợp True Platform / TestOps cloud.
 - Không cài đặt/thay đổi Katalon Studio bên trong repo này.
 

@@ -4,7 +4,7 @@ Ngày: 2026-08-07 · Trạng thái: chờ duyệt
 
 ## 1. Mục tiêu
 
-- Cho phép native agent "meow" dùng **phiên đăng nhập ChatGPT web** (browser automation, không phải API key)
+- Cho phép native agent "bs" dùng **phiên đăng nhập ChatGPT web** (browser automation, không phải API key)
   làm một **provider tuỳ chọn**, bên cạnh các provider chính thống hiện có (anthropic/google/openai-compatible).
 - Cơ chế port lại (không phụ thuộc runtime) từ dự án tham khảo `codex-chatgpt-web`
   (Playwright điều khiển Chrome thật đăng nhập chatgpt.com, gõ prompt vào composer, đọc DOM trả về).
@@ -16,7 +16,7 @@ Ngày: 2026-08-07 · Trạng thái: chờ duyệt
 - `src/main/agent/llm.ts` định nghĩa `LlmClient { stream(opts: LlmStreamOptions): AsyncGenerator<LlmStreamPart> }`
   — đây là interface duy nhất mà `loop.ts`/`session.ts` cần từ một "LLM backend". `LlmStreamPart.kind` gồm
   `text | reasoning | tool-call | finish | error`.
-- Điểm nối provider → llm client hiện tại: `meow-agent-manager.ts:673`
+- Điểm nối provider → llm client hiện tại: `bs-agent-manager.ts:673`
   `const llmClient = (this.deps.createLlm ?? createLlm)(resolved.provider, resolved.apiKey ?? '', resolved.baseUrl)`.
 - `resolveAgentConfig()` (`agent/config.ts`) tách `model` dạng `"provider/model"`, tra `ProviderSettings` tương ứng.
   `provider` là string tự do — không cần đổi type/schema để thêm giá trị `chatgpt-web`.
@@ -30,9 +30,9 @@ Ngày: 2026-08-07 · Trạng thái: chờ duyệt
 | Chủ đề | Quyết định |
 |---|---|
 | Vị trí code | Module mới `src/main/chatgpt-web/*`, không đổi `agent/llm.ts` |
-| Điểm nối duy nhất | `meow-agent-manager.ts`: nếu `resolved.provider === 'chatgpt-web'` → `new ChatGptWebLlmClient(...)` thay vì `createLlm(...)` |
+| Điểm nối duy nhất | `bs-agent-manager.ts`: nếu `resolved.provider === 'chatgpt-web'` → `new ChatGptWebLlmClient(...)` thay vì `createLlm(...)` |
 | Interface | `ChatGptWebLlmClient implements LlmClient` — cùng `stream()` trả `AsyncGenerator<LlmStreamPart>`, loop.ts không cần biết backend |
-| Phạm vi | Hỗ trợ tool-calling đầy đủ ngay từ v1 (không chỉ chat text) — meow agent gọi bash/read/write/edit... qua backend này |
+| Phạm vi | Hỗ trợ tool-calling đầy đủ ngay từ v1 (không chỉ chat text) — bs agent gọi bash/read/write/edit... qua backend này |
 | Browser engine | Chrome/Chromium độc lập qua `playwright-core` (`chromium` hệ thống hoặc do người dùng chỉ định đường dẫn), tách biệt hoàn toàn khỏi Chromium của Electron |
 | "Full mode" (MCP tunnel) của repo gốc | **Không port** — `loop.ts` đã tự thực thi tool cục bộ; chỉ cần ChatGPT trả tool-call dạng text để parse |
 | Local HTTP server / SSE bridge của repo gốc | **Không port** — gọi trực tiếp in-process, không qua HTTP loopback |
@@ -85,13 +85,13 @@ Ngày: 2026-08-07 · Trạng thái: chờ duyệt
 - Nội dung: banner cảnh báo (browser automation không chính thức, rủi ro vỡ khi ChatGPT đổi UI, rủi ro ToS),
   nút Login/Logout, trạng thái phiên, toggle bật/tắt (mặc định tắt).
 - Khi bật + đã login: `chatgpt-web` xuất hiện trong `ModelPicker` như mọi provider khác (5 model = 5 effort level).
-- Không đổi `MeowConfig`/`AgentConfig` schema — `provider`/`model` vẫn là string tự do như hiện tại.
+- Không đổi `BsConfig`/`AgentConfig` schema — `provider`/`model` vẫn là string tự do như hiện tại.
 
 ## 9. Kiểm thử
 
 - Unit: `response-parser.ts` (parse text/tool-call/finish từ mẫu markdown giả lập), `prompt.ts` (nén context đúng
   format, không cần Chrome thật) — chạy trong CI.
-- `meow-agent-manager.ts`: test nhánh rẽ chọn `ChatGptWebLlmClient` khi `provider === 'chatgpt-web'`, dùng client
+- `bs-agent-manager.ts`: test nhánh rẽ chọn `ChatGptWebLlmClient` khi `provider === 'chatgpt-web'`, dùng client
   giả lập qua `deps.createLlm`-style injection — đảm bảo không phá test hiện có cho anthropic/google/openai-compatible.
 - `browser-login.ts`/`browser-worker.ts`: không unit test được (phụ thuộc DOM thật) → smoke-test thủ công có
   hướng dẫn trong docs (tương tự lệnh `doctor`/`browser check` của repo tham khảo).

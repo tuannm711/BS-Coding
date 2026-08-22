@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Cho native Meow agent tạo/sửa Word (.docx), Excel (.xlsx), PowerPoint (.pptx) qua một native tool mới `office` — spawn one-shot `officecli` subprocess, tự tải binary về `userData/officecli/` khi chưa có trong PATH.
+**Goal:** Cho native BS agent tạo/sửa Word (.docx), Excel (.xlsx), PowerPoint (.pptx) qua một native tool mới `office` — spawn one-shot `officecli` subprocess, tự tải binary về `userData/officecli/` khi chưa có trong PATH.
 
 **Architecture:** Thêm `OfficeCliBinary` (main process, service thuần) quản lý resolve/tải binary; thêm `officeTool` (ToolDefinition) spawn `[binary, ...args, '--json']` với cwd = project, timeout kill cả process tree. Tool đăng ký trong `createDefaultTools` khi có `getUserDataDir`; permission mặc định `office: 'ask'`. Không đổi IPC/preload/renderer.
 
@@ -12,7 +12,7 @@
 
 - Tuân theo `AGENTS.md`: không thêm comment thừa; chỉ comment khi giải thích quyết định phức tạp (VD: checksum mismatch, tree-kill timeout).
 - IPC: không đổi `src/shared/ipc.ts`, preload, renderer — tool chỉ chạy trong main process.
-- Tool mới phải thêm `office: 'ask'` vào `DEFAULT_MEOW_CONFIG.permission` trong `src/main/agent/config.ts`.
+- Tool mới phải thêm `office: 'ask'` vào `DEFAULT_BS_CONFIG.permission` trong `src/main/agent/config.ts`.
 - Windows: `officecli` là `.exe` thật (không phải `.cmd` shim) → spawn trực tiếp, **không** bọc qua `cmd.exe`.
 - Download dùng `fetch` (Node 20+, `redirect: 'follow'`); URL asset theo install.ps1 của OfficeCLI.
 - Bắt buộc `npm run typecheck` pass và `npm test` pass sau mỗi task.
@@ -56,7 +56,7 @@ import {
 let dir = ''
 
 function makeDir(): string {
-  dir = mkdtempSync(path.join(tmpdir(), 'meow-officecli-'))
+  dir = mkdtempSync(path.join(tmpdir(), 'bs-officecli-'))
   return dir
 }
 
@@ -397,7 +397,7 @@ afterEach(() => {
 })
 
 function ctx(): ToolContext {
-  dir = mkdtempSync(path.join(tmpdir(), 'meow-office-tool-'))
+  dir = mkdtempSync(path.join(tmpdir(), 'bs-office-tool-'))
   return { cwd: dir, ask: async () => null }
 }
 
@@ -610,7 +610,7 @@ git commit -m "feat(agent): add office tool spawning officecli subprocess"
 **Files:**
 - Modify: `src/main/agent/tools/registry.ts`
 - Modify: `src/main/index.ts` (block `tools: createDefaultTools({ ... })`)
-- Modify: `src/main/agent/config.ts` (`DEFAULT_MEOW_CONFIG.permission`)
+- Modify: `src/main/agent/config.ts` (`DEFAULT_BS_CONFIG.permission`)
 
 **Interfaces:**
 - Consumes: `createOfficeTool` (Task 2), `OfficeCliBinary` (Task 1).
@@ -626,7 +626,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { createDefaultTools } from '../../src/main/agent/tools/registry'
-import { DEFAULT_MEOW_CONFIG } from '../../src/main/agent/config'
+import { DEFAULT_BS_CONFIG } from '../../src/main/agent/config'
 
 let dir = ''
 afterEach(() => {
@@ -637,7 +637,7 @@ afterEach(() => {
 
 describe('createDefaultTools', () => {
   it('adds the office tool when getUserDataDir is provided', () => {
-    dir = mkdtempSync(path.join(tmpdir(), 'meow-reg-'))
+    dir = mkdtempSync(path.join(tmpdir(), 'bs-reg-'))
     const tools = createDefaultTools({ getUserDataDir: () => dir })
     expect(tools.has('office')).toBe(true)
   })
@@ -650,7 +650,7 @@ describe('createDefaultTools', () => {
 
 describe('default permission', () => {
   it('defaults office permission to ask', () => {
-    expect(DEFAULT_MEOW_CONFIG.permission.office).toBe('ask')
+    expect(DEFAULT_BS_CONFIG.permission.office).toBe('ask')
   })
 })
 ```
@@ -680,7 +680,7 @@ sửa interface `DefaultToolsOptions` thêm `getUserDataDir?: () => string | und
   return new Map(tools.map(t => [t.name, t]))
 ```
 
-`src/main/agent/config.ts` — trong `DEFAULT_MEOW_CONFIG.permission`, thêm dòng:
+`src/main/agent/config.ts` — trong `DEFAULT_BS_CONFIG.permission`, thêm dòng:
 
 ```ts
     bash: 'ask',

@@ -2,13 +2,13 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Make browser element finding fast and stable (ARIA tree snapshot + ref-based interaction like Playwright `ariaSnapshot`), never open new Chrome windows from LLM actions (background tabs in existing windows), group Meow-opened tabs under a "Meow" tab group, and support full-page screenshots of background tabs without stealing focus.
+**Goal:** Make browser element finding fast and stable (ARIA tree snapshot + ref-based interaction like Playwright `ariaSnapshot`), never open new Chrome windows from LLM actions (background tabs in existing windows), group BS-opened tabs under a "BS" tab group, and support full-page screenshots of background tabs without stealing focus.
 
 **Architecture:** Content script builds a nested ARIA tree using `getComputedRole()`/`getComputedName()` (no layout) with `ref` handles on interactive nodes; a ref→element map in the content script resolves `click/type/select` by ref. Background service worker tracks a "working tab", opens background tabs in existing windows, groups them via `chrome.tabGroups`, and captures screenshots via `chrome.debugger` CDP `Page.captureScreenshot`. Main-process tools pass refs through unchanged.
 
 **Tech Stack:** Chrome MV3 extension (TS, esbuild → `out/browser-extension`), `@types/chrome`, Vitest (node env, fake DOM objects), main-process zod tools.
 
-**Spec:** `docs/superpowers/specs/2026-08-10-meow-browser-snapshot-tabs-design.md`
+**Spec:** `docs/superpowers/specs/2026-08-10-bs-browser-snapshot-tabs-design.md`
 
 ---
 
@@ -20,7 +20,7 @@
 | `src/browser-extension/manifest.json` | Add `debugger`, `tabGroups` permissions; bump version to 0.2.0 |
 | `src/browser-extension/snapshot.ts` (new) | Pure ARIA tree builder: `buildAriaTree`, `fallbackRole`, `fallbackName`, `createRefMap`, `resolveRef` — no DOM/global side effects, unit-testable |
 | `src/browser-extension/content.ts` | Use `buildAriaTree` in `read`; ref-based `click/type/select`; hold ref map |
-| `src/browser-extension/background.ts` | Working tab, openTab (window reuse + "Meow" group), listTabs group info, switchTab, CDP screenshot |
+| `src/browser-extension/background.ts` | Working tab, openTab (window reuse + "BS" group), listTabs group info, switchTab, CDP screenshot |
 | `src/main/agent/tools/browser.ts` | Tools: add `ref` params, new `browser_open_tab`, update descriptions |
 | `src/main/browser/chrome-launcher.ts` | Drop `--new-window` when spawning Chrome |
 | `tests/unit/browser/snapshot.test.ts` (new) | Unit tests for snapshot.ts (fake DOM objects) |
@@ -66,9 +66,9 @@ In `src/browser-extension/manifest.json`:
 ```json
 {
   "manifest_version": 3,
-  "name": "Meow Browser Bridge",
+  "name": "BS Browser Bridge",
   "version": "0.2.0",
-  "description": "Bridge giữa Meow Coding và Chrome: cho phép agent đọc/thao tác trang trên profile Chrome thật.",
+  "description": "Bridge giữa BS Coding và Chrome: cho phép agent đọc/thao tác trang trên profile Chrome thật.",
   "permissions": ["tabs", "scripting", "storage", "debugger", "tabGroups"],
   ...
 }
@@ -533,7 +533,7 @@ Verified via `npm run typecheck` + `npm run build:extension` + manual checks (ba
 After the existing module-level state in `background.ts` (after `let pendingCode`), add:
 
 ```ts
-const GROUP_TITLE = 'Meow'
+const GROUP_TITLE = 'BS'
 const GROUP_COLOR = 'blue' as chrome.tabGroups.ColorEnum
 
 let workingTabId: number | null = null
@@ -555,13 +555,13 @@ async function lastFocusedWindowId(): Promise<number | undefined> {
   return byFocus[0]?.id
 }
 
-async function meowGroupId(): Promise<number | undefined> {
+async function bsGroupId(): Promise<number | undefined> {
   const groups = await chrome.tabGroups.query({})
   return groups.find(g => g.title === GROUP_TITLE)?.id
 }
 
-async function addToMeowGroup(tabId: number): Promise<{ groupId?: number; groupTitle?: string }> {
-  const existing = await meowGroupId()
+async function addToBSGroup(tabId: number): Promise<{ groupId?: number; groupTitle?: string }> {
+  const existing = await bsGroupId()
   const groupId = await chrome.tabs.group({ tabIds: [tabId], ...(existing != null ? { groupId: existing } : {}) })
   await chrome.tabGroups.update(groupId, { title: GROUP_TITLE, color: GROUP_COLOR })
   return { groupId, groupTitle: GROUP_TITLE }
@@ -590,7 +590,7 @@ case 'openTab': {
     ? await chrome.tabs.create({ url, windowId, active: false })
     : await chrome.tabs.create({ url })
   workingTabId = tab.id ?? null
-  const group = tab.id != null ? await addToMeowGroup(tab.id) : {}
+  const group = tab.id != null ? await addToBSGroup(tab.id) : {}
   send({ ok: true, data: { id: tab.id, url: tab.url, ...group } })
   return
 }
@@ -682,7 +682,7 @@ Expected: both pass.
 
 ```bash
 git add src/browser-extension/background.ts
-git commit -m "feat(browser-extension): working tab, background openTab in existing window + Meow group, listTabs group info, CDP full-page screenshot"
+git commit -m "feat(browser-extension): working tab, background openTab in existing window + BS group, listTabs group info, CDP full-page screenshot"
 ```
 
 ---
@@ -777,7 +777,7 @@ Add the `browser_open_tab` tool right after `browser_navigate`:
     {
       name: 'browser_open_tab',
       description:
-        'Open a URL in a new background tab of an existing Chrome window, grouped under "Meow". ' +
+        'Open a URL in a new background tab of an existing Chrome window, grouped under "BS". ' +
         'Never opens a new Chrome window unless none are open, and does not focus Chrome.',
       schema: z.object({
         url: z.string().describe('The http(s) URL to open.')
@@ -913,7 +913,7 @@ git commit -m "feat(browser): chrome launcher reuses existing window (drop --new
 ## Task 7: Docs + full verification
 
 **Files:**
-- Modify: `docs/superpowers/specs/2026-08-10-meow-browser-snapshot-tabs-design.md` (note implementation refinements if any)
+- Modify: `docs/superpowers/specs/2026-08-10-bs-browser-snapshot-tabs-design.md` (note implementation refinements if any)
 
 - [ ] **Step 1: Note the working-tab simplification in the spec**
 
@@ -927,7 +927,7 @@ Expected: all pass (typecheck clean; 65+ test files pass; extension builds).
 - [ ] **Step 3: Commit**
 
 ```bash
-git add docs/superpowers/specs/2026-08-10-meow-browser-snapshot-tabs-design.md
+git add docs/superpowers/specs/2026-08-10-bs-browser-snapshot-tabs-design.md
 git commit -m "docs: note working-tab targeting in browser snapshot spec"
 ```
 
@@ -936,7 +936,7 @@ git commit -m "docs: note working-tab targeting in browser snapshot spec"
 ## Manual verification (after implementation)
 
 1. `npm run dev` → pair extension (Reload it in `chrome://extensions` first — manifest changed to 0.2.0).
-2. Agent: `browser_open_tab` a few URLs → confirm tabs open **in the existing Chrome window, in background, inside a "Meow" group** (colored blue), and no new window appears.
+2. Agent: `browser_open_tab` a few URLs → confirm tabs open **in the existing Chrome window, in background, inside a "BS" group** (colored blue), and no new window appears.
 3. `browser_screenshot` a background tab → confirm a full-page PNG is saved and Chrome was not focused.
 4. On a dynamic page (React app with an agent card): `browser_read` → the "Chat" button appears in the tree with a `[rN]` ref; `browser_click {ref}` works; `browser_read` feels fast (no per-element `innerText`).
 5. `browser_switch_tab` → tab activates in its window, the OS focus stays on whatever the user was using.

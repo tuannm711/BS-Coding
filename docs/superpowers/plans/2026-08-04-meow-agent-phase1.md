@@ -1,10 +1,10 @@
-# Meow Agent — Phase 1 Implementation Plan
+# BS Agent — Phase 1 Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended)
 > or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`)
 > syntax for tracking.
 
-**Goal:** Xây agent coding native "Meow Agent" trong meow-coding — agent loop, tools core, config,
+**Goal:** Xây agent coding native "BS Agent" trong bs-coding — agent loop, tools core, config,
 permission, session persist, chat panel UI — tái hiện kiến trúc core opencode theo stack dự án.
 
 **Architecture:** Mọi logic agent chạy trong **main process** (`src/main/agent/`), giao tiếp với
@@ -14,7 +14,7 @@ native trong pane grid hiện có. LLM dùng Vercel AI SDK (`ai` + `@ai-sdk/anth
 
 **Tech Stack (bổ sung):** `ai`, `@ai-sdk/anthropic`, `@ai-sdk/openai-compatible`, `zod` (schema tool).
 
-**Spec:** `docs/superpowers/specs/2026-08-04-meow-agent-builtin-design.md`
+**Spec:** `docs/superpowers/specs/2026-08-04-bs-agent-builtin-design.md`
 
 **Quy ước test:** viết failing test trước → chạy xác nhận FAIL → implement → chạy PASS → typecheck →
 commit từng task.
@@ -27,7 +27,7 @@ commit từng task.
 |---|---|
 | `src/shared/types.ts` (modify) | Thêm `AgentKind`, `ChatMessage`, `ToolCallData`, `ChatEvent`, `PromptResponse` |
 | `src/shared/ipc.ts` (modify) | Thêm `Channels` chat + method `AgentApi` |
-| `src/main/agent/config.ts` | Load `meow.json` + env: provider/model/agents/permissions |
+| `src/main/agent/config.ts` | Load `bs.json` + env: provider/model/agents/permissions |
 | `src/main/agent/message.ts` | Chuyển `ChatMessage`+`ToolCallData` ↔ AI SDK message/tool |
 | `src/main/agent/llm.ts` | `LlmClient` interface + `createAnthropicLlm` / `createOpenAICompatibleLlm` |
 | `src/main/agent/permission.ts` | Rules allow/ask/deny + matcher |
@@ -36,8 +36,8 @@ commit từng task.
 | `src/main/agent/apply-patch.ts` | Parser + áp unified diff (cho tool apply-patch) |
 | `src/main/agent/tools/registry.ts` | `ToolDefinition` + registry |
 | `src/main/agent/tools/{bash,read,write,edit,glob,grep,apply-patch,todowrite,question}.ts` | Tools |
-| `src/main/meow-agent-manager.ts` | Điều phối session/loop per agent, IPC wiring, default agent |
-| `src/main/index.ts` (modify) | Khởi tạo `MeowAgentManager`, register handlers chat |
+| `src/main/bs-agent-manager.ts` | Điều phối session/loop per agent, IPC wiring, default agent |
+| `src/main/index.ts` (modify) | Khởi tạo `BsAgentManager`, register handlers chat |
 | `src/preload/index.ts` (modify) | Expose method chat |
 | `src/renderer/src/components/chat/{ChatPanel,MessageItem,ToolCallCard,ChatInput}.tsx` | Chat UI |
 | `src/renderer/src/App.tsx`, `Pane.tsx`, `PaneGrid.tsx` (modify) | Render ChatPanel cho agent native |
@@ -118,8 +118,8 @@ Commit: `feat: shared chat types and ipc contract`
 - [ ] **Step 1: Viết failing test**
 
 Cases:
-- parse `meow.json` hợp lệ → provider/model/agents/permissions đúng.
-- file không tồn tại → dùng defaults (model `anthropic`, agent `meow` system prompt mặc định).
+- parse `bs.json` hợp lệ → provider/model/agents/permissions đúng.
+- file không tồn tại → dùng defaults (model `anthropic`, agent `bs` system prompt mặc định).
 - file hỏng JSON → fallback defaults (không throw).
 - `resolveApiKey`: ưu tiên config string > env var (`apiKeyEnv`) > `process.env[apiKeyEnv]`.
 - permission default: tool không có rule → `ask`.
@@ -127,7 +127,7 @@ Cases:
 - [ ] **Step 2: Implement**
 
 ```ts
-export interface MeowConfig {
+export interface BsConfig {
   provider: Record<string, { apiKeyEnv?: string; baseUrl?: string; model: string }>
   model: string
   agents: Record<string, { model?: string; systemPrompt: string }>
@@ -136,14 +136,14 @@ export interface MeowConfig {
 export interface ResolvedAgentConfig {
   provider: string; model: string; apiKey: string | null; systemPrompt: string
 }
-export function loadMeowConfig(filePath: string, env: NodeJS.ProcessEnv = process.env): MeowConfig
-export function resolveAgentConfig(cfg: MeowConfig, agentName: string, env?): ResolvedAgentConfig
+export function loadBsConfig(filePath: string, env: NodeJS.ProcessEnv = process.env): BsConfig
+export function resolveAgentConfig(cfg: BsConfig, agentName: string, env?): ResolvedAgentConfig
 export function resolveApiKey(providerCfg, env?): string | null
-export const DEFAULT_MEOW_CONFIG: MeowConfig
+export const DEFAULT_BS_CONFIG: BsConfig
 ```
 Defaults: `provider.anthropic = { apiKeyEnv: 'ANTHROPIC_API_KEY', model: 'claude-sonnet-4-5' }`,
 `provider.openai = { apiKeyEnv: 'OPENAI_API_KEY', model: 'gpt-4o' }`, `model: 'anthropic'`,
-`agents.meow.systemPrompt = "You are Meow, a coding agent working inside an Electron app..."`,
+`agents.bs.systemPrompt = "You are BS, a coding agent working inside an Electron app..."`,
 `permission: {}` (default ask).
 
 - [ ] **Step 3: Test pass + typecheck + commit** (`feat: agent config loader`)
@@ -372,15 +372,15 @@ run():
 
 ---
 
-## Task 10: MeowAgentManager + main wiring + default agent
+## Task 10: BsAgentManager + main wiring + default agent
 
-**Files:** `src/main/meow-agent-manager.ts`, `src/main/index.ts` (modify),
-`tests/unit/meow-agent-manager.test.ts`
+**Files:** `src/main/bs-agent-manager.ts`, `src/main/index.ts` (modify),
+`tests/unit/bs-agent-manager.test.ts`
 
 - [ ] **Step 1: Viết failing test cho manager**
 
 ```ts
-export class MeowAgentManager {
+export class BsAgentManager {
   constructor(deps: { configPath: string; store: SessionStore; tools: Map<string, ToolDefinition> })
   isNative(agentId: string): boolean
   send(agentId: string, text: string): Promise<void>
@@ -404,15 +404,15 @@ respondPrompt allow/deny → tool chạy/không chạy; init → tạo runner ch
 
 - [ ] **Step 3: Modify `src/main/index.ts`**
 
-- Khởi tạo `meowAgent = new MeowAgentManager({ configPath: userData/meow.json, store: SessionStore(createJsonStore(sessions.json)), tools: createDefaultTools() })`.
+- Khởi tạo `bsAgent = new BsAgentManager({ configPath: userData/bs.json, store: SessionStore(createJsonStore(sessions.json)), tools: createDefaultTools() })`.
 - Register handlers: `ChatSend/Stop/NewSession/ListMessages/RespondPrompt`; forward `chat:event`.
-- `WorkspaceAdd`: nếu workspace mới → tự add 1 agent `{ kind:'native', templateId:'meow', name:'meow' }`.
-- `addDefaultTemplates`: thêm template mặc định `{ id:'meow', name:'meow', kind:'native' }` (mở rộng `DEFAULT_TEMPLATES` + `Template` type thêm `kind?: AgentKind`).
+- `WorkspaceAdd`: nếu workspace mới → tự add 1 agent `{ kind:'native', templateId:'bs', name:'bs' }`.
+- `addDefaultTemplates`: thêm template mặc định `{ id:'bs', name:'bs', kind:'native' }` (mở rộng `DEFAULT_TEMPLATES` + `Template` type thêm `kind?: AgentKind`).
 - `before-quit`: dừng mọi runner (abort) trước khi thoát.
 - `workspaces.addAgent`: nhận `kind` trong `NewAgentInput`.
 
 - [ ] **Step 4: Test pass + typecheck + app mở không lỗi (`npm run dev`) + commit**
-(`feat: meow agent manager and main wiring`)
+(`feat: bs agent manager and main wiring`)
 
 ---
 
@@ -444,7 +444,7 @@ Thêm 6 method chat vào `api` (subscribe `EventChat` qua helper `subscribe`).
 
 - [ ] **Step 4: Manual test `npm run dev`**
 
-Mở workspace (có meow agent native) → chat panel hiện → gõ prompt → message user hiện; chưa có key
+Mở workspace (có bs agent native) → chat panel hiện → gõ prompt → message user hiện; chưa có key
 model → event error hint config (dựa vào `listChatMessages`/event). Xác nhận không crash.
 
 - [ ] **Step 5: typecheck + commit** (`feat: renderer chat panel for native agent`)
@@ -470,7 +470,7 @@ npm run build && npm run e2e
 ```
 Tất cả PASS.
 
-- [ ] **Step 3: Commit cuối** (`feat: meow agent phase 1`)
+- [ ] **Step 3: Commit cuối** (`feat: bs agent phase 1`)
 
 ---
 

@@ -21,7 +21,7 @@
 ## Task 2 — electron-builder publish config
 
 `electron-builder.ts`:
-- Add `publish: { provider: 'github', owner: 'stardust-bytes', repo: 'meow-coding' }` at top level of the exported config (next to `appId`).
+- Add `publish: { provider: 'github', owner: 'stardust-bytes', repo: 'bs-coding' }` at top level of the exported config (next to `appId`).
 - Do NOT modify `.github/workflows/build.yml` — it already uploads `latest*.yml` + `*.blockmap` to GitHub Releases.
 
 **Test:** `npm run dist:dir` still packages successfully (app-update.yml will be generated into the asar resources; not needed for this test).
@@ -202,6 +202,6 @@ onUpdaterStatus: (cb: (e: UpdaterStatusEvent) => void) => subscribe(Channels.Eve
 - AGENTS.md: IPC channels only via `Channels` from `src/shared/ipc.ts` — never hardcode strings.
 - `src/shared` must not import Node/Electron.
 - Only main process spawns/kills processes; renderer via `window.api`.
-- System-style notifications from main use Vietnamese with `[meow]` prefix; UI labels in English.
+- System-style notifications from main use Vietnamese with `[bs]` prefix; UI labels in English.
 - No redundant comments.
 - UpdateService emits status events; MainApp forwards to renderer — keep the service Electron-agnostic except for the updater import so it stays unit-testable.

@@ -1,4 +1,4 @@
-# Meow Coding — Subagent: Background + Live Stream + Parallel — Design
+# BS Coding — Subagent: Background + Live Stream + Parallel — Design
 
 Ngày: 2026-08-06 · Trạng thái: chờ duyệt · Bước: sau brainstorm (đã chốt thiết kế với user)
 
@@ -28,7 +28,7 @@ Ngày: 2026-08-06 · Trạng thái: chờ duyệt · Bước: sau brainstorm (đ
   - Subagent emit `subagent-event` như thường → card live cập nhật.
   - Khi xong (`done`/`error`): main append kết quả vào **main transcript** (assistant message chứa
     báo cáo subagent) + emit `subagent-event { sub: 'done', state, result }` → card update.
-- Theo dõi background jobs: `MeowAgentManager` thêm `Map<taskId, {agentId, promise}>` — khi promise
+- Theo dõi background jobs: `BsAgentManager` thêm `Map<taskId, {agentId, promise}>` — khi promise
   resolve → append result. Dọn khi agent remove/dispose.
 
 ### 3b. Live stream view — `ChatPanel.tsx` + Modal
@@ -54,7 +54,7 @@ Ngày: 2026-08-06 · Trạng thái: chờ duyệt · Bước: sau brainstorm (đ
 | File | Thay đổi |
 |---|---|
 | `src/main/agent/tools/task.ts` | `background` param + async runner + result callback |
-| `src/main/meow-agent-manager.ts` | track background jobs, append result vào transcript, dọn khi remove |
+| `src/main/bs-agent-manager.ts` | track background jobs, append result vào transcript, dọn khi remove |
 | `src/main/agent/loop.ts` | parallel nâng cao (tách nhóm permission) |
 | `src/shared/types.ts` | `subagent-event` thêm `reasoning?`, `result?`, `background?` |
 | `src/renderer/src/components/chat/ChatPanel.tsx` | card click → popup live stream; giữ state chi tiết |

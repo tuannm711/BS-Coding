@@ -14,15 +14,15 @@ Không đụng: external CLI agents, `Command.model`, auto stage-detection.
 
 | File | Vai trò trong plan |
 |---|---|
-| `src/shared/types.ts` | Thêm `SubagentType` + `MeowSettings.subagentModels` (optional) |
-| `src/main/agent/config.ts` | `MeowConfig.subagentModels`, normalize + round-trip config↔settings |
+| `src/shared/types.ts` | Thêm `SubagentType` + `BsSettings.subagentModels` (optional) |
+| `src/main/agent/config.ts` | `BsConfig.subagentModels`, normalize + round-trip config↔settings |
 | `src/main/agent/tools/task.ts` | `createTaskTool` nhận `resolveSubagent`, sub dùng model/llm riêng |
-| `src/main/meow-agent-manager.ts` | Dựng `resolveSubagent` trong `register()`, cache LLM client riêng |
+| `src/main/bs-agent-manager.ts` | Dựng `resolveSubagent` trong `register()`, cache LLM client riêng |
 | `src/renderer/src/components/settings/AgentsTab.tsx` | Section "Sub-agent models" UI |
 | `src/renderer/src/components/settings/SettingsDialog.tsx` | Truyền `subagentModels` + `providers` xuống AgentsTab |
 | `tests/unit/agent-config.test.ts` | Test normalize + round-trip |
 | `tests/unit/agent-task-tool.test.ts` | Test `resolveSubagent` (có/không cấu hình) |
-| `tests/unit/meow-agent-manager.test.ts` | Test resolver wiring qua manager |
+| `tests/unit/bs-agent-manager.test.ts` | Test resolver wiring qua manager |
 
 ## Quy ước chung
 
@@ -42,7 +42,7 @@ Thêm gần `ModelRef` (dòng ~264):
 ```ts
 export type SubagentType = 'research' | 'general' | 'reviewer'
 
-export interface MeowSettings {
+export interface BsSettings {
   // ...existing fields
   /** Model override per sub-agent role. Missing role -> inherit main agent model. */
   subagentModels?: Partial<Record<SubagentType, ModelRef>>
@@ -79,7 +79,7 @@ describe('subagentModels', () => {
       model: 'p1',
       subagentModels: sub
     }))
-    return loadMeowConfig(file)
+    return loadBsConfig(file)
   }
 
   it('keeps valid role models', () => {
@@ -108,12 +108,12 @@ describe('subagentModels', () => {
 ```
 
 Mẫu trên theo pattern có sẵn trong file: `writeFileSync(file, JSON.stringify(...))` +
-`loadMeowConfig(file)` (normalization chạy trong `loadMeowConfig` qua `mergeDefaults`).
+`loadBsConfig(file)` (normalization chạy trong `loadBsConfig` qua `mergeDefaults`).
 
 **Code — `src/main/agent/config.ts`:**
 
 1. Import thêm từ `'../../shared/types'`: `ModelRef`, `SubagentType`.
-2. `MeowConfig` thêm:
+2. `BsConfig` thêm:
 ```ts
 subagentModels?: Partial<Record<SubagentType, ModelRef>>
 ```
@@ -123,7 +123,7 @@ const SUBAGENT_ROLES: readonly SubagentType[] = ['research', 'general', 'reviewe
 
 function normalizeSubagentModels(
   raw: Partial<Record<SubagentType, ModelRef>> | undefined,
-  providers: Record<string, MeowProviderConfig>
+  providers: Record<string, BSProviderConfig>
 ): Partial<Record<SubagentType, ModelRef>> | undefined {
   if (!raw) return undefined
   const out: Partial<Record<SubagentType, ModelRef>> = {}
@@ -151,7 +151,7 @@ function normalizeSubagentModels(
 
 **Verify:** `npx vitest run tests/unit/agent-config.test.ts`.
 
-**Commit:** `feat(config): subagentModels in meow.json with validation`
+**Commit:** `feat(config): subagentModels in bs.json with validation`
 
 ---
 
@@ -230,9 +230,9 @@ và đổi `model: opts.model` → `model: sub?.model ?? opts.model`, `llm: opts
 
 ## Task 4 — Manager wiring (TDD)
 
-**Test trước — `tests/unit/meow-agent-manager.test.ts`.**
+**Test trước — `tests/unit/bs-agent-manager.test.ts`.**
 
-Xem helper `makeManager` hiện có (đã stub `createLlm`/`chatGptWeb`). Thêm test: config `meow.json`
+Xem helper `makeManager` hiện có (đã stub `createLlm`/`chatGptWeb`). Thêm test: config `bs.json`
 có `subagentModels: { research: { provider: 'p1', model: 'm2' } }`; stub `createLlm` trả về
 `StubLlm` ghi lại `(provider, model)`; sau khi `register`, gọi `sendUserMessage` yêu cầu agent dùng
 `task` tool với `subagent_type: 'research'`; assert LLM client được tạo với model `m2` và được dùng.
@@ -245,7 +245,7 @@ sai → fallback main.)
 > resolver được gọi. Nếu vẫn khó, giữ test ở mức: config sai → fallback không crash + task tool
 > đã được test ở Task 3. Ghi rõ điều này trong PR.
 
-**Code — `src/main/meow-agent-manager.ts`:**
+**Code — `src/main/bs-agent-manager.ts`:**
 
 1. Import `ResolvedSubagentModel` từ task tool.
 2. Thêm field `private subagentLlm = new Map<string, ResolvedSubagentModel>()` (key `agentId:role`) —
@@ -268,7 +268,7 @@ Import `SubagentType` từ shared.
 5. `reload()` đã gọi lại `register()` cho từng agent → resolver rebuild theo config mới (không cần
    xử lý thêm).
 
-**Verify:** `npx vitest run tests/unit/meow-agent-manager.test.ts` + toàn bộ `npm test`.
+**Verify:** `npx vitest run tests/unit/bs-agent-manager.test.ts` + toàn bộ `npm test`.
 
 **Commit:** `feat(agent): wire per-role subagent models into task tool`
 
@@ -292,7 +292,7 @@ Import `SubagentType` từ shared.
 
 **File:** `src/renderer/src/components/settings/AgentsTab.tsx`
 
-- `Props` thêm: `providers: MeowSettings['providers']`, `subagentModels?: Partial<Record<SubagentType, ModelRef>>`,
+- `Props` thêm: `providers: BsSettings['providers']`, `subagentModels?: Partial<Record<SubagentType, ModelRef>>`,
   `onChangeSubagentModels`.
 - Thêm section sau list agents (trước phần add):
 ```tsx
@@ -358,10 +358,10 @@ lưu, mở lại — giá trị còn nguyên; "Use main agent model" xoá đư�
 ## Task 6 — Final verification
 
 - `npm run typecheck` pass.
-- `npm test` pass (đặc biệt: agent-config, agent-task-tool, meow-agent-manager).
+- `npm test` pass (đặc biệt: agent-config, agent-task-tool, bs-agent-manager).
 - Kiểm tra `src/shared/AGENTS.md` không vi phạm: chỉ JSON-serializable trong shared (đúng —
   `SubagentType`/`ModelRef` đều plain type).
-- IPC contract: `MeowSettings` optional field — không phá test `ipc-contract`.
+- IPC contract: `BsSettings` optional field — không phá test `ipc-contract`.
 - Không ảnh hưởng e2e (không đổi luồng spawn/PTY), nên không bắt buộc `npm run e2e`; nếu muốn chắc:
   `npm run build && npm run e2e`.
 

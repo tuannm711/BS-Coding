@@ -84,7 +84,7 @@ jobs:
         run: npx electron-builder --${{ matrix.target }} --publish never
       - uses: actions/upload-artifact@v4
         with:
-          name: meow-${{ matrix.os }}
+          name: bs-${{ matrix.os }}
           path: release/*
           if-no-files-found: error
 
@@ -141,7 +141,7 @@ Trong `README.md`, sau dòng `npm run dist:mac    # package macOS (dmg + zip; mu
 
 GitHub Actions (`.github/workflows/build.yml`) builds Windows, macOS, and Linux installers on each
 push to `master` and on every `v*` tag. Tagged releases are published automatically — grab the
-latest installers from the [Releases](https://github.com/stardust-bytes/meow-coding/releases) page.
+latest installers from the [Releases](https://github.com/tuannm711/BS-Coding/releases) page.
 ```
 
 - [ ] **Step 2: Commit**

@@ -1,10 +1,10 @@
-# Meow Coding — Landing page cho GitHub Pages (docs/index.html) — Design
+# BS Coding — Landing page cho GitHub Pages (docs/index.html) — Design
 
 Ngày: 2026-08-08 · Trạng thái: chờ duyệt · Bước: sau brainstorm (đã chốt thiết kế với user)
 
 ## 1. Mục tiêu
 
-Tạo 1 trang landing page giới thiệu repo Meow Coding, đặt tại `docs/index.html`, để cài đặt GitHub
+Tạo 1 trang landing page giới thiệu repo BS Coding, đặt tại `docs/index.html`, để cài đặt GitHub
 Pages (chế độ "Deploy from branch → folder `/docs`"). Trang nhắm tới người xem GitHub repo / landing
 công khai.
 
@@ -22,7 +22,7 @@ công khai.
 
 ### File tạo mới
 - `docs/index.html` — toàn bộ trang (HTML + CSS inline + JS inline).
-- `docs/meow-app-screen.png` — **copy** từ `media/meow-app-screen.png`.
+- `docs/bs-app-screen.png` — **copy** từ `media/bs-app-screen.png`.
 
 > **Bắt buộc:** GitHub Pages chế độ `/docs` chỉ serve nội dung trong `docs/`. Nếu ảnh nằm ở
 > `media/`, sẽ 404. Vì vậy phải copy screenshot vào `docs/` để trang self-contained.
@@ -42,24 +42,24 @@ công khai.
   gradient glow nền, animation reveal-on-scroll, gradient text.
 - **JS nhỏ** (~30 dòng): smooth scroll cho anchor links, `IntersectionObserver` reveal, năm hiện tại
   ở footer, hiệu ứng glow nhẹ (mousemove optional — giữ đơn giản).
-- **Đường dẫn tương đối** (`./meow-app-screen.png`, `#features`...) — hoạt động dưới subpath
-  `https://stardust-bytes.github.io/meow-coding/`.
+- **Đường dẫn tương đối** (`./bs-app-screen.png`, `#features`...) — hoạt động dưới subpath
+  `https://stardust-bytes.github.io/bs-coding/`.
 
 ### 4b. Bố cục
 
-1. **Navbar** — glass, sticky top. Trái: logo 🐱 + "Meow Coding". Phải: links `Features`, `Sources`,
-   nút **View on GitHub** (trỏ `https://github.com/stardust-bytes/meow-coding`).
+1. **Navbar** — glass, sticky top. Trái: logo 🐱 + "BS Coding". Phải: links `Features`, `Sources`,
+   nút **View on GitHub** (trỏ `https://github.com/tuannm711/BS-Coding`).
 2. **Hero** — badge `v0.16.0 · Open source`; H1 *"Run multiple coding agents, side by side."*; tagline
    1–2 câu (tóm tắt từ README: chạy opencode / Claude Code / aider / bất kỳ CLI agent nào trong các
-   pane song song, kèm native Meow agent); 2 CTA: **View on GitHub** + **Releases** (link repo
+   pane song song, kèm native BS agent); 2 CTA: **View on GitHub** + **Releases** (link repo
    `/releases`); dòng chip tech stack: `Electron · React · TypeScript · PTY · xterm.js`; nền gradient
    glow (tím/amber) mờ phía sau.
-3. **App screenshot** — `docs/meow-app-screen.png` trong khung glass bo góc lớn + glow border, có
+3. **App screenshot** — `docs/bs-app-screen.png` trong khung glass bo góc lớn + glow border, có
    caption ngắn.
 4. **Key features** — grid 3 cột × 6 card glass (responsive 1→2→3 cột):
    - **Multi-agent panes** — spawn nhiều CLI agent, stop/restart/inject/zoom per pane, kill cả cây
      process khi thoát.
-   - **Native Meow agent** — chat UI, streaming, markdown, tool-call cards, image attachment,
+   - **Native BS agent** — chat UI, streaming, markdown, tool-call cards, image attachment,
      undo/redo.
    - **Slash commands & skills** — `/init`, `/review`, `/new`, `/frontend-design`, `/sp-*`, custom
      command với `$1..$N`, `@path`, `!cmd`.
@@ -78,13 +78,13 @@ công khai.
 
 ### 4c. Màu sắc & typography
 - Nền: `#0b0d12` (gần đen xanh), gradient glow mờ (violet `#7c3aed`, amber `#f59e0b` — tông
-  cat/meow).
+  cat/bs).
 - Text: trắng/xám (slate), accent gradient text cho từ khóa.
 - Font: Inter (body/heading), JetBrains Mono (badge/chip/code).
 
 ## 5. Tiêu chí thành công
 
-- `docs/index.html` + `docs/meow-app-screen.png` mở được trong trình duyệt, không lỗi console.
+- `docs/index.html` + `docs/bs-app-screen.png` mở được trong trình duyệt, không lỗi console.
 - Ảnh screenshot hiển thị (đường dẫn tương đối đúng).
 - Responsive: mobile (1 cột) → desktop (3 cột features).
 - Không phụ thuộc file ngoài `docs/`; chỉ phụ thuộc CDN (Tailwind, Google Fonts) — chấp nhận được.

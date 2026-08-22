@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Meow Coding — desktop app (Electron + React) quản lý nhiều CLI coding agent (opencode, Claude Code,
+BS Coding — desktop app (Electron + React) quản lý nhiều CLI coding agent (opencode, Claude Code,
 aider, ...) chạy song song trong các pane terminal trên một cửa sổ.
 
 ## Công nghệ
@@ -51,7 +51,7 @@ Alias `@shared` → `src/shared` (đã cấu hình trong electron.vite.config.ts
 - Security: `contextIsolation: true`, `nodeIntegration: false`, `sandbox: false`. Không expose
   `ipcRenderer` ra window.
 - Ngôn ngữ: mã nguồn + UI label tiếng Anh; thông báo system-style từ main dùng tiếng Việt, prefix
-  `[meow]`.
+  `[bs]`.
 - Không thêm comment thừa; chỉ comment khi giải thích quyết định phức tạp (VD: Windows shim, tree-kill).
 - Agent thoát phải được xử lý: kill cả process tree (`tree-kill`), không để process mồ côi.
 - Browser bridge: chỉ bind `127.0.0.1` (không expose mạng), pairing code bắt buộc trước khi nhận lệnh;

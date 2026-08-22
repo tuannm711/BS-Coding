@@ -1,4 +1,4 @@
-# Meow Coding — Dynamic Model Variant (per-model reasoning effort): Design Spec
+# BS Coding — Dynamic Model Variant (per-model reasoning effort): Design Spec
 
 Ngày: 2026-08-06 · Trạng thái: chờ duyệt
 
@@ -45,7 +45,7 @@ Tham chiếu: opencode `packages/opencode/src/provider/transform.ts:1648-1777`
 - Wire-format `providerOptionsFor(provider, model, variant)` thêm branch Google.
 - Validation khi đổi model: nếu `currentVariant` không nằm trong list mới → reset `undefined`.
 - Tests: `models-catalog.test.ts` (mới), mở rộng `llm-variant.test.ts` (Google + Anthropic out-of-map),
-  `meow-agent-manager.test.ts` (clamp on register), `ipc-contract.test.ts` (channel mới).
+  `bs-agent-manager.test.ts` (clamp on register), `ipc-contract.test.ts` (channel mới).
 
 **Không làm:**
 - Anthropic `budget_tokens` numeric / `thinking: { type: 'adaptive' }` (để PR sau).
@@ -59,7 +59,7 @@ Tham chiếu: opencode `packages/opencode/src/provider/transform.ts:1648-1777`
 ┌─────────────────────────────────────────────────────────────┐
 │  Main process                                                │
 │  ┌──────────────────────┐    ┌────────────────────────────┐ │
-│  │ ModelsCatalog         │    │ MeowAgentManager           │ │
+│  │ ModelsCatalog         │    │ BsAgentManager           │ │
 │  │  ├─ fetch(api.json)   │    │  ├─ register(agent)        │ │
 │  │  ├─ mapProviders()    │    │  │  validate variant       │ │
 │  │  │   filter reasoning │    │  │  against getVariants()  │ │
@@ -226,7 +226,7 @@ const refreshVariants = useCallback(() => {
 }, [agentId, currentVariant, onVariantChange])
 
 useEffect(() => { refreshVariants() }, [refreshVariants])
-// ModelPicker post-IPC → fire event 'meow:model-changed' → refreshVariants() ở đây
+// ModelPicker post-IPC → fire event 'bs:model-changed' → refreshVariants() ở đây
 
 {availableVariants.length > 0 && (
   <select
@@ -247,14 +247,14 @@ useEffect(() => { refreshVariants() }, [refreshVariants])
 
 `ModelPicker.tsx` — sau khi `setAgentModel` thành công:
 ```tsx
-window.dispatchEvent(new CustomEvent('meow:model-changed', { detail: { agentId } }))
+window.dispatchEvent(new CustomEvent('bs:model-changed', { detail: { agentId } }))
 ```
 
 ## 9. Validation khi đổi model
 
 Hai lớp clamp đảm bảo `workspaces.json` không bao giờ giữ variant ngoài `allowed` của model hiện tại.
 
-**Lớp 1 — `MeowAgentManager.setVariant()` (`src/main/meow-agent-manager.ts:313-324`)**: clamp trước khi set
+**Lớp 1 — `BsAgentManager.setVariant()` (`src/main/bs-agent-manager.ts:313-324`)**: clamp trước khi set
 in-memory, trước khi runner rebuild:
 
 ```ts
@@ -274,7 +274,7 @@ setVariant(agentId: string, variant: string | undefined): void {
 
 private allowedVariantsFor(agent: AgentConfig): string[] {
   if (!this.deps.catalog) return []
-  const cfg = loadMeowConfig(this.deps.configPath)
+  const cfg = loadBsConfig(this.deps.configPath)
   const resolved = resolveAgentConfig(cfg, agent.name, this.deps.env, agent.model)
   if (!resolved.provider || !resolved.model) return []
   return this.deps.catalog.getVariants(resolved.provider, resolved.model)
@@ -282,22 +282,22 @@ private allowedVariantsFor(agent: AgentConfig): string[] {
 ```
 
 **Lớp 2 — `MainApp.setAgentVariant()` (`src/main/index.ts:240-246`)**: persist theo giá trị đã được
-clamp trong lớp 1. Vì `meowAgent.setVariant` đã mutate `agent.variant` thành `valid` rồi, MainApp đọc lại:
+clamp trong lớp 1. Vì `bsAgent.setVariant` đã mutate `agent.variant` thành `valid` rồi, MainApp đọc lại:
 
 ```ts
 setAgentVariant(agentId: string, variant: string | null): void {
-  this.meowAgent.setVariant(agentId, variant ?? undefined)
+  this.bsAgent.setVariant(agentId, variant ?? undefined)
   const ws = this.findWorkspaceByAgent(agentId)
-  const stored = this.meowAgent.getVariant(agentId)  // getter mới: trả về agent.variant sau clamp
+  const stored = this.bsAgent.getVariant(agentId)  // getter mới: trả về agent.variant sau clamp
   if (ws) {
     this.workspaces.updateAgent(ws.projectPath, agentId, { variant: stored })
   }
 }
 ```
 
-Getter `MeowAgentManager.getVariant(agentId)` trả về `agent.variant` hiện tại (đã qua clamp).
+Getter `BsAgentManager.getVariant(agentId)` trả về `agent.variant` hiện tại (đã qua clamp).
 
-**Lớp 3 — `MeowAgentManager.register()` (`src/main/meow-manager.ts:509-581`)**: defense-in-depth, cover
+**Lớp 3 — `BsAgentManager.register()` (`src/main/bs-manager.ts:509-581`)**: defense-in-depth, cover
 case variant trên disk không hợp lệ vì model đã đổi từ nơi khác:
 
 ```ts
@@ -366,7 +366,7 @@ main().catch(err => { console.error(err); process.exit(1) })
 |---|---|
 | `tests/unit/models-catalog.test.ts` (mới) | `mapProviders` extract `effort.values` đúng; bỏ `toggle`/`budget_tokens`; bỏ qua model không có `reasoning_options` |
 | `tests/unit/llm-variant.test.ts` (mở rộng) | Google → `thinkingLevel`; Anthropic variant ngoài map → không gửi `thinking`; OpenAI-compatible giữ nguyên case cũ |
-| `tests/unit/meow-agent-manager.test.ts` (mở rộng) | `setVariant(id, 'newvalue')` clamp trong `register()` khi model không support |
+| `tests/unit/bs-agent-manager.test.ts` (mở rộng) | `setVariant(id, 'newvalue')` clamp trong `register()` khi model không support |
 | `tests/unit/ipc-contract.test.ts` (mở rộng) | Thêm `getAgentVariants` + `'agent:get-variants'` vào required methods + stub |
 
 ## 12. Files thay đổi
@@ -377,7 +377,7 @@ main().catch(err => { console.error(err); process.exit(1) })
 | `src/shared/ipc.ts` | sửa |
 | `src/preload/index.ts` | sửa |
 | `src/main/index.ts` | sửa |
-| `src/main/meow-agent-manager.ts` | sửa |
+| `src/main/bs-agent-manager.ts` | sửa |
 | `src/main/agent/llm.ts` | sửa |
 | `src/main/agent/loop.ts` | sửa |
 | `src/main/agent/config.ts` | không đổi (`ResolvedAgentConfig.model` đã có) |
@@ -390,7 +390,7 @@ main().catch(err => { console.error(err); process.exit(1) })
 | `package.json` | sửa (script `regen:models`) |
 | `tests/unit/models-catalog.test.ts` | thêm mới |
 | `tests/unit/llm-variant.test.ts` | sửa |
-| `tests/unit/meow-agent-manager.test.ts` | sửa |
+| `tests/unit/bs-agent-manager.test.ts` | sửa |
 | `tests/unit/ipc-contract.test.ts` | sửa |
 
 ## 13. Xử lý lỗi
@@ -399,7 +399,7 @@ main().catch(err => { console.error(err); process.exit(1) })
 |---|---|
 | Live fetch `models.dev` lỗi / timeout | Dùng snapshot bundle (đã có field `variants`) |
 | Snapshot bundle cũ (chưa regen) | `variants` undefined → picker ẩn cho mọi model — graceful |
-| User config provider trong `meow.json` không có trong catalog | `getVariants` trả `[]` → picker ẩn |
+| User config provider trong `bs.json` không có trong catalog | `getVariants` trả `[]` → picker ẩn |
 | User chọn variant rồi đổi sang model không support | `register()` clamp; persist lại `undefined` vào `workspaces.json` |
 | User đổi variant sang value ngoài `availableVariants` (qua dev tools) | `setVariant` accept mọi string; `register()` clamp khi next turn |
 | Google model không có `thinkingLevel` field hợp lệ | Provider gửi raw value; LLM provider sẽ reject nếu invalid (error surface qua `chat:event error`) |

@@ -1,16 +1,16 @@
-# Meow Coding — Session Management (theo model opencode)
+# BS Coding — Session Management (theo model opencode)
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Thêm khả năng quản lý sessions cho agent native "meow" giống opencode: mỗi agent có **nhiều session**, mỗi session có id riêng + title + thời gian; cho phép **list / tạo mới / chuyển (tiếp tục) / xóa** từ UI chat. Giữ nguyên hành vi hiện có (send/stop/mode/permission) và không phá e2e.
+**Goal:** Thêm khả năng quản lý sessions cho agent native "bs" giống opencode: mỗi agent có **nhiều session**, mỗi session có id riêng + title + thời gian; cho phép **list / tạo mới / chuyển (tiếp tục) / xóa** từ UI chat. Giữ nguyên hành vi hiện có (send/stop/mode/permission) và không phá e2e.
 
 **Nguồn tham khảo:** source opencode `D:\GitHub\opencode-1.18.11` — `packages/opencode/src/session/session.ts`, `prompt.ts`:
 - Session có `id` riêng (không gắn cứng vào agent), `title`, `time_created`, `time_updated`, `directory`.
-- Title mặc định "New session"; opencode tự đặt title từ first user message (bản đầy đủ dùng LLM agent "title"; **meow dùng heuristic deterministic**: first line của first user message, truncate ~60 ký tự).
+- Title mặc định "New session"; opencode tự đặt title từ first user message (bản đầy đủ dùng LLM agent "title"; **bs dùng heuristic deterministic**: first line của first user message, truncate ~60 ký tự).
 - List sort theo `time_updated DESC`; `touch` khi dùng → session active luôn ở đầu danh sách.
 - `remove` cascade con; tiếp tục session = gắn active vào session đó.
 
-**Phạm vi:** `src/main/agent/session.ts`, `src/main/meow-agent-manager.ts`, `src/main/index.ts`, `src/shared/{types,ipc}.ts`, `src/preload/index.ts`, `src/renderer` (ChatPanel + component mới SessionBar + styles), test `ipc-contract` + unit test mới cho SessionStore. Không đổi SessionRunner (loop.ts).
+**Phạm vi:** `src/main/agent/session.ts`, `src/main/bs-agent-manager.ts`, `src/main/index.ts`, `src/shared/{types,ipc}.ts`, `src/preload/index.ts`, `src/renderer` (ChatPanel + component mới SessionBar + styles), test `ipc-contract` + unit test mới cho SessionStore. Không đổi SessionRunner (loop.ts).
 
 ---
 
@@ -46,7 +46,7 @@ API `SessionStore`:
 - `setTitle(id, title)`, `touch(id)`, `delete(id)`.
 - Migration trong `load()`: entry thiếu `agentId` → gán `agentId = id`; thiếu `title` → suy từ first user message hoặc "New session"; thiếu `createdAt` → dùng `updatedAt`.
 
-## 2. MeowAgentManager
+## 2. BsAgentManager
 
 - Thêm `activeSessions = Map<agentId, sessionId>`.
 - `activeSessionId(agentId)`: resolve = `store.latest(agentId)` hoặc `store.create(...)` (cần `agent.cwd` làm `projectPath`).
@@ -95,9 +95,9 @@ Cập nhật đồng bộ: main handlers, preload, `tests/unit/ipc-contract.test
 - [ ] **Step 2:** Refactor `session.ts` theo thiết kế §1.
 - [ ] **Step 3:** `npm test` pass.
 
-## Task 2: MeowAgentManager multi-session
+## Task 2: BsAgentManager multi-session
 
-**Files:** `src/main/meow-agent-manager.ts`
+**Files:** `src/main/bs-agent-manager.ts`
 
 - [ ] **Step 1:** Thêm `activeSessions` + `activeSessionId` + các method list/create/switch/delete.
 - [ ] **Step 2:** Sửa `register` runner callbacks → session active; sửa `newSession`, `listMessages`, `listTranscript`, `send`.

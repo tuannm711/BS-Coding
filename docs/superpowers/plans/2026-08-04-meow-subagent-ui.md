@@ -1,6 +1,6 @@
-# Meow Coding — Hiển thị sub-agent đang chạy trong UI (theo opencode)
+# BS Coding — Hiển thị sub-agent đang chạy trong UI (theo opencode)
 
-**Goal:** Người dùng **thấy sub-agent chạy live** trong chat. opencode làm vậy bằng child-session + subtask part, UI stream message sub-agent lồng vào chat cha. Meow: stream hoạt động sub-agent thành event `subagent-event` → renderer hiện card lồng cập nhật live (streaming text + tool calls + state).
+**Goal:** Người dùng **thấy sub-agent chạy live** trong chat. opencode làm vậy bằng child-session + subtask part, UI stream message sub-agent lồng vào chat cha. BS: stream hoạt động sub-agent thành event `subagent-event` → renderer hiện card lồng cập nhật live (streaming text + tool calls + state).
 
 **Phạm vi:** `src/shared/types.ts`, `src/main/agent/tools/types.ts`, `src/main/agent/loop.ts`, `src/main/agent/tools/task.ts`, renderer `ChatPanel.tsx`, `styles.css`, tests.
 

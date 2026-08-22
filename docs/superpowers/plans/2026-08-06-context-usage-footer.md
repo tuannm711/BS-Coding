@@ -438,23 +438,23 @@ git commit -m "feat(loop): persist token usage on messages and report usage per 
 ### Task 4: Manager `getContextInfo` + kênh IPC + event `usage`
 
 **Files:**
-- Modify: `src/main/meow-agent-manager.ts` (thêm method `getContextInfo`, sửa callback `onUsage` ở dòng 600-610)
+- Modify: `src/main/bs-agent-manager.ts` (thêm method `getContextInfo`, sửa callback `onUsage` ở dòng 600-610)
 - Modify: `src/shared/ipc.ts` (Channels + `AgentApi`)
 - Modify: `src/preload/index.ts`
 - Modify: `src/main/index.ts` (đăng ký handler)
-- Test: `tests/unit/meow-agent-manager.test.ts`, `tests/unit/ipc-contract.test.ts`
+- Test: `tests/unit/bs-agent-manager.test.ts`, `tests/unit/ipc-contract.test.ts`
 
 **Interfaces:**
 - Consumes: `ContextInfo`, `MessageTokens`, ChatEvent `usage` (Task 1); `onUsage` per-step (Task 3)
 - Produces:
-  - `MeowAgentManager.getContextInfo(agentId: string): ContextInfo`
+  - `BsAgentManager.getContextInfo(agentId: string): ContextInfo`
   - `Channels.AgentGetContext = 'agent:get-context'`
   - `AgentApi.getContextInfo(agentId: string): Promise<ContextInfo>`
   - Event `{ type: 'usage', agentId, tokens, sessionCost }` được emit mỗi step
 
 - [x] **Step 1: Viết test thất bại**
 
-Thêm vào `tests/unit/meow-agent-manager.test.ts`, trong `describe('MeowAgentManager', …)`:
+Thêm vào `tests/unit/bs-agent-manager.test.ts`, trong `describe('BsAgentManager', …)`:
 
 ```ts
   it('getContextInfo reports the config limit and the auto-compact threshold', async () => {
@@ -503,7 +503,7 @@ Thêm vào `tests/unit/ipc-contract.test.ts`:
 
 - [x] **Step 2: Chạy test để xác nhận nó fail**
 
-Run: `npx vitest run tests/unit/meow-agent-manager.test.ts tests/unit/ipc-contract.test.ts`
+Run: `npx vitest run tests/unit/bs-agent-manager.test.ts tests/unit/ipc-contract.test.ts`
 Expected: FAIL — `manager.getContextInfo is not a function`, `Channels.AgentGetContext` là `undefined`
 
 - [x] **Step 3: Thêm kênh IPC vào `src/shared/ipc.ts`**
@@ -520,7 +520,7 @@ Thêm `ContextInfo` vào danh sách import type ở dòng 1-5, và thêm method 
   getContextInfo(agentId: string): Promise<ContextInfo>
 ```
 
-- [x] **Step 4: Implement `getContextInfo` trong `src/main/meow-agent-manager.ts`**
+- [x] **Step 4: Implement `getContextInfo` trong `src/main/bs-agent-manager.ts`**
 
 Thêm `ContextInfo` vào import type từ `'../shared/types'`. Thêm method ngay dưới `getAgentModel` (kết thúc ở dòng 348):
 
@@ -528,7 +528,7 @@ Thêm `ContextInfo` vào import type từ `'../shared/types'`. Thêm method ngay
   getContextInfo(agentId: string): ContextInfo {
     const agent = this.agents.get(agentId)
     if (!agent) return { limit: null, compactThreshold: null, sessionCost: 0 }
-    const cfg = loadMeowConfig(this.deps.configPath)
+    const cfg = loadBsConfig(this.deps.configPath)
     const resolved = resolveAgentConfig(cfg, agent.name, this.deps.env, agent.model)
     const modelLimit = resolved.provider && resolved.model
       ? this.modelLimits.get(`${resolved.provider}/${resolved.model}`)
@@ -583,12 +583,12 @@ Trong `src/preload/index.ts`, thêm ngay sau `getAgentModel` (dòng 34):
 Trong `src/main/index.ts`, thêm ngay sau handler `AgentGetModel` (dòng 378):
 
 ```ts
-  ipcMain.handle(Channels.AgentGetContext, (_e, agentId: string) => mainApp.meowAgent.getContextInfo(agentId))
+  ipcMain.handle(Channels.AgentGetContext, (_e, agentId: string) => mainApp.bsAgent.getContextInfo(agentId))
 ```
 
 - [x] **Step 7: Chạy test để xác nhận pass**
 
-Run: `npx vitest run tests/unit/meow-agent-manager.test.ts tests/unit/ipc-contract.test.ts`
+Run: `npx vitest run tests/unit/bs-agent-manager.test.ts tests/unit/ipc-contract.test.ts`
 Expected: PASS
 
 - [x] **Step 8: Chạy toàn bộ test + typecheck**
@@ -599,7 +599,7 @@ Expected: tất cả PASS, exit 0
 - [x] **Step 9: Commit**
 
 ```bash
-git add src/main/meow-agent-manager.ts src/shared/ipc.ts src/preload/index.ts src/main/index.ts tests/unit/meow-agent-manager.test.ts tests/unit/ipc-contract.test.ts
+git add src/main/bs-agent-manager.ts src/shared/ipc.ts src/preload/index.ts src/main/index.ts tests/unit/bs-agent-manager.test.ts tests/unit/ipc-contract.test.ts
 git commit -m "feat(ipc): expose context limit, compact threshold and session cost"
 ```
 
@@ -689,8 +689,8 @@ Gọi nó cùng chỗ với `refreshVariants` — sửa hai effect ở dòng 103
       const detail = (e as CustomEvent<{ agentId: string }>).detail
       if (detail?.agentId === agentId) { refreshVariants(); loadContextInfo() }
     }
-    window.addEventListener('meow:model-changed', onModelChanged)
-    return () => window.removeEventListener('meow:model-changed', onModelChanged)
+    window.addEventListener('bs:model-changed', onModelChanged)
+    return () => window.removeEventListener('bs:model-changed', onModelChanged)
   }, [agentId, refreshVariants, loadContextInfo])
 ```
 
@@ -793,9 +793,9 @@ không phải dev server.
 4. Tạo session mới (`.session-new`) → footer về `—`
 
 Không tự động hoá được vế "đổi `maxContextTokens` qua Settings UI" — thay bằng cách seed
-thẳng giá trị đó vào `meow.json` trước khi mở app, vì mục tiêu là xác nhận logic màu/ngưỡng
+thẳng giá trị đó vào `bs.json` trước khi mở app, vì mục tiêu là xác nhận logic màu/ngưỡng
 đúng, không phải hành vi UI Settings (đã có ở nơi khác). Cờ **$cost luôn = 0** trong app thật:
-`MeowAgentManager.deps.prices` không được set ở đâu trong `src/main/index.ts` (chỉ dùng
+`BsAgentManager.deps.prices` không được set ở đâu trong `src/main/index.ts` (chỉ dùng
 trong unit test) → `priceFor()` luôn `undefined` → `calcCost()` luôn trả `0` → đoạn
 `{cost > 0 && …}` trong `ContextFooter` không bao giờ render trong app thật hiện nay. Đây là
 gap có sẵn từ trước, nằm ngoài phạm vi plan này (plan chỉ đổi *thời điểm* cộng dồn cost, không

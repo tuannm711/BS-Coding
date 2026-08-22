@@ -1,4 +1,4 @@
-# Meow Coding — Context Usage Footer (theo model opencode): Design Spec
+# BS Coding — Context Usage Footer (theo model opencode): Design Spec
 
 Ngày: 2026-08-06 · Trạng thái: chờ duyệt
 
@@ -46,7 +46,7 @@ sidebar/stats screen.
 |---|---|---|
 | LLM | `src/main/agent/llm.ts:93-104` | Map thêm `reasoningTokens`, `cachedInputTokens` từ `part.totalUsage` |
 | Loop | `src/main/agent/loop.ts` | Gắn `tokens` vào assistant message khi persist; báo usage sau **mỗi step** |
-| Manager | `src/main/meow-agent-manager.ts` | Getter `getContextInfo(agentId)`; emit event `usage` |
+| Manager | `src/main/bs-agent-manager.ts` | Getter `getContextInfo(agentId)`; emit event `usage` |
 | IPC | `src/shared/ipc.ts`, `src/main/index.ts`, preload | Kênh mới `AgentGetContext: 'agent:get-context'` |
 | Types | `src/shared/types.ts` | `MessageTokens`, `ChatMessage.tokens?`, `ContextInfo`, ChatEvent `usage` |
 | Renderer | `ContextFooter.tsx` (mới), `ChatPanel.tsx`, `styles.css` | Block mới trong `.chat-composer` sau `<ChatInput>` |
@@ -114,7 +114,7 @@ của **session đang mở**. Một kênh trả đủ ba số là đường ng�
 tổng cộng dồn không đổi, nhưng nếu user bấm Stop hoặc gặp lỗi giữa chừng thì chi phí đã tiêu vẫn
 được ghi nhận. Event `done` giữ nguyên `tokens`/`cost` để không phá contract hiện tại.
 
-`getContextInfo(agentId)` tái dùng nguyên logic đã có ở `meow-agent-manager.ts:540-543`:
+`getContextInfo(agentId)` tái dùng nguyên logic đã có ở `bs-agent-manager.ts:540-543`:
 
 ```ts
 const limit = modelLimits.get(`${provider}/${model}`)?.context ?? cfg.maxContextTokens ?? null

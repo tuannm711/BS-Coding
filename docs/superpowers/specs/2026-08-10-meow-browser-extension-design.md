@@ -1,4 +1,4 @@
-# Meow Coding — Browser Control qua Chrome Extension (debug web / auto thao tác): Design Spec
+# BS Coding — Browser Control qua Chrome Extension (debug web / auto thao tác): Design Spec
 
 Ngày: 2026-08-10 · Trạng thái: chờ duyệt (cập nhật 2026-08-10 sau pull codebase 0.17.0)
 
@@ -23,7 +23,7 @@ Các quyết định thiết kế (Phần 2-12) **không đổi**.
 
 ## 1. Mục tiêu
 
-Cho phép **native Meow agent** (và sau này CLI agent ngoài) tự điều khiển Chrome để **debug/test web**:
+Cho phép **native BS agent** (và sau này CLI agent ngoài) tự điều khiển Chrome để **debug/test web**:
 mở trang, click, nhập liệu, đọc DOM, chụp screenshot, đọc console/network, chờ element xuất hiện — **trên
 đúng profile Chrome thật của user** (có session đăng nhập, bookmark, extension cài sẵn), giống "Claude on
 Chrome". Không tách profile riêng theo project.
@@ -33,7 +33,7 @@ Chrome". Không tách profile riêng theo project.
 - Chạy trên Chrome profile **thật đang dùng hàng ngày** — không restart Chrome với cờ đặc biệt, không
   dùng profile tạm (Playwright-style) trừ khi user tự chọn.
 - Auto thao tác không cần user duyệt từng thao tác (permission mặc định `allow` — user đã chốt).
-- Meow tự mở Chrome + hướng dẫn cài extension khi chưa sẵn sàng.
+- BS tự mở Chrome + hướng dẫn cài extension khi chưa sẵn sàng.
 - Xác thực kết nối bằng **pairing code** để website lạ không điều khiển được extension.
 
 ## 2. Quyết định thiết kế
@@ -41,22 +41,22 @@ Chrome". Không tách profile riêng theo project.
 | Chủ đề | Quyết định |
 |---|---|
 | Cơ chế | **Chrome Extension MV3** (kiểu Claude on Chrome), load unpacked, chạy trên profile thật |
-| Kênh extension ↔ Meow | **Localhost WebSocket** do Meow chạy (Phương án A) — extension là client, connect ra `ws://127.0.0.1:<port>` |
+| Kênh extension ↔ BS | **Localhost WebSocket** do BS chạy (Phương án A) — extension là client, connect ra `ws://127.0.0.1:<port>` |
 | Xác thực | **Pairing code** 6 chữ số, TL ngắn, sinh mỗi lần khởi động app; bắt buộc trước khi nhận lệnh |
-| Agent dùng trước | **Native Meow agent** (tool trực tiếp trong main process). CLI helper + MCP server cho agent ngoài → phase 2 |
+| Agent dùng trước | **Native BS agent** (tool trực tiếp trong main process). CLI helper + MCP server cho agent ngoài → phase 2 |
 | Permission tool browser | Mặc định **`allow`** (không hỏi) — user chốt; đổi được trong settings |
 | Cho phép tab | **Tất cả tab** (host permission `<all_urls>`) — user chốt; có cảnh báo log |
-| Chrome chưa sẵn sàng | Meow mở Chrome (`shell.openExternal`) + dialog hướng dẫn cài extension (`[meow]`, tiếng Việt) |
-| Cài extension | Meow copy build extension tới `userData/browser-extension/` (đường dẫn ổn định) → hướng dẫn Load unpacked 1 lần |
+| Chrome chưa sẵn sàng | BS mở Chrome (`shell.openExternal`) + dialog hướng dẫn cài extension (`[bs]`, tiếng Việt) |
+| Cài extension | BS copy build extension tới `userData/browser-extension/` (đường dẫn ổn định) → hướng dẫn Load unpacked 1 lần |
 | Screenshot | Lưu PNG vào `userData/browser-screenshots/`, trả path cho agent |
-| Pane xem trong Meow | **Ngoài MVP** (phase 2) |
+| Pane xem trong BS | **Ngoài MVP** (phase 2) |
 | CLI/MCP cho agent ngoài | **Ngoài MVP** (phase 2) — dùng sẵn `@modelcontextprotocol/sdk` + quy tắc cmd shim Windows |
 | Thêm dependency | `ws` (WS server trong main) |
 
 ## 3. Kiến trúc
 
 ```
-┌──────────────────── Meow (Electron) ────────────────────┐
+┌──────────────────── BS (Electron) ────────────────────┐
 │ main process                                            │
 │  ┌─────────────┐   ┌──────────────────────────────┐    │
 │  │ Native agent│──▶│ BrowserBridge:                │    │
@@ -155,14 +155,14 @@ Mỗi tool: schema zod, gọi `BrowserBridge.execute`, map kết quả thành `T
 - **Chỉ bind `127.0.0.1`** — không expose ra mạng.
 - Permission tool browser mặc định `allow` (user chốt) — **rủi ro đã ghi nhận**: agent tự động thao tác
   trên profile thật có session đăng nhập; user có thể đổi thành `ask` trong settings.
-- Cho phép tất cả tab (`<all_urls>`) — user chốt; bridge log cảnh báo `[meow]` khi thao tác domain lạ.
+- Cho phép tất cả tab (`<all_urls>`) — user chốt; bridge log cảnh báo `[bs]` khi thao tác domain lạ.
 
 ## 9. MVP scope
 
 **Có**: extension MV3 load unpacked trên profile thật; pairing + WS bridge + reconnect; 12 tools native;
-Meow tự mở Chrome + hướng dẫn cài; ring buffer console/network; DOM change events.
+BS tự mở Chrome + hướng dẫn cài; ring buffer console/network; DOM change events.
 
-**Chưa có (phase 2)**: pane xem trực tiếp trong Meow; CLI helper `meow-browser`; MCP server cho agent ngoài;
+**Chưa có (phase 2)**: pane xem trực tiếp trong BS; CLI helper `bs-browser`; MCP server cho agent ngoài;
 persist pairing giữa các lần khởi động app (MVP: mã mới mỗi lần chạy — extension chỉ cần pair lại 1 lần
 mỗi phiên app).
 
@@ -177,7 +177,7 @@ src/browser-extension/           # MV3 extension (build riêng)
 src/main/browser/
   bridge.ts                      # WS server + pairing + command router + events
   chrome-launcher.ts             # mở Chrome + hướng dẫn cài
-  install-guide.ts               # nội dung dialog tiếng Việt [meow]
+  install-guide.ts               # nội dung dialog tiếng Việt [bs]
 src/main/agent/tools/browser.ts  # native browser tools (zod schemas)
 src/shared/browser-types.ts      # protocol types (không import Node/Electron)
 src/shared/ipc.ts                # + Browser:* channels
@@ -201,5 +201,5 @@ electron.vite.config.ts          # + build entry cho extension
 
 - Kiến trúc app: `src/main/agent/tools/` (registry, types), `src/main/index.ts` (IPC wiring),
   `src/shared/ipc.ts` (Channels), AGENTS.md (quy ước: Windows cmd shim, chỉ main spawn process,
-  thông báo tiếng Việt prefix `[meow]`).
+  thông báo tiếng Việt prefix `[bs]`).
 - `@modelcontextprotocol/sdk` đã có sẵn trong dependencies — dùng cho MCP phase 2.

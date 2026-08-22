@@ -1,4 +1,4 @@
-# Meow Coding — Browser Deep Snapshot qua CDP (Accessibility tree) + Debug Session bền vững: Design Spec
+# BS Coding — Browser Deep Snapshot qua CDP (Accessibility tree) + Debug Session bền vững: Design Spec
 
 Ngày: 2026-08-10 · Trạng thái: chờ duyệt
 

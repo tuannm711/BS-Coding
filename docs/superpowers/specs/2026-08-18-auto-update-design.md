@@ -12,7 +12,7 @@
 
 ## 2. Phương pháp
 
-Dùng **`electron-updater`** (thư viện chính thức của electron-builder). Nguồn: **GitHub Releases** của repo `stardust-bytes/meow-coding`.
+Dùng **`electron-updater`** (thư viện chính thức của electron-builder). Nguồn: **GitHub Releases** của repo `tuannm711/BS-Coding`.
 
 ### Vì sao không tự viết GitHub API
 - electron-updater nhận sẵn: so sánh semver, tải **delta** qua `*.blockmap`, verify hash, kiểm tra chữ ký (macOS), tự chọn artifact đúng nền tảng, quản lý cài đặt (NSIS/AppImage/zip).
@@ -25,7 +25,7 @@ Dùng **`electron-updater`** (thư viện chính thức của electron-builder).
   publish: {
     provider: 'github',
     owner: 'stardust-bytes',
-    repo: 'meow-coding'
+    repo: 'bs-coding'
   }
   ```
 - Khi package, electron-builder sinh `app-update.yml` (chứa URL nguồn update) vào resources của app. `electron-updater` đọc file này lúc runtime.

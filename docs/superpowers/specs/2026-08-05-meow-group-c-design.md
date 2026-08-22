@@ -1,10 +1,10 @@
-# Meow Coding — Group C: LSP + Diagnostics: Design Spec
+# BS Coding — Group C: LSP + Diagnostics: Design Spec
 
 Ngày: 2026-08-05 · Trạng thái: chờ duyệt
 
 ## 1. Mục tiêu
 
-Mang LSP + diagnostics từ opencode sang meow-coding (native agent), giúp:
+Mang LSP + diagnostics từ opencode sang bs-coding (native agent), giúp:
 - Sau `write`/`edit`/`apply-patch` báo lỗi lint/type ngay (diagnostics).
 - Cung cấp tool `lsp` (goToDefinition/findReferences/hover/documentSymbol) cho agent tra cứu code.
 
@@ -32,7 +32,7 @@ Mang LSP + diagnostics từ opencode sang meow-coding (native agent), giúp:
 ### 3.2 Diagnostics integration
 - **Trigger**: sau `write`/`edit`/`apply-patch` thành công → chờ `publishDiagnostics` (timeout ~3s)
   → thêm vào tool output: `[LSP] <file>:<line>:<col>: <message>` (tối đa 5).
-- **Config**: `lsp: { enabled: true, servers: {...} }` trong meow.json; `lsp.diagnosticsTimeoutMs = 3000`.
+- **Config**: `lsp: { enabled: true, servers: {...} }` trong bs.json; `lsp.diagnosticsTimeoutMs = 3000`.
 - **Chỉ diagnostics**: file mới mở qua `didOpen`; không đọc toàn bộ project.
 
 ### 3.3 Tool `lsp`
@@ -47,7 +47,7 @@ Mang LSP + diagnostics từ opencode sang meow-coding (native agent), giúp:
 - `src/main/agent/tools/lsp.ts` (mới) — tool definition.
 - `src/main/agent/tools/write.ts`, `edit.ts`, `apply-patch.ts` — inject diagnostics vào output.
 - `src/main/agent/config.ts` — `lsp` config.
-- `src/main/meow-agent-manager.ts` — khởi tạo LSP per workspace, cung cấp `lsp` tool.
+- `src/main/bs-agent-manager.ts` — khởi tạo LSP per workspace, cung cấp `lsp` tool.
 - Tests: `lsp-manager` (mock server, diagnostics), `lsp-tool`, `edit` diagnostics injection.
 
 ## 5. Xử lý lỗi

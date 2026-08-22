@@ -5,7 +5,7 @@ Ngày: 2026-08-06 · Trạng thái: chờ duyệt · Bước: sau brainstorm (đ
 ## 1. Mục tiêu
 
 Gom chat input + nút attach file thành **một cụm container** giống ChatGPT trong pane chat của
-Meow Coding. Chỉ đổi UI (`ChatInput.tsx` + `styles.css`), **giữ nguyên** toàn bộ logic/backend:
+BS Coding. Chỉ đổi UI (`ChatInput.tsx` + `styles.css`), **giữ nguyên** toàn bộ logic/backend:
 `accept="image/*"`, `MAX_IMAGES=4`, giới hạn 5MB, luồng ảnh → vision model, @-mention.
 
 ## 2. Hiện trạng

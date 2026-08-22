@@ -1,4 +1,4 @@
-# Meow Coding — Mobile Remote Control (Desktop bridge + Relay server): Implementation Plan
+# BS Coding — Mobile Remote Control (Desktop bridge + Relay server): Implementation Plan
 
 Ngày: 2026-08-19 · Spec gốc: `docs/superpowers/specs/2026-08-19-mobile-remote-control-design.md`
 
@@ -9,7 +9,7 @@ Spec gốc gồm 3 subsystem độc lập: **relay server**, **desktop bridge**,
 
 - **Plan này**: relay server + desktop bridge + protocol types + desktop UI tối thiểu. Test được
   end-to-end bằng **fake mobile client** (WS client trong integration test) — không cần điện thoại thật.
-- **Plan sau (chưa viết)**: app mobile React Native (`meow-mobile`, repo riêng) tiêu thụ cùng protocol.
+- **Plan sau (chưa viết)**: app mobile React Native (`bs-mobile`, repo riêng) tiêu thụ cùng protocol.
   Chỉ viết sau khi plan này xong, để contract đã ổn định.
 
 Không làm gì trong plan này: mobile app, E2E encryption, trả lời question/permission từ phone,
@@ -23,7 +23,7 @@ lệnh nguy hiểm (kill agent, xóa workspace/session).
 - Mọi lệnh từ phone đi qua **safety gate**: nếu `enabled=false` → từ chối. Chỉ expose đọc + chat:send
   + session không phá hủy.
 - Chỉ main process mở socket; renderer qua IPC (channel mới `Remote*` — không hardcode string).
-- Thông báo system-style từ main dùng tiếng Việt, prefix `[meow]`.
+- Thông báo system-style từ main dùng tiếng Việt, prefix `[bs]`.
 
 ## 2. File structure
 
@@ -49,7 +49,7 @@ tests/integration/remote/relay-flow.test.ts
 ### Sửa
 
 ```
-src/main/meow-agent-manager.ts   // thêm public listAgents(): AgentConfig[]
+src/main/bs-agent-manager.ts   // thêm public listAgents(): AgentConfig[]
 src/shared/ipc.ts                // + Channels.RemoteGetStatus/RemoteSetEnabled/RemoteSetRelayUrl/
                                  //   RemoteStartPairing/RemoteRevokeToken/EventRemoteStatus
                                  // + AgentApi methods tương ứng
@@ -173,7 +173,7 @@ Dùng `createJsonStore<RemoteSettings>` (pattern như `workspaces.json` trong in
 **Tạo `server/package.json`**:
 ```jsonc
 {
-  "name": "meow-relay",
+  "name": "bs-relay",
   "private": true,
   "type": "module",
   "scripts": { "start": "node index.ts --experimental-strip-types 2>/dev/null || node --run start" },
@@ -212,7 +212,7 @@ nằm trong cùng repo nên hoisted). Không thêm vào references của tsconfi
 
 **Tạo `server/README.md`**: chạy `npm install && npm start`; deploy VPS với Caddy:
 ```
-meow-relay.example.com {
+bs-relay.example.com {
     reverse_proxy 127.0.0.1:3928
 }
 ```
@@ -227,7 +227,7 @@ trên port 0 trong test).
 
 ### Task 4 — RemoteCommands dispatcher (TDD)
 
-**Sửa `src/main/meow-agent-manager.ts`**: thêm public method (đặt cạnh `addAgent`):
+**Sửa `src/main/bs-agent-manager.ts`**: thêm public method (đặt cạnh `addAgent`):
 ```ts
 listAgents(): AgentConfig[] {
   return [...this.agents.values()]
@@ -237,7 +237,7 @@ listAgents(): AgentConfig[] {
 **Tạo `src/main/remote/remote-commands.ts`**:
 ```ts
 export interface RemoteCommandContext {
-  meowAgent: Pick<MeowAgentManager, 'listAgents'|'listSessions'|'createSession'|'switchSession'|
+  bsAgent: Pick<BsAgentManager, 'listAgents'|'listSessions'|'createSession'|'switchSession'|
     'renameSession'|'send'|'isRunning'|'isBackground'>
   workspaceStore: Pick<WorkspaceStore, 'list'>
   isEnabled(): boolean
@@ -250,20 +250,20 @@ export async function dispatchRemoteCommand(
 ```
 Map:
 - `workspace:list` → `workspaceStore.list()`
-- `agent:list` → `meowAgent.listAgents().map(a => ({ id, name, cwd, kind }))` — chỉ expose 4 field
+- `agent:list` → `bsAgent.listAgents().map(a => ({ id, name, cwd, kind }))` — chỉ expose 4 field
   (không lộ apiKey/model đầy đủ).
 - `agent:state` (params `{agentId}`) → `{ running: isRunning, background: isBackground }`
 - `session:list` (params `{agentId}`) → `listSessions(agentId)`
 - `session:create` (`{agentId}`) → `createSession(agentId)`
 - `session:switch` (`{agentId, sessionId}`) → `switchSession(agentId, sessionId)`
 - `session:rename` (`{agentId, sessionId, title}`) → `renameSession(agentId, sessionId, title)`
-- `chat:send` (`{agentId, text}`) → validate `text` non-empty → `await meowAgent.send(agentId, text)`
+- `chat:send` (`{agentId, text}`) → validate `text` non-empty → `await bsAgent.send(agentId, text)`
   → trả `{ queued: true }` (agent đang chạy sẽ xếp hàng — hành vi có sẵn của `send()`).
 
 **Safety gate đặt ở ĐẦU hàm**: `if (!ctx.isEnabled()) return { ok:false, error:'remote disabled' }`.
 Unknown command → `{ ok:false, error:'unknown command' }`. Agent không tồn tại → error rõ ràng.
 
-**Test `tests/unit/remote-commands.test.ts`**: fake context (object literal) — không cần MeowAgentManager
+**Test `tests/unit/remote-commands.test.ts`**: fake context (object literal) — không cần BsAgentManager
 thật:
 - disabled → mọi command trả `remote disabled`, không gọi gì.
 - workspace:list / agent:list trả đúng data từ fake.
@@ -381,13 +381,13 @@ remote = new RemoteManager({
   store: remoteStore,
   pairing: new RemotePairing(),
   context: {
-    meowAgent: this.meowAgent,
+    bsAgent: this.bsAgent,
     workspaceStore: this.workspaces,
     isEnabled: () => remoteStore.load().enabled
   }
 })
 ```
-  (đặt sau khi `meowAgent` đã khởi tạo — nếu constructor order không cho phép, khởi tạo trong
+  (đặt sau khi `bsAgent` đã khởi tạo — nếu constructor order không cho phép, khởi tạo trong
   `init()`/`whenReady`; chọn vị trí không phá vỡ order hiện có.)
 - Composition `setOnEvent` (dòng ~170): thêm `mainApp.remote?.handleAgentEvent(event)` ngay trước
   `win?.webContents.send(Channels.EventChat, event)`.
@@ -452,7 +452,7 @@ e2e; kiểm tra `tests/e2e` có test settings không, nếu có thì chạy.)
 - [ ] Không hardcode channel string — dùng `Channels.Remote*`.
 - [ ] `src/shared/remote-types.ts` không import Node/Electron.
 - [ ] Chỉ main process mở socket (relay client nằm trong main; renderer chỉ qua `window.api`).
-- [ ] Thông báo từ main prefix `[meow]` + tiếng Việt (nếu có push notification).
+- [ ] Thông báo từ main prefix `[bs]` + tiếng Việt (nếu có push notification).
 - [ ] Không thêm comment thừa.
 - [ ] Agent thoát/xử lý: relay client `dispose()` đóng WS sạch khi app quit — không để timer mồ côi.
 - [ ] Relay bind — dev bind `0.0.0.0` nhưng README bắt buộc reverse proxy TLS (không để plain ws ra

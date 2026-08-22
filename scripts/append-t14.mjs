@@ -11,7 +11,7 @@ const append = `
 > 1. **Fresh install + login.** Open Settings → "Login ChatGPT Web". A visible Chrome opens; sign in manually; close it. Verify both userData/chatgpt-web/storage-state.json and userData/chatgpt-web/browser-profile/Cookies exist.
 > 2. **Headless chat turn.** Send a message through the chatgpt-web provider. Chat flow opens a headless Chrome; response returns normally.
 > 3. **Profile survives missing JSON.** Delete storage-state.json, keep browser-profile/. Send another message — it still works (browser-profile is the source of truth; ephemeral context loads from it).
-> 4. **Fallback to visible on Cloudflare.** Corrupt browser-profile/Cookies (e.g., empty it). Send a message — a visible Chrome window pops up + the renderer toast "[meow] Cloudflare cần xác minh. Vui lòng giải trong cửa sổ Chrome vừa mở." Solve the challenge; chat resumes.
+> 4. **Fallback to visible on Cloudflare.** Corrupt browser-profile/Cookies (e.g., empty it). Send a message — a visible Chrome window pops up + the renderer toast "[bs] Cloudflare cần xác minh. Vui lòng giải trong cửa sổ Chrome vừa mở." Solve the challenge; chat resumes.
 > 5. **Logout wipes everything.** Logout from Settings. Verify both storage-state.json and browser-profile/ are deleted.
 > 6. **Re-login creates fresh profile.** Login again from Settings. Verify a new browser-profile/ is created and the chat flow works.
 `

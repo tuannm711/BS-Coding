@@ -75,7 +75,7 @@ Quyết định của người dùng khi được hỏi scope:
   - Bỏ `this.connections.resolveSpawnEnv(tmpl.id)` khi spawn CLI agent — không inject credentials
     nữa; CLI agent chạy với config mặc định của máy.
   - Bỏ `quotaMonitor.start()/stop()`, `gateway.start()/stop()` trong lifecycle.
-- `src/main/meow-agent-manager.ts`:
+- `src/main/bs-agent-manager.ts`:
   - Bỏ `syncGatewayProvider`, import `forwardListModels`, import types `GatewayStatus`, `ProviderAccount`,
     `ConnectionSecrets`.
   - Bỏ special-case `gateway` trong `fetchProviderModels`.
@@ -88,7 +88,7 @@ Quyết định của người dùng khi được hỏi scope:
 
 ## 5. Dọn user data (máy hiện tại)
 
-- Xóa entry `provider.gateway` trong `meow.json` (nếu có) — để ModelPicker không còn hiện model
+- Xóa entry `provider.gateway` trong `bs.json` (nếu có) — để ModelPicker không còn hiện model
   gateway chết.
 - Xóa refs `provider:gateway`, `conn:*` trong `connections/vault.json` (file vault sẽ không còn
   được đọc nữa sau khi xóa ConnectionsManager — dọn sạch cho gọn).

@@ -30,7 +30,7 @@ each release that touches this feature.
    for the exact error.
 
 ## 3. First turn (text only)
-1. In the chat panel, pick an agent using the native `meow` template, open the
+1. In the chat panel, pick an agent using the native `bs` template, open the
    model picker, and select `chatgpt-web / medium`.
 2. Send a simple prompt ("what's 2+2?"). A headless Chrome should launch
    briefly; the answer should appear in the chat panel once ChatGPT finishes

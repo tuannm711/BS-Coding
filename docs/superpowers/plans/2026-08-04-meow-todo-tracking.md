@@ -1,4 +1,4 @@
-# Meow Coding — Todo list tracking (theo opencode)
+# BS Coding — Todo list tracking (theo opencode)
 
 **Goal:** Khi agent gọi `todowrite`, todo list được **lưu theo session** và hiển thị trong UI chat để theo dõi tiến độ (pending / in_progress / completed / cancelled + đếm X/Y). Tham khảo source opencode `D:\GitHub\opencode-1.18.11`:
 
@@ -7,7 +7,7 @@
 - `packages/opencode/src/tool/todo.ts` — `todowrite` nhận `todos: Todo.Info[]`, ghi đè, output = JSON.
 - `packages/opencode/src/tool/todowrite.txt` — hướng dẫn model: chỉ dùng khi ≥3 bước, đúng 1 `in_progress`, `completed` chỉ khi thực sự xong, cập nhật realtime.
 
-**Phạm vi:** `src/shared/types.ts`, `src/main/agent/session.ts`, `src/main/agent/tools/{types,todowrite}.ts`, `src/main/agent/loop.ts`, `src/main/meow-agent-manager.ts`, `src/shared/ipc.ts`, `src/preload/index.ts`, `src/main/index.ts`, `ChatPanel.tsx`, `styles.css`, tests.
+**Phạm vi:** `src/shared/types.ts`, `src/main/agent/session.ts`, `src/main/agent/tools/{types,todowrite}.ts`, `src/main/agent/loop.ts`, `src/main/bs-agent-manager.ts`, `src/shared/ipc.ts`, `src/preload/index.ts`, `src/main/index.ts`, `ChatPanel.tsx`, `styles.css`, tests.
 
 ---
 
@@ -33,7 +33,7 @@ Schema `todos: [{ content, status enum, priority enum optional }]`; description 
 ### loop.ts
 `LoopDeps.setTodos?`; trong `executeCall` toolCtx: `setTodos: (todos) => this.deps.setTodos?.(todos)`.
 
-### meow-agent-manager.ts
+### bs-agent-manager.ts
 - `register()`: `setTodos: (todos) => { this.deps.store.setTodos(this.activeSessionId(agent.id), todos); this.emit({ type: 'todo-updated', agentId: agent.id, todos }) }`.
 - `getTodos(agentId)`: `store.todos(activeSessionId)`.
 
@@ -61,7 +61,7 @@ Schema `todos: [{ content, status enum, priority enum optional }]`; description 
 - [ ] tools/types.ts: `setTodos?`.
 - [ ] todowrite.ts: schema + run.
 - [ ] loop.ts: LoopDeps.setTodos + toolCtx.setTodos.
-- [ ] meow-agent-manager.ts: register setTodos + getTodos.
+- [ ] bs-agent-manager.ts: register setTodos + getTodos.
 - [ ] ipc/preload/index handlers + test.
 - [ ] typecheck + npm test.
 

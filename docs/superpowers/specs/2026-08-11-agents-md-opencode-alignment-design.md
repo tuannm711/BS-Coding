@@ -1,10 +1,10 @@
-# Meow Coding — Align AGENTS.md handling with opencode — Design
+# BS Coding — Align AGENTS.md handling with opencode — Design
 
 Ngày: 2026-08-11 · Trạng thái: chờ duyệt · Bước: sau brainstorm (đã chốt thiết kế với user)
 
 ## 1. Mục tiêu
 
-LLM trong meow rất ít khi chủ động quét/đọc AGENTS.md, nhất là các file module-level nằm trong
+LLM trong bs rất ít khi chủ động quét/đọc AGENTS.md, nhất là các file module-level nằm trong
 thư mục con của project. Đối chiếu với opencode (`D:\GitHub\opencode`): chỗ nào giống thì giữ,
 chỗ nào khác thì chỉnh cho giống, chỗ nào opencode không có thì bỏ.
 
@@ -58,13 +58,13 @@ Nguồn: `D:\GitHub\opencode\packages\opencode\src\session\instruction.ts`,
 
 Không nhắc AGENTS.md trong base prompt — việc quét chủ động đến từ template `/sp-*` + skills.
 
-## 3. Thiết kế mới cho meow
+## 3. Thiết kế mới cho bs
 
 ### 3a. System prompt: global + root-level, 1 loại ưu tiên (`src/main/agent/instructions.ts`)
 
 - **Global (home dir, thay userData):** đọc file đầu tiên tồn tại trong
-  `[~/.config/meow/AGENTS.md, ~/.claude/CLAUDE.md]`. Bỏ tham số `userDataDir` khỏi
-  `loadInstructions(cwd)`; `meow-agent-manager.ts` bỏ truyền `this.deps.userInstructionsDir`.
+  `[~/.config/bs/AGENTS.md, ~/.claude/CLAUDE.md]`. Bỏ tham số `userDataDir` khỏi
+  `loadInstructions(cwd)`; `bs-agent-manager.ts` bỏ truyền `this.deps.userInstructionsDir`.
 - **Project (walk up từ cwd tới git root/home):** ưu tiên **một loại** — 2 pass:
   1. Pass 1: walk-up, kiểm tra có tồn tại bất kỳ `AGENTS.md` nào trên đường đi không.
   2. Pass 2: nếu có → chỉ collect các `AGENTS.md`; nếu không → collect các `CLAUDE.md`.
@@ -99,7 +99,7 @@ Không nhắc AGENTS.md trong base prompt — việc quét chủ động đến 
 
 ### 3c. Base prompt: khuyến khích search tools (`src/main/agent/config.ts`)
 
-Thêm nguyên văn vào `DEFAULT_MEOW_CONFIG.agents.meow.systemPrompt` (cuối đoạn hiện tại):
+Thêm nguyên văn vào `DEFAULT_BS_CONFIG.agents.bs.systemPrompt` (cuối đoạn hiện tại):
 
 > "Use the available search tools to understand the codebase and the user's query. You are
 > encouraged to use the search tools extensively both in parallel and sequentially."
@@ -120,7 +120,7 @@ Thêm nguyên văn vào `DEFAULT_MEOW_CONFIG.agents.meow.systemPrompt` (cuối �
 | `src/main/agent/tools/read.ts` | Sau khi đọc, gọi `ctx.onFileRead?.(full)`, nối text non-empty vào output dạng `<system-reminder>`; bỏ dùng trực tiếp `instructionFilesForFile` |
 | `src/main/agent/loop.ts` | Bỏ `attachInstructions()` + `readFiles` + `instructionFilesForFile` import; implement callback `onFileRead` cho ToolContext với dedupe `Set<string>` cross-message + skip system-prompt paths |
 | `src/main/agent/tools/edit.ts` | Bỏ `ctx.onFileRead?.(full)` |
-| `src/main/meow-agent-manager.ts` | Bỏ truyền `userInstructionsDir` vào `loadInstructions`; bỏ field `userInstructionsDir` khỏi deps nếu không dùng nơi khác |
+| `src/main/bs-agent-manager.ts` | Bỏ truyền `userInstructionsDir` vào `loadInstructions`; bỏ field `userInstructionsDir` khỏi deps nếu không dùng nơi khác |
 | `src/main/index.ts` | Bỏ truyền `userInstructionsDir: app.getPath('userData')` |
 | `src/main/agent/config.ts` | Thêm câu search-tools vào default systemPrompt |
 

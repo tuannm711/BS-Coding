@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Thêm built-in slash command `/frontend-design` cho native Meow agent — dispatch request tới skill `frontend-design` (đã bundle) qua pattern giống `SUPERPOWERS_COMMANDS`.
+**Goal:** Thêm built-in slash command `/frontend-design` cho native BS agent — dispatch request tới skill `frontend-design` (đã bundle) qua pattern giống `SUPERPOWERS_COMMANDS`.
 
 **Architecture:** Thêm một `Command` vào `builtin` map trong `src/main/agent/commands.ts`; command này là prompt thường (không `type: 'system'`), chảy qua pipeline `listCommands` → `/` menu → `runCommand` → `resolveCommand` có sẵn. Không đổi IPC/preload/renderer.
 
@@ -13,7 +13,7 @@
 - Tuân theo `AGENTS.md`: không thêm comment thừa; chỉ comment khi giải thích quyết định phức tạp.
 - Tên command `frontend-design` (không prefix `sp-`), khớp tên skill để agent gọi `skill(name)`.
 - Template phải chứa: `Use the \`frontend-design\` skill for this request and follow it strictly.`, dòng `Read @AGENTS.md before taking action.`, và `User request:` + `$ARGUMENTS`.
-- Không đổi `src/shared/ipc.ts`, preload, renderer, `meow-agent-manager.ts`.
+- Không đổi `src/shared/ipc.ts`, preload, renderer, `bs-agent-manager.ts`.
 - Bắt buộc `npm run typecheck` pass và `npm test` pass sau khi hoàn thành.
 
 ---
@@ -110,7 +110,7 @@ Thêm 2 test vào block `describe('CommandStore', ...)` (sau test "lists built-i
   })
 
   it('frontend-design command resolves $ARGUMENTS into the skill dispatch prompt', async () => {
-    const dir = mkdtempSync(path.join(tmpdir(), 'meow-fd-'))
+    const dir = mkdtempSync(path.join(tmpdir(), 'bs-fd-'))
     try {
       const out = await resolveCommand(FRONTEND_DESIGN_COMMAND, ['redesign the landing page'], {
         cwd: dir, commands: []

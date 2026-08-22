@@ -73,7 +73,7 @@ Behavior:
 ## ChatPanel wiring (unchanged behavior)
 
 - `currentVariant`, `availableVariants`, `refreshVariants`, the
-  `meow:model-changed` listener, and the `onVariantChange` callback all stay as
+  `bs:model-changed` listener, and the `onVariantChange` callback all stay as
   they are today. Only the rendered element changes:
   `onChange={v => { setCurrentVariant(v); onVariantChange?.(v === '' ? undefined : v) }}`.
 

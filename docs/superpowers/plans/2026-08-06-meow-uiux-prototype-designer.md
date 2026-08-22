@@ -1,10 +1,10 @@
-# Meow UI/UX Prototype Designer (Figma Make style) Implementation Plan
+# BS UI/UX Prototype Designer (Figma Make style) Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add a prototype-design workspace in Meow Coding where a BA chats with a design-oriented agent to generate a real React+Vite multi-screen prototype (with mock data), previews it live via a Vite dev server, and promotes it into a dev agent's context to build the real frontend.
+**Goal:** Add a prototype-design workspace in BS Coding where a BA chats with a design-oriented agent to generate a real React+Vite multi-screen prototype (with mock data), previews it live via a Vite dev server, and promotes it into a dev agent's context to build the real frontend.
 
-**Architecture:** A second Electron BrowserWindow loads the same renderer with `?view=prototype`; a new `design` agent kind (extending `MeowAgentManager`) writes a scaffolded React+Vite app into `<project>/docs/uiux-design/<name>/`; a `PrototypePreviewServer` spawns Vite to serve it in an `<iframe>` (and optionally in an external browser). IPC contract (`Channels`/`AgentApi`) is extended symmetrically across main/preload/renderer.
+**Architecture:** A second Electron BrowserWindow loads the same renderer with `?view=prototype`; a new `design` agent kind (extending `BsAgentManager`) writes a scaffolded React+Vite app into `<project>/docs/uiux-design/<name>/`; a `PrototypePreviewServer` spawns Vite to serve it in an `<iframe>` (and optionally in an external browser). IPC contract (`Channels`/`AgentApi`) is extended symmetrically across main/preload/renderer.
 
 **Tech Stack:** Electron 41, React 19, Vite 7, TypeScript strict, `node:child_process`, `tree-kill`, Vitest.
 
@@ -15,7 +15,7 @@
 - Modify: `src/shared/types.ts` — `AgentKind` thêm `'design'`, `PrototypeInfo`, `PrototypeRuntime`, `PrototypePreviewEvent`.
 - Modify: `src/shared/ipc.ts` — `Channels` + `AgentApi` methods for prototype.
 - Modify: `src/main/default-templates.ts` — template "Design Prototype".
-- Modify: `src/main/meow-agent-manager.ts` — register design kind, design system prompt + design skills dir.
+- Modify: `src/main/bs-agent-manager.ts` — register design kind, design system prompt + design skills dir.
 - Modify: `src/main/agent/skill.ts` — `collectSkills` nhận thêm extra dir.
 - Create: `src/main/prototype-scaffold.ts` — tạo cấu trúc React+Vite.
 - Create: `src/main/prototype-preview-server.ts` — quản lý Vite dev server + static HTTP server.
@@ -46,7 +46,7 @@
 Thêm vào `tests/unit/ipc-contract.test.ts` (đầu test file, phần import) và 1 test mới:
 
 ```ts
-import type { AgentConfig, ChatMessage, MeowSettings, PrototypeInfo, PrototypeRuntime, PrototypePreviewEvent } from '../../src/shared/types'
+import type { AgentConfig, ChatMessage, BsSettings, PrototypeInfo, PrototypeRuntime, PrototypePreviewEvent } from '../../src/shared/types'
 ```
 
 Cuối file (sau test 'types settings payloads...'), thêm:
@@ -212,7 +212,7 @@ git commit -m "ipc: prototype list/create/open/preview/promote channels"
 
 **Files:**
 - Modify: `src/main/default-templates.ts`
-- Modify: `src/main/meow-agent-manager.ts`
+- Modify: `src/main/bs-agent-manager.ts`
 - Modify: `src/main/agent/skill.ts`
 - Test: `tests/unit/agent-skill.test.ts` (verify extra dir)
 
@@ -230,7 +230,7 @@ Trong file, thêm test:
 
 ```ts
   it('collects skills from an extra directory', () => {
-    const root = mkdtempSync(path.join(tmpdir(), 'meow-skill-extra-'))
+    const root = mkdtempSync(path.join(tmpdir(), 'bs-skill-extra-'))
     try {
       const extra = path.join(root, 'extra')
       mkdirSync(path.join(extra, 'ui-ux-pro-max'), { recursive: true })
@@ -260,7 +260,7 @@ export function collectSkills(
   builtinSkillsDir?: string,
   ...extraDirs: string[]
 ): Skill[] {
-  const dirs = [path.join(cwd, '.meow', 'skills')]
+  const dirs = [path.join(cwd, '.bs', 'skills')]
   if (userSkillsDir) dirs.push(userSkillsDir)
   if (builtinSkillsDir) dirs.push(builtinSkillsDir)
   dirs.push(...extraDirs)
@@ -278,10 +278,10 @@ Trong `src/main/default-templates.ts`, thêm vào `DEFAULT_TEMPLATES`:
 
 `command` rỗng vì design agent là native-style (không spawn PTY).
 
-- [ ] **Step 5: MeowAgentManager nhận designSkillsDir**
+- [ ] **Step 5: BsAgentManager nhận designSkillsDir**
 
-Trong `src/main/meow-agent-manager.ts`:
-- `MeowAgentManagerDeps` thêm field:
+Trong `src/main/bs-agent-manager.ts`:
+- `BsAgentManagerDeps` thêm field:
 
 ```ts
   designSkillsDir?: string
@@ -309,7 +309,7 @@ Expected: PASS.
 - [ ] **Step 7: Commit**
 
 ```bash
-git add src/main/default-templates.ts src/main/meow-agent-manager.ts src/main/agent/skill.ts tests/unit/agent-skill.test.ts
+git add src/main/default-templates.ts src/main/bs-agent-manager.ts src/main/agent/skill.ts tests/unit/agent-skill.test.ts
 git commit -m "feat: design agent template and design skills dir"
 ```
 
@@ -318,18 +318,18 @@ git commit -m "feat: design agent template and design skills dir"
 ### Task 4: Design system prompt + register design agent
 
 **Files:**
-- Modify: `src/main/meow-agent-manager.ts`
-- Test: `tests/unit/meow-agent-manager.test.ts`
+- Modify: `src/main/bs-agent-manager.ts`
+- Test: `tests/unit/bs-agent-manager.test.ts`
 
 - [ ] **Step 1: Write the failing test**
 
-Xem cách test hiện có trong `tests/unit/meow-agent-manager.test.ts` để dựng manager ảo (mock store, tools trống). Thêm test:
+Xem cách test hiện có trong `tests/unit/bs-agent-manager.test.ts` để dựng manager ảo (mock store, tools trống). Thêm test:
 
 ```ts
   it('registers a design agent with the design prompt and design skills', () => {
     const deps = makeDeps() // helper hiện có, thêm designSkillsDir
     deps.designSkillsDir = '/design-skills'
-    const manager = new MeowAgentManager(deps)
+    const manager = new BsAgentManager(deps)
     manager.addAgent({
       id: 'd1', name: 'checkout', templateId: 'design-prototype', cwd: '/p/docs/uiux-design/checkout', kind: 'design'
     })
@@ -341,12 +341,12 @@ Nếu test hiện có không có helper `makeDeps`, đọc file và tạo tối 
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `npx vitest run tests/unit/meow-agent-manager.test.ts`
+Run: `npx vitest run tests/unit/bs-agent-manager.test.ts`
 Expected: FAIL — `isNative('d1')` false vì chỉ kind `native` được register.
 
 - [ ] **Step 3: Register design agents**
 
-Trong `src/main/meow-agent-manager.ts`:
+Trong `src/main/bs-agent-manager.ts`:
 - `init()`: đổi `if (agent.kind === 'native') this.register(agent)` → `if (agent.kind === 'native' || agent.kind === 'design') this.register(agent)`.
 - `addAgent()`: đổi tương tự.
 
@@ -356,7 +356,7 @@ Tạo file `src/main/design-prompt.ts`:
 
 ```ts
 export const DESIGN_SYSTEM_PROMPT =
-  'You are a UI/UX design agent inside Meow Coding. You help Business Analysts prototype ' +
+  'You are a UI/UX design agent inside BS Coding. You help Business Analysts prototype ' +
   'business flows and interfaces before real code is written. You generate a real React + Vite ' +
   'app (single-page, multi-screen) using react-router for navigation and mock data in src/data/mock.ts. ' +
   'Always work inside your working directory (the prototype folder under docs/uiux-design). ' +
@@ -376,13 +376,13 @@ Thêm import `import { DESIGN_SYSTEM_PROMPT } from './design-prompt'`.
 
 - [ ] **Step 5: Run tests to verify pass**
 
-Run: `npx vitest run tests/unit/meow-agent-manager.test.ts`
+Run: `npx vitest run tests/unit/bs-agent-manager.test.ts`
 Expected: PASS.
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/main/meow-agent-manager.ts src/main/design-prompt.ts tests/unit/meow-agent-manager.test.ts
+git add src/main/bs-agent-manager.ts src/main/design-prompt.ts tests/unit/bs-agent-manager.test.ts
 git commit -m "feat: register design agents with dedicated system prompt"
 ```
 
@@ -406,7 +406,7 @@ import { createPrototypeScaffold } from '../../src/main/prototype-scaffold'
 
 describe('createPrototypeScaffold', () => {
   it('creates a React+Vite structure under docs/uiux-design/<name>', async () => {
-    const project = mkdtempSync(path.join(tmpdir(), 'meow-proto-'))
+    const project = mkdtempSync(path.join(tmpdir(), 'bs-proto-'))
     try {
       const dir = await createPrototypeScaffold(project, 'Checkout Flow', { skipInstall: true })
       expect(dir.endsWith(path.join('docs', 'uiux-design', 'checkout-flow'))).toBe(true)
@@ -423,7 +423,7 @@ describe('createPrototypeScaffold', () => {
   })
 
   it('rejects invalid names', async () => {
-    const project = mkdtempSync(path.join(tmpdir(), 'meow-proto-'))
+    const project = mkdtempSync(path.join(tmpdir(), 'bs-proto-'))
     try {
       await expect(createPrototypeScaffold(project, '..', { skipInstall: true })).rejects.toThrow()
     } finally {
@@ -587,7 +587,7 @@ export async function createPrototypeScaffold(
   writeFileSync(path.join(dir, 'PROTOTYPE.md'), [
     `# ${slug} — UI/UX Prototype`,
     '',
-    'Generated by Meow Design agent. Real React + Vite app with mock data.',
+    'Generated by BS Design agent. Real React + Vite app with mock data.',
     'Use this source as reference when building the real frontend.',
     ''
   ].join('\n'))
@@ -814,7 +814,7 @@ Trong class `MainApp` field (sau `pty = new PtyManager()`):
   prototypePreview = new PrototypePreviewServer()
 ```
 
-Constructor `MainApp`, trong `meowAgent` deps thêm `designSkillsDir`:
+Constructor `MainApp`, trong `bsAgent` deps thêm `designSkillsDir`:
 
 ```ts
     designSkillsDir: app.isPackaged
@@ -845,7 +845,7 @@ Thêm method vào `MainApp` (sau `resetActiveProject`):
       kind: 'design'
     })
     const agent = ws.agents[ws.agents.length - 1]
-    this.meowAgent.addAgent(agent)
+    this.bsAgent.addAgent(agent)
     return { name, path: dir, agentId: agent.id }
   }
 
@@ -882,12 +882,12 @@ Thêm method vào `MainApp` (sau `resetActiveProject`):
     const prompt = `Build the real frontend for the project based on the UI/UX prototype at ` +
       `${proto.path} (docs/uiux-design/${proto.name}). Read PROTOTYPE.md and all source files ` +
       `in that folder, then implement the real app using those screens and flows.`
-    this.meowAgent.send(dev.id, prompt)
+    this.bsAgent.send(dev.id, prompt)
     return true
   }
 ```
 
-Lưu ý: `meowAgent.send` trả về Promise<void> — gọi `void this.meowAgent.send(...)` hoặc để fire-and-forget; hàm promote trả `true` ngay.
+Lưu ý: `bsAgent.send` trả về Promise<void> — gọi `void this.bsAgent.send(...)` hoặc để fire-and-forget; hàm promote trả `true` ngay.
 
 - [ ] **Step 2: Thêm hàm tạo prototype window + handler**
 
@@ -902,7 +902,7 @@ function createPrototypeWindow(): void {
   protoWin = new BrowserWindow({
     width: 1500,
     height: 950,
-    title: 'Meow Prototype',
+    title: 'BS Prototype',
     backgroundColor: '#1e1e1e',
     ...getWindowChromeOptions(process.platform),
     webPreferences: {
@@ -956,7 +956,7 @@ Trong `before-quit`, thêm `void mainApp.prototypePreview.stopAll()` trước `a
 
 ```ts
   mainApp.stopGitPoll()
-  void mainApp.meowAgent.dispose().then(() => {
+  void mainApp.bsAgent.dispose().then(() => {
     void mainApp.prototypePreview.stopAll()
     mainApp.pty.stopAll().finally(() => app.exit(0))
   })
@@ -1287,7 +1287,7 @@ test('prototype studio opens a separate window', async () => {
   await window.getByRole('button', { name: 'menu' }).click()
   await window.getByRole('button', { name: 'Prototype Studio' }).click()
   const protoWindow = await app.waitForEvent('window')
-  await expect(protoWindow).toHaveTitle(/Meow Prototype/)
+  await expect(protoWindow).toHaveTitle(/BS Prototype/)
   await protoWindow.locator('.prototype-window').waitFor()
   await app.close()
 })

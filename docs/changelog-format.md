@@ -5,7 +5,7 @@ Quy ước viết changelog giữa các version (VD: `v0.21.4 → v0.25.1`) đ�
 ## Cấu trúc
 
 ```markdown
-# Changelog — Meow Coding v<old> → v<new>
+# Changelog — BS Coding v<old> → v<new>
 
 ## 🚀 New Features
 
@@ -34,7 +34,7 @@ Quy ước viết changelog giữa các version (VD: `v0.21.4 → v0.25.1`) đ�
 - Gom commit theo nhóm tính năng (dùng `git log --oneline <range>` để liệt kê), không liệt kê từng commit.
 - Mỗi mục 1 dòng, không quá 2 câu; bắt đầu bằng động từ hoặc cụm người dùng thấy được.
 - Emoji ở header mục chính (`🚀`, `📱`, `🐛`, `🧹`).
-- Header: `# Changelog — Meow Coding v<old> → v<new>`.
+- Header: `# Changelog — BS Coding v<old> → v<new>`.
 
 ## Cách tạo
 

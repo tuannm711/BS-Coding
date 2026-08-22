@@ -1,4 +1,4 @@
-# Meow Coding — Fast workspace open (non-blocking) — Plan
+# BS Coding — Fast workspace open (non-blocking) — Plan
 
 **Goal:** Xoá delay khi mở project (pane view phải hiện ngay, không đợi backend). Đo được: lần mở đầu
 485ms, mở lại 20-31ms (render ~36ms) — toàn bộ delay nằm ở IPC `openWorkspace` block trên init
@@ -9,7 +9,7 @@
 - `src/main/index.ts` `openWorkspace`: register native agent đồng bộ (rẻ, để chat mount đúng
   transcript), trả `runtimeFor` ngay, chạy `init` + `Promise.all(startAgent)` ở background qua
   `prepareWorkspace` (kèm catch để không crash).
-- `src/main/meow-agent-manager.ts`:
+- `src/main/bs-agent-manager.ts`:
   - `register(agent, force?)`: `force` cho phép rebuild runner sau khi tools sync (MCP/user), skip nếu
     turn đang chạy.
   - `init`: `register(agent, true)` để áp dụng tools/model limits mới.

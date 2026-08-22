@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Make meow's AGENTS.md handling match opencode: system prompt embeds only global + single-type project AGENTS.md; nearby AGENTS.md attaches inline into the `read` tool output as a `<system-reminder>` (deduped cross-message, `read`-only); base prompt encourages search tools.
+**Goal:** Make bs's AGENTS.md handling match opencode: system prompt embeds only global + single-type project AGENTS.md; nearby AGENTS.md attaches inline into the `read` tool output as a `<system-reminder>` (deduped cross-message, `read`-only); base prompt encourages search tools.
 
 **Architecture:** Rework `instructions.ts` loading rules, move attach-on-read from a synthesized user message in `loop.ts` into the `read` tool output via a changed `ToolContext.onFileRead` contract, wire `systemInstructionPaths` from the manager into `SessionRunner`, and extend the default system prompt with opencode's search-tools sentence.
 
@@ -26,9 +26,9 @@
 | `src/main/agent/loop.ts` | SessionRunner turn loop | Remove `readFiles` + `attachInstructions()`; add `attachedInstructions` set (cross-message dedupe) + `systemInstructionPaths` from deps; `toolCtx.onFileRead` returns `<system-reminder>` text |
 | `src/main/agent/tools/read.ts` | Read file tool | Call `ctx.onFileRead?.(full)`, append returned text to output |
 | `src/main/agent/tools/edit.ts` | Edit file tool | Remove `ctx.onFileRead?.(full)` (read-only trigger) |
-| `src/main/meow-agent-manager.ts` | Agent registry + SessionRunner wiring | `loadInstructions(agent.cwd)` (no userDataDir); pass `systemInstructionPaths` into SessionRunner deps; remove `userInstructionsDir` from deps |
+| `src/main/bs-agent-manager.ts` | Agent registry + SessionRunner wiring | `loadInstructions(agent.cwd)` (no userDataDir); pass `systemInstructionPaths` into SessionRunner deps; remove `userInstructionsDir` from deps |
 | `src/main/index.ts` | App bootstrap | Remove `userInstructionsDir: app.getPath('userData')` |
-| `src/main/agent/config.ts` | Default config | Append opencode search-tools sentence to `DEFAULT_MEOW_CONFIG.agents.meow.systemPrompt` |
+| `src/main/agent/config.ts` | Default config | Append opencode search-tools sentence to `DEFAULT_BS_CONFIG.agents.bs.systemPrompt` |
 | `tests/unit/agent-instructions.test.ts` | instructions.ts tests | Rewrite: single-type priority, global home-dir helper, instructionFilesForFile skip/per-dir |
 | `tests/unit/agent-loop.test.ts` | SessionRunner tests | Rewrite attach tests: reminder lives in tool output, cross-message dedupe |
 | `tests/unit/agent-tools.test.ts` | Tool tests | Add read-reminder + edit-no-call tests |
@@ -56,7 +56,7 @@ let root: string
 let cwd: string
 
 beforeEach(() => {
-  root = mkdtempSync(path.join(tmpdir(), 'meow-inst-'))
+  root = mkdtempSync(path.join(tmpdir(), 'bs-inst-'))
   cwd = path.join(root, 'repo', 'src')
   mkdirSync(cwd, { recursive: true })
 })
@@ -108,19 +108,19 @@ describe('loadInstructions', () => {
 })
 
 describe('globalInstructionFiles', () => {
-  it('returns the meow global file when present', () => {
+  it('returns the bs global file when present', () => {
     const home = path.join(root, 'home')
-    mkdirSync(path.join(home, '.config', 'meow'), { recursive: true })
+    mkdirSync(path.join(home, '.config', 'bs'), { recursive: true })
     mkdirSync(path.join(home, '.claude'), { recursive: true })
-    writeFileSync(path.join(home, '.config', 'meow', 'AGENTS.md'), '# Global meow')
+    writeFileSync(path.join(home, '.config', 'bs', 'AGENTS.md'), '# Global bs')
     writeFileSync(path.join(home, '.claude', 'CLAUDE.md'), '# Global claude')
     const files = globalInstructionFiles(home)
     expect(files).toHaveLength(1)
-    expect(files[0].content).toBe('# Global meow')
-    expect(files[0].path).toBe(path.join(home, '.config', 'meow', 'AGENTS.md'))
+    expect(files[0].content).toBe('# Global bs')
+    expect(files[0].path).toBe(path.join(home, '.config', 'bs', 'AGENTS.md'))
   })
 
-  it('falls back to ~/.claude/CLAUDE.md when no meow AGENTS.md exists', () => {
+  it('falls back to ~/.claude/CLAUDE.md when no bs AGENTS.md exists', () => {
     const home = path.join(root, 'home')
     mkdirSync(path.join(home, '.claude'), { recursive: true })
     writeFileSync(path.join(home, '.claude', 'CLAUDE.md'), '# Claude global')
@@ -209,7 +209,7 @@ function walkUp(startDir: string, collect: (dir: string) => void): void {
 // parameter exists for tests; production always uses homedir().
 export function globalInstructionFiles(homeDir: string = homedir()): InstructionFile[] {
   const candidates = [
-    path.join(homeDir, '.config', 'meow', 'AGENTS.md'),
+    path.join(homeDir, '.config', 'bs', 'AGENTS.md'),
     path.join(homeDir, '.claude', 'CLAUDE.md')
   ]
   for (const p of candidates) {
@@ -270,8 +270,8 @@ export function instructionsText(files: InstructionFile[]): string {
 
 ### Step 4: Update call sites so the tree still compiles
 
-`src/main/meow-agent-manager.ts`:
-- Remove `userInstructionsDir?: string` from `MeowAgentManagerDeps` interface (line ~53).
+`src/main/bs-agent-manager.ts`:
+- Remove `userInstructionsDir?: string` from `BsAgentManagerDeps` interface (line ~53).
 - Change line ~697 from `loadInstructions(agent.cwd, this.deps.userInstructionsDir)` to `loadInstructions(agent.cwd)`.
 
 `src/main/index.ts`:
@@ -296,7 +296,7 @@ Expected: PASS.
 ### Step 7: Commit
 
 ```bash
-git add src/main/agent/instructions.ts src/main/meow-agent-manager.ts src/main/index.ts tests/unit/agent-instructions.test.ts
+git add src/main/agent/instructions.ts src/main/bs-agent-manager.ts src/main/index.ts tests/unit/agent-instructions.test.ts
 git commit -m "refactor: instructions.ts — home-dir global + single-type project priority (opencode-style)"
 ```
 
@@ -317,7 +317,7 @@ import { execFileSync } from 'node:child_process'
 
 ```ts
 it('returns nearby AGENTS.md via onFileRead and does not inject a user message', async () => {
-  const dir = mkdtempSync(path.join(tmpdir(), 'meow-loop-agents-'))
+  const dir = mkdtempSync(path.join(tmpdir(), 'bs-loop-agents-'))
   execFileSync('git', ['init', '-q'], { cwd: dir })
   const sub = path.join(dir, 'src')
   mkdirSync(sub)
@@ -358,7 +358,7 @@ it('returns nearby AGENTS.md via onFileRead and does not inject a user message',
 })
 
 it('does not re-attach AGENTS.md already attached (cross-message dedupe)', async () => {
-  const dir = mkdtempSync(path.join(tmpdir(), 'meow-loop-agents-'))
+  const dir = mkdtempSync(path.join(tmpdir(), 'bs-loop-agents-'))
   execFileSync('git', ['init', '-q'], { cwd: dir })
   const sub = path.join(dir, 'src')
   mkdirSync(sub)
@@ -625,7 +625,7 @@ git commit -m "feat: read tool appends AGENTS.md reminder; edit no longer trigge
 
 ## Task 4: Pass `systemInstructionPaths` from manager into SessionRunner
 
-### Step 1: Update `meow-agent-manager.ts`
+### Step 1: Update `bs-agent-manager.ts`
 
 In `register()`, replace:
 ```ts
@@ -657,7 +657,7 @@ Expected: PASS.
 ### Step 3: Commit
 
 ```bash
-git add src/main/meow-agent-manager.ts
+git add src/main/bs-agent-manager.ts
 git commit -m "feat: pass system instruction paths to SessionRunner for read-reminder dedupe"
 ```
 
@@ -667,9 +667,9 @@ git commit -m "feat: pass system instruction paths to SessionRunner for read-rem
 
 ### Step 1: Write the failing test
 
-In `tests/unit/agent-config.test.ts`, in the test that asserts the default system prompt (currently `expect(cfg.agents.meow.systemPrompt).toMatch(/question tool/i)`), add:
+In `tests/unit/agent-config.test.ts`, in the test that asserts the default system prompt (currently `expect(cfg.agents.bs.systemPrompt).toMatch(/question tool/i)`), add:
 ```ts
-    expect(cfg.agents.meow.systemPrompt).toMatch(/search tools/i)
+    expect(cfg.agents.bs.systemPrompt).toMatch(/search tools/i)
 ```
 
 ### Step 2: Run the test to verify it fails
@@ -682,7 +682,7 @@ Expected: FAIL on the new assertion.
 
 ### Step 3: Update `config.ts`
 
-In `src/main/agent/config.ts`, append to the `DEFAULT_MEOW_CONFIG.agents.meow.systemPrompt` string (keep the existing sentences):
+In `src/main/agent/config.ts`, append to the `DEFAULT_BS_CONFIG.agents.bs.systemPrompt` string (keep the existing sentences):
 ```ts
         'Use the available search tools to understand the codebase and the user\'s query. ' +
         'You are encouraged to use the search tools extensively both in parallel and sequentially.'

@@ -1,4 +1,4 @@
-# Meow Coding — UI Redesign (VS Code-like, no-border, vuông vức)
+# BS Coding — UI Redesign (VS Code-like, no-border, vuông vức)
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -6,7 +6,7 @@
 
 **Phạm vi:** Chỉ `src/renderer` (styles.css + các component React + xterm theme). Không đụng main/preload/shared, không đổi IPC channel, không đổi luồng dữ liệu.
 
-**Spec tham khảo:** `docs/superpowers/specs/2026-08-04-meow-coding-agent-console-design.md` (§5 UI Design Direction — bản mới bổ sung nguyên tắc này).
+**Spec tham khảo:** `docs/superpowers/specs/2026-08-04-bs-coding-agent-console-design.md` (§5 UI Design Direction — bản mới bổ sung nguyên tắc này).
 
 ---
 

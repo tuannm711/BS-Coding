@@ -4,11 +4,11 @@
 
 **Goal:** Make the variant/reasoning-effort picker in the chat panel render dynamically based on the currently selected model's supported values (sourced from `https://models.dev/api.json`), matching opencode's behavior.
 
-**Architecture:** Hybrid approach — replace the hardcoded `'medium' | 'high' | 'max'` union with a runtime string validated against a per-model `variants?: Record<string, string[]>` field in the existing `ModelsCatalog`. Add an IPC channel `agent:get-variants` to query available variants for the agent's current model. Extend `providerOptionsFor` to add a Google branch (`thinkingConfig.thinkingLevel`). Two layers of clamping in `MeowAgentManager.setVariant` + `register()` ensure `workspaces.json` never holds an out-of-range variant.
+**Architecture:** Hybrid approach — replace the hardcoded `'medium' | 'high' | 'max'` union with a runtime string validated against a per-model `variants?: Record<string, string[]>` field in the existing `ModelsCatalog`. Add an IPC channel `agent:get-variants` to query available variants for the agent's current model. Extend `providerOptionsFor` to add a Google branch (`thinkingConfig.thinkingLevel`). Two layers of clamping in `BsAgentManager.setVariant` + `register()` ensure `workspaces.json` never holds an out-of-range variant.
 
 **Tech Stack:** TypeScript strict, Electron IPC, React, Vitest. Same as existing codebase.
 
-**Spec:** `docs/superpowers/specs/2026-08-06-meow-dynamic-variant-design.md`
+**Spec:** `docs/superpowers/specs/2026-08-06-bs-dynamic-variant-design.md`
 
 ---
 
@@ -24,17 +24,17 @@ Files created or modified by this plan:
 | `src/main/index.ts` | New IPC handler `AgentGetVariants`; widen `setAgentVariant`; clamp persistence |
 | `src/main/models-catalog.ts` | Parser reads `reasoning_options` → `variants` field; new `getVariants(p, m)` API |
 | `src/main/models-snapshot.json` | Regenerate with `variants` fields |
-| `src/main/meow-agent-manager.ts` | `setVariant` clamps via `allowedVariantsFor`; `register()` defense-in-depth clamp; new `getVariant` getter |
+| `src/main/bs-agent-manager.ts` | `setVariant` clamps via `allowedVariantsFor`; `register()` defense-in-depth clamp; new `getVariant` getter |
 | `src/main/agent/llm.ts` | `ModelVariant` → `string`; `providerOptionsFor(provider, model, variant)` adds Google branch; Anthropic out-of-budget → undefined |
 | `src/main/agent/loop.ts` | `LoopDeps.variant?: string` |
 | `src/renderer/src/components/chat/ChatPanel.tsx` | Dynamic `<select>`; fetch `availableVariants` via IPC; hide when empty; clamp on model change |
-| `src/renderer/src/components/chat/ModelPicker.tsx` | Fire `meow:model-changed` after `setAgentModel` |
+| `src/renderer/src/components/chat/ModelPicker.tsx` | Fire `bs:model-changed` after `setAgentModel` |
 | `src/renderer/src/components/Pane.tsx` | Widen `handleVariantChange` signature |
 | `scripts/regen-models-snapshot.ts` | New script: fetch models.dev → write snapshot with `variants` |
 | `package.json` | Add `regen:models` script |
 | `tests/unit/models-catalog.test.ts` | Add tests for `variants` extraction + `getVariants` |
 | `tests/unit/llm-variant.test.ts` | Add Google + Anthropic-out-of-budget tests |
-| `tests/unit/meow-agent-manager.test.ts` | Add clamp test |
+| `tests/unit/bs-agent-manager.test.ts` | Add clamp test |
 | `tests/unit/ipc-contract.test.ts` | Add `getAgentVariants` to required methods + channel assert |
 
 ---
@@ -156,7 +156,7 @@ git commit -m "feat(preload): expose getAgentVariants, widen setAgentVariant"
 
 **Files:**
 - Modify: `src/main/index.ts:240-246,371-372`
-- Modify (later): `src/main/meow-agent-manager.ts` — needs `getVariant` getter (Task 7)
+- Modify (later): `src/main/bs-agent-manager.ts` — needs `getVariant` getter (Task 7)
 
 - [ ] **Step 1: Widen `setAgentVariant` signature**
 
@@ -165,7 +165,7 @@ In `src/main/index.ts` line 240:
 ```ts
 // Before:
   setAgentVariant(agentId: string, variant: 'medium' | 'high' | 'max'): void {
-    this.meowAgent.setVariant(agentId, variant)
+    this.bsAgent.setVariant(agentId, variant)
     const ws = this.findWorkspaceByAgent(agentId)
     if (ws) {
       this.workspaces.updateAgent(ws.projectPath, agentId, { variant })
@@ -174,10 +174,10 @@ In `src/main/index.ts` line 240:
 
 // After:
   setAgentVariant(agentId: string, variant: string | null): void {
-    this.meowAgent.setVariant(agentId, variant ?? undefined)
+    this.bsAgent.setVariant(agentId, variant ?? undefined)
     const ws = this.findWorkspaceByAgent(agentId)
     if (ws) {
-      const stored = this.meowAgent.getVariant(agentId)
+      const stored = this.bsAgent.getVariant(agentId)
       this.workspaces.updateAgent(ws.projectPath, agentId, { variant: stored })
     }
   }
@@ -196,7 +196,7 @@ In `src/main/index.ts` line 371:
   ipcMain.handle(Channels.AgentSetVariant, (_e, agentId: string, variant: string | null) =>
     mainApp.setAgentVariant(agentId, variant))
   ipcMain.handle(Channels.AgentGetVariants, (_e, agentId: string) =>
-    mainApp.meowAgent.getAvailableVariants(agentId))
+    mainApp.bsAgent.getAvailableVariants(agentId))
 ```
 
 - [ ] **Step 3: Run typecheck**
@@ -575,7 +575,7 @@ Expected: PASS (4 tests).
 Run: `npm run typecheck`
 
 Expected: FAIL with errors in `src/main/agent/loop.ts:37` (`variant?: ModelVariant`) and
-`src/main/meow-agent-manager.ts:313,563` — fixed in Task 7.
+`src/main/bs-agent-manager.ts:313,563` — fixed in Task 7.
 
 - [ ] **Step 7: Commit**
 
@@ -586,10 +586,10 @@ git commit -m "feat(llm): add Google thinkingLevel branch, Anthropic out-of-budg
 
 ---
 
-## Task 7: Clamp variant in `MeowAgentManager` (set + register + getter)
+## Task 7: Clamp variant in `BsAgentManager` (set + register + getter)
 
 **Files:**
-- Modify: `src/main/meow-agent-manager.ts:4,313-324,563`
+- Modify: `src/main/bs-agent-manager.ts:4,313-324,563`
 - Modify: `src/main/agent/loop.ts:2,37`
 
 - [ ] **Step 1: Update imports + `LoopDeps.variant` type**
@@ -616,9 +616,9 @@ import type { ChatEvent, ChatMessage, PromptResponse, QuestionPrompt, TokenUsage
 
 Run: `npm run typecheck`
 
-Expected: FAIL only with `src/main/meow-agent-manager.ts` errors.
+Expected: FAIL only with `src/main/bs-agent-manager.ts` errors.
 
-- [ ] **Step 3: Write the failing test in `meow-agent-manager.test.ts`**
+- [ ] **Step 3: Write the failing test in `bs-agent-manager.test.ts`**
 
 Add after the existing `setVariant passes the variant to the llm stream (default high)` test
 (after line 332):
@@ -633,7 +633,7 @@ Add after the existing `setVariant passes the variant to the llm stream (default
   })
 
   it('setVariant keeps an allow-listed value', async () => {
-    const dir = mkdtempSync(path.join(tmpdir(), 'meow-var-'))
+    const dir = mkdtempSync(path.join(tmpdir(), 'bs-var-'))
     try {
       const catalog = new ModelsCatalog(path.join(dir, 'models.json'), async () =>
         ({ ok: true, json: async () => ({
@@ -644,7 +644,7 @@ Add after the existing `setVariant passes the variant to the llm stream (default
             }
           }
         }) }) as unknown as Response)
-      const { manager } = await makeManager({ configPath: path.join(dir, 'meow.json'), catalog })
+      const { manager } = await makeManager({ configPath: path.join(dir, 'bs.json'), catalog })
       await manager.send('a1', 'first')
       manager.setVariant('a1', 'low')
       expect(manager.getVariant('a1')).toBe('low')
@@ -658,13 +658,13 @@ Add after the existing `setVariant passes the variant to the llm stream (default
 
 - [ ] **Step 4: Run the new test**
 
-Run: `npx vitest run tests/unit/meow-agent-manager.test.ts -t "clamps an out-of-allow"`
+Run: `npx vitest run tests/unit/bs-agent-manager.test.ts -t "clamps an out-of-allow"`
 
 Expected: FAIL — `setVariant` doesn't clamp yet, `getVariant` doesn't exist.
 
 - [ ] **Step 5: Remove `ModelVariant` import and add helper methods**
 
-In `src/main/meow-agent-manager.ts`, modify line 4:
+In `src/main/bs-agent-manager.ts`, modify line 4:
 
 ```ts
 // Before:
@@ -689,7 +689,7 @@ Add new methods in the class. Insert after `getProviderModels` (after line 354):
 
   private allowedVariantsFor(agent: AgentConfig): string[] {
     if (!this.deps.catalog) return []
-    const cfg = loadMeowConfig(this.deps.configPath)
+    const cfg = loadBsConfig(this.deps.configPath)
     const resolved = resolveAgentConfig(cfg, agent.name, this.deps.env, agent.model)
     if (!resolved.provider || !resolved.model) return []
     return this.deps.catalog.getVariants(resolved.provider, resolved.model)
@@ -761,7 +761,7 @@ Modify the `register()` method (lines 563 + nearby):
 
 - [ ] **Step 7: Run the new tests**
 
-Run: `npx vitest run tests/unit/meow-agent-manager.test.ts`
+Run: `npx vitest run tests/unit/bs-agent-manager.test.ts`
 
 Expected: PASS (all tests, including new ones).
 
@@ -774,7 +774,7 @@ Expected: PASS (no remaining errors in main process code; renderer errors next).
 - [ ] **Step 9: Commit**
 
 ```bash
-git add src/main/meow-agent-manager.ts src/main/agent/loop.ts tests/unit/meow-agent-manager.test.ts
+git add src/main/bs-agent-manager.ts src/main/agent/loop.ts tests/unit/bs-agent-manager.test.ts
 git commit -m "feat(manager): clamp variant on set + register, expose getAvailableVariants/getVariant"
 ```
 
@@ -935,8 +935,8 @@ Add inside the `ChatPanel` component body (right after the existing `useState` c
       const detail = (e as CustomEvent<{ agentId: string }>).detail
       if (detail?.agentId === agentId) refreshVariants()
     }
-    window.addEventListener('meow:model-changed', onModelChanged)
-    return () => window.removeEventListener('meow:model-changed', onModelChanged)
+    window.addEventListener('bs:model-changed', onModelChanged)
+    return () => window.removeEventListener('bs:model-changed', onModelChanged)
   }, [agentId, refreshVariants])
 ```
 
@@ -1019,7 +1019,7 @@ In `src/renderer/src/components/chat/ModelPicker.tsx`, modify the `onClick` hand
                       setOpen(false)
                       setCurrent({ provider, model: m })
                       void window.api.setAgentModel(agentId, provider, m)
-                      window.dispatchEvent(new CustomEvent('meow:model-changed', { detail: { agentId } }))
+                      window.dispatchEvent(new CustomEvent('bs:model-changed', { detail: { agentId } }))
                     }}
 ```
 
@@ -1143,7 +1143,7 @@ Run: `npm test`
 Expected: PASS. Specifically check:
 - `tests/unit/models-catalog.test.ts` — 8 tests (6 existing + 2 new)
 - `tests/unit/llm-variant.test.ts` — 4 tests (rewritten)
-- `tests/unit/meow-agent-manager.test.ts` — 3 variant-related tests (1 existing + 2 new)
+- `tests/unit/bs-agent-manager.test.ts` — 3 variant-related tests (1 existing + 2 new)
 - `tests/unit/ipc-contract.test.ts` — 1 new assertion for `AgentGetVariants`
 
 - [ ] **Step 3: Manual smoke check (renderer)**

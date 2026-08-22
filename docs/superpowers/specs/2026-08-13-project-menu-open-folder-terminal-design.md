@@ -10,7 +10,7 @@ Open in VS Code, Remove. User muốn thêm 2 hành động:
 
 1. **Open Folder** — mở thư mục project trong file manager của OS (Windows Explorer / Finder /
    file manager Linux).
-2. **Open Terminal** — mở một cửa sổ terminal (pane) ngay trong app Meow Coding, working
+2. **Open Terminal** — mở một cửa sổ terminal (pane) ngay trong app BS Coding, working
    directory = thư mục project đó.
 
 Yêu cầu đã chốt qua trao đổi:
@@ -30,7 +30,7 @@ Yêu cầu đã chốt qua trao đổi:
    - Khi shell thoát (exit) → pane bị xóa khỏi UI.
    - Khi đổi workspace khác hoặc thoát app → toàn bộ terminal session bị đóng (tree-kill).
    - Terminal **không** được lưu vào `workspaces.json`, không có template, không có log file,
-     không kích hoạt alert/logic "[meow] Agent thoát...".
+     không kích hoạt alert/logic "[bs] Agent thoát...".
 4. Pane terminal trong `PaneHeader` chỉ hiển thị các hành động có nghĩa: **Zoom** và
    **Close terminal** (đóng + xóa pane). Vì shell exit tự xóa pane nên "Stop" và "Delete" sẽ trùng
    nghĩa → gộp thành một hành động duy nhất. Ẩn Inject / Log / Restart / Toggle Background /
@@ -105,7 +105,7 @@ export interface TerminalInfo {
   - `closeAllTerminals()`: đóng hết terminal session hiện có (duyệt `pty` sessions, lọc
     `isTerminal` → `stop`).
 - Trong constructor, `pty.on('exit')`: nếu `pty.isTerminal(agentId)` → gửi
-  `EventTerminalExit { id, exitCode }` và **không** chạy nhánh agent (log hint "[meow] Agent
+  `EventTerminalExit { id, exitCode }` và **không** chạy nhánh agent (log hint "[bs] Agent
   thoát...", `alerts.onExit`, `setState`).
 - `pty.on('data')`: nếu là terminal → vẫn `win?.webContents.send(Channels.EventPtyData, ...)` nhưng
   **bỏ qua** `logs.append` / `alerts.onOutput` / `setState`.

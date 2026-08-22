@@ -1,6 +1,6 @@
-# Meow Relay
+# BS Relay
 
-WebSocket relay for the Meow mobile remote control. Routes messages between a
+WebSocket relay for the BS mobile remote control. Routes messages between a
 single desktop client and a single mobile client; message payloads are opaque.
 
 ## Run
@@ -17,7 +17,7 @@ Listens on `0.0.0.0:3928` (override with the `PORT` env var).
 Put it behind a TLS reverse proxy, e.g. Caddy:
 
 ```
-meow-relay.example.com {
+bs-relay.example.com {
     reverse_proxy 127.0.0.1:3928
 }
 ```

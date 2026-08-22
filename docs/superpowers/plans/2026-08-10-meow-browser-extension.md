@@ -1,6 +1,6 @@
-# Meow Coding — Browser Control via Chrome Extension: Implementation Plan
+# BS Coding — Browser Control via Chrome Extension: Implementation Plan
 
-Ngày: 2026-08-10 · Spec: `docs/superpowers/specs/2026-08-10-meow-browser-extension-design.md` · Trạng thái: chờ thực thi (cập nhật 2026-08-10 sau pull codebase 0.17.0)
+Ngày: 2026-08-10 · Spec: `docs/superpowers/specs/2026-08-10-bs-browser-extension-design.md` · Trạng thái: chờ thực thi (cập nhật 2026-08-10 sau pull codebase 0.17.0)
 
 ## 0. Cập nhật sau pull (2026-08-10) — delta so với bản plan gốc
 
@@ -21,7 +21,7 @@ Codebase đã nâng lên **0.17.0**; các commit code từ bản triển khai c�
 ## 1. Tổng quan
 
 Triển khai MVP "Browser Control": extension Chrome MV3 chạy trên profile thật của user, kết nối tới
-WS server do Meow main process chạy (`ws` package), xác thực bằng pairing code. Native Meow agent có
+WS server do BS main process chạy (`ws` package), xác thực bằng pairing code. Native BS agent có
 14 tool `browser_*` (permission mặc định `allow`). Renderer chỉ hiện status chip + dialog ghép nối.
 
 Phạm vi MVP: native agent tools + extension + bridge + pairing + launcher/hướng dẫn. **Không có**
@@ -67,7 +67,7 @@ src/main/agent/tools/
   registry.ts                        # SỬA — DefaultToolsOptions.browser?; đăng ký khi có
 src/main/agent/
   permission.ts                      # SỬA — PLAN_RULES thêm browser_*: 'ask'
-  config.ts                          # SỬA — DEFAULT_MEOW_CONFIG.permission thêm browser_*: 'allow'
+  config.ts                          # SỬA — DEFAULT_BS_CONFIG.permission thêm browser_*: 'allow'
 src/main/index.ts                    # SỬA — tạo bridge+launcher, truyền vào createDefaultTools, IPC handlers,
                                      #   forward EventBrowserStatus, start/close theo lifecycle
 src/preload/index.ts                 # SỬA — window.api.browser.*
@@ -199,12 +199,12 @@ docs/AGENTS.md                       # SỬA — ghi chú browser feature (main 
    ```json
    {
      "manifest_version": 3,
-     "name": "Meow Browser Bridge",
+     "name": "BS Browser Bridge",
      "version": "0.1.0",
      "permissions": ["tabs", "scripting", "storage"],
      "host_permissions": ["<all_urls>"],
      "background": { "service_worker": "background.js" },
-     "action": { "default_popup": "popup.html", "default_title": "Meow Browser Bridge" },
+     "action": { "default_popup": "popup.html", "default_title": "BS Browser Bridge" },
      "content_scripts": [{
        "matches": ["<all_urls>"],
        "js": ["content.js"],
@@ -332,7 +332,7 @@ export function createChromeLauncher(deps: BrowserLauncherDeps): BrowserLauncher
 export interface BrowserLauncher {
   openChrome(): Promise<void>            // mở Chrome thật (executable path) tới chrome://extensions
   openExtensionFolder(): Promise<void>   // shell.openPath(extensionDir)
-  showInstallGuide(): Promise<void>      // dialog.showMessageBox tiếng Việt [meow]
+  showInstallGuide(): Promise<void>      // dialog.showMessageBox tiếng Việt [bs]
 }
 ```
 
@@ -340,13 +340,13 @@ export interface BrowserLauncher {
 để tìm đường dẫn Chrome thật. `openChrome()` spawn `chrome.exe --new-window chrome://extensions` thay vì
 `shell.openExternal` (tránh phụ thuộc default browser). Import: `import { resolveChromeExecutablePath } from '../chatgpt-web/browser-login'`.
 
-Nội dung guide (tiếng Việt, prefix `[meow]`):
+Nội dung guide (tiếng Việt, prefix `[bs]`):
 ```
-[meow] Cài extension Meow Browser Bridge để agent điều khiển Chrome.
+[bs] Cài extension BS Browser Bridge để agent điều khiển Chrome.
 1. Nhấn "Mở chrome://extensions" (Chrome sẽ mở trang extension).
 2. Bật Developer mode (góc phải trên).
 3. Nhấn "Load unpacked" và chọn thư mục: <extensionDir>
-4. Quay lại Meow, nhấn "Ghép nối" để lấy mã, nhập mã vào popup extension.
+4. Quay lại BS, nhấn "Ghép nối" để lấy mã, nhập mã vào popup extension.
 ```
 Buttons: `['Mở chrome://extensions', 'Mở thư mục extension', 'Đóng']`; xử lý click qua `dialog.showMessageBox` return value.
 
@@ -391,11 +391,11 @@ Buttons: `['Mở chrome://extensions', 'Mở thư mục extension', 'Đóng']`; 
 2. `registry.ts`: `DefaultToolsOptions` thêm `browser?: { bridge: BrowserBridgeLike; launcher: BrowserLauncherLike }`; trong `createDefaultTools`, nếu có → `...createBrowserTools(opts.browser.bridge, opts.browser.launcher)`.
    **0.17.0**: registry đã có `getUserDataDir?: () => string` + `office` tool (tạo sau khi có `userDataDir`) — thêm `browser` cạnh đó, **không phá logic office**.
 3. `permission.ts` `PLAN_RULES`: thêm `'browser_*': 'ask'`.
-4. `config.ts` `DEFAULT_MEOW_CONFIG.permission`: thêm `'browser_*': 'allow'`.
+4. `config.ts` `DEFAULT_BS_CONFIG.permission`: thêm `'browser_*': 'allow'`.
 5. Test:
    - `agent-tools-browser.test.ts`: fake bridge (`execute` trả kết quả mặc định, `waitForPaired` true, logs mẫu); fake launcher (spy). Test từng tool: schema nhận input đúng, output/error mapping, `browser_start` khi chưa paired gọi launcher + trả status, khi paired không gọi launcher.
-   - `agent-config.test.ts`: `DEFAULT_MEOW_CONFIG.permission['browser_*']` = `'allow'`.
-   - `agent-permission.test.ts`: plan mode + `{...PLAN_RULES}` → `decidePermission('plan', DEFAULT_MEOW_CONFIG.permission, ()=>false, 'browser_click')` = `'ask'`; build mode → `'allow'`.
+   - `agent-config.test.ts`: `DEFAULT_BS_CONFIG.permission['browser_*']` = `'allow'`.
+   - `agent-permission.test.ts`: plan mode + `{...PLAN_RULES}` → `decidePermission('plan', DEFAULT_BS_CONFIG.permission, ()=>false, 'browser_click')` = `'ask'`; build mode → `'allow'`.
 
 **Kiểm thử**: `npm test`, `npm run typecheck`.
 **Commit**: `feat(agent): native browser tools with allow-by-default permission`

@@ -26,14 +26,14 @@ rỗng.
 - Browser profile preserve toàn bộ state (cookies, cache, IndexedDB, fingerprint signals) giữa
   login và chat → Cloudflare không thấy fingerprint đổi.
 - Session token được capture đầy đủ (fix bug "auth cookie missing").
-- UI render thông báo challenge bằng tiếng Việt, prefix `[meow]`, hiển thị trong renderer.
+- UI render thông báo challenge bằng tiếng Việt, prefix `[bs]`, hiển thị trong renderer.
 
 ## 3. Phạm vi
 
 ### Trong phạm vi
 - Sửa `src/main/chatgpt-web/{session-store,browser-login,browser-worker,client,manager}.ts`.
 - Thêm IPC channel `EventChatGptWebChallenge` + `onChatGptWebChallenge` API.
-- Renderer subscribe challenge event, render toast (tiếng Việt, prefix `[meow]`).
+- Renderer subscribe challenge event, render toast (tiếng Việt, prefix `[bs]`).
 - Cleanup `browser-profile/` trong `logout()`.
 - Plan doc `2026-08-07-chatgpt-web-provider.md` Task 14 được update với manual smoke steps mới.
 
@@ -55,7 +55,7 @@ rỗng.
 | Fallback | Đóng context cũ → `launchPersistentContext(userDataDir, { headless: false })` → wait 5 phút |
 | Cleanup khi logout | `rmSync` cả `storage-state.json` lẫn `browser-profile/` (recursive) |
 | IPC notifier | Channel mới `EventChatGptWebChallenge`, payload `{ reason: 'cloudflare' \| 'session-expired' }` |
-| UI | Toast/modal trong renderer, tiếng Việt prefix `[meow]` |
+| UI | Toast/modal trong renderer, tiếng Việt prefix `[bs]` |
 | Test | Unit (Vitest) + Manual smoke (Task 14); không E2E |
 
 ## 5. Kiến trúc & luồng dữ liệu
@@ -109,7 +109,7 @@ runChatGptWebTurn:
       await page.waitForSelector(SELECTORS.composer, 5min) // user giải challenge
       // ... retry flow ...
     } else if (page.url().includes('/auth/login')) {
-      throw new Error('[meow] Phiên đăng nhập ChatGPT đã hết hạn...')
+      throw new Error('[bs] Phiên đăng nhập ChatGPT đã hết hạn...')
     } else {
       throw err
     }
@@ -172,7 +172,7 @@ chatGptWeb = new ChatGptWebManager(userDataDir, {
 | `src/shared/ipc.ts` | Thêm `EventChatGptWebChallenge`, `ChallengeReason`, `ChallengeEvent`, `onChatGptWebChallenge` |
 | `src/main/index.ts` | Khởi tạo `ChatGptWebManager(userDataDir, { notifyChallenge })` với callback gọi `webContents.send`. Handler IPC cho `EventChatGptWebChallenge` không cần (chỉ send từ main) |
 | `src/preload/index.ts` | Expose `onChatGptWebChallenge` qua `contextBridge` |
-| Renderer (nơi có alert UI) | Subscribe `window.api.onChatGptWebChallenge`, render toast tiếng Việt prefix `[meow]` |
+| Renderer (nơi có alert UI) | Subscribe `window.api.onChatGptWebChallenge`, render toast tiếng Việt prefix `[bs]` |
 | `docs/superpowers/plans/2026-08-07-chatgpt-web-provider.md` | Update Task 14 manual smoke test với steps mới (xem §10) |
 | `tests/unit/chatgpt-web/` (nếu chưa có) | Vitest cho `manager`, `runChatGptWebTurn` với mock page |
 
@@ -216,14 +216,14 @@ export async function runChatGptWebTurn(
 
 ## 9. Xử lý lỗi
 
-| # | Tình huống | Message (tiếng Việt, prefix `[meow]`) | Hành động |
+| # | Tình huống | Message (tiếng Việt, prefix `[bs]`) | Hành động |
 |---|---|---|---|
-| E1 | CF challenge khi chat headless | `[meow] Cloudflare cần xác minh. Vui lòng giải trong cửa sổ Chrome vừa mở.` | Fallback visible, retry với timeout 5 phút |
-| E2 | User không giải trong 5 phút | `[meow] Cloudflare challenge không được giải. Vui lòng thử lại.` | Throw, kết thúc turn |
-| E3 | URL = `/auth/login` sau khi pass CF | `[meow] Phiên đăng nhập ChatGPT đã hết hạn. Vui lòng đăng nhập lại từ Settings.` | Throw, kết thúc turn |
-| E4 | Browser profile locked | `[meow] ChatGPT Web provider đang bận. Vui lòng thử lại sau.` | Throw nếu `err.message.includes('already in use')` |
-| E5 | `storage-state.json` corrupted | `[meow] Stored session bị lỗi. Vui lòng đăng nhập lại từ Settings.` | Catch trong `createChatGptWebPage`, throw |
-| E6 | Chrome version cũ | `[meow] Chrome của bạn quá cũ. Vui lòng cập nhật hoặc chọn Chrome khác trong Settings.` | Catch `chromium.launch` error, throw |
+| E1 | CF challenge khi chat headless | `[bs] Cloudflare cần xác minh. Vui lòng giải trong cửa sổ Chrome vừa mở.` | Fallback visible, retry với timeout 5 phút |
+| E2 | User không giải trong 5 phút | `[bs] Cloudflare challenge không được giải. Vui lòng thử lại.` | Throw, kết thúc turn |
+| E3 | URL = `/auth/login` sau khi pass CF | `[bs] Phiên đăng nhập ChatGPT đã hết hạn. Vui lòng đăng nhập lại từ Settings.` | Throw, kết thúc turn |
+| E4 | Browser profile locked | `[bs] ChatGPT Web provider đang bận. Vui lòng thử lại sau.` | Throw nếu `err.message.includes('already in use')` |
+| E5 | `storage-state.json` corrupted | `[bs] Stored session bị lỗi. Vui lòng đăng nhập lại từ Settings.` | Catch trong `createChatGptWebPage`, throw |
+| E6 | Chrome version cũ | `[bs] Chrome của bạn quá cũ. Vui lòng cập nhật hoặc chọn Chrome khác trong Settings.` | Catch `chromium.launch` error, throw |
 | E7 | Không tìm thấy Chrome | `"No Chrome installation found. Set a custom Chrome path in Settings."` | Đã có sẵn ở `resolveChromeExecutablePath` |
 | E8 | userData dir không writable | Error từ `launchPersistentContext`, bubble lên UI | Không wrap |
 | E9 | Network fail giữa turn | Error từ page operations, AbortSignal + poll deadline | Đã có sẵn |
@@ -255,7 +255,7 @@ File mới: `tests/unit/chatgpt-web/manager.test.ts`, `tests/unit/chatgpt-web/br
 3. Xóa `storage-state.json` thủ công nhưng giữ `browser-profile/` → gửi message → vẫn work
    (cookies trong profile vẫn còn, ephemeral context load từ profile).
 4. Test fallback: corrupt cookies trong profile (`browser-profile/Cookies` rỗng) → gửi message →
-   Chrome visible pop up + toast `[meow] Cloudflare cần xác minh` → giải → chat tiếp tục.
+   Chrome visible pop up + toast `[bs] Cloudflare cần xác minh` → giải → chat tiếp tục.
 5. Logout từ Settings → verify cả `storage-state.json` lẫn `browser-profile/` bị xóa.
 6. Login lại → verify `browser-profile/` mới được tạo.
 
@@ -274,7 +274,7 @@ File mới: `tests/unit/chatgpt-web/manager.test.ts`, `tests/unit/chatgpt-web/br
       `#prompt-textarea`).
 - [ ] Fallback visible kích hoạt khi cookies bị corrupt, user giải được challenge, chat tiếp tục.
 - [ ] Logout xóa sạch cả JSON lẫn profile directory.
-- [ ] Toast tiếng Việt prefix `[meow]` hiển thị trong renderer khi fallback.
+- [ ] Toast tiếng Việt prefix `[bs]` hiển thị trong renderer khi fallback.
 - [ ] Plan doc Task 14 được update với manual smoke mới.
 
 ## 12. Rủi ro & mở rộng tương lai

@@ -4,7 +4,7 @@ Trạng thái: chờ duyệt
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Xây "Model Connections Center" trong meow-coding: quản lý đăng nhập/auth/kết nối nhiều
+**Goal:** Xây "Model Connections Center" trong bs-coding: quản lý đăng nhập/auth/kết nối nhiều
 provider model (Claude, Codex, ChatGPT web, API key vault) + quota monitoring, thay thế cách kết nối
 gõ API key hiện tại. Port cơ chế từ cockpit-tools theo spec
 `docs/superpowers/specs/2026-08-21-model-connections-design.md`.
@@ -20,7 +20,7 @@ phần OAuth (dùng `fetch`/`http` Node built-in); `playwright-core` đã có ch
 
 - Spec: `docs/superpowers/specs/2026-08-21-model-connections-design.md` — implement đúng spec.
 - IPC channel mới không hardcode string; chỉ dùng `Channels` từ `src/shared/ipc.ts`.
-- System messages từ main tiếng Việt, prefix `[meow]` (AGENTS.md).
+- System messages từ main tiếng Việt, prefix `[bs]` (AGENTS.md).
 - Chỉ main process đụng secret; renderer chỉ nhận metadata + masked secret.
 - Mỗi task có verification (typecheck hoặc unit test chạy được).
 - Commit nhỏ, mỗi task 1 commit nếu được.
@@ -42,7 +42,7 @@ phần OAuth (dùng `fetch`/`http` Node built-in); `playwright-core` đã có ch
 | `src/main/connections/manager.ts` | Mới | ConnectionsManager + resolveSpawnEnv |
 | `src/main/pty-manager.ts` | Sửa | `start(..., env?)` |
 | `src/main/index.ts` | Sửa | Wire ConnectionsManager + IPC handlers + startAgent env resolution |
-| `src/main/meow-agent-manager.ts` | Sửa | connectProvider lưu vault + keyRef; resolveAgentConfig đọc vault |
+| `src/main/bs-agent-manager.ts` | Sửa | connectProvider lưu vault + keyRef; resolveAgentConfig đọc vault |
 | `src/main/agent/config.ts` | Sửa | ProviderSettings thêm `keyRef`; resolve key từ vault |
 | `src/preload/index.ts` | Sửa | Expose `connections.*` methods |
 | `src/renderer/.../settings/ConnectionsTab.tsx` | Mới | Tab Connections trong SettingsDialog |
@@ -79,7 +79,7 @@ phần OAuth (dùng `fetch`/`http` Node built-in); `playwright-core` đã có ch
   tuỳ `apiBaseUrl`+`apiKeyField`.
 - [x] **T2.2** `src/main/agent/config.ts`: `ProviderSettings` thêm `keyRef?: string`;
   `resolveAgentConfig` nhận dep `getSecret(ref)` và ưu tiên `keyRef` khi resolve apiKey.
-- [x] **T2.3** `src/main/meow-agent-manager.ts`: `connectProvider(providerId, apiKey, baseUrl)` → lưu
+- [x] **T2.3** `src/main/bs-agent-manager.ts`: `connectProvider(providerId, apiKey, baseUrl)` → lưu
   vault (ref `provider:<id>`), set `keyRef`, không giữ apiKey plaintext trong settings; dep
   `connections` được inject (constructor).
 - [x] **T2.4** ProvidersTab.tsx: hiển thị trạng thái key đã lưu + nút "Replace key"/"Disconnect";
@@ -120,7 +120,7 @@ phần OAuth (dùng `fetch`/`http` Node built-in); `playwright-core` đã có ch
     account_id.
   - `mergeAuthFile(baseDir, account)` → đọc `~/.codex/auth.json` (nếu có), merge theo §5.2.1,
     atomic write (temp + rename), backup bản gốc nếu chưa có backup.
-  - `removeAuthAccount()` → restore backup / xoá field meow.
+  - `removeAuthAccount()` → restore backup / xoá field bs.
   - `fetchQuota(tokens)` → `chatgpt.com/backend-api/wham/usage` + `subscriptions` (Bearer + UA).
   - `importAuthJson(json)` — chấp nhận auth.json từ máy khác.
 - [x] **T4.2** Manager: wire codex adapter; `resolveSpawnEnv('codex')` → env `OPENAI_API_KEY` nếu
@@ -143,7 +143,7 @@ phần OAuth (dùng `fetch`/`http` Node built-in); `playwright-core` đã có ch
   (set active), Logout/Remove. Masked secret hiển thị.
 - [x] **T5.4** Register tab trong `SettingsDialog.tsx`.
 - **Verify T5**: typecheck + test pass. Thủ công: login đủ loại, xem quota, switch account, spawn
-  agent dùng đúng account, alert quota hiển thị `[meow]`.
+  agent dùng đúng account, alert quota hiển thị `[bs]`.
 
 ## Phase 6 — Polish + test toàn diện
 

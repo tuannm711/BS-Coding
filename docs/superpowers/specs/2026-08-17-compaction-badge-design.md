@@ -1,10 +1,10 @@
-# Meow Coding — Compaction Badge in Chat Feed — Design
+# BS Coding — Compaction Badge in Chat Feed — Design
 
 Ngày: 2026-08-17 · Trạng thái: đã duyệt với user · Bước: sau brainstorm
 
 ## 1. Mục tiêu
 
-Hiển thị rõ khi session Meow native được compact: một chip "Context compacted" giữa feed, đặt giữa
+Hiển thị rõ khi session BS native được compact: một chip "Context compacted" giữa feed, đặt giữa
 marker "What did we do so far?" và summary, để user nhận biết context cũ đã được tóm tắt.
 
 ## 2. Quyết định đã chốt với user

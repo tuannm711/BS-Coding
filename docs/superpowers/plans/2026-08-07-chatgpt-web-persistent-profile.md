@@ -15,7 +15,7 @@ Trạng thái: chờ duyệt
 - Spec: `docs/superpowers/specs/2026-08-07-chatgpt-web-persistent-profile-design.md` — mọi task dưới đây implement đúng theo spec.
 - Giữ nguyên hành vi các provider khác (anthropic, openai-compatible, ...).
 - IPC channel mới **không hardcode** string; chỉ dùng `Channels` từ `src/shared/ipc.ts`.
-- System messages tiếng Việt, prefix `[meow]` (theo AGENTS.md).
+- System messages tiếng Việt, prefix `[bs]` (theo AGENTS.md).
 - File path trong test/code dùng forward slash (`path.join` trong code).
 - Mỗi task có verification step (typecheck hoặc test chạy được).
 - Commit nhỏ, mỗi task 1 commit nếu có thể.
@@ -32,7 +32,7 @@ Trạng thái: chờ duyệt
 | `src/shared/ipc.ts` | Sửa | Thêm `EventChatGptWebChallenge`, `ChallengeReason`, `ChallengeEvent`, `onChatGptWebChallenge` |
 | `src/main/index.ts` | Sửa | Khởi tạo `ChatGptWebManager` với `notifyChallenge` callback |
 | `src/preload/index.ts` | Sửa | Expose `onChatGptWebChallenge` qua `contextBridge` |
-| `src/renderer/src/...` (nơi có alert/notification UI) | Sửa | Subscribe challenge event, render toast tiếng Việt `[meow]` |
+| `src/renderer/src/...` (nơi có alert/notification UI) | Sửa | Subscribe challenge event, render toast tiếng Việt `[bs]` |
 | `docs/superpowers/plans/2026-08-07-chatgpt-web-provider.md` | Sửa | Update Task 14 manual smoke test với 6 steps mới |
 | `tests/unit/chatgpt-web/manager.test.ts` | Mới | Unit test cho `manager` |
 | `tests/unit/chatgpt-web/browser-worker.test.ts` | Mới | Unit test cho fallback logic |
@@ -274,7 +274,7 @@ Trạng thái: chờ duyệt
       return runTurnBody(page, recreate, prompt, effort, signal, options)
     }
     if (isTimeout && page.url().includes('/auth/login')) {
-      throw new Error('[meow] Phiên đăng nhập ChatGPT đã hết hạn. Vui lòng đăng nhập lại từ Settings.')
+      throw new Error('[bs] Phiên đăng nhập ChatGPT đã hết hạn. Vui lòng đăng nhập lại từ Settings.')
     }
     throw err
   }
@@ -469,7 +469,7 @@ Trạng thái: chờ duyệt
 - [ ] Test case 1 — `login()` gọi `loginToChatGptWeb` với `userDataDir`:
   ```ts
   it('login() passes userDataDir to loginToChatGptWeb', async () => {
-    const dir = mkdtempSync(path.join(tmpdir(), 'meow-mgr-'))
+    const dir = mkdtempSync(path.join(tmpdir(), 'bs-mgr-'))
     const loginFn = vi.fn(async () => ({ authenticated: true, verifiedAt: new Date().toISOString() }))
     const mgr = new ChatGptWebManager(dir, { login: loginFn })
 
@@ -484,7 +484,7 @@ Trạng thái: chờ duyệt
 - [ ] Test case 2 — `logout()` xóa cả JSON lẫn profile:
   ```ts
   it('logout() removes storage-state.json and browser-profile/', () => {
-    const dir = mkdtempSync(path.join(tmpdir(), 'meow-mgr-'))
+    const dir = mkdtempSync(path.join(tmpdir(), 'bs-mgr-'))
     const profileDir = path.join(dir, 'browser-profile')
     require('node:fs').mkdirSync(profileDir, { recursive: true })
     require('node:fs').writeFileSync(path.join(dir, 'storage-state.json'), '{}')
@@ -525,9 +525,9 @@ Trạng thái: chờ duyệt
   })
   ```
 - [ ] Đảm bảo `BrowserWindow` và `Channels` đã được import.
-- [ ] Tìm nơi `chatGptWeb` được truyền cho `meowAgent` (khoảng dòng 66). Truyền thêm `notifyChallenge` xuống `createChatGptWebLlmClient` nếu cần — kiểm tra `meowAgent` có dùng `chatGptWeb.getSessionStore()` hay không. Nếu có, xem cách wire sao cho `notifyChallenge` đến được `client.ts`.
-- [ ] **Note**: `client.ts` không tự wire `notifyChallenge` — nó nhận qua constructor deps. Cần xem cách `meow-agent-manager.ts` (hoặc nơi tạo `LlmClient`) truyền deps. Có thể cần thêm wiring ở `meow-agent-manager.ts` — không nằm trong scope của plan này, **defer**: thêm `notifyChallenge` qua một module-level setter hoặc `ChatGptWebManager.getSessionStore()` accessor trả về store + notifier bundle.
-- [ ] **Quyết định cuối**: Thêm method `ChatGptWebManager.createLlmClient()` thay vì để `meow-agent-manager` tự gọi `createChatGptWebLlmClient`. Method này đóng gói cả `store` lẫn `notifyChallenge`. Sửa `meow-agent-manager.ts` để gọi `chatGptWeb.createLlmClient()` thay vì `createChatGptWebLlmClient(store)` (nếu hiện tại nó gọi như vậy — kiểm tra).
+- [ ] Tìm nơi `chatGptWeb` được truyền cho `bsAgent` (khoảng dòng 66). Truyền thêm `notifyChallenge` xuống `createChatGptWebLlmClient` nếu cần — kiểm tra `bsAgent` có dùng `chatGptWeb.getSessionStore()` hay không. Nếu có, xem cách wire sao cho `notifyChallenge` đến được `client.ts`.
+- [ ] **Note**: `client.ts` không tự wire `notifyChallenge` — nó nhận qua constructor deps. Cần xem cách `bs-agent-manager.ts` (hoặc nơi tạo `LlmClient`) truyền deps. Có thể cần thêm wiring ở `bs-agent-manager.ts` — không nằm trong scope của plan này, **defer**: thêm `notifyChallenge` qua một module-level setter hoặc `ChatGptWebManager.getSessionStore()` accessor trả về store + notifier bundle.
+- [ ] **Quyết định cuối**: Thêm method `ChatGptWebManager.createLlmClient()` thay vì để `bs-agent-manager` tự gọi `createChatGptWebLlmClient`. Method này đóng gói cả `store` lẫn `notifyChallenge`. Sửa `bs-agent-manager.ts` để gọi `chatGptWeb.createLlmClient()` thay vì `createChatGptWebLlmClient(store)` (nếu hiện tại nó gọi như vậy — kiểm tra).
 - [ ] Chạy `npm run typecheck` — phải pass.
 
 **Verify:** `npm run typecheck` exit 0.
@@ -574,12 +574,12 @@ Trạng thái: chờ duyệt
   ```ts
   useEffect(() => {
     return window.api.onChatGptWebChallenge((e) => {
-      // Render toast tiếng Việt prefix [meow]
+      // Render toast tiếng Việt prefix [bs]
       showToast({
         kind: 'warning',
         message: e.reason === 'cloudflare'
-          ? '[meow] Cloudflare cần xác minh. Vui lòng giải trong cửa sổ Chrome vừa mở.'
-          : '[meow] Phiên đăng nhập ChatGPT đã hết hạn. Vui lòng đăng nhập lại từ Settings.'
+          ? '[bs] Cloudflare cần xác minh. Vui lòng giải trong cửa sổ Chrome vừa mở.'
+          : '[bs] Phiên đăng nhập ChatGPT đã hết hạn. Vui lòng đăng nhập lại từ Settings.'
       })
     })
   }, [])
@@ -590,7 +590,7 @@ Trạng thái: chờ duyệt
 
 **Verify:** `npm run typecheck` exit 0, `npm run build` exit 0.
 
-**Commit:** `feat(chatgpt-web): renderer shows [meow] toast on challenge event`
+**Commit:** `feat(chatgpt-web): renderer shows [bs] toast on challenge event`
 
 ---
 
@@ -606,7 +606,7 @@ Trạng thái: chờ duyệt
   1. App mới cài → Settings → Login → Chrome visible → login thủ công → đóng → verify `storage-state.json` + `browser-profile/Cookies` tồn tại.
   2. Gửi message qua chatgpt-web → chat mở headless → response về.
   3. Xóa `storage-state.json`, giữ `browser-profile/` → gửi message → vẫn work (profile là source of truth).
-  4. Corrupt `browser-profile/Cookies` → gửi message → Chrome visible pop up + toast `[meow] Cloudflare cần xác minh` → giải → chat tiếp tục.
+  4. Corrupt `browser-profile/Cookies` → gửi message → Chrome visible pop up + toast `[bs] Cloudflare cần xác minh` → giải → chat tiếp tục.
   5. Logout → verify cả JSON lẫn profile bị xóa.
   6. Login lại → verify `browser-profile/` mới được tạo.
 - [ ] Commit riêng cho plan doc update.

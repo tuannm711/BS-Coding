@@ -1,4 +1,4 @@
-# Meow Coding — Sub-agent model theo vai trò (Role-based sub-agent models): Design Spec
+# BS Coding — Sub-agent model theo vai trò (Role-based sub-agent models): Design Spec
 
 Ngày: 2026-08-19 · Trạng thái: chờ duyệt
 
@@ -24,7 +24,7 @@ tech: sub-agent là một *tool* main chủ động gọi, việc delegate thu�
 
 ## 2. Phạm vi
 
-- Chỉ áp dụng cho **Meow agent built-in** (không đụng external CLI agents: opencode, Claude Code, aider).
+- Chỉ áp dụng cho **BS agent built-in** (không đụng external CLI agents: opencode, Claude Code, aider).
 - Chỉ 3 loại sub-agent hiện có: `research` | `general` | `reviewer` (định nghĩa trong
   `SUBAGENT_CONFIGS`, `src/main/agent/tools/task.ts`).
 - **Ngoài phạm vi** (follow-up riêng nếu cần): `Command.model` (model theo slash-command, field đã có
@@ -34,19 +34,19 @@ tech: sub-agent là một *tool* main chủ động gọi, việc delegate thu�
 
 | Chủ đề | Quyết định |
 |---|---|
-| Nơi lưu cấu hình | **Global trong settings** (`MeowSettings.subagentModels`) — dùng chung cho mọi agent pane, đúng yêu cầu user: "new agent pane nhận chung 1 settings, không settings riêng" |
+| Nơi lưu cấu hình | **Global trong settings** (`BsSettings.subagentModels`) — dùng chung cho mọi agent pane, đúng yêu cầu user: "new agent pane nhận chung 1 settings, không settings riêng" |
 | Wire format | `Record<SubagentType, ModelRef>` — `ModelRef { provider, model }` (đã tồn tại trong shared types) |
 | Fallback khi chưa cấu hình | Kế thừa model/LLM client của main agent (giữ nguyên hành vi hiện tại — zero break) |
 | Runtime | `createTaskTool` nhận thêm `resolveSubagent(type)`; có cấu hình → resolve provider/model + **tạo LLM client riêng**; không → undefined, kế thừa |
 | UI | Section "Sub-agent models" trong Settings (tab Agents), 3 dòng provider+model picker, mỗi dòng có nút "Use main agent model" để xóa cấu hình |
-| Persistence | `meow.json` — field `subagentModels` top-level; nối qua `configToSettings`/`settingsToConfig` như các field khác |
+| Persistence | `bs.json` — field `subagentModels` top-level; nối qua `configToSettings`/`settingsToConfig` như các field khác |
 
 ## 4. Data model
 
-### 4.1 `src/shared/types.ts` — mở rộng `MeowSettings`
+### 4.1 `src/shared/types.ts` — mở rộng `BsSettings`
 
 ```ts
-export interface MeowSettings {
+export interface BsSettings {
   // ...existing
   subagentModels?: Partial<Record<'research' | 'general' | 'reviewer', ModelRef>>
 }
@@ -57,10 +57,10 @@ export interface MeowSettings {
 > `src/shared/types.ts`. (Quyết định: chuyển `SubagentType` sang shared — renderer cũng cần nó cho UI
 > dropdown, và `Command`/types thuần đã nằm shared.)
 
-### 4.2 `src/main/agent/config.ts` — mở rộng `MeowConfig`
+### 4.2 `src/main/agent/config.ts` — mở rộng `BsConfig`
 
 ```ts
-export interface MeowConfig {
+export interface BsConfig {
   // ...existing
   subagentModels?: Partial<Record<SubagentType, ModelRef>>
 }
@@ -75,7 +75,7 @@ export interface MeowConfig {
 - Provider phải tồn tại trong `cfg.provider`; model phải thuộc `provider.models`. Không hợp lệ →
   coi như chưa cấu hình (fallback main) — **không hard-fail**, vì user có thể đổi provider sau.
 
-## 5. Runtime — `src/main/agent/tools/task.ts` + `meow-agent-manager.ts`
+## 5. Runtime — `src/main/agent/tools/task.ts` + `bs-agent-manager.ts`
 
 Hiện tại `createTaskTool({ llm, model, tools, onBackgroundResult })` — sub agent dùng chung `opts.llm`
 và `opts.model`. Thay đổi:
@@ -110,7 +110,7 @@ const runner = new SessionRunner({
 })
 ```
 
-### 5.2 `meow-agent-manager.ts` — cấp `resolveSubagent`
+### 5.2 `bs-agent-manager.ts` — cấp `resolveSubagent`
 
 Trong `register()` (nơi tạo `taskTool`), xây dựng resolver:
 
@@ -130,7 +130,7 @@ có list agent system prompts):
 - Mỗi row: tên role + dropdown provider + dropdown model (đổ từ `settings.providers`, render động
   theo provider — pattern giống `ModelPicker.tsx`).
 - Nút "Use main agent model" → xóa cấu hình role đó (về fallback).
-- Dữ liệu nằm thẳng trong `MeowSettings.subagentModels` — global, mọi agent pane dùng chung.
+- Dữ liệu nằm thẳng trong `BsSettings.subagentModels` — global, mọi agent pane dùng chung.
 
 ## 7. Kiểm thử
 
@@ -146,6 +146,6 @@ có list agent system prompts):
 - **Mất cache khi khác provider**: sub-agent dùng provider/model khác main → context sub không tận
   dụng cache của main. Chấp nhận — sub-agent context nhỏ, ngắn.
 - **API key thiếu**: nếu sub dùng provider chưa connect → `resolveAgentConfig` trả `apiKey: null` →
-  fallback về main (không crash). Ghi log `[meow]` nếu cần.
+  fallback về main (không crash). Ghi log `[bs]` nếu cần.
 - **Không bắt buộc delegate**: feature chỉ đảm bảo *khi sub chạy thì đúng model*; việc có chạy hay
   không thuộc skill system (đã nêu ở mục 1).

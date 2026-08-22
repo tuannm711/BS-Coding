@@ -10,7 +10,7 @@ Tài liệu theo workflow Superpowers.
 
 ## Quy ước
 
-- Đặt tên file: `YYYY-MM-DD-slug.md` (VD: `2026-08-04-meow-coding-agent-console.md`).
+- Đặt tên file: `YYYY-MM-DD-slug.md` (VD: `2026-08-04-bs-coding-agent-console.md`).
 - Dòng đầu nêu trạng thái (VD: `Trạng thái: chờ duyệt`).
 - Quy trình: brainstorm → spec → plan → thực thi. Cập nhật spec/plan khi có thay đổi quyết định.
 - Khi viết spec/plan mới, tham khảo spec/plan hiện có để giữ nhất quán về format.

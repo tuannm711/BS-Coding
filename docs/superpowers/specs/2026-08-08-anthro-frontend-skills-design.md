@@ -1,4 +1,4 @@
-# Meow Coding — Bundle Anthropic front-end/design skills : Design Spec
+# BS Coding — Bundle Anthropic front-end/design skills : Design Spec
 
 Ngày: 2026-08-08 · Trạng thái: chờ duyệt
 
@@ -6,7 +6,7 @@ Ngày: 2026-08-08 · Trạng thái: chờ duyệt
 
 Nhúng 5 skill front-end/design từ repo công khai [`anthropics/skills`](https://github.com/anthropics/skills)
 (Apache-2.0) vào app giống cách đã làm với **superpowers** (plan
-`2026-08-04-meow-superpowers-bundle.md`): đặt vào `resources/skills/<name>/`, để native Meow agent
+`2026-08-04-bs-superpowers-bundle.md`): đặt vào `resources/skills/<name>/`, để native BS agent
 load qua tool `skill` mà không cần cấu hình gì thêm.
 
 5 skill chọn (toàn bộ nội dung liên quan, copy nguyên vẹn — **không chỉnh sửa**):
@@ -32,7 +32,7 @@ Không tạo sync script (copy một lần theo yêu cầu). Không thêm vào `
 | Sync | Không thêm script; không đóng gói automation tải lại. |
 | Code | **Không đổi** `skill.ts`, `tools/skill.ts`, registry, manager, index.ts, config, packaging. |
 | UI/UX | Không đổi IPC/preload/renderer. |
-| Nhận biết hành vi | Vài skill nhắc claude.ai "artifact" — chỉ là hướng dẫn; agent Meow sẽ ghi file vào workspace thay vì hiển thị artifact. Chấp nhận lệch này. |
+| Nhận biết hành vi | Vài skill nhắc claude.ai "artifact" — chỉ là hướng dẫn; agent BS sẽ ghi file vào workspace thay vì hiển thị artifact. Chấp nhận lệch này. |
 
 ## 3. Kiến trúc / luồng dữ liệu
 

@@ -1,4 +1,4 @@
-# Meow Coding — Custom Title Bar (gộp logo + toolbar + nút cửa sổ) : Design Spec
+# BS Coding — Custom Title Bar (gộp logo + toolbar + nút cửa sổ) : Design Spec
 
 Ngày: 2026-08-06 · Trạng thái: chờ duyệt
 
@@ -46,7 +46,7 @@ IPC mới (Channels + preload, đồng nhất cho cả 3 OS dù chỉ Linux th�
   onWindowMaximizedChange(cb)  → lắng nghe event 'maximize'/'unmaximize' của BrowserWindow
 
 renderer: <TitleBar> (mới, đầu App.tsx, trên .app-body hiện có)
-  ├─ trái: icon mèo nhỏ (resources/logo-mark.png, cắt riêng) + text "Meow Coding"
+  ├─ trái: icon mèo nhỏ (resources/logo-mark.png, cắt riêng) + text "BS Coding"
   ├─ giữa: vùng trống, -webkit-app-region: drag, double-click → toggle maximize
   └─ phải:
        Linux           → 3 nút SVG tự vẽ (no-drag), icon maximize/restore đổi theo isWindowMaximized()
@@ -91,9 +91,9 @@ Thay đổi file:
 
 ## 6. Tiêu chí thành công
 
-- Trên Windows: logo + "Meow Coding" + 3 nút cửa sổ nằm cùng 1 dòng, màu nền đồng bộ `--bg-panel`,
+- Trên Windows: logo + "BS Coding" + 3 nút cửa sổ nằm cùng 1 dòng, màu nền đồng bộ `--bg-panel`,
   Snap Layout (Windows 11) vẫn hoạt động khi hover nút maximize.
-- Trên macOS: logo + "Meow Coding" cùng dòng với traffic-light đã dịch vị trí (màu traffic-light vẫn
+- Trên macOS: logo + "BS Coding" cùng dòng với traffic-light đã dịch vị trí (màu traffic-light vẫn
   là màu gốc macOS — đã thống nhất là giới hạn chấp nhận được).
 - Trên Linux: 3 nút tự vẽ hoạt động đúng (minimize/maximize-restore/close), kéo thả cửa sổ bằng vùng
   trống hoạt động, double-click toggle maximize.

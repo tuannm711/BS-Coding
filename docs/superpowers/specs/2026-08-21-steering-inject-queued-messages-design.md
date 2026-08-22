@@ -21,7 +21,7 @@ instruction in context. This mirrors opencode v2's "steering".
   steering is a v2 feature. Claude Code / Codex docs were JS-rendered (could
   not read); both use queues + explicit Esc interrupt, not auto-steer.
 
-## Current meow-coding behavior
+## Current bs-coding behavior
 
 - `send()` → if running, push to a per-agent queue (`MAX_QUEUE = 5`), emit
   `queue-updated`.
@@ -122,7 +122,7 @@ filter items via existing `replaceItems()` dropping the matching user message.
 | File | Change |
 | --- | --- |
 | `src/main/agent/loop.ts` | `takeSteers` dep + injection at step boundary |
-| `src/main/meow-agent-manager.ts` | wire `takeSteers`, handle remove-injected-message, emit removed event |
+| `src/main/bs-agent-manager.ts` | wire `takeSteers`, handle remove-injected-message, emit removed event |
 | `src/main/agent/session.ts` | `removeMessage()` |
 | `src/main/index.ts` | IPC handler for the removed event if needed |
 | `src/shared/ipc.ts` | `EventMessageRemoved` channel |

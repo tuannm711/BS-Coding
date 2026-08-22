@@ -1,13 +1,13 @@
-# Setup Katalon Studio automation with Meow Coding
+# Setup Katalon Studio automation with BS Coding
 
-Hướng dẫn dành cho **người dùng mới** muốn dùng native Meow agent để viết và chạy
+Hướng dẫn dành cho **người dùng mới** muốn dùng native BS agent để viết và chạy
 test script tự động trên Katalon Studio (Web UI, API, Mobile) qua MCP.
 
 ## Yêu cầu tối thiểu
 
 | Thứ | Điều kiện |
 |---|---|
-| Meow Coding | Đã cài đặt, cấu hình **LLM provider + API key** (Settings → Providers) |
+| BS Coding | Đã cài đặt, cấu hình **LLM provider + API key** (Settings → Providers) |
 | Katalon Studio | **≥ 11.1.0** (bản có MCP server; bản Free license là đủ) |
 | Project Katalon | Một project thật (Test Cases, Object Repository, ...) |
 
@@ -16,7 +16,7 @@ test script tự động trên Katalon Studio (Web UI, API, Mobile) qua MCP.
 ### 1. Cài & mở Katalon Studio
 
 Cài Katalon Studio ≥ 11.1.0, mở project cần làm test. Giữ cửa sổ Studio mở trong
-khi dùng Meow agent (hoặc host MCP standalone qua CLI nếu muốn đóng GUI).
+khi dùng BS agent (hoặc host MCP standalone qua CLI nếu muốn đóng GUI).
 
 ### 2. Bật MCP server trong Katalon Studio
 
@@ -26,9 +26,9 @@ khi dùng Meow agent (hoặc host MCP standalone qua CLI nếu muốn đóng GUI
    `{"url": "http://localhost:33699/..."}`) — đây là nguồn chính xác duy nhất,
    path endpoint có thể khác giữa các phiên bản.
 
-### 3. Thêm MCP server vào Meow Coding
+### 3. Thêm MCP server vào BS Coding
 
-1. Meow Coding → **Settings → MCP tab**.
+1. BS Coding → **Settings → MCP tab**.
 2. Thêm server:
    - Tên: `katalon-studio`
    - URL: giá trị từ nút **Copy** ở bước 2 (mặc định `http://localhost:33699/mcp`)
@@ -42,7 +42,7 @@ khi dùng Meow agent (hoặc host MCP standalone qua CLI nếu muốn đóng GUI
 
 ### 4. Chạy thử
 
-Hỏi agent (native Meow agent):
+Hỏi agent (native BS agent):
 
 - "Liệt kê các tools Katalon có sẵn" — xác nhận MCP connected.
 - "Tạo test case đăng nhập cho project Katalon và chạy thử" — kiểm tra luồng

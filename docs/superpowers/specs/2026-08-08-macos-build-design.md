@@ -1,10 +1,10 @@
-# Meow Coding — macOS build support : Design Spec
+# BS Coding — macOS build support : Design Spec
 
 Ngày: 2026-08-08 · Trạng thái: chờ duyệt
 
 ## 1. Mục tiêu
 
-Thêm khả năng đóng gói macOS cho Meow Coding: `npm run dist:mac` tạo `.dmg` + `.zip` cho cả
+Thêm khả năng đóng gói macOS cho BS Coding: `npm run dist:mac` tạo `.dmg` + `.zip` cho cả
 Apple Silicon (`arm64`) và Intel (`x64`). Chạy trên máy macOS.
 
 ## 2. Quyết định thiết kế
@@ -29,7 +29,7 @@ npm run dist:mac
        ├─ reads build.mac: target dmg/zip, arch x64/arm64
        ├─ icon: moew-coding-logo.png → auto-gen .icns
        ├─ extraResources: resources/skills → skills (kế thừa config chung)
-       └─ release/Meow Coding-<version>-{arm64,x64}.{dmg,zip}
+       └─ release/BS Coding-<version>-{arm64,x64}.{dmg,zip}
 ```
 
 ## 4. Thành phần / file
@@ -57,5 +57,5 @@ npm run dist:mac
 ## 7. Tiêu chí thành công
 
 - `package.json` có `build.mac` đúng schema electron-builder (dmg + zip, x64 + arm64).
-- `npm run dist:mac` chạy được trên macOS, tạo `release/Meow Coding-<ver>-arm64.dmg` + `-x64.dmg` (+ `.zip`).
+- `npm run dist:mac` chạy được trên macOS, tạo `release/BS Coding-<ver>-arm64.dmg` + `-x64.dmg` (+ `.zip`).
 - Không phá build `win`/`linux` hiện có, không phá test/typecheck.

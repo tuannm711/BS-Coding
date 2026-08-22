@@ -4,14 +4,14 @@ Ngày: 2026-08-21 · Trạng thái: chờ duyệt
 
 > Nguồn tham chiếu: `github.com/jlcodes99/cockpit-tools` (Tauri/Rust) — công cụ quản lý đa tài
 > khoản cho các AI IDE/CLI (Codex, Claude, Copilot, Cursor, Windsurf, Trae, Grok, Zed...).
-> Port **concept + cơ chế** sang stack meow-coding: Electron + TypeScript strict + electron-vite +
+> Port **concept + cơ chế** sang stack bs-coding: Electron + TypeScript strict + electron-vite +
 > Vitest + Vercel AI SDK. Không copy code Rust; tái hiện luồng OAuth, account switch/injection,
 > quota monitoring, encrypted vault bằng TS.
 
 ## 1. Mục tiêu
 
 Thay thế cách kết nối "thuần tuý" hiện tại (gõ API key vào config JSON) bằng **Model Connections
-Center**: một nơi quản lý đăng nhập/auth/kết nối tới các nhà cung cấp model mà meow-coding spawn:
+Center**: một nơi quản lý đăng nhập/auth/kết nối tới các nhà cung cấp model mà bs-coding spawn:
 
 - **Claude Code** — đăng nhập OAuth, nhiều account, chuyển đổi account, xem plan/quota.
 - **Codex** — đăng nhập OAuth (auth.openai.com), nhiều account, chuyển đổi (ghi `~/.codex/auth.json`),
@@ -19,10 +19,10 @@ Center**: một nơi quản lý đăng nhập/auth/kết nối tới các nhà c
 - **API key vault** — kho API key mã hoá (safeStorage) cho các provider native (Anthropic, OpenAI,
   Google, OpenAI-compatible, relay), thay cho việc để key plaintext trong settings.
 - **Quota monitoring** — truy vấn plan/usage/period theo account, cảnh báo gần hết hạn qua
-  notification-service (prefix `[meow]`).
+  notification-service (prefix `[bs]`).
 
 > **Ghi chú quyết định:** Tính năng ChatGPT web (provider `chatgpt-web`) đã bị **gỡ hoàn toàn**
-> khỏi meow-coding (theo yêu cầu người dùng) trước khi module Connections được xây — không còn code
+> khỏi bs-coding (theo yêu cầu người dùng) trước khi module Connections được xây — không còn code
 > `src/main/chatgpt-web/`, không còn Channels/IPC, tab Settings, tests tương ứng. ProviderId không bao
 > gồm `chatgpt-web`.
 
@@ -240,14 +240,14 @@ Luồng:
 
 - Switch = **merge** vào file hiện có (giữ các key lạ khác; atomic write qua temp file + rename —
   tái dùng pattern `atomic_write` của cockpit). Trước khi ghi, backup file gốc (nếu không phải do
-  meow tạo) vào `userData/connections/codex/auth.json.backup`.
+  bs tạo) vào `userData/connections/codex/auth.json.backup`.
 - API-key account: `{ "auth_mode": "apikey", "OPENAI_API_KEY": "sk-..." }`.
-- Remove/Logout account đang active → restore backup (nếu có) hoặc xoá field meow đã merge.
+- Remove/Logout account đang active → restore backup (nếu có) hoặc xoá field bs đã merge.
 
 ### 5.3 API key vault (native agent)
 
 - `ConnectionsStore.saveSecret(provider, keyId, secret)` → mã hoá safeStorage, lưu vào vault file.
-- ProviderSettings trong `MeowSettings.providers[]` thêm field `keyRef?: string` (thay vì `apiKey`
+- ProviderSettings trong `BsSettings.providers[]` thêm field `keyRef?: string` (thay vì `apiKey`
   plaintext). `connectProvider()` hiện tại: nếu có apiKey truyền vào → lưu vault + set keyRef; nếu
   chỉ keyRef → giữ nguyên.
 - `resolveAgentConfig()` đọc `keyRef` → vault.getSecret → apiKey thực (chỉ tồn tại trong main
@@ -276,7 +276,7 @@ Luồng:
   + `subscriptions`.
 - Refresh: khi mở Connections tab, sau login/switch, scheduler 45 phút. Chỉ refresh account có token
   còn hạn (skew 5 phút như cockpit); token sắp hết → refresh token trước.
-- Alert: `used/limit >= 0.9` hoặc `remaining < 5%` → `notification-service.show('[meow] Quota ...')`,
+- Alert: `used/limit >= 0.9` hoặc `remaining < 5%` → `notification-service.show('[bs] Quota ...')`,
   cooldown 300 giây/account. Quota lỗi → `quotaError` hiển thị trong UI, không spam.
 
 ## 8. Security
@@ -295,7 +295,7 @@ Luồng:
 - IPC: chỉ dùng `Channels` từ `src/shared/ipc.ts`, không hardcode.
 - Data bền: `userData/` (templates.json, workspaces.json...); log qua `log-manager`.
 - Chỉ main spawn/kill process; renderer qua `window.api`.
-- System messages từ main dùng tiếng Việt, prefix `[meow]`.
+- System messages từ main dùng tiếng Việt, prefix `[bs]`.
 - Không comment thừa; giải thích quyết định phức tạp (OAuth headers, auth.json merge).
 - `npm run typecheck` + `npm test` bắt buộc pass trước khi xong.
 

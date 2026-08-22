@@ -1,11 +1,11 @@
-# Changelog — Meow Coding v0.25.3 → v0.25.4
+# Changelog — BS Coding v0.25.3 → v0.25.4
 
 ## 🚀 New Features
 
 ### Run in background — minimize to tray
-- Closing the window now hides Meow Coding to the system tray (Windows taskbar, macOS menu bar, Linux indicator) instead of quitting — agents, terminals and chat keep running.
-- One-time system notification the first time the window is hidden: "Meow Coding vẫn đang chạy ngầm, click icon tray để mở lại."
-- Tray icon: left-click toggles the window, right-click menu offers **Show Meow Coding** and **Exit** (real quit still runs the full cleanup: agents, PTY sessions, browser bridge).
+- Closing the window now hides BS Coding to the system tray (Windows taskbar, macOS menu bar, Linux indicator) instead of quitting — agents, terminals and chat keep running.
+- One-time system notification the first time the window is hidden: "BS Coding vẫn đang chạy ngầm, click icon tray để mở lại."
+- Tray icon: left-click toggles the window, right-click menu offers **Show BS Coding** and **Exit** (real quit still runs the full cleanup: agents, PTY sessions, browser bridge).
 - Reopening the window restores the exact UI state — nothing is re-hydrated.
 
 ### File viewer — single horizontal scrollbar

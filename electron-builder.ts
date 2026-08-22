@@ -28,14 +28,14 @@ async function signWindows(configuration: { path: string }): Promise<void> {
 }
 
 const config: Configuration = {
-  appId: 'com.meow.coding',
-  productName: 'Meow Coding',
+  appId: 'com.bs.coding',
+  productName: 'BS Coding',
   publish: {
     provider: 'github',
-    owner: 'stardust-bytes',
-    repo: 'meow-coding'
+    owner: 'tuannm711',
+    repo: 'BS-Coding'
   },
-  icon: 'moew-coding-logo.png',
+  icon: 'bs-coding-logo.png',
   directories: {
     output: 'release'
   },
@@ -60,14 +60,14 @@ const config: Configuration = {
     }
   },
   nsis: {
-    artifactName: 'Meow.Coding.Setup.${version}.${ext}',
+    artifactName: 'BS.Coding.Setup.${version}.${ext}',
     oneClick: false,
     allowToChangeInstallationDirectory: true,
     createDesktopShortcut: true,
     createStartMenuShortcut: true
   },
   portable: {
-    artifactName: 'Meow.Coding.${version}.${ext}'
+    artifactName: 'BS.Coding.${version}.${ext}'
   },
   linux: {
     target: [
@@ -76,7 +76,7 @@ const config: Configuration = {
     ],
     icon: 'build/icons',
     category: 'Development',
-    maintainer: 'Meow Coding'
+    maintainer: 'BS Coding'
   },
   mac: {
     target: [
@@ -84,7 +84,7 @@ const config: Configuration = {
       { target: 'zip', arch: ['x64', 'arm64'] }
     ],
     category: 'public.app-category.developer-tools',
-    icon: 'moew-coding-logo.png'
+    icon: 'bs-coding-logo.png'
   }
 }
 

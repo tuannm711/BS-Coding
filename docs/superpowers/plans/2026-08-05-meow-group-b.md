@@ -1,4 +1,4 @@
-# Meow Coding — Group B: Slash Commands, Cost/Stats, File Watcher: Kế hoạch
+# BS Coding — Group B: Slash Commands, Cost/Stats, File Watcher: Kế hoạch
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -12,7 +12,7 @@
 
 - Types: `Command { name, description, template, agent?, model? }` (shared).
 - `CommandStore`: built-ins `/init`, `/review` + user commands `userData/commands.json` +
-  project `project/.meow/commands/*.md` (frontmatter `name/description` + body template).
+  project `project/.bs/commands/*.md` (frontmatter `name/description` + body template).
   API: `list(projectPath)`, `save(command)`, `remove(name)`, `resolve(name, args, cwd)`.
 - `resolveCommandTemplate(template, args)`:
   - `$1..$N` (last slurps remainder), `$ARGUMENTS`, `@path` → gọi `expandReferences` (đã có).

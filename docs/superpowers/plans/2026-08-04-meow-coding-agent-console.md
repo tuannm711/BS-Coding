@@ -1,4 +1,4 @@
-# Meow Coding — Desktop Agent Console: Implementation Plan
+# BS Coding — Desktop Agent Console: Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -8,7 +8,7 @@
 
 **Tech Stack:** Electron, electron-vite, React 19, TypeScript, `@lydell/node-pty` (ConPTY Windows), `@xterm/xterm` + `@xterm/addon-fit`, `tree-kill`, Vitest (unit + integration), Playwright (E2E).
 
-**Spec:** `docs/superpowers/specs/2026-08-04-meow-coding-agent-console-design.md`
+**Spec:** `docs/superpowers/specs/2026-08-04-bs-coding-agent-console-design.md`
 
 ---
 
@@ -67,7 +67,7 @@ Các file sẽ được tạo, với trách nhiệm từng file:
 
 ```json
 {
-  "name": "meow-coding",
+  "name": "bs-coding",
   "version": "0.1.0",
   "private": true,
   "main": "./out/main/index.js",
@@ -196,7 +196,7 @@ function createWindow(): void {
   const win = new BrowserWindow({
     width: 1400,
     height: 900,
-    title: 'Meow Coding',
+    title: 'BS Coding',
     backgroundColor: '#1e1e1e',
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.js'),
@@ -239,7 +239,7 @@ export {}
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'" />
-    <title>Meow Coding</title>
+    <title>BS Coding</title>
   </head>
   <body>
     <div id="root"></div>
@@ -267,7 +267,7 @@ createRoot(document.getElementById('root')!).render(
 
 ```tsx
 export default function App() {
-  return <div className="app">Meow Coding</div>
+  return <div className="app">BS Coding</div>
 }
 ```
 
@@ -303,7 +303,7 @@ body {
 - [ ] **Step 14: Chạy app xác nhận cửa sổ mở**
 
 Run: `npm run dev`
-Expected: cửa sổ Electron mở, hiển thị "Meow Coding", không có lỗi trong console. Nhấn `Ctrl+C` để thoát.
+Expected: cửa sổ Electron mở, hiển thị "BS Coding", không có lỗi trong console. Nhấn `Ctrl+C` để thoát.
 
 - [ ] **Step 15: Commit**
 
@@ -527,7 +527,7 @@ let dir: string
 let file: string
 
 beforeEach(() => {
-  dir = mkdtempSync(path.join(tmpdir(), 'meow-json-'))
+  dir = mkdtempSync(path.join(tmpdir(), 'bs-json-'))
   file = path.join(dir, 'data.json')
 })
 
@@ -739,7 +739,7 @@ let file: string
 let store: WorkspaceStore
 
 beforeEach(() => {
-  const dir = mkdtempSync(path.join(tmpdir(), 'meow-ws-'))
+  const dir = mkdtempSync(path.join(tmpdir(), 'bs-ws-'))
   file = path.join(dir, 'workspaces.json')
   store = new WorkspaceStore(createJsonStore(file))
 })
@@ -885,7 +885,7 @@ let dir: string
 let logs: LogManager
 
 beforeEach(() => {
-  dir = mkdtempSync(path.join(tmpdir(), 'meow-log-'))
+  dir = mkdtempSync(path.join(tmpdir(), 'bs-log-'))
   logs = new LogManager(dir)
 })
 
@@ -1001,7 +1001,7 @@ describe('GitStatusService.get', () => {
   let dir: string
 
   beforeEach(() => {
-    dir = mkdtempSync(path.join(tmpdir(), 'meow-git-'))
+    dir = mkdtempSync(path.join(tmpdir(), 'bs-git-'))
     execFileSync('git', ['init', '-q'], { cwd: dir })
     execFileSync('git', ['config', 'user.email', 't@t'], { cwd: dir })
     execFileSync('git', ['config', 'user.name', 't'], { cwd: dir })
@@ -1010,7 +1010,7 @@ describe('GitStatusService.get', () => {
   afterEach(() => rmSync(dir, { recursive: true, force: true }))
 
   it('returns null when not a git repo', async () => {
-    const notRepo = mkdtempSync(path.join(tmpdir(), 'meow-git-nr-'))
+    const notRepo = mkdtempSync(path.join(tmpdir(), 'bs-git-nr-'))
     try {
       const result = await new GitStatusService().get(notRepo)
       expect(result).toBeNull()
@@ -1578,7 +1578,7 @@ function createWindow(): void {
   win = new BrowserWindow({
     width: 1400,
     height: 900,
-    title: 'Meow Coding',
+    title: 'BS Coding',
     backgroundColor: '#1e1e1e',
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.js'),
@@ -2714,7 +2714,7 @@ import { test, expect, _electron as electron } from '@playwright/test'
 test('app launches and shows the main window', async () => {
   const app = await electron.launch({ args: ['.'] })
   const window = await app.firstWindow()
-  await expect(window).toHaveTitle(/Meow Coding/)
+  await expect(window).toHaveTitle(/BS Coding/)
   await expect(window.locator('.sidebar')).toBeVisible()
   await app.close()
 })
@@ -2752,7 +2752,7 @@ git commit -m "test: playwright e2e smoke"
 - [ ] **Step 1: Tạo `README.md`**
 
 ```markdown
-# Meow Coding
+# BS Coding
 
 Desktop app quản lý nhiều CLI coding agent (opencode, Claude Code, aider, ...) trong các
 pane terminal song song trên một cửa sổ.
