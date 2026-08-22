@@ -4,9 +4,9 @@ import { axTreeToSnapshot, mergeFrameAxTrees } from './ax-snapshot'
 import type { AxFrameBundle, AxNodeLike } from './ax-snapshot'
 
 const DEFAULT_PORT = 3927
-const STORAGE_KEY = 'meowBridge'
+const STORAGE_KEY = 'bsBridge'
 const HEARTBEAT_MS = 20_000
-const ALARM_NAME = 'meow-bridge-keepalive'
+const ALARM_NAME = 'bs-bridge-keepalive'
 
 interface StoredState {
   port?: number
@@ -20,7 +20,7 @@ let reconnectDelay = 1000
 let paired = false
 let pendingCode: string | null = null
 
-const GROUP_TITLE = 'Meow'
+const GROUP_TITLE = 'Bs'
 const GROUP_COLOR = 'blue' as chrome.tabGroups.ColorEnum
 
 let workingTabId: number | null = null
@@ -66,7 +66,7 @@ async function detectPort(): Promise<number> {
       if (typeof body.port === 'number') return body.port
     }
   } catch {
-    // Meow chưa chạy hoặc port khác — dùng default
+    // Bs chưa chạy hoặc port khác — dùng default
   }
   return DEFAULT_PORT
 }
@@ -183,14 +183,14 @@ async function lastFocusedWindowId(): Promise<number | undefined> {
   }
 }
 
-async function meowGroupId(): Promise<number | undefined> {
+async function bsGroupId(): Promise<number | undefined> {
   const groups = await chrome.tabGroups.query({})
   return groups.find(g => g.title === GROUP_TITLE)?.id
 }
 
-function addToMeowGroup(tabId: number): Promise<{ groupId?: number; groupTitle?: string }> {
+function addToBsGroup(tabId: number): Promise<{ groupId?: number; groupTitle?: string }> {
   const run = groupLock.then(async () => {
-    const existing = await meowGroupId()
+    const existing = await bsGroupId()
     const groupId = await chrome.tabs.group({ tabIds: [tabId], ...(existing != null ? { groupId: existing } : {}) })
     await chrome.tabGroups.update(groupId, { title: GROUP_TITLE, color: GROUP_COLOR })
     return { groupId, groupTitle: GROUP_TITLE }
@@ -369,7 +369,7 @@ async function handleCommand(msg: Extract<BridgeToExtension, { type: 'cmd' }>): 
         let group: { groupId?: number; groupTitle?: string } = {}
         if (tab.id != null) {
           try {
-            group = await addToMeowGroup(tab.id)
+            group = await addToBsGroup(tab.id)
           } catch {
             /* group creation failed; the tab itself is still open */
           }
@@ -407,7 +407,7 @@ async function handleCommand(msg: Extract<BridgeToExtension, { type: 'cmd' }>): 
         let group: { groupId?: number; groupTitle?: string } = {}
         if (tab.id != null) {
           try {
-            group = await addToMeowGroup(tab.id)
+            group = await addToBsGroup(tab.id)
           } catch {
             /* group creation failed; the tab itself is still open */
           }

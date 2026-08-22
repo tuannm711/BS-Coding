@@ -9,7 +9,7 @@ describe('TruncationStore', () => {
   let store: TruncationStore
 
   beforeEach(() => {
-    dir = mkdtempSync(path.join(tmpdir(), 'meow-trunc-'))
+    dir = mkdtempSync(path.join(tmpdir(), 'bs-trunc-'))
     store = new TruncationStore(dir)
   })
 

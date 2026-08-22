@@ -22,12 +22,12 @@ describe('websearch tool', () => {
       })
     }))
     vi.stubGlobal('fetch', fetchMock)
-    const r = await websearchTool.run({ query: 'meow coding' }, ctx)
+    const r = await websearchTool.run({ query: 'bs coding' }, ctx)
     expect(r.output).toContain('1. First Result')
     expect(r.output).toContain('https://example.com/1')
     const body = JSON.parse(fetchMock.mock.calls[0][1].body as string)
     expect(body.api_key).toBe('tavily-key')
-    expect(body.query).toBe('meow coding')
+    expect(body.query).toBe('bs coding')
   })
 
   it('reports a missing API key', async () => {

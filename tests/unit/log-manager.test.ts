@@ -8,7 +8,7 @@ let dir: string
 let logs: LogManager
 
 beforeEach(() => {
-  dir = mkdtempSync(path.join(tmpdir(), 'meow-log-'))
+  dir = mkdtempSync(path.join(tmpdir(), 'bs-log-'))
   logs = new LogManager(dir)
 })
 

@@ -8,7 +8,7 @@ let dir: string
 let file: string
 
 beforeEach(() => {
-  dir = mkdtempSync(path.join(tmpdir(), 'meow-json-'))
+  dir = mkdtempSync(path.join(tmpdir(), 'bs-json-'))
   file = path.join(dir, 'data.json')
 })
 

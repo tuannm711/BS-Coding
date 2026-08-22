@@ -577,7 +577,7 @@ describe('SessionRunner', () => {
   })
 
   it('returns nearby AGENTS.md via onFileRead and does not inject a user message', async () => {
-    const dir = mkdtempSync(path.join(tmpdir(), 'meow-loop-agents-'))
+    const dir = mkdtempSync(path.join(tmpdir(), 'bs-loop-agents-'))
     execFileSync('git', ['init', '-q'], { cwd: dir })
     const sub = path.join(dir, 'src')
     mkdirSync(sub)
@@ -618,7 +618,7 @@ describe('SessionRunner', () => {
   })
 
   it('does not re-attach AGENTS.md already attached (cross-message dedupe)', async () => {
-    const dir = mkdtempSync(path.join(tmpdir(), 'meow-loop-agents-'))
+    const dir = mkdtempSync(path.join(tmpdir(), 'bs-loop-agents-'))
     execFileSync('git', ['init', '-q'], { cwd: dir })
     const sub = path.join(dir, 'src')
     mkdirSync(sub)

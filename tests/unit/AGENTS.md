@@ -7,7 +7,7 @@ tests/unit/<file>` for one file).
 ## Conventions
 
 - **Never** call a real LLM API — agent tests use a stub `LlmClient` (`makeManager` in
-  `meow-agent-manager.test.ts`) or `partsQueue` to script outputs.
+  `bs-agent-manager.test.ts`) or `partsQueue` to script outputs.
 - `ipc-contract.test.ts` guards the contract: every `AgentApi` method must exist, every channel
   string is asserted. **Update it whenever the IPC contract changes.**
 - Keep tests hermetic: temp dirs via `mkdtempSync(tmpdir())` + cleanup in `afterEach`/`finally`.

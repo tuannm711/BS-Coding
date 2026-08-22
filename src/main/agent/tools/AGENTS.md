@@ -1,6 +1,6 @@
 # AGENTS.md — src/main/agent/tools
 
-The tool registry for the native Meow agent. Each file exports a `ToolDefinition`
+The tool registry for the native Bs agent. Each file exports a `ToolDefinition`
 (`name`, `description`, `schema` (zod), `run`) — see `types.ts`. Tools are executed by
 `SessionRunner` (`../loop.ts`) and permission-gated via `decidePermission` (`../permission.ts`).
 
@@ -9,7 +9,7 @@ The tool registry for the native Meow agent. Each file exports a `ToolDefinition
 | File | Responsibility |
 |---|---|
 | `types.ts` | `ToolDefinition` interface + `ToolSchema` type — the contract every tool implements. |
-| `registry.ts` | `createDefaultTools()` — the default tool map handed to `MeowAgentManager`. |
+| `registry.ts` | `createDefaultTools()` — the default tool map handed to `BsAgentManager`. |
 | `bash.ts` | Runs shell commands (Windows: wraps via git-bash fallback; kills process tree on timeout). |
 | `edit.ts` | Line-based file edit (old_string/new_string) with safety checks. |
 | `write.ts` | Write/overwrite a file. |
@@ -34,4 +34,4 @@ The tool registry for the native Meow agent. Each file exports a `ToolDefinition
 - Each tool is a plain object matching `ToolDefinition`; `schema` is a zod type with a `.parse()`.
 - Never spawn/kill processes directly from the renderer — only tools in this folder (main process) may do so.
 - `bash` on Windows: prefer Git Bash (`gitBashPath`/`buildShellCommand`), fall back to `cmd.exe` — do not break that logic.
-- Add new tools to `registry.ts` and to `DEFAULT_MEOW_CONFIG.permission` in `../config.ts`.
+- Add new tools to `registry.ts` and to `DEFAULT_BS_CONFIG.permission` in `../config.ts`.

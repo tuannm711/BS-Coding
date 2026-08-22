@@ -10,7 +10,7 @@ let dir: string
 let ctx: ToolContext
 
 beforeEach(() => {
-  dir = mkdtempSync(path.join(tmpdir(), 'meow-git-tool-'))
+  dir = mkdtempSync(path.join(tmpdir(), 'bs-git-tool-'))
   ctx = { cwd: dir, ask: async () => null }
   execFileSync('git', ['init', '-q'], { cwd: dir })
   execFileSync('git', ['config', 'user.email', 't@t'], { cwd: dir })
@@ -92,7 +92,7 @@ describe('git tool', () => {
   })
 
   it('does not ENOENT when the cwd is missing', async () => {
-    const missing = path.join(tmpdir(), 'meow-git-missing-' + Date.now())
+    const missing = path.join(tmpdir(), 'bs-git-missing-' + Date.now())
     const r = await gitTool.run({ args: 'status' }, { cwd: missing, ask: async () => null })
     expect(r.error).toBeTruthy()
     expect(r.error).not.toMatch(/ENOENT/)

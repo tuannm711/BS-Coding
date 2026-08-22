@@ -8,7 +8,7 @@ import type { ToolContext } from '../../src/main/agent/tools/types'
 let dir: string
 
 beforeEach(() => {
-  dir = mkdtempSync(path.join(tmpdir(), 'meow-tools-'))
+  dir = mkdtempSync(path.join(tmpdir(), 'bs-tools-'))
 })
 
 afterEach(() => rmSync(dir, { recursive: true, force: true }))
@@ -28,8 +28,8 @@ describe('loadUserTools', () => {
     const tools = await loadUserTools([dir])
     expect(tools).toHaveLength(1)
     expect(tools[0].name).toBe('greet')
-    const r = await tools[0].run({ who: 'meow' }, ctx)
-    expect(r.output).toBe('hello meow')
+    const r = await tools[0].run({ who: 'bs' }, ctx)
+    expect(r.output).toBe('hello bs')
   })
 
   it('derives the name from the filename when missing', async () => {

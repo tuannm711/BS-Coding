@@ -1,4 +1,4 @@
-const STORAGE_KEY = 'meowBridge'
+const STORAGE_KEY = 'bsBridge'
 const DEFAULT_PORT = 3927
 
 function $(id: string): HTMLElement {
@@ -32,12 +32,12 @@ async function detect(): Promise<void> {
     if (res.ok) {
       const body = await res.json() as { port?: number }
       if (typeof body.port === 'number') portInput.value = String(body.port)
-      $('hint').textContent = `Detected Meow bridge on port ${body.port}.`
+      $('hint').textContent = `Detected Bs bridge on port ${body.port}.`
     } else {
       $('hint').textContent = 'Không tìm thấy bridge tại port mặc định.'
     }
   } catch {
-    $('hint').textContent = 'Meow chưa chạy? Không kết nối được bridge.'
+    $('hint').textContent = 'Bs chưa chạy? Không kết nối được bridge.'
   }
 }
 

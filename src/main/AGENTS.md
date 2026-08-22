@@ -7,7 +7,7 @@ handlers và vòng đời app.
 
 - `index.ts` — `MainApp` điều phối toàn bộ: setState, forward sự kiện `pty:data`/`agent:state`/
   `git:status` ra renderer; `registerIpcHandlers`; window lifecycle; `before-quit` → `pty.stopAll()`.
-- `meow-agent-manager.ts` — `MeowAgentManager`: orchestrate agent chat loop, sessions, commands,
+- `bs-agent-manager.ts` — `BsAgentManager`: orchestrate agent chat loop, sessions, commands,
   permissions, subagents, MCP/user tools, stats, settings. Nơi duy nhất điều phối native agent.
 - `pty-manager.ts` — wrapper node-pty, phát sự kiện `data`/`exit`. `buildSpawnCommand` bọc lệnh
   non-`.exe` qua `cmd.exe` trên Windows (ConPTY không spawn được `.cmd` shim trực tiếp). Dùng
@@ -39,7 +39,7 @@ handlers và vòng đời app.
   trong `src/shared/ipc.ts`.
 - Thêm IPC: thêm channel vào `Channels` + method vào `AgentApi` (`src/shared/ipc.ts`), handler trong
   `registerIpcHandlers`, triển khai tương ứng trong preload. Không hardcode channel string.
-- Khi agent exit: chèn hint tiếng Việt prefix `[meow]` nếu thoát lỗi (code ≠ 0) và không có output.
+- Khi agent exit: chèn hint tiếng Việt prefix `[bs]` nếu thoát lỗi (code ≠ 0) và không có output.
 - Tránh để process mồ côi: mọi path stop đều đi qua `tree-kill`; kiểm tra sau khi đổi logic stop.
 
 ## Kiểm thử
@@ -47,7 +47,7 @@ handlers và vòng đời app.
 - Unit: `tests/unit/` — một file test cho một module: pty-spawn-command, terminal-shell,
   window-chrome, updater, models-catalog, model-variants, notification-service, file-suggest,
   file-watcher, git-status-service, alert-service, json-store, log-manager, template-manager,
-  workspace-store, meow-agent-manager, ipc-contract, ...
+  workspace-store, bs-agent-manager, ipc-contract, ...
 - Integration: `tests/integration/pty-manager.test.ts` (spawn thật qua ConPTY, dùng fixture CLI),
   `agent-stream-overlap.test.ts`, `browser/bridge-flow.test.ts`.
 - Chạy: `npm run typecheck`, `npm test`.

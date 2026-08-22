@@ -31,7 +31,7 @@ export default function Sidebar({
   const [openProjectMenu, setOpenProjectMenu] = useState<string | null>(null)
   const [projectMenuPos, setProjectMenuPos] = useState<{ x: number; y: number } | null>(null)
   const [error, setError] = useState('')
-  const [collapsed, setCollapsed] = useState(() => localStorage.getItem('meow.sidebar.collapsed') === '1')
+  const [collapsed, setCollapsed] = useState(() => localStorage.getItem('bs.sidebar.collapsed') === '1')
   const [footerMenuOpen, setFooterMenuOpen] = useState(false)
   const [footerMenuPos, setFooterMenuPos] = useState<{ x: number; bottom: number } | null>(null)
   const [version, setVersion] = useState('')
@@ -41,7 +41,7 @@ export default function Sidebar({
   }, [])
 
   useEffect(() => {
-    localStorage.setItem('meow.sidebar.collapsed', collapsed ? '1' : '0')
+    localStorage.setItem('bs.sidebar.collapsed', collapsed ? '1' : '0')
   }, [collapsed])
 
   useEffect(() => {

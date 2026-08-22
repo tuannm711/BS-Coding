@@ -9,7 +9,7 @@ import type { ToolContext } from '../../src/main/agent/tools/types'
 let dir: string
 
 beforeEach(() => {
-  dir = mkdtempSync(path.join(tmpdir(), 'meow-skill-'))
+  dir = mkdtempSync(path.join(tmpdir(), 'bs-skill-'))
 })
 
 afterEach(() => rmSync(dir, { recursive: true, force: true }))
@@ -18,7 +18,7 @@ const ctx: ToolContext = { cwd: '', ask: async () => null }
 
 describe('skills', () => {
   it('parses frontmatter and loads .md skill files', () => {
-    const skillsDir = path.join(dir, '.meow', 'skills')
+    const skillsDir = path.join(dir, '.bs', 'skills')
     mkdirSync(skillsDir, { recursive: true })
     writeFileSync(path.join(skillsDir, 'refactor.md'), [
       '---',
@@ -54,7 +54,7 @@ describe('skills', () => {
   it('collects project skills and dedupes by name', () => {
     const userDir = path.join(dir, 'user-skills')
     const projDir = path.join(dir, 'proj')
-    const projSkills = path.join(projDir, '.meow', 'skills')
+    const projSkills = path.join(projDir, '.bs', 'skills')
     mkdirSync(userDir, { recursive: true })
     mkdirSync(projSkills, { recursive: true })
     writeFileSync(path.join(userDir, 'shared.md'), '---\nname: shared\ndescription: a\n---\nuser\n')
@@ -79,7 +79,7 @@ describe('skills', () => {
   })
 
   it('skill tool returns the skill content and errors on unknown', async () => {
-    const skillsDir = path.join(dir, '.meow', 'skills')
+    const skillsDir = path.join(dir, '.bs', 'skills')
     mkdirSync(skillsDir, { recursive: true })
     writeFileSync(path.join(skillsDir, 'refactor.md'), '---\nname: refactor\ndescription: guides\n---\nrun tests\n')
     ctx.cwd = dir

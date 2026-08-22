@@ -8,7 +8,7 @@ const FIXTURE = path.join(__dirname, '..', 'fixtures', 'echo-agent.js')
 
 describe('PtyManager windows shim spawn', () => {
   it.skipIf(process.platform !== 'win32')('runs a bare npm-style .cmd shim command', async () => {
-    const dir = mkdtempSync(path.join(tmpdir(), 'meow-shim-'))
+    const dir = mkdtempSync(path.join(tmpdir(), 'bs-shim-'))
     const managers: PtyManager[] = []
     const originalPath = process.env.PATH
     try {
@@ -145,7 +145,7 @@ describe('PtyManager', () => {
   it('startTerminal spawns a real shell and tracks it as terminal', async () => {
     const pty = new PtyManager()
     managers.push(pty)
-    const dir = mkdtempSync(path.join(tmpdir(), 'meow-term-'))
+    const dir = mkdtempSync(path.join(tmpdir(), 'bs-term-'))
     const shell = process.platform === 'win32' ? 'cmd.exe' : '/bin/sh'
     const id = 'term1'
     const data: string[] = []
@@ -177,7 +177,7 @@ describe('PtyManager', () => {
   it('terminal exit events carry kind: terminal', async () => {
     const pty = new PtyManager()
     managers.push(pty)
-    const dir = mkdtempSync(path.join(tmpdir(), 'meow-term-exit-'))
+    const dir = mkdtempSync(path.join(tmpdir(), 'bs-term-exit-'))
     const shell = process.platform === 'win32' ? 'cmd.exe' : '/bin/sh'
     const id = 'term-exit-1'
     const exited: { agentId: string; exitCode: number; kind?: 'agent' | 'terminal' }[] = []

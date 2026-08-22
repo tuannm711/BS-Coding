@@ -147,7 +147,7 @@ export class RemoteManager {
         type: 'agent:state',
         agentId: e.agentId,
         running: true,
-        background: this.deps.context.meowAgent.isBackground(e.agentId)
+        background: this.deps.context.bsAgent.isBackground(e.agentId)
       }
     }
     if (e.type === 'done' || e.type === 'error') {
@@ -155,7 +155,7 @@ export class RemoteManager {
         type: 'agent:state',
         agentId: e.agentId,
         running: false,
-        background: this.deps.context.meowAgent.isBackground(e.agentId)
+        background: this.deps.context.bsAgent.isBackground(e.agentId)
       }
     }
     return { type: 'chat:event', event: e }

@@ -9,7 +9,7 @@ let file: string
 let store: WorkspaceStore
 
 beforeEach(() => {
-  const dir = mkdtempSync(path.join(tmpdir(), 'meow-ws-'))
+  const dir = mkdtempSync(path.join(tmpdir(), 'bs-ws-'))
   file = path.join(dir, 'workspaces.json')
   store = new WorkspaceStore(createJsonStore(file))
 })
@@ -57,7 +57,7 @@ describe('WorkspaceStore', () => {
 
   it('updates an agent mode', () => {
     store.add('/proj/a', 'Project A')
-    const ws = store.addAgent('/proj/a', { name: 'meow', templateId: 'meow', cwd: '/proj/a', kind: 'native' })
+    const ws = store.addAgent('/proj/a', { name: 'bs', templateId: 'bs', cwd: '/proj/a', kind: 'native' })
     const agentId = ws.agents[0].id
     store.updateAgent('/proj/a', agentId, { mode: 'plan' })
     expect(store.get('/proj/a')?.agents[0].mode).toBe('plan')

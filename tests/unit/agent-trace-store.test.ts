@@ -9,7 +9,7 @@ describe('TraceStore', () => {
   let store: TraceStore
 
   beforeEach(() => {
-    dir = mkdtempSync(path.join(tmpdir(), 'meow-trace-'))
+    dir = mkdtempSync(path.join(tmpdir(), 'bs-trace-'))
     store = new TraceStore(dir)
   })
 

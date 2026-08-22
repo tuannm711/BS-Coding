@@ -45,7 +45,7 @@ export default function TitleBar({ panelOpen, onTogglePanel }: Props) {
     >
       <div className="title-bar-brand">
         <img src={logoMark} className="title-bar-logo" alt="" />
-        <span className="title-bar-title">Meow Coding</span>
+        <span className="title-bar-title">BS Coding</span>
 
       </div>
       <div className="title-bar-right">

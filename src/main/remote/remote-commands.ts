@@ -1,4 +1,4 @@
-import type { MeowAgentManager } from '../meow-agent-manager'
+import type { BsAgentManager } from '../bs-agent-manager'
 import type { PromptResponse } from '../../shared/types'
 import type { WorkspaceStore } from '../workspace-store'
 import type { RemoteCommandName, RemoteCmdResult } from '../../shared/remote-types'
@@ -6,7 +6,7 @@ import type { RemoteCommandName, RemoteCmdResult } from '../../shared/remote-typ
 export type RemoteCommandResult = Omit<RemoteCmdResult, 'type' | 'id'>
 
 export interface RemoteCommandContext {
-  meowAgent: Pick<MeowAgentManager, 'listAgents' | 'listSessions' | 'createSession' | 'switchSession' |
+  bsAgent: Pick<BsAgentManager, 'listAgents' | 'listSessions' | 'createSession' | 'switchSession' |
     'renameSession' | 'listMessages' | 'send' | 'respondPrompt' | 'runCommand' |
     'listCommands' | 'isRunning' | 'isBackground'>
   workspaceStore: Pick<WorkspaceStore, 'list'>
@@ -22,7 +22,7 @@ export async function dispatchRemoteCommand(
   const agentId = typeof params.agentId === 'string' ? params.agentId : undefined
   const agentError = (): { ok: false; error: string } | null => {
     if (!agentId) return { ok: false, error: 'missing required param: agentId' }
-    if (!ctx.meowAgent.listAgents().some(a => a.id === agentId)) {
+    if (!ctx.bsAgent.listAgents().some(a => a.id === agentId)) {
       return { ok: false, error: `unknown agent: ${agentId}` }
     }
     return null
@@ -34,43 +34,43 @@ export async function dispatchRemoteCommand(
       case 'agent:list':
         return {
           ok: true,
-          result: ctx.meowAgent.listAgents().map(a => ({ id: a.id, name: a.name, cwd: a.cwd, kind: a.kind }))
+          result: ctx.bsAgent.listAgents().map(a => ({ id: a.id, name: a.name, cwd: a.cwd, kind: a.kind }))
         }
       case 'agent:state': {
         const missing = agentError()
         if (missing) return missing
         return {
           ok: true,
-          result: { running: ctx.meowAgent.isRunning(agentId!), background: ctx.meowAgent.isBackground(agentId!) }
+          result: { running: ctx.bsAgent.isRunning(agentId!), background: ctx.bsAgent.isBackground(agentId!) }
         }
       }
       case 'session:list': {
         const missing = agentError()
         if (missing) return missing
-        return { ok: true, result: ctx.meowAgent.listSessions(agentId!) }
+        return { ok: true, result: ctx.bsAgent.listSessions(agentId!) }
       }
       case 'session:create': {
         const missing = agentError()
         if (missing) return missing
-        return { ok: true, result: ctx.meowAgent.createSession(agentId!) }
+        return { ok: true, result: ctx.bsAgent.createSession(agentId!) }
       }
       case 'session:switch': {
         const missing = agentError()
         if (missing) return missing
         if (typeof params.sessionId !== 'string') return { ok: false, error: 'missing required param: sessionId' }
-        return { ok: true, result: ctx.meowAgent.switchSession(agentId!, params.sessionId) }
+        return { ok: true, result: ctx.bsAgent.switchSession(agentId!, params.sessionId) }
       }
       case 'session:rename': {
         const missing = agentError()
         if (missing) return missing
         if (typeof params.sessionId !== 'string') return { ok: false, error: 'missing required param: sessionId' }
         if (typeof params.title !== 'string') return { ok: false, error: 'missing required param: title' }
-        return { ok: true, result: ctx.meowAgent.renameSession(agentId!, params.sessionId, params.title) }
+        return { ok: true, result: ctx.bsAgent.renameSession(agentId!, params.sessionId, params.title) }
       }
       case 'session:messages': {
         const missing = agentError()
         if (missing) return missing
-        return { ok: true, result: ctx.meowAgent.listMessages(agentId!) }
+        return { ok: true, result: ctx.bsAgent.listMessages(agentId!) }
       }
       case 'chat:respond': {
         const missing = agentError()
@@ -81,7 +81,7 @@ export async function dispatchRemoteCommand(
           ...(typeof params.text === 'string' ? { text: params.text } : {}),
           ...(params.always === true ? { always: true } : {})
         }
-        ctx.meowAgent.respondPrompt(agentId!, params.promptId, resp)
+        ctx.bsAgent.respondPrompt(agentId!, params.promptId, resp)
         return { ok: true, result: { responded: true } }
       }
       case 'chat:send': {
@@ -93,14 +93,14 @@ export async function dispatchRemoteCommand(
         // message and hand the command string to the model as a prompt.
         const m = /^\/(\S+)(?:\s+([\s\S]*))?$/.exec(params.text)
         if (m) {
-          const agent = ctx.meowAgent.listAgents().find(a => a.id === agentId)
-          const command = agent ? ctx.meowAgent.listCommands(agent.cwd).find(c => c.name === m[1]) : undefined
+          const agent = ctx.bsAgent.listAgents().find(a => a.id === agentId)
+          const command = agent ? ctx.bsAgent.listCommands(agent.cwd).find(c => c.name === m[1]) : undefined
           if (command) {
-            await ctx.meowAgent.runCommand(agentId!, m[1], m[2] ?? '')
+            await ctx.bsAgent.runCommand(agentId!, m[1], m[2] ?? '')
             return { ok: true, result: { queued: true } }
           }
         }
-        await ctx.meowAgent.send(agentId!, params.text)
+        await ctx.bsAgent.send(agentId!, params.text)
         return { ok: true, result: { queued: true } }
       }
       default:

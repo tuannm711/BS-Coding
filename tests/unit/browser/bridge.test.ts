@@ -16,7 +16,7 @@ function newBridge(deps: Record<string, unknown> = {}): BrowserBridge {
 }
 
 function tmpDir(): string {
-  const d = mkdtempSync(path.join(tmpdir(), 'meow-bridge-'))
+  const d = mkdtempSync(path.join(tmpdir(), 'bs-bridge-'))
   dirs.push(d)
   return d
 }

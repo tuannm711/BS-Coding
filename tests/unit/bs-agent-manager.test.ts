@@ -2,8 +2,8 @@ import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { mkdtempSync, rmSync, writeFileSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { MeowAgentManager } from '../../src/main/meow-agent-manager'
-import type { MeowAgentManagerDeps } from '../../src/main/meow-agent-manager'
+import { BsAgentManager } from '../../src/main/bs-agent-manager'
+import type { BsAgentManagerDeps } from '../../src/main/bs-agent-manager'
 import { SessionStore } from '../../src/main/agent/session'
 import type { StoredSession } from '../../src/main/agent/session'
 import type { JsonStore } from '../../src/main/json-store'
@@ -19,7 +19,7 @@ import type { LlmClient, LlmStreamOptions, LlmStreamPart } from '../../src/main/
 import type { AgentConfig, ChatEvent, PromptResponse } from '../../src/shared/types'
 
 const MEOW_AGENT: AgentConfig = {
-  id: 'a1', name: 'meow', templateId: 'meow', cwd: '/proj', kind: 'native'
+  id: 'a1', name: 'bs', templateId: 'bs', cwd: '/proj', kind: 'native'
 }
 const PTY_AGENT: AgentConfig = {
   id: 'a2', name: 'opencode', templateId: 'opencode', cwd: '/proj'
@@ -34,8 +34,8 @@ async function makeManager(opts: StubLlmOptions & {
   configPath?: string
   catalog?: ModelsCatalog
 } = {}) {
-  const cfgDir = mkdtempSync(path.join(tmpdir(), 'meow-mgr-cfg-'))
-  const defaultCfg = path.join(cfgDir, 'meow.json')
+  const cfgDir = mkdtempSync(path.join(tmpdir(), 'bs-mgr-cfg-'))
+  const defaultCfg = path.join(cfgDir, 'bs.json')
   if (!opts.configPath) {
     writeFileSync(defaultCfg, JSON.stringify({
       provider: { test: { apiKey: 'sk-test', models: ['test-model'] } },
@@ -86,7 +86,7 @@ async function makeManager(opts: StubLlmOptions & {
     }
     return llmClient
   })
-  const manager = new MeowAgentManager({
+  const manager = new BsAgentManager({
     configPath: opts.configPath ?? defaultCfg,
     store,
     snapshots,
@@ -104,7 +104,7 @@ async function makeManager(opts: StubLlmOptions & {
   return { manager, store, events, createLlm, savedPermissions, llmCalls, llmSystems, llmVariants, llmModels }
 }
 
-describe('MeowAgentManager', () => {
+describe('BsAgentManager', () => {
   it('registers native agents and ignores pty agents', async () => {
     const { manager } = await makeManager()
     expect(manager.isNative('a1')).toBe(true)
@@ -194,9 +194,9 @@ describe('MeowAgentManager', () => {
     const permEntries: SavedPermission[] = []
     const savedPermissions = new SavedPermissions({ load: () => permEntries, save: (n) => permEntries.splice(0, permEntries.length, ...n) })
     const evts: ChatEvent[] = []
-    const tmpDir = mkdtempSync(path.join(tmpdir(), 'meow-mgr-err-'))
-    const m2 = new MeowAgentManager({
-      configPath: '/nonexistent/meow.json',
+    const tmpDir = mkdtempSync(path.join(tmpdir(), 'bs-mgr-err-'))
+    const m2 = new BsAgentManager({
+      configPath: '/nonexistent/bs.json',
       store,
       snapshots,
       savedPermissions,
@@ -210,7 +210,7 @@ describe('MeowAgentManager', () => {
     await m2.send('a1', 'hi')
     rmSync(tmpDir, { recursive: true, force: true })
     expect(evts.some(e => e.type === 'error')).toBe(true)
-    expect((evts.find(e => e.type === 'error') as Extract<ChatEvent, { type: 'error' }>).message).toContain('[meow]')
+    expect((evts.find(e => e.type === 'error') as Extract<ChatEvent, { type: 'error' }>).message).toContain('[bs]')
   })
 
   it('stop aborts a running turn and emits done stopped', async () => {
@@ -295,7 +295,7 @@ describe('MeowAgentManager', () => {
     const { manager: m2, events: evts } = await makeManager({
       partsQueue: [
         [
-          { kind: 'tool-call', toolCallId: 'tc1', toolName: 'websearch', toolInput: { query: 'meow' } },
+          { kind: 'tool-call', toolCallId: 'tc1', toolName: 'websearch', toolInput: { query: 'bs' } },
           { kind: 'finish' }
         ],
         [{ kind: 'text', text: 'ok' }, { kind: 'finish' }]
@@ -346,7 +346,7 @@ describe('MeowAgentManager', () => {
   it('undo removes the last turn transcript and redo restores it', async () => {
     const { manager, store } = await makeManager()
     // Seed a snapshot turn so undo has history to pop.
-    const file = path.join(tmpdir(), 'meow-undo-f.txt')
+    const file = path.join(tmpdir(), 'bs-undo-f.txt')
     writeFileSync(file, 'original')
     const snapshots = (manager as unknown as { deps: { snapshots: import('../../src/main/agent/snapshot').SnapshotStore } }).deps.snapshots
     snapshots.beginTurn('a1')
@@ -389,9 +389,9 @@ describe('MeowAgentManager', () => {
   })
 
   it('saveSettings writes config and reloads with the new provider/key', async () => {
-    const dir = mkdtempSync(path.join(tmpdir(), 'meow-mgr-'))
+    const dir = mkdtempSync(path.join(tmpdir(), 'bs-mgr-'))
     try {
-      const configPath = path.join(dir, 'meow.json')
+      const configPath = path.join(dir, 'bs.json')
       const { manager, createLlm } = await makeManager({ configPath })
       createLlm.mockClear()
       const saved = await manager.saveSettings({
@@ -455,9 +455,9 @@ describe('MeowAgentManager', () => {
   })
 
   it('setVariant passes a clamped variant descriptor to the llm stream', async () => {
-    const dir = mkdtempSync(path.join(tmpdir(), 'meow-var-stream-'))
+    const dir = mkdtempSync(path.join(tmpdir(), 'bs-var-stream-'))
     try {
-      const cfgPath = path.join(dir, 'meow.json')
+      const cfgPath = path.join(dir, 'bs.json')
       writeFileSync(cfgPath, JSON.stringify({
         provider: { test: { apiKey: 'sk-test', models: ['test-model'] } },
         model: 'test'
@@ -492,9 +492,9 @@ describe('MeowAgentManager', () => {
   })
 
   it('setVariant keeps an allow-listed value', async () => {
-    const dir = mkdtempSync(path.join(tmpdir(), 'meow-var-'))
+    const dir = mkdtempSync(path.join(tmpdir(), 'bs-var-'))
     try {
-      const cfgPath = path.join(dir, 'meow.json')
+      const cfgPath = path.join(dir, 'bs.json')
       writeFileSync(cfgPath, JSON.stringify({
         provider: { test: { apiKey: 'sk-test', models: ['test-model'] } },
         model: 'test'
@@ -521,13 +521,13 @@ describe('MeowAgentManager', () => {
   })
 
   it('connectProvider syncs models and baseUrl from the catalog', async () => {
-    const dir = mkdtempSync(path.join(tmpdir(), 'meow-conn-'))
+    const dir = mkdtempSync(path.join(tmpdir(), 'bs-conn-'))
     try {
       const catalog = new ModelsCatalog(path.join(dir, 'models.json'), async () =>
         ({ ok: true, json: async () => ({
           deepseek: { name: 'DeepSeek', api: 'https://api.deepseek.com', models: { 'deepseek-chat': {}, 'deepseek-reasoner': {} } }
         }) }) as unknown as Response)
-      const { manager } = await makeManager({ configPath: path.join(dir, 'meow.json'), catalog })
+      const { manager } = await makeManager({ configPath: path.join(dir, 'bs.json'), catalog })
       const settings = await manager.connectProvider('deepseek', 'sk-ds')
       expect(settings.providers).toHaveLength(1)
       expect(settings.providers[0]).toMatchObject({
@@ -544,14 +544,14 @@ describe('MeowAgentManager', () => {
   })
 
   it('disconnectProvider removes a provider and fixes the default', async () => {
-    const dir = mkdtempSync(path.join(tmpdir(), 'meow-conn-'))
+    const dir = mkdtempSync(path.join(tmpdir(), 'bs-conn-'))
     try {
       const catalog = new ModelsCatalog(path.join(dir, 'models.json'), async () =>
         ({ ok: true, json: async () => ({
           deepseek: { name: 'DeepSeek', api: 'https://api.deepseek.com', models: { a: {} } },
           openai: { name: 'OpenAI', api: 'https://api.openai.com/v1', models: { b: {} } }
         }) }) as unknown as Response)
-      const { manager } = await makeManager({ configPath: path.join(dir, 'meow.json'), catalog })
+      const { manager } = await makeManager({ configPath: path.join(dir, 'bs.json'), catalog })
       await manager.connectProvider('deepseek', 'sk-ds')
       await manager.connectProvider('openai', 'sk-oa')
       const settings = await manager.disconnectProvider('deepseek')
@@ -787,9 +787,9 @@ describe('MeowAgentManager', () => {
   })
 
   it('task tool resolves a configured subagent model to a dedicated llm', async () => {
-    const dir = mkdtempSync(path.join(tmpdir(), 'meow-subagent-'))
+    const dir = mkdtempSync(path.join(tmpdir(), 'bs-subagent-'))
     try {
-      const configPath = path.join(dir, 'meow.json')
+      const configPath = path.join(dir, 'bs.json')
       writeFileSync(configPath, JSON.stringify({
         provider: {
           test: { apiKey: 'sk-test', models: ['test-model'] },
@@ -820,9 +820,9 @@ describe('MeowAgentManager', () => {
   })
 
   it('task tool falls back to the main model when the subagent provider has no api key', async () => {
-    const dir = mkdtempSync(path.join(tmpdir(), 'meow-subagent-'))
+    const dir = mkdtempSync(path.join(tmpdir(), 'bs-subagent-'))
     try {
-      const configPath = path.join(dir, 'meow.json')
+      const configPath = path.join(dir, 'bs.json')
       writeFileSync(configPath, JSON.stringify({
         provider: {
           test: { apiKey: 'sk-test', models: ['test-model'] },

@@ -19,7 +19,7 @@ describe('SessionStore.removeMessage', () => {
   let file: string
 
   beforeEach(() => {
-    dir = mkdtempSync(path.join(tmpdir(), 'meow-sess-rm-'))
+    dir = mkdtempSync(path.join(tmpdir(), 'bs-sess-rm-'))
     file = path.join(dir, 'sessions.json')
   })
 

@@ -12,7 +12,7 @@ describe('ModelsCatalog', () => {
   let dir: string
 
   beforeEach(() => {
-    dir = mkdtempSync(path.join(tmpdir(), 'meow-cat-'))
+    dir = mkdtempSync(path.join(tmpdir(), 'bs-cat-'))
   })
 
   afterEach(() => rmSync(dir, { recursive: true, force: true }))

@@ -9,7 +9,7 @@ describe('FileWatcher', () => {
   let watcher: FileWatcher | null = null
 
   beforeEach(() => {
-    dir = mkdtempSync(path.join(tmpdir(), 'meow-watch-'))
+    dir = mkdtempSync(path.join(tmpdir(), 'bs-watch-'))
   })
 
   afterEach(() => {

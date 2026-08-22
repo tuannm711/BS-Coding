@@ -131,7 +131,7 @@ describe('RemoteSettingsStore', () => {
   let file: string
 
   beforeEach(() => {
-    const dir = mkdtempSync(path.join(tmpdir(), 'meow-remote-'))
+    const dir = mkdtempSync(path.join(tmpdir(), 'bs-remote-'))
     file = path.join(dir, 'remote.json')
   })
 

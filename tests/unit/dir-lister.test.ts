@@ -40,7 +40,7 @@ describe('sortEntries', () => {
 
 describe('listDir', () => {
   it('lists files and dirs, skipping ignored entries', async () => {
-    const dir = mkdtempSync(path.join(tmpdir(), 'meow-dir-'))
+    const dir = mkdtempSync(path.join(tmpdir(), 'bs-dir-'))
     mkdirSync(path.join(dir, 'src'))
     mkdirSync(path.join(dir, 'node_modules'))
     writeFileSync(path.join(dir, 'README.md'), 'hi')
@@ -53,7 +53,7 @@ describe('listDir', () => {
   })
 
   it('returns [] for an empty dir', async () => {
-    const dir = mkdtempSync(path.join(tmpdir(), 'meow-empty-'))
+    const dir = mkdtempSync(path.join(tmpdir(), 'bs-empty-'))
     expect(await listDir(dir)).toEqual([])
   })
 })

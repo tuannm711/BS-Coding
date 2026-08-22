@@ -1,12 +1,12 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import type { AgentSettings, CompactionSettings, MeowSettings, ModelRef, NotificationsSettings, PermissionRule, SubagentType } from '../../shared/types'
+import type { AgentSettings, CompactionSettings, BsSettings, ModelRef, NotificationsSettings, PermissionRule, SubagentType } from '../../shared/types'
 import type { McpServerConfig } from './mcp/manager'
 
 export type { PermissionRule }
 export type { McpServerConfig }
 
-export interface MeowProviderConfig {
+export interface BsProviderConfig {
   apiKeyEnv?: string
   apiKey?: string
   /** Reference into the encrypted vault (safeStorage) — preferred over apiKey. */
@@ -15,13 +15,13 @@ export interface MeowProviderConfig {
   models: string[]
 }
 
-export interface MeowAgentConfig {
+export interface BsAgentConfig {
   provider?: string
   model?: string
   systemPrompt: string
 }
 
-export type MeowCompactionConfig = CompactionSettings
+export type BsCompactionConfig = CompactionSettings
 
 export interface ToolOutputConfig {
   maxBytes: number
@@ -39,15 +39,15 @@ export interface TraceConfig {
   enabled: boolean
 }
 
-export interface MeowConfig {
-  provider: Record<string, MeowProviderConfig>
+export interface BsConfig {
+  provider: Record<string, BsProviderConfig>
   model: string
-  agents: Record<string, MeowAgentConfig>
+  agents: Record<string, BsAgentConfig>
   permission: Record<string, PermissionRule>
   mcp: Record<string, McpServerConfig>
   maxContextTokens: number
   maxSteps: number
-  compaction: MeowCompactionConfig
+  compaction: BsCompactionConfig
   toolOutput: ToolOutputConfig
   lsp: LspConfig
   notifications?: NotificationsConfig
@@ -68,7 +68,7 @@ export interface ResolvedAgentConfig {
 // delay compaction past the real limit.
 export const DEFAULT_MAX_CONTEXT_TOKENS = 128000
 export const DEFAULT_MAX_STEPS = Infinity
-export const DEFAULT_COMPACTION: MeowCompactionConfig = {
+export const DEFAULT_COMPACTION: BsCompactionConfig = {
   auto: true,
   buffer: 20000,
   keepTokens: 8000,
@@ -92,12 +92,12 @@ export const DEFAULT_NOTIFICATIONS: NotificationsConfig = {
   onDone: true
 }
 
-export const DEFAULT_MEOW_CONFIG: MeowConfig = {
+export const DEFAULT_BS_CONFIG: BsConfig = {
   provider: {},
   model: '',
   agents: {
-    meow: {
-      systemPrompt: 'You are Meow, a coding agent running inside the Meow Coding desktop app. ' +
+    bs: {
+      systemPrompt: 'You are Bs, a coding agent running inside the BS Coding desktop app. ' +
         'You help the user build and maintain their codebase. You have access to tools like ' +
         'bash, read, write, edit, glob, grep, apply-patch and todowrite. Read files before ' +
         'editing them, run tests after changes, and keep answers concise. Whenever you need ' +
@@ -131,9 +131,9 @@ export const DEFAULT_MEOW_CONFIG: MeowConfig = {
   trace: DEFAULT_TRACE
 }
 
-type RawProvider = Partial<MeowProviderConfig> & Record<string, unknown>
+type RawProvider = Partial<BsProviderConfig> & Record<string, unknown>
 
-function normalizeProvider(raw: RawProvider): MeowProviderConfig {
+function normalizeProvider(raw: RawProvider): BsProviderConfig {
   const models = Array.isArray(raw.models)
     ? (raw.models as string[]).filter(m => typeof m === 'string' && m.trim() !== '')
     : typeof raw.model === 'string' && raw.model
@@ -147,25 +147,25 @@ function normalizeProvider(raw: RawProvider): MeowProviderConfig {
   }
 }
 
-function normalizeAgents(raw: Record<string, unknown> | undefined): Record<string, MeowAgentConfig> {
-  const base = DEFAULT_MEOW_CONFIG.agents
+function normalizeAgents(raw: Record<string, unknown> | undefined): Record<string, BsAgentConfig> {
+  const base = DEFAULT_BS_CONFIG.agents
   if (!raw) return base
-  const out: Record<string, MeowAgentConfig> = {}
+  const out: Record<string, BsAgentConfig> = {}
   for (const [name, value] of Object.entries(raw)) {
     if (typeof value !== 'object' || value === null) continue
-    const v = value as Partial<MeowAgentConfig> & Record<string, unknown>
+    const v = value as Partial<BsAgentConfig> & Record<string, unknown>
     const legacyModel = typeof v.model === 'string' ? v.model : undefined
     const isProviderRef = legacyModel !== undefined && !legacyModel.includes('/')
     out[name] = {
       provider: typeof v.provider === 'string' ? v.provider : (isProviderRef ? legacyModel : undefined),
       model: typeof v.model === 'string' && !isProviderRef ? v.model : undefined,
-      systemPrompt: typeof v.systemPrompt === 'string' ? v.systemPrompt : (base[name]?.systemPrompt ?? base.meow.systemPrompt)
+      systemPrompt: typeof v.systemPrompt === 'string' ? v.systemPrompt : (base[name]?.systemPrompt ?? base.bs.systemPrompt)
     }
   }
   return { ...base, ...out }
 }
 
-function normalizeCompaction(raw: Partial<MeowCompactionConfig> | undefined): MeowCompactionConfig {
+function normalizeCompaction(raw: Partial<BsCompactionConfig> | undefined): BsCompactionConfig {
   return {
     auto: raw?.auto ?? DEFAULT_COMPACTION.auto,
     buffer: raw?.buffer ?? DEFAULT_COMPACTION.buffer,
@@ -223,7 +223,7 @@ const SUBAGENT_ROLES: readonly SubagentType[] = ['research', 'general', 'reviewe
 
 function normalizeSubagentModels(
   raw: Partial<Record<SubagentType, ModelRef>> | undefined,
-  providers: Record<string, MeowProviderConfig>
+  providers: Record<string, BsProviderConfig>
 ): Partial<Record<SubagentType, ModelRef>> | undefined {
   if (!raw) return undefined
   const out: Partial<Record<SubagentType, ModelRef>> = {}
@@ -237,16 +237,16 @@ function normalizeSubagentModels(
   return Object.keys(out).length > 0 ? out : undefined
 }
 
-function mergeDefaults(raw: Partial<MeowConfig>): MeowConfig {
-  const providers: Record<string, MeowProviderConfig> = {}
+function mergeDefaults(raw: Partial<BsConfig>): BsConfig {
+  const providers: Record<string, BsProviderConfig> = {}
   for (const [id, p] of Object.entries(raw.provider ?? {})) {
     providers[id] = normalizeProvider(p as RawProvider)
   }
   return {
     provider: providers,
-    model: raw.model ?? DEFAULT_MEOW_CONFIG.model,
+    model: raw.model ?? DEFAULT_BS_CONFIG.model,
     agents: normalizeAgents(raw.agents),
-    permission: { ...DEFAULT_MEOW_CONFIG.permission, ...(raw.permission ?? {}) },
+    permission: { ...DEFAULT_BS_CONFIG.permission, ...(raw.permission ?? {}) },
     mcp: normalizeMcp(raw.mcp),
     maxContextTokens: raw.maxContextTokens ?? DEFAULT_MAX_CONTEXT_TOKENS,
     maxSteps: raw.maxSteps ?? DEFAULT_MAX_STEPS,
@@ -259,19 +259,19 @@ function mergeDefaults(raw: Partial<MeowConfig>): MeowConfig {
   }
 }
 
-export function loadMeowConfig(filePath: string): MeowConfig {
+export function loadBsConfig(filePath: string): BsConfig {
   if (!existsSync(filePath)) return mergeDefaults({})
   try {
     const parsed = JSON.parse(readFileSync(filePath, 'utf-8'))
     if (typeof parsed !== 'object' || parsed === null) return mergeDefaults({})
-    return mergeDefaults(parsed as Partial<MeowConfig>)
+    return mergeDefaults(parsed as Partial<BsConfig>)
   } catch {
     return mergeDefaults({})
   }
 }
 
 export function resolveApiKey(
-  provider: MeowProviderConfig,
+  provider: BsProviderConfig,
   env: NodeJS.ProcessEnv = process.env,
   getSecret?: (ref: string) => string | null
 ): string | null {
@@ -285,13 +285,13 @@ export function resolveApiKey(
 }
 
 export function resolveAgentConfig(
-  cfg: MeowConfig,
+  cfg: BsConfig,
   agentName: string,
   env: NodeJS.ProcessEnv = process.env,
   agentModel?: string,
   getSecret?: (ref: string) => string | null
 ): ResolvedAgentConfig {
-  const agent = cfg.agents[agentName] ?? cfg.agents.meow
+  const agent = cfg.agents[agentName] ?? cfg.agents.bs
   let providerName = agent.provider ?? cfg.model
   let modelName: string | undefined
   if (agentModel) {
@@ -325,7 +325,7 @@ export function resolveAgentConfig(
   }
 }
 
-export function configToSettings(cfg: MeowConfig): MeowSettings {
+export function configToSettings(cfg: BsConfig): BsSettings {
   return {
     providers: Object.entries(cfg.provider).map(([id, p]) => ({
       id,
@@ -354,8 +354,8 @@ export function configToSettings(cfg: MeowConfig): MeowSettings {
   }
 }
 
-export function settingsToConfig(settings: MeowSettings, base: MeowConfig = DEFAULT_MEOW_CONFIG): MeowConfig {
-  const providers: Record<string, MeowProviderConfig> = {}
+export function settingsToConfig(settings: BsSettings, base: BsConfig = DEFAULT_BS_CONFIG): BsConfig {
+  const providers: Record<string, BsProviderConfig> = {}
   for (const p of settings.providers) {
     const models = (p.models ?? []).filter(m => typeof m === 'string' && m.trim() !== '')
     if (!p.id.trim()) continue
@@ -368,7 +368,7 @@ export function settingsToConfig(settings: MeowSettings, base: MeowConfig = DEFA
     }
   }
   const defaultProvider = providers[settings.defaultProvider] ? settings.defaultProvider : (Object.keys(providers)[0] ?? '')
-  const agents: Record<string, MeowAgentConfig> = {}
+  const agents: Record<string, BsAgentConfig> = {}
   for (const a of settings.agents ?? []) {
     if (!a.name.trim()) continue
     agents[a.name.trim()] = {
@@ -380,10 +380,10 @@ export function settingsToConfig(settings: MeowSettings, base: MeowConfig = DEFA
   return {
     provider: providers,
     model: defaultProvider,
-    agents: Object.keys(agents).length > 0 ? agents : (base.agents ?? DEFAULT_MEOW_CONFIG.agents),
+    agents: Object.keys(agents).length > 0 ? agents : (base.agents ?? DEFAULT_BS_CONFIG.agents),
     permission: settings.permission
-      ? { ...DEFAULT_MEOW_CONFIG.permission, ...settings.permission }
-      : (base.permission ?? DEFAULT_MEOW_CONFIG.permission),
+      ? { ...DEFAULT_BS_CONFIG.permission, ...settings.permission }
+      : (base.permission ?? DEFAULT_BS_CONFIG.permission),
     mcp: normalizeMcp(settings.mcp ?? base.mcp ?? {}),
     maxContextTokens: settings.maxContextTokens ?? base.maxContextTokens ?? DEFAULT_MAX_CONTEXT_TOKENS,
     maxSteps: settings.maxSteps ?? base.maxSteps ?? DEFAULT_MAX_STEPS,
@@ -400,7 +400,7 @@ export function settingsToConfig(settings: MeowSettings, base: MeowConfig = DEFA
   }
 }
 
-export function writeMeowConfig(filePath: string, cfg: MeowConfig): void {
+export function writeBsConfig(filePath: string, cfg: BsConfig): void {
   mkdirSync(path.dirname(filePath), { recursive: true })
   writeFileSync(filePath, JSON.stringify(cfg, null, 2))
 }

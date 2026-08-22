@@ -25,7 +25,7 @@ import { SavedPermissions } from './agent/saved-permissions'
 import type { SavedPermission } from './agent/saved-permissions'
 import { createDefaultTools } from './agent/tools/registry'
 import { isTextPath, openFileViewer, openWithSystemApp, readFileContent } from './file-viewer'
-import { MeowAgentManager } from './meow-agent-manager'
+import { BsAgentManager } from './bs-agent-manager'
 import { CommandStore } from './agent/commands'
 import { FileWatcher } from './file-watcher'
 import { ArtifactStore } from './artifact-store'
@@ -43,7 +43,7 @@ import { RemoteSettingsStore } from './remote/remote-settings'
 import { RemotePairing } from './remote/remote-pairing'
 import { migrateLegacyUserData, resolveUserDataDir } from './bs-migration'
 import { Channels } from '../shared/ipc'
-import type { AgentState, Command, FileViewerPayload, ImageAttachment, MeowSettings, NewAgentInput, PromptResponse, Template, TerminalInfo, Workspace, WorkspaceRuntime } from '../shared/types'
+import type { AgentState, Command, FileViewerPayload, ImageAttachment, BsSettings, NewAgentInput, PromptResponse, Template, TerminalInfo, Workspace, WorkspaceRuntime } from '../shared/types'
 
 let win: BrowserWindow | null = null
 let isQuitting = false
@@ -108,8 +108,8 @@ class MainApp {
   })
   traces = new TraceStore(path.join(app.getPath('userData'), 'traces'))
   vault = new Vault(path.join(app.getPath('userData'), 'connections', 'vault.json'))
-  meowAgent = new MeowAgentManager({
-    configPath: path.join(app.getPath('userData'), 'meow.json'),
+  bsAgent = new BsAgentManager({
+    configPath: path.join(app.getPath('userData'), 'bs.json'),
     vault: this.vault,
     store: new SessionStore(createJsonStore<StoredSession>(path.join(app.getPath('userData'), 'sessions.json'))),
     trace: this.traces,
@@ -154,7 +154,7 @@ class MainApp {
     store: this.remoteStore,
     pairing: new RemotePairing(),
     context: {
-      meowAgent: this.meowAgent,
+      bsAgent: this.bsAgent,
       workspaceStore: this.workspaces,
       isEnabled: () => this.remoteStore.load().enabled
     }
@@ -193,13 +193,13 @@ class MainApp {
         const agent = ws?.agents.find(a => a.id === agentId)
         const tmpl = agent ? this.templates.list().find(t => t.id === agent.templateId) : undefined
         const label = tmpl ? `${tmpl.command} ${tmpl.args.join(' ')}`.trim() : (agent?.name ?? agentId)
-        const hint = `[meow] Agent thoát với exit code ${code} và không có output. Kiểm tra lệnh "${label}" có trong PATH không, rồi dùng restart.\n`
+        const hint = `[bs] Agent thoát với exit code ${code} và không có output. Kiểm tra lệnh "${label}" có trong PATH không, rồi dùng restart.\n`
         this.logs.append(agentId, hint)
         win?.webContents.send(Channels.EventPtyData, { agentId, data: hint })
       }
       this.alerts.onExit(agentId, code)
       const startTs = this.ptyStartTs.get(agentId)
-      if (startTs !== undefined && mainApp.meowAgent.isTraceEnabled()) {
+      if (startTs !== undefined && mainApp.bsAgent.isTraceEnabled()) {
         this.ptyStartTs.delete(agentId)
         this.traces.append(agentId, {
           type: 'pty-run', agentId, sessionId: agentId, startTs,
@@ -217,7 +217,7 @@ class MainApp {
         : { status: 'error' as const, alert: 'error' as const, exitCode }
       this.setState(agentId, patch)
     })
-    this.meowAgent.setOnEvent(event => {
+    this.bsAgent.setOnEvent(event => {
       // Native agents have no PTY, so their AgentState comes from chat events.
       // Keeps the pane header/badge/background panel status truthful.
       if (event.type === 'turn-started') {
@@ -235,8 +235,8 @@ class MainApp {
           // Download finished in the background — let the user know even with
           // the dialog closed; clicking installs and restarts.
           const n = new Notification({
-            title: 'Meow Coding',
-            body: `[meow] v${e.version} đã tải xong. Click để cài đặt và khởi động lại.`
+            title: 'BS Coding',
+            body: `[bs] v${e.version} đã tải xong. Click để cài đặt và khởi động lại.`
           })
           n.on('click', () => this.updater.install())
           n.show()
@@ -309,7 +309,7 @@ class MainApp {
     if (agent.kind === 'native') return
     const tmpl = this.templates.list().find(t => t.id === agent.templateId)
     if (!tmpl) {
-      const message = `[meow] Không tìm thấy template "${agent.templateId}" cho agent "${agent.name}". Thêm template đó hoặc xóa agent này.\n`
+      const message = `[bs] Không tìm thấy template "${agent.templateId}" cho agent "${agent.name}". Thêm template đó hoặc xóa agent này.\n`
       this.logs.append(agentId, message)
       win?.webContents.send(Channels.EventPtyData, { agentId, data: message })
       this.setState(agentId, { status: 'error', alert: 'error' })
@@ -319,7 +319,7 @@ class MainApp {
     try {
       this.pty.start(agentId, agent.name, tmpl.command, tmpl.args, agent.cwd)
       this.ptyStartTs.set(agentId, Date.now())
-      if (mainApp.meowAgent.isTraceEnabled()) {
+      if (mainApp.bsAgent.isTraceEnabled()) {
         this.traces.append(agentId, {
           type: 'pty-run', agentId, sessionId: agentId, startTs: this.ptyStartTs.get(agentId) ?? Date.now(),
           logPath: this.logs.pathFor(agentId)
@@ -327,7 +327,7 @@ class MainApp {
       }
       this.alerts.track(agentId)
     } catch (err) {
-      const message = `[meow] Không thể khởi động agent "${agent.name}" (${tmpl.command} ${tmpl.args.join(' ')}): ${String(err)}\n`
+      const message = `[bs] Không thể khởi động agent "${agent.name}" (${tmpl.command} ${tmpl.args.join(' ')}): ${String(err)}\n`
       this.logs.append(agentId, message)
       win?.webContents.send(Channels.EventPtyData, { agentId, data: message })
       this.setState(agentId, { status: 'error', alert: 'error' })
@@ -364,11 +364,11 @@ class MainApp {
     const ws = this.workspaces.get(projectPath)
     if (!ws) throw new Error(`Workspace not found: ${projectPath}`)
     this.activeProject = projectPath
-    this.meowAgent.setProjectPath(projectPath)
+    this.bsAgent.setProjectPath(projectPath)
     // Register native agents synchronously (cheap) so the chat panel mounts
     // with its real transcript immediately; full tools/MCP come from init below.
     for (const agent of ws.agents) {
-      if (agent.kind === 'native') this.meowAgent.addAgent(agent)
+      if (agent.kind === 'native') this.bsAgent.addAgent(agent)
     }
     const rt = this.runtimeFor(ws)
     this.startGitPoll(projectPath)
@@ -376,12 +376,12 @@ class MainApp {
     // Tools/MCP sync, model catalog refresh and PTY startup run off the
     // critical path so the pane shell paints instantly instead of waiting for
     // all of them (measured ~0.5s+ on first open).
-    void this.prepareWorkspace(ws).catch(err => console.error('[meow] prepareWorkspace:', err))
+    void this.prepareWorkspace(ws).catch(err => console.error('[bs] prepareWorkspace:', err))
     return rt
   }
 
   private async prepareWorkspace(ws: Workspace): Promise<void> {
-    await this.meowAgent.init(ws.agents)
+    await this.bsAgent.init(ws.agents)
     await Promise.all(ws.agents.map(a => this.startAgent(a.id)))
   }
 
@@ -453,7 +453,7 @@ class MainApp {
   }
 
   setAgentMode(agentId: string, mode: 'build' | 'plan'): void {
-    this.meowAgent.setMode(agentId, mode)
+    this.bsAgent.setMode(agentId, mode)
     const ws = this.findWorkspaceByAgent(agentId)
     if (ws) {
       const updated = this.workspaces.updateAgent(ws.projectPath, agentId, { mode })
@@ -462,7 +462,7 @@ class MainApp {
   }
 
   setAgentBackground(agentId: string, background: boolean): void {
-    this.meowAgent.setBackground(agentId, background)
+    this.bsAgent.setBackground(agentId, background)
     const ws = this.findWorkspaceByAgent(agentId)
     if (ws) {
       this.workspaces.updateAgent(ws.projectPath, agentId, { background })
@@ -470,17 +470,17 @@ class MainApp {
   }
 
   setAgentVariant(agentId: string, variant: string | null): void {
-    this.meowAgent.setVariant(agentId, variant ?? undefined)
+    this.bsAgent.setVariant(agentId, variant ?? undefined)
     const ws = this.findWorkspaceByAgent(agentId)
     if (ws) {
-      const stored = this.meowAgent.getVariant(agentId)
+      const stored = this.bsAgent.getVariant(agentId)
       const updated = this.workspaces.updateAgent(ws.projectPath, agentId, { variant: stored })
       this.pushAgentConfig(updated, agentId)
     }
   }
 
   setAgentModel(agentId: string, provider: string, model: string): void {
-    this.meowAgent.setModel(agentId, provider, model)
+    this.bsAgent.setModel(agentId, provider, model)
     const ws = this.findWorkspaceByAgent(agentId)
     if (ws) {
       const updated = this.workspaces.updateAgent(ws.projectPath, agentId, { model: `${provider}/${model}` })
@@ -499,7 +499,7 @@ class MainApp {
     this.stopGitPoll()
     this.watcher?.stop()
     this.watcher = null
-    this.meowAgent.stopAll()
+    this.bsAgent.stopAll()
     if (this.activeProject) this.artifacts.clear(this.activeProject)
     this.activeProject = null
     this.closeAllTerminals()
@@ -514,7 +514,7 @@ function createWindow(): void {
   win = new BrowserWindow({
     width: 1400,
     height: 900,
-    title: 'Meow Coding',
+    title: 'BS Coding',
     backgroundColor: '#1e1e1e',
     ...getWindowChromeOptions(process.platform),
     webPreferences: {
@@ -565,14 +565,14 @@ function registerIpcHandlers(): void {
     const ws = mainApp.workspaces.add(projectPath, name)
     if (ws.agents.length === 0) {
       mainApp.workspaces.addAgent(projectPath, {
-        name: 'meow',
-        templateId: 'meow',
+        name: 'bs',
+        templateId: 'bs',
         cwd: projectPath,
         kind: 'native'
       })
     }
     const fresh = mainApp.workspaces.get(projectPath)!
-    void mainApp.meowAgent.init(fresh.agents)
+    void mainApp.bsAgent.init(fresh.agents)
     return mainApp.runtimeFor(fresh)
   })
 
@@ -580,7 +580,7 @@ function registerIpcHandlers(): void {
     const ws = mainApp.workspaces.get(projectPath)
     if (ws) {
       for (const agent of ws.agents) {
-        mainApp.meowAgent.removeAgent(agent.id)
+        mainApp.bsAgent.removeAgent(agent.id)
         await mainApp.pty.stop(agent.id)
         mainApp.clearState(agent.id)
         mainApp.alerts.clear(agent.id)
@@ -601,7 +601,7 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle(Channels.ProjectOpenFolder, async (_e, projectPath: string) => {
     const err = await shell.openPath(projectPath)
-    if (err) console.error('[meow] open folder failed:', err)
+    if (err) console.error('[bs] open folder failed:', err)
   })
   ipcMain.handle(Channels.FileOpen, async (_e, payload: FileViewerPayload) => {
     const abs = path.resolve(payload.root, payload.path)
@@ -609,7 +609,7 @@ function registerIpcHandlers(): void {
       const st = await stat(abs)
       if (!st.isFile()) throw new Error('not a file')
     } catch {
-      new Notification({ title: 'Meow Coding', body: `[meow] Không tìm thấy file: ${payload.path}` }).show()
+      new Notification({ title: 'BS Coding', body: `[bs] Không tìm thấy file: ${payload.path}` }).show()
       return
     }
     const kind = isTextPath(abs)
@@ -648,13 +648,13 @@ function registerIpcHandlers(): void {
     const agentInput = tmpl?.kind ? { ...input, kind: tmpl.kind } : input
     const ws = mainApp.workspaces.addAgent(projectPath, agentInput)
     const added = ws.agents[ws.agents.length - 1]
-    mainApp.meowAgent.addAgent(added)
+    mainApp.bsAgent.addAgent(added)
     await mainApp.startAgent(added.id)
     return mainApp.runtimeFor(ws)
   })
 
   ipcMain.handle(Channels.AgentRemove, async (_e, projectPath: string, agentId: string) => {
-    mainApp.meowAgent.removeAgent(agentId)
+    mainApp.bsAgent.removeAgent(agentId)
     await mainApp.pty.stop(agentId)
     mainApp.workspaces.removeAgent(projectPath, agentId)
     mainApp.clearState(agentId)
@@ -667,23 +667,23 @@ function registerIpcHandlers(): void {
   ipcMain.handle(Channels.AgentSetVariant, (_e, agentId: string, variant: string | null) =>
     mainApp.setAgentVariant(agentId, variant))
   ipcMain.handle(Channels.AgentGetVariants, (_e, agentId: string) =>
-    mainApp.meowAgent.getAvailableVariants(agentId))
+    mainApp.bsAgent.getAvailableVariants(agentId))
   ipcMain.handle(Channels.AgentSetModel, (_e, agentId: string, provider: string, model: string) =>
     mainApp.setAgentModel(agentId, provider, model))
-  ipcMain.handle(Channels.AgentGetModel, (_e, agentId: string) => mainApp.meowAgent.getAgentModel(agentId))
-  ipcMain.handle(Channels.AgentGetContext, (_e, agentId: string) => mainApp.meowAgent.getContextInfo(agentId))
+  ipcMain.handle(Channels.AgentGetModel, (_e, agentId: string) => mainApp.bsAgent.getAgentModel(agentId))
+  ipcMain.handle(Channels.AgentGetContext, (_e, agentId: string) => mainApp.bsAgent.getContextInfo(agentId))
   ipcMain.handle(Channels.AgentSetBackground, (_e, agentId: string, background: boolean) =>
     mainApp.setAgentBackground(agentId, background))
   ipcMain.handle(Channels.FilesSuggest, (_e, agentId: string, prefix: string) =>
-    mainApp.meowAgent.suggestFiles(agentId, prefix))
-  ipcMain.handle(Channels.ProviderModels, () => mainApp.meowAgent.getProviderModels())
+    mainApp.bsAgent.suggestFiles(agentId, prefix))
+  ipcMain.handle(Channels.ProviderModels, () => mainApp.bsAgent.getProviderModels())
   ipcMain.handle(Channels.ProviderFetchModels, (_e, providerId: string) =>
-    mainApp.meowAgent.fetchProviderModels(providerId))
-  ipcMain.handle(Channels.ProviderCatalog, () => mainApp.meowAgent.listProviderCatalog())
+    mainApp.bsAgent.fetchProviderModels(providerId))
+  ipcMain.handle(Channels.ProviderCatalog, () => mainApp.bsAgent.listProviderCatalog())
   ipcMain.handle(Channels.ProviderConnect, (_e, providerId: string, apiKey: string, baseUrl?: string) =>
-    mainApp.meowAgent.connectProvider(providerId, apiKey, baseUrl))
+    mainApp.bsAgent.connectProvider(providerId, apiKey, baseUrl))
   ipcMain.handle(Channels.ProviderDisconnect, (_e, providerId: string) =>
-    mainApp.meowAgent.disconnectProvider(providerId))
+    mainApp.bsAgent.disconnectProvider(providerId))
 
   ipcMain.handle(Channels.TemplateList, () => mainApp.templates.list())
   ipcMain.handle(Channels.TemplateSave, (_e, t: Template) => mainApp.templates.save(t))
@@ -712,42 +712,42 @@ function registerIpcHandlers(): void {
     void shell.openPath(mainApp.logs.pathFor(agentId))
   })
   ipcMain.handle(Channels.ChatSend, (_e, agentId: string, text: string, images?: ImageAttachment[]) =>
-    mainApp.meowAgent.send(agentId, text, images))
-  ipcMain.handle(Channels.ChatStop, (_e, agentId: string) => mainApp.meowAgent.stopAndDrain(agentId))
+    mainApp.bsAgent.send(agentId, text, images))
+  ipcMain.handle(Channels.ChatStop, (_e, agentId: string) => mainApp.bsAgent.stopAndDrain(agentId))
   ipcMain.handle(Channels.ChatRunCommand, (_e, agentId: string, name: string, args: string) =>
-    mainApp.meowAgent.runCommand(agentId, name, args))
-  ipcMain.handle(Channels.ChatUndo, (_e, agentId: string) => mainApp.meowAgent.undo(agentId))
-  ipcMain.handle(Channels.ChatRedo, (_e, agentId: string) => mainApp.meowAgent.redo(agentId))
-  ipcMain.handle(Channels.ChatNewSession, (_e, agentId: string) => mainApp.meowAgent.newSession(agentId))
-  ipcMain.handle(Channels.ChatListMessages, (_e, agentId: string) => mainApp.meowAgent.listMessages(agentId))
-  ipcMain.handle(Channels.ChatListTranscript, (_e, agentId: string) => mainApp.meowAgent.listTranscript(agentId))
-  ipcMain.handle(Channels.ChatGetTodos, (_e, agentId: string) => mainApp.meowAgent.getTodos(agentId))
-  ipcMain.handle(Channels.ChatIsRunning, (_e, agentId: string) => mainApp.meowAgent.isRunning(agentId))
+    mainApp.bsAgent.runCommand(agentId, name, args))
+  ipcMain.handle(Channels.ChatUndo, (_e, agentId: string) => mainApp.bsAgent.undo(agentId))
+  ipcMain.handle(Channels.ChatRedo, (_e, agentId: string) => mainApp.bsAgent.redo(agentId))
+  ipcMain.handle(Channels.ChatNewSession, (_e, agentId: string) => mainApp.bsAgent.newSession(agentId))
+  ipcMain.handle(Channels.ChatListMessages, (_e, agentId: string) => mainApp.bsAgent.listMessages(agentId))
+  ipcMain.handle(Channels.ChatListTranscript, (_e, agentId: string) => mainApp.bsAgent.listTranscript(agentId))
+  ipcMain.handle(Channels.ChatGetTodos, (_e, agentId: string) => mainApp.bsAgent.getTodos(agentId))
+  ipcMain.handle(Channels.ChatIsRunning, (_e, agentId: string) => mainApp.bsAgent.isRunning(agentId))
   ipcMain.handle(Channels.ChatRespondPrompt, (_e, agentId: string, promptId: string, resp: PromptResponse) =>
-    mainApp.meowAgent.respondPrompt(agentId, promptId, resp))
+    mainApp.bsAgent.respondPrompt(agentId, promptId, resp))
   ipcMain.handle(Channels.ChatQueueRemove, (_e, agentId: string, id: string) =>
-    mainApp.meowAgent.removeQueued(agentId, id))
+    mainApp.bsAgent.removeQueued(agentId, id))
   ipcMain.handle(Channels.ChatQueueEdit, (_e, agentId: string, id: string, text: string) =>
-    mainApp.meowAgent.editQueued(agentId, id, text))
-  ipcMain.handle(Channels.SessionList, (_e, agentId: string) => mainApp.meowAgent.listSessions(agentId))
-  ipcMain.handle(Channels.SessionCreate, (_e, agentId: string) => mainApp.meowAgent.createSession(agentId))
+    mainApp.bsAgent.editQueued(agentId, id, text))
+  ipcMain.handle(Channels.SessionList, (_e, agentId: string) => mainApp.bsAgent.listSessions(agentId))
+  ipcMain.handle(Channels.SessionCreate, (_e, agentId: string) => mainApp.bsAgent.createSession(agentId))
   ipcMain.handle(Channels.SessionSwitch, (_e, agentId: string, sessionId: string) =>
-    mainApp.meowAgent.switchSession(agentId, sessionId))
+    mainApp.bsAgent.switchSession(agentId, sessionId))
   ipcMain.handle(Channels.SessionDelete, (_e, agentId: string, sessionId: string) =>
-    mainApp.meowAgent.deleteSession(agentId, sessionId))
+    mainApp.bsAgent.deleteSession(agentId, sessionId))
   ipcMain.handle(Channels.SessionRename, (_e, agentId: string, sessionId: string, title: string) =>
-    mainApp.meowAgent.renameSession(agentId, sessionId, title))
+    mainApp.bsAgent.renameSession(agentId, sessionId, title))
   ipcMain.handle(Channels.TraceList, (_e, agentId: string) => mainApp.traces.listForAgent(agentId))
   ipcMain.handle(Channels.TraceRead, (_e, sessionId: string) => mainApp.traces.read(sessionId))
   ipcMain.handle(Channels.TraceDelete, (_e, sessionId: string) => mainApp.traces.delete(sessionId))
-  ipcMain.handle(Channels.SettingsGet, () => mainApp.meowAgent.getSettings())
-  ipcMain.handle(Channels.SettingsSave, (_e, settings: MeowSettings) =>
-    mainApp.meowAgent.saveSettings(settings))
-  ipcMain.handle(Channels.McpStatus, () => mainApp.meowAgent.getMcpStatus())
-  ipcMain.handle(Channels.CommandList, (_e, projectPath: string) => mainApp.meowAgent.listCommands(projectPath))
-  ipcMain.handle(Channels.CommandSave, (_e, command: Command) => mainApp.meowAgent.saveCommand(command))
-  ipcMain.handle(Channels.CommandRemove, (_e, name: string) => mainApp.meowAgent.removeCommand(name))
-  ipcMain.handle(Channels.StatsGet, () => mainApp.meowAgent.getStats())
+  ipcMain.handle(Channels.SettingsGet, () => mainApp.bsAgent.getSettings())
+  ipcMain.handle(Channels.SettingsSave, (_e, settings: BsSettings) =>
+    mainApp.bsAgent.saveSettings(settings))
+  ipcMain.handle(Channels.McpStatus, () => mainApp.bsAgent.getMcpStatus())
+  ipcMain.handle(Channels.CommandList, (_e, projectPath: string) => mainApp.bsAgent.listCommands(projectPath))
+  ipcMain.handle(Channels.CommandSave, (_e, command: Command) => mainApp.bsAgent.saveCommand(command))
+  ipcMain.handle(Channels.CommandRemove, (_e, name: string) => mainApp.bsAgent.removeCommand(name))
+  ipcMain.handle(Channels.StatsGet, () => mainApp.bsAgent.getStats())
   ipcMain.handle(Channels.AppQuit, () => app.quit())
   ipcMain.handle(Channels.AppVersion, () => app.getVersion())
   ipcMain.handle(Channels.UpdaterCheck, () => mainApp.checkForUpdates())
@@ -779,12 +779,12 @@ app.whenReady().then(async () => {
   const userDataDir = resolveUserDataDir(process.env, app.getPath('userData'))
   app.setPath('userData', userDataDir)
   await migrateLegacyUserData(userDataDir, {
-    legacyDir: path.join(path.dirname(userDataDir), 'Meow Coding')
+    legacyDir: path.join(path.dirname(userDataDir), 'BS Coding')
   })
   mainApp = new MainApp()
-  mainApp.meowAgent.truncationCleanup()
+  mainApp.bsAgent.truncationCleanup()
   await mainApp.browserBridge.start().catch(err => {
-    console.error('[meow] browser bridge start failed:', err)
+    console.error('[bs] browser bridge start failed:', err)
   })
   mainApp.browserBridge.onStatusChange(info => {
     win?.webContents.send(Channels.EventBrowserStatus, info)
@@ -796,7 +796,7 @@ app.whenReady().then(async () => {
     ? path.join(process.resourcesPath, 'browser-extension')
     : path.join(app.getAppPath(), 'out', 'browser-extension')
   ensureExtensionInstalled(extSource, path.join(app.getPath('userData'), 'browser-extension'))
-  if (!mainApp.meowAgent.isTraceEnabled()) {
+  if (!mainApp.bsAgent.isTraceEnabled()) {
     // Trace temporarily disabled: drop old trace data so nothing lingers.
     rmSync(path.join(app.getPath('userData'), 'traces'), { recursive: true, force: true })
   }
@@ -811,7 +811,7 @@ app.whenReady().then(async () => {
     try {
       mainApp.checkForUpdatesAuto()
     } catch (err) {
-      console.error('[meow] auto update check failed:', err)
+      console.error('[bs] auto update check failed:', err)
     }
   }, 1500)
   app.on('activate', () => {
@@ -833,7 +833,7 @@ app.on('before-quit', (event) => {
   cleaningUp = true
   isQuitting = true
   mainApp.stopGitPoll()
-  void mainApp.meowAgent.dispose().then(() => {
+  void mainApp.bsAgent.dispose().then(() => {
     return mainApp.traces.flushAll()
   }).then(() => {
     return mainApp.browserBridge.close()

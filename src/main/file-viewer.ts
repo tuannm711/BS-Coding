@@ -114,5 +114,5 @@ export async function readFileContent(absPath: string): Promise<FileContentResul
 /** Open non-text files with the OS default app. */
 export async function openWithSystemApp(absPath: string): Promise<void> {
   const err = await shell.openPath(absPath)
-  if (err) console.error('[meow] open file failed:', err)
+  if (err) console.error('[bs] open file failed:', err)
 }

@@ -44,7 +44,7 @@ export const bashTool: ToolDefinition = {
     const fallbackCwd = existsSync(ctx.cwd) ? ctx.cwd : homedir()
     const usedFallback = fallbackCwd !== ctx.cwd
     const note = usedFallback
-      ? `[meow] working dir "${ctx.cwd}" khong ton tai, chay tu "${fallbackCwd}".\n`
+      ? `[bs] working dir "${ctx.cwd}" khong ton tai, chay tu "${fallbackCwd}".\n`
       : ''
     const resolved = buildShellCommand(command, fallbackCwd)
     return new Promise<ToolRunResult>(resolve => {

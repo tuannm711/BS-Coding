@@ -254,7 +254,7 @@ export interface AgentSettings {
   model?: string
 }
 
-export interface MeowSettings {
+export interface BsSettings {
   providers: ProviderSettings[]
   defaultProvider: string
   agents: AgentSettings[]

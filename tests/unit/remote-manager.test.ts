@@ -24,7 +24,7 @@ function makeStore(initial?: Partial<RemoteSettings>): RemoteSettingsStore {
 
 function makeContext(): RemoteCommandContext {
   return {
-    meowAgent: {
+    bsAgent: {
       listAgents: vi.fn(),
       listSessions: vi.fn(),
       createSession: vi.fn(),
@@ -94,7 +94,7 @@ describe('RemoteManager', () => {
   })
 
   it('handleAgentEvent maps turn-started to agent:state running true', () => {
-    ;(context.meowAgent.isBackground as ReturnType<typeof vi.fn>).mockReturnValue(true)
+    ;(context.bsAgent.isBackground as ReturnType<typeof vi.fn>).mockReturnValue(true)
     manager.setEnabled(true)
     manager.handleAgentEvent({ type: 'turn-started', agentId: 'a1' })
     expect(fake.client.sendEvent).toHaveBeenCalledWith({
@@ -106,7 +106,7 @@ describe('RemoteManager', () => {
   })
 
   it('handleAgentEvent maps done to agent:state running false', () => {
-    ;(context.meowAgent.isBackground as ReturnType<typeof vi.fn>).mockReturnValue(false)
+    ;(context.bsAgent.isBackground as ReturnType<typeof vi.fn>).mockReturnValue(false)
     manager.setEnabled(true)
     manager.handleAgentEvent({ type: 'done', agentId: 'a1', reason: 'completed' })
     expect(fake.client.sendEvent).toHaveBeenCalledWith({
@@ -118,7 +118,7 @@ describe('RemoteManager', () => {
   })
 
   it('handleAgentEvent maps error to agent:state running false', () => {
-    ;(context.meowAgent.isBackground as ReturnType<typeof vi.fn>).mockReturnValue(false)
+    ;(context.bsAgent.isBackground as ReturnType<typeof vi.fn>).mockReturnValue(false)
     manager.setEnabled(true)
     manager.handleAgentEvent({ type: 'error', agentId: 'a1', message: 'boom' })
     expect(fake.client.sendEvent).toHaveBeenCalledWith({

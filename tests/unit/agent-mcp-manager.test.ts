@@ -71,7 +71,7 @@ describe('McpManager', () => {
     const [serverSide, clientSide] = InMemoryTransport.createLinkedPair()
     await server.connect(serverSide)
 
-    const projectDir = mkdtempSync(path.join(tmpdir(), 'meow-mcp-root-'))
+    const projectDir = mkdtempSync(path.join(tmpdir(), 'bs-mcp-root-'))
     try {
       const mcp = new McpManager({ createTransport: () => clientSide })
       managers.push(mcp)

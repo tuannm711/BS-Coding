@@ -60,7 +60,7 @@ describe('TemplateManager persistence', () => {
   let file: string
 
   beforeEach(() => {
-    dir = mkdtempSync(path.join(tmpdir(), 'meow-tmpl-'))
+    dir = mkdtempSync(path.join(tmpdir(), 'bs-tmpl-'))
     file = path.join(dir, 'templates.json')
   })
 

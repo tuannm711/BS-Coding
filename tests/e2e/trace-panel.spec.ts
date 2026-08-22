@@ -4,15 +4,15 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 
 test('native agent Trace tab renders the trace ledger', async () => {
-  const userData = mkdtempSync(path.join(tmpdir(), 'meow-trace-'))
-  const project = mkdtempSync(path.join(tmpdir(), 'meow-trace-project-'))
+  const userData = mkdtempSync(path.join(tmpdir(), 'bs-trace-'))
+  const project = mkdtempSync(path.join(tmpdir(), 'bs-trace-project-'))
   try {
     const agentId = 'e2e-trace'
     const workspaces = [{
       projectPath: project,
       name: 'Trace Test',
       agents: [
-        { id: agentId, name: 'meow', templateId: 'meow', cwd: project, kind: 'native' }
+        { id: agentId, name: 'bs', templateId: 'bs', cwd: project, kind: 'native' }
       ]
     }]
     writeFileSync(path.join(userData, 'workspaces.json'), JSON.stringify(workspaces, null, 2))
@@ -46,7 +46,7 @@ test('native agent Trace tab renders the trace ledger', async () => {
     writeFileSync(path.join(traceDir, 'sess-1.jsonl'), traceLines.map(l => JSON.stringify(l)).join('\n') + '\n')
 
     // Trace is app-disabled by default; enable it via config so the tab shows.
-    writeFileSync(path.join(userData, 'meow.json'), JSON.stringify({ trace: { enabled: true } }))
+    writeFileSync(path.join(userData, 'bs.json'), JSON.stringify({ trace: { enabled: true } }))
 
     const app = await electron.launch({
       args: ['.'],

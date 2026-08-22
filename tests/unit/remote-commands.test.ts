@@ -14,7 +14,7 @@ const ALL_COMMANDS: RemoteCommandName[] = [
 ]
 
 function makeCtx(overrides: Partial<RemoteCommandContext> = {}) {
-  const meowAgent = {
+  const bsAgent = {
     listAgents: vi.fn(),
     listSessions: vi.fn(),
     createSession: vi.fn(),
@@ -30,12 +30,12 @@ function makeCtx(overrides: Partial<RemoteCommandContext> = {}) {
   }
   const workspaceStore = { list: vi.fn() }
   const ctx: RemoteCommandContext = {
-    meowAgent,
+    bsAgent,
     workspaceStore,
     isEnabled: vi.fn(() => true),
     ...overrides
   }
-  return { ctx, meowAgent, workspaceStore }
+  return { ctx, bsAgent, workspaceStore }
 }
 
 function agent(id: string, name: string) {
@@ -44,16 +44,16 @@ function agent(id: string, name: string) {
 
 describe('dispatchRemoteCommand', () => {
   it('returns remote disabled for every command and never calls the handlers', async () => {
-    const { ctx, meowAgent, workspaceStore } = makeCtx({ isEnabled: vi.fn(() => false) })
+    const { ctx, bsAgent, workspaceStore } = makeCtx({ isEnabled: vi.fn(() => false) })
     for (const cmd of ALL_COMMANDS) {
       const res = await dispatchRemoteCommand(cmd, { agentId: 'a1', sessionId: 's1', title: 'T', text: 'hi' }, ctx)
       expect(res).toEqual({ ok: false, error: 'remote disabled' })
     }
     expect(ctx.isEnabled).toHaveBeenCalledTimes(ALL_COMMANDS.length)
     const handlers = [
-      meowAgent.listAgents, meowAgent.listSessions, meowAgent.createSession,
-      meowAgent.switchSession, meowAgent.renameSession, meowAgent.send,
-      meowAgent.isRunning, meowAgent.isBackground, workspaceStore.list
+      bsAgent.listAgents, bsAgent.listSessions, bsAgent.createSession,
+      bsAgent.switchSession, bsAgent.renameSession, bsAgent.send,
+      bsAgent.isRunning, bsAgent.isBackground, workspaceStore.list
     ]
     for (const handler of handlers) expect(handler).not.toHaveBeenCalled()
   })
@@ -70,8 +70,8 @@ describe('dispatchRemoteCommand', () => {
   })
 
   it('agent:list returns only id, name, cwd and kind', async () => {
-    const { ctx, meowAgent } = makeCtx()
-    meowAgent.listAgents.mockReturnValue([
+    const { ctx, bsAgent } = makeCtx()
+    bsAgent.listAgents.mockReturnValue([
       { id: 'a1', name: 'One', templateId: 't1', cwd: '/work/one', kind: 'native', model: 'gpt-x', apiKey: 'secret' },
       { id: 'a2', name: 'Two', templateId: 't2', cwd: '/work/two' }
     ])
@@ -86,137 +86,137 @@ describe('dispatchRemoteCommand', () => {
   })
 
   it('agent:state returns running and background from the manager', async () => {
-    const { ctx, meowAgent } = makeCtx()
-    meowAgent.listAgents.mockReturnValue([agent('a1', 'One')])
-    meowAgent.isRunning.mockReturnValue(true)
-    meowAgent.isBackground.mockReturnValue(false)
+    const { ctx, bsAgent } = makeCtx()
+    bsAgent.listAgents.mockReturnValue([agent('a1', 'One')])
+    bsAgent.isRunning.mockReturnValue(true)
+    bsAgent.isBackground.mockReturnValue(false)
     const res = await dispatchRemoteCommand('agent:state', { agentId: 'a1' }, ctx)
-    expect(meowAgent.isRunning).toHaveBeenCalledWith('a1')
-    expect(meowAgent.isBackground).toHaveBeenCalledWith('a1')
+    expect(bsAgent.isRunning).toHaveBeenCalledWith('a1')
+    expect(bsAgent.isBackground).toHaveBeenCalledWith('a1')
     expect(res).toEqual({ ok: true, result: { running: true, background: false } })
   })
 
   it('agent:state errors for a nonexistent agent without calling the state methods', async () => {
-    const { ctx, meowAgent } = makeCtx()
-    meowAgent.listAgents.mockReturnValue([agent('a1', 'One')])
+    const { ctx, bsAgent } = makeCtx()
+    bsAgent.listAgents.mockReturnValue([agent('a1', 'One')])
     const res = await dispatchRemoteCommand('agent:state', { agentId: 'nope' }, ctx)
     expect(res).toEqual({ ok: false, error: 'unknown agent: nope' })
-    expect(meowAgent.isRunning).not.toHaveBeenCalled()
-    expect(meowAgent.isBackground).not.toHaveBeenCalled()
+    expect(bsAgent.isRunning).not.toHaveBeenCalled()
+    expect(bsAgent.isBackground).not.toHaveBeenCalled()
   })
 
   it('session:list returns the sessions for the agent', async () => {
-    const { ctx, meowAgent } = makeCtx()
-    meowAgent.listAgents.mockReturnValue([agent('a1', 'One')])
+    const { ctx, bsAgent } = makeCtx()
+    bsAgent.listAgents.mockReturnValue([agent('a1', 'One')])
     const sessions = [{ id: 's1', agentId: 'a1', title: 'S1', messageCount: 0, createdAt: 1, updatedAt: 2 }]
-    meowAgent.listSessions.mockReturnValue(sessions)
+    bsAgent.listSessions.mockReturnValue(sessions)
     const res = await dispatchRemoteCommand('session:list', { agentId: 'a1' }, ctx)
-    expect(meowAgent.listSessions).toHaveBeenCalledWith('a1')
+    expect(bsAgent.listSessions).toHaveBeenCalledWith('a1')
     expect(res).toEqual({ ok: true, result: sessions })
   })
 
   it('session:create calls createSession and returns the summary', async () => {
-    const { ctx, meowAgent } = makeCtx()
-    meowAgent.listAgents.mockReturnValue([agent('a1', 'One')])
+    const { ctx, bsAgent } = makeCtx()
+    bsAgent.listAgents.mockReturnValue([agent('a1', 'One')])
     const summary = { id: 's2', agentId: 'a1', title: 'S2', messageCount: 0, createdAt: 3, updatedAt: 4 }
-    meowAgent.createSession.mockReturnValue(summary)
+    bsAgent.createSession.mockReturnValue(summary)
     const res = await dispatchRemoteCommand('session:create', { agentId: 'a1' }, ctx)
-    expect(meowAgent.createSession).toHaveBeenCalledWith('a1')
+    expect(bsAgent.createSession).toHaveBeenCalledWith('a1')
     expect(res).toEqual({ ok: true, result: summary })
   })
 
   it('session:switch calls switchSession with the exact args', async () => {
-    const { ctx, meowAgent } = makeCtx()
-    meowAgent.listAgents.mockReturnValue([agent('a1', 'One')])
+    const { ctx, bsAgent } = makeCtx()
+    bsAgent.listAgents.mockReturnValue([agent('a1', 'One')])
     const summary = { id: 's1', agentId: 'a1', title: 'S1', messageCount: 0, createdAt: 1, updatedAt: 2 }
-    meowAgent.switchSession.mockReturnValue(summary)
+    bsAgent.switchSession.mockReturnValue(summary)
     const res = await dispatchRemoteCommand('session:switch', { agentId: 'a1', sessionId: 's1' }, ctx)
-    expect(meowAgent.switchSession).toHaveBeenCalledTimes(1)
-    expect(meowAgent.switchSession).toHaveBeenCalledWith('a1', 's1')
+    expect(bsAgent.switchSession).toHaveBeenCalledTimes(1)
+    expect(bsAgent.switchSession).toHaveBeenCalledWith('a1', 's1')
     expect(res).toEqual({ ok: true, result: summary })
   })
 
   it('session:switch errors for a nonexistent agent without calling switchSession', async () => {
-    const { ctx, meowAgent } = makeCtx()
-    meowAgent.listAgents.mockReturnValue([agent('a1', 'One')])
+    const { ctx, bsAgent } = makeCtx()
+    bsAgent.listAgents.mockReturnValue([agent('a1', 'One')])
     const res = await dispatchRemoteCommand('session:switch', { agentId: 'nope', sessionId: 's1' }, ctx)
     expect(res).toEqual({ ok: false, error: 'unknown agent: nope' })
-    expect(meowAgent.switchSession).not.toHaveBeenCalled()
+    expect(bsAgent.switchSession).not.toHaveBeenCalled()
   })
 
   it('session:rename calls renameSession with agentId, sessionId and title', async () => {
-    const { ctx, meowAgent } = makeCtx()
-    meowAgent.listAgents.mockReturnValue([agent('a1', 'One')])
+    const { ctx, bsAgent } = makeCtx()
+    bsAgent.listAgents.mockReturnValue([agent('a1', 'One')])
     const summary = { id: 's1', agentId: 'a1', title: 'New', messageCount: 1, createdAt: 1, updatedAt: 5 }
-    meowAgent.renameSession.mockReturnValue(summary)
+    bsAgent.renameSession.mockReturnValue(summary)
     const res = await dispatchRemoteCommand('session:rename', { agentId: 'a1', sessionId: 's1', title: 'New' }, ctx)
-    expect(meowAgent.renameSession).toHaveBeenCalledWith('a1', 's1', 'New')
+    expect(bsAgent.renameSession).toHaveBeenCalledWith('a1', 's1', 'New')
     expect(res).toEqual({ ok: true, result: summary })
   })
 
   it('session:messages returns the message history for the agent', async () => {
-    const { ctx, meowAgent } = makeCtx()
-    meowAgent.listAgents.mockReturnValue([agent('a1', 'One')])
+    const { ctx, bsAgent } = makeCtx()
+    bsAgent.listAgents.mockReturnValue([agent('a1', 'One')])
     const msgs = [{ id: 'm1', role: 'user', text: 'hi', createdAt: 1 }]
-    meowAgent.listMessages.mockReturnValue(msgs)
+    bsAgent.listMessages.mockReturnValue(msgs)
     const res = await dispatchRemoteCommand('session:messages', { agentId: 'a1' }, ctx)
     expect(res).toEqual({ ok: true, result: msgs })
-    expect(meowAgent.listMessages).toHaveBeenCalledWith('a1')
+    expect(bsAgent.listMessages).toHaveBeenCalledWith('a1')
   })
 
   it('chat:respond calls respondPrompt with allow and optional text', async () => {
-    const { ctx, meowAgent } = makeCtx()
-    meowAgent.listAgents.mockReturnValue([agent('a1', 'One')])
+    const { ctx, bsAgent } = makeCtx()
+    bsAgent.listAgents.mockReturnValue([agent('a1', 'One')])
     const res = await dispatchRemoteCommand('chat:respond', {
       agentId: 'a1', promptId: 'p1', allow: true, text: 'yes', always: true
     }, ctx)
     expect(res).toEqual({ ok: true, result: { responded: true } })
-    expect(meowAgent.respondPrompt).toHaveBeenCalledWith('a1', 'p1', { allow: true, text: 'yes', always: true })
+    expect(bsAgent.respondPrompt).toHaveBeenCalledWith('a1', 'p1', { allow: true, text: 'yes', always: true })
   })
 
   it('chat:respond requires promptId', async () => {
-    const { ctx, meowAgent } = makeCtx()
-    meowAgent.listAgents.mockReturnValue([agent('a1', 'One')])
+    const { ctx, bsAgent } = makeCtx()
+    bsAgent.listAgents.mockReturnValue([agent('a1', 'One')])
     const res = await dispatchRemoteCommand('chat:respond', { agentId: 'a1', allow: true }, ctx)
     expect(res.ok).toBe(false)
-    expect(meowAgent.respondPrompt).not.toHaveBeenCalled()
+    expect(bsAgent.respondPrompt).not.toHaveBeenCalled()
   })
 
   it('chat:send routes a known slash command to runCommand, not send', async () => {
-    const { ctx, meowAgent } = makeCtx()
-    meowAgent.listAgents.mockReturnValue([agent('a1', 'One')])
-    meowAgent.listCommands.mockReturnValue([{ name: 'help', type: 'prompt', args: [] }])
+    const { ctx, bsAgent } = makeCtx()
+    bsAgent.listAgents.mockReturnValue([agent('a1', 'One')])
+    bsAgent.listCommands.mockReturnValue([{ name: 'help', type: 'prompt', args: [] }])
     const res = await dispatchRemoteCommand('chat:send', { agentId: 'a1', text: '/help xyz' }, ctx)
     expect(res).toEqual({ ok: true, result: { queued: true } })
-    expect(meowAgent.runCommand).toHaveBeenCalledWith('a1', 'help', 'xyz')
-    expect(meowAgent.send).not.toHaveBeenCalled()
+    expect(bsAgent.runCommand).toHaveBeenCalledWith('a1', 'help', 'xyz')
+    expect(bsAgent.send).not.toHaveBeenCalled()
   })
 
   it('chat:send falls back to send for an unknown slash command', async () => {
-    const { ctx, meowAgent } = makeCtx()
-    meowAgent.listAgents.mockReturnValue([agent('a1', 'One')])
-    meowAgent.listCommands.mockReturnValue([{ name: 'help', type: 'prompt', args: [] }])
+    const { ctx, bsAgent } = makeCtx()
+    bsAgent.listAgents.mockReturnValue([agent('a1', 'One')])
+    bsAgent.listCommands.mockReturnValue([{ name: 'help', type: 'prompt', args: [] }])
     const res = await dispatchRemoteCommand('chat:send', { agentId: 'a1', text: '/nope hi' }, ctx)
     expect(res.ok).toBe(true)
-    expect(meowAgent.send).toHaveBeenCalledWith('a1', '/nope hi')
-    expect(meowAgent.runCommand).not.toHaveBeenCalled()
+    expect(bsAgent.send).toHaveBeenCalledWith('a1', '/nope hi')
+    expect(bsAgent.runCommand).not.toHaveBeenCalled()
   })
 
   it('chat:send calls send with the exact agentId and text and returns queued', async () => {
-    const { ctx, meowAgent } = makeCtx()
-    meowAgent.listAgents.mockReturnValue([agent('a1', 'One')])
+    const { ctx, bsAgent } = makeCtx()
+    bsAgent.listAgents.mockReturnValue([agent('a1', 'One')])
     const res = await dispatchRemoteCommand('chat:send', { agentId: 'a1', text: 'hello there' }, ctx)
-    expect(meowAgent.send).toHaveBeenCalledTimes(1)
-    expect(meowAgent.send).toHaveBeenCalledWith('a1', 'hello there')
+    expect(bsAgent.send).toHaveBeenCalledTimes(1)
+    expect(bsAgent.send).toHaveBeenCalledWith('a1', 'hello there')
     expect(res).toEqual({ ok: true, result: { queued: true } })
   })
 
   it('chat:send rejects empty text without calling send', async () => {
-    const { ctx, meowAgent } = makeCtx()
-    meowAgent.listAgents.mockReturnValue([agent('a1', 'One')])
+    const { ctx, bsAgent } = makeCtx()
+    bsAgent.listAgents.mockReturnValue([agent('a1', 'One')])
     const res = await dispatchRemoteCommand('chat:send', { agentId: 'a1', text: '   ' }, ctx)
     expect(res).toEqual({ ok: false, error: 'text is required' })
-    expect(meowAgent.send).not.toHaveBeenCalled()
+    expect(bsAgent.send).not.toHaveBeenCalled()
   })
 
   it('returns an error for an unknown command', async () => {
@@ -226,16 +226,16 @@ describe('dispatchRemoteCommand', () => {
   })
 
   it('returns missing required param when agentId is absent', async () => {
-    const { ctx, meowAgent } = makeCtx()
+    const { ctx, bsAgent } = makeCtx()
     const res = await dispatchRemoteCommand('agent:state', {}, ctx)
     expect(res).toEqual({ ok: false, error: 'missing required param: agentId' })
-    expect(meowAgent.isRunning).not.toHaveBeenCalled()
+    expect(bsAgent.isRunning).not.toHaveBeenCalled()
   })
 
   it('wraps a throwing handler into an error result instead of rejecting', async () => {
-    const { ctx, meowAgent } = makeCtx()
-    meowAgent.listAgents.mockReturnValue([agent('a1', 'One')])
-    meowAgent.listSessions.mockImplementation(() => {
+    const { ctx, bsAgent } = makeCtx()
+    bsAgent.listAgents.mockReturnValue([agent('a1', 'One')])
+    bsAgent.listSessions.mockImplementation(() => {
       throw new Error('boom')
     })
     const res = await dispatchRemoteCommand('session:list', { agentId: 'a1' }, ctx)

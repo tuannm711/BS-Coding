@@ -1,17 +1,17 @@
 import { useState } from 'react'
-import type { AgentSettings, MeowSettings, ModelRef, SubagentType } from '@shared/types'
+import type { AgentSettings, BsSettings, ModelRef, SubagentType } from '@shared/types'
 import Modal from './Modal'
 
 const SUBMODEL_ROLES = ['research', 'general', 'reviewer'] as const
 
 const defaultPrompt = (name: string) =>
-  `You are ${name}, a coding agent running inside the Meow Coding desktop app. ` +
+  `You are ${name}, a coding agent running inside the BS Coding desktop app. ` +
   'You help the user build and maintain their codebase. Read files before editing them, ' +
   'run tests after changes, and keep answers concise.'
 
 interface Props {
   agents: AgentSettings[]
-  providers: MeowSettings['providers']
+  providers: BsSettings['providers']
   subagentModels?: Partial<Record<SubagentType, ModelRef>>
   onChangeAgents: (agents: AgentSettings[]) => void
   onChangeSubagentModels: (models?: Partial<Record<SubagentType, ModelRef>>) => void
@@ -54,7 +54,7 @@ export default function AgentsTab({ agents, providers, subagentModels, onChangeA
 
   const removeAgent = (index: number) => {
     const name = agents[index]?.name
-    if (name === 'meow') return
+    if (name === 'bs') return
     onChangeAgents(agents.filter((_, i) => i !== index))
   }
 
@@ -62,7 +62,7 @@ export default function AgentsTab({ agents, providers, subagentModels, onChangeA
     <div className="settings-tab agents-tab">
       <div className="agents-head">
         <p className="settings-hint">
-          Agent system prompts. "meow" is the default native agent and cannot be removed.
+          Agent system prompts. "bs" is the default native agent and cannot be removed.
         </p>
         <button className="btn primary small" onClick={openAdd}>+ Add agent</button>
       </div>
@@ -70,7 +70,7 @@ export default function AgentsTab({ agents, providers, subagentModels, onChangeA
         <div className="settings-row agents-row" key={a.name}>
           <div className="agents-row-head">
             <span className="agent-name">{a.name}</span>
-            <button className="btn small" disabled={a.name === 'meow'} onClick={() => removeAgent(i)}>
+            <button className="btn small" disabled={a.name === 'bs'} onClick={() => removeAgent(i)}>
               Remove
             </button>
           </div>

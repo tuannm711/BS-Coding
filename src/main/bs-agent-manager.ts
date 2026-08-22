@@ -1,10 +1,10 @@
 import { randomUUID } from 'node:crypto'
 import { writeFileSync } from 'node:fs'
-import type { ChatEvent, ChatMessage, ChatTranscriptItem, ContextInfo, FileSuggestion, ImageAttachment, McpServerStatus, MeowSettings, MessageTokens, ModelUsage, NotificationsSettings, PromptResponse, QueuedMessage, StatsSummary, TodoItem, TraceEvent, UsageSummary } from '../shared/types'
+import type { ChatEvent, ChatMessage, ChatTranscriptItem, ContextInfo, FileSuggestion, ImageAttachment, McpServerStatus, BsSettings, MessageTokens, ModelUsage, NotificationsSettings, PromptResponse, QueuedMessage, StatsSummary, TodoItem, TraceEvent, UsageSummary } from '../shared/types'
 import type { AgentConfig, AgentMode, ArtifactEntry, CatalogProviderSummary, Command, ModelRef, SubagentType } from '../shared/types'
 import {
-  configToSettings, loadMeowConfig, resolveAgentConfig, settingsToConfig, writeMeowConfig,
-  type MeowConfig, type ResolvedAgentConfig
+  configToSettings, loadBsConfig, resolveAgentConfig, settingsToConfig, writeBsConfig,
+  type BsConfig, type ResolvedAgentConfig
 } from './agent/config'
 import { SessionRunner } from './agent/loop'
 import { createLlm } from './agent/llm'
@@ -38,7 +38,7 @@ import type { Vault } from './vault'
 import { TraceStore } from './agent/trace-store'
 import type { TraceEventInput } from './agent/trace-store'
 
-export interface MeowAgentManagerDeps {
+export interface BsAgentManagerDeps {
   configPath: string
   vault?: Vault
   store: SessionStore
@@ -65,7 +65,7 @@ export interface MeowAgentManagerDeps {
   notifications?: NotificationsSettings
 }
 
-export class MeowAgentManager {
+export class BsAgentManager {
   private runners = new Map<string, SessionRunner>()
   private agents = new Map<string, AgentConfig>()
   private resolved = new Map<string, ResolvedAgentConfig>()
@@ -91,9 +91,9 @@ export class MeowAgentManager {
   private lastCompactionAt = new Map<string, number>()
   private idleCompactTimer: ReturnType<typeof setInterval> | null = null
 
-  constructor(private deps: MeowAgentManagerDeps) {
+  constructor(private deps: BsAgentManagerDeps) {
     this.tools = new Map(deps.tools)
-    const cfg = loadMeowConfig(deps.configPath)
+    const cfg = loadBsConfig(deps.configPath)
     this.deps = { ...deps, notifications: cfg.notifications }
     this.traceEnabled = cfg.trace?.enabled ?? false
     // Auto-compact when a session sits over its context limit while idle
@@ -110,14 +110,14 @@ export class MeowAgentManager {
       if (e.type === 'done' && this.deps.notifications?.onDone !== false) {
         const cost = e.cost !== undefined ? ` · ${e.cost.toFixed(4)}` : ''
         this.deps.notify?.notify({
-          title: '[meow] Hoàn thành',
+          title: '[bs] Hoàn thành',
           body: `${this.agents.get(e.agentId)?.name ?? e.agentId}${e.reason ? ` (${e.reason})` : ''}${cost}`,
           agentId: e.agentId,
           onActivate: () => this.deps.onActivateAgent?.(e.agentId)
         })
       } else if (e.type === 'error' && this.deps.notifications?.onDone !== false) {
         this.deps.notify?.notify({
-          title: '[meow] Lỗi',
+          title: '[bs] Lỗi',
           body: `${this.agents.get(e.agentId)?.name ?? e.agentId}: ${e.message}`,
           agentId: e.agentId,
           onActivate: () => this.deps.onActivateAgent?.(e.agentId)
@@ -282,7 +282,7 @@ export class MeowAgentManager {
     if (this.running.has(agentId)) {
       const q = this.queues.get(agentId) ?? []
       if (q.length >= this.MAX_QUEUE) {
-        this.emit({ type: 'error', agentId, message: '[meow] Hàng đợi đã đầy (tối đa 5 tin). Hãy chờ turn hiện tại xong hoặc xóa tin đang chờ.' })
+        this.emit({ type: 'error', agentId, message: '[bs] Hàng đợi đã đầy (tối đa 5 tin). Hãy chờ turn hiện tại xong hoặc xóa tin đang chờ.' })
         return
       }
       q.push({ id: randomUUID(), text, images, displayText })
@@ -325,7 +325,7 @@ export class MeowAgentManager {
         type: 'error',
         agentId,
         message:
-          '[meow] Chưa cấu hình provider/API key. Mở Settings, thêm provider (id + API key + models) rồi thử lại.'
+          '[bs] Chưa cấu hình provider/API key. Mở Settings, thêm provider (id + API key + models) rồi thử lại.'
       })
       return
     }
@@ -488,7 +488,7 @@ export class MeowAgentManager {
   getAgentModel(agentId: string): ModelRef | null {
     const agent = this.agents.get(agentId)
     if (!agent) return null
-    const cfg = loadMeowConfig(this.deps.configPath)
+    const cfg = loadBsConfig(this.deps.configPath)
     const resolved = this.resolveAgentConfig(cfg, agent.name, agent.model)
     if (!resolved.provider || !resolved.model) return null
     return { provider: resolved.provider, model: resolved.model }
@@ -497,7 +497,7 @@ export class MeowAgentManager {
   getContextInfo(agentId: string): ContextInfo {
     const agent = this.agents.get(agentId)
     if (!agent) return { limit: null, compactThreshold: null, sessionCost: 0 }
-    const cfg = loadMeowConfig(this.deps.configPath)
+    const cfg = loadBsConfig(this.deps.configPath)
     const resolved = this.resolveAgentConfig(cfg, agent.name, agent.model)
     const modelLimit = resolved.provider && resolved.model
       ? this.modelLimits.get(`${resolved.provider}/${resolved.model}`)
@@ -512,7 +512,7 @@ export class MeowAgentManager {
   }
 
   getProviderModels(): ModelRef[] {
-    const cfg = loadMeowConfig(this.deps.configPath)
+    const cfg = loadBsConfig(this.deps.configPath)
     const refs: ModelRef[] = []
     for (const [provider, p] of Object.entries(cfg.provider)) {
       for (const model of p.models) refs.push({ provider, model })
@@ -532,7 +532,7 @@ export class MeowAgentManager {
 
   private allowedVariantsFor(agent: AgentConfig): string[] {
     if (!this.deps.catalog) return []
-    const cfg = loadMeowConfig(this.deps.configPath)
+    const cfg = loadBsConfig(this.deps.configPath)
     const resolved = this.resolveAgentConfig(cfg, agent.name, agent.model)
     if (!resolved.provider || !resolved.model) return []
     return Object.keys(this.modelVariants.get(`${resolved.provider}/${resolved.model}`) ?? {})
@@ -549,7 +549,7 @@ export class MeowAgentManager {
     return this.deps.catalog.list()
   }
 
-  async connectProvider(providerId: string, apiKey: string, baseUrl?: string): Promise<MeowSettings> {
+  async connectProvider(providerId: string, apiKey: string, baseUrl?: string): Promise<BsSettings> {
     const catalog = await this.deps.catalog?.fetch() ?? {}
     const models = catalog[providerId]?.models ?? []
     const settings = this.getSettings()
@@ -574,7 +574,7 @@ export class MeowAgentManager {
     return this.saveSettings({ ...settings, providers: nextProviders, defaultProvider })
   }
 
-  async disconnectProvider(providerId: string): Promise<MeowSettings> {
+  async disconnectProvider(providerId: string): Promise<BsSettings> {
     const settings = this.getSettings()
     this.deps.vault?.deleteSecret(`provider:${providerId}`)
     const nextProviders = settings.providers.filter(p => p.id !== providerId)
@@ -584,8 +584,8 @@ export class MeowAgentManager {
     return this.saveSettings({ ...settings, providers: nextProviders, defaultProvider })
   }
 
-  getSettings(): MeowSettings {
-    return configToSettings(loadMeowConfig(this.deps.configPath))
+  getSettings(): BsSettings {
+    return configToSettings(loadBsConfig(this.deps.configPath))
   }
 
   getMcpStatus(): McpServerStatus[] {
@@ -617,7 +617,7 @@ export class MeowAgentManager {
     const all = this.listCommands(agent.cwd)
     const command = all.find(c => c.name === name || `/${c.name}` === name)
     if (!command) {
-      this.emit({ type: 'error', agentId, message: `[meow] Không tìm thấy command "${name}".` })
+      this.emit({ type: 'error', agentId, message: `[bs] Không tìm thấy command "${name}".` })
       return
     }
     // System commands act on state (e.g. creating a session) instead of
@@ -646,7 +646,7 @@ export class MeowAgentManager {
       const u = s.usage
       totalCost += u.cost
       // Provider dashboards count cache-read/write tokens in the input total,
-      // so include them here to keep Meow's numbers comparable.
+      // so include them here to keep Bs's numbers comparable.
       totalTokens += u.input + u.output + u.cacheRead + u.cacheWrite
       perModel[model] = {
         messages: (perModel[model]?.messages ?? 0) + 1,
@@ -658,10 +658,10 @@ export class MeowAgentManager {
     return { totalCost, totalTokens, perModel, perSession }
   }
 
-  async saveSettings(settings: MeowSettings): Promise<MeowSettings> {
-    const current = loadMeowConfig(this.deps.configPath)
+  async saveSettings(settings: BsSettings): Promise<BsSettings> {
+    const current = loadBsConfig(this.deps.configPath)
     const cfg = settingsToConfig(settings, current)
-    writeMeowConfig(this.deps.configPath, cfg)
+    writeBsConfig(this.deps.configPath, cfg)
     this.deps = { ...this.deps, notifications: cfg.notifications }
     await this.reload()
     return configToSettings(cfg)
@@ -676,7 +676,7 @@ export class MeowAgentManager {
     }
     await this.syncTools()
     await this.refreshModelLimits()
-    this.traceEnabled = loadMeowConfig(this.deps.configPath).trace?.enabled ?? false
+    this.traceEnabled = loadBsConfig(this.deps.configPath).trace?.enabled ?? false
     for (const agent of agents) this.register(agent)
   }
 
@@ -690,7 +690,7 @@ export class MeowAgentManager {
   // Runs compaction for agents sitting over the context limit while no turn
   // is in flight. Cheap threshold check first; only then spend an LLM call.
   private async maybeCompactIdle(): Promise<void> {
-    const cfg = loadMeowConfig(this.deps.configPath)
+    const cfg = loadBsConfig(this.deps.configPath)
     for (const agentId of this.runners.keys()) {
       if (this.running.has(agentId) || this.compacting.has(agentId)) continue
       const now = Date.now()
@@ -746,7 +746,7 @@ export class MeowAgentManager {
   }
 
   private async syncTools(): Promise<void> {
-    const cfg = loadMeowConfig(this.deps.configPath)
+    const cfg = loadBsConfig(this.deps.configPath)
     await this.mcp.connect(cfg.mcp ?? {}, this.deps.projectPath)
     const userTools = await loadUserTools(
       [this.deps.userToolsDir].filter((d): d is string => Boolean(d))
@@ -767,7 +767,7 @@ export class MeowAgentManager {
       this.runners.delete(agent.id)
       this.resolved.delete(agent.id)
     }
-    const cfg = loadMeowConfig(this.deps.configPath)
+    const cfg = loadBsConfig(this.deps.configPath)
     const resolved = this.resolveAgentConfig(cfg, agent.name, agent.model)
     this.resolved.set(agent.id, resolved)
     const modelLimit = resolved.provider && resolved.model
@@ -915,7 +915,7 @@ export class MeowAgentManager {
     this.runners.set(agent.id, runner)
   }
 
-  private resolveAgentConfig(cfg: MeowConfig, agentName: string, agentModel?: string): ResolvedAgentConfig {
+  private resolveAgentConfig(cfg: BsConfig, agentName: string, agentModel?: string): ResolvedAgentConfig {
     return resolveAgentConfig(
       cfg,
       agentName,
@@ -940,7 +940,7 @@ export class MeowAgentManager {
       }
       if (this.deps.notifications?.needsInput !== false) {
         this.deps.notify?.notify({
-          title: '[meow] Cần bạn nhập',
+          title: '[bs] Cần bạn nhập',
           body: `${this.agents.get(agentId)?.name ?? agentId} đang chờ...`,
           agentId,
           onActivate: () => this.deps.onActivateAgent?.(agentId)

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { Channels } from '../../src/shared/ipc'
 import type { AgentApi, BrowserStatusEvent, PtyDataEvent, AgentStateEvent, GitStatusEvent, ChatEvent } from '../../src/shared/ipc'
 import type { BrowserStatusInfo } from '../../src/shared/browser-types'
-import type { AgentConfig, ChatMessage, MeowSettings } from '../../src/shared/types'
+import type { AgentConfig, ChatMessage, BsSettings } from '../../src/shared/types'
 
 describe('IPC contract', () => {
   it('defines all channels used by the preload api', () => {
@@ -223,7 +223,7 @@ describe('IPC contract', () => {
 
   it('types chat payloads without runtime error', () => {
     const msg: ChatMessage = { id: 'm1', role: 'user', text: 'hi', createdAt: 1 }
-    const cfg: AgentConfig = { id: 'a1', name: 'meow', templateId: 'meow', cwd: '/p', kind: 'native' }
+    const cfg: AgentConfig = { id: 'a1', name: 'bs', templateId: 'bs', cwd: '/p', kind: 'native' }
     const evt: ChatEvent = { type: 'text-delta', agentId: 'a1', delta: 'x' }
     const promptEvt: ChatEvent = {
       type: 'prompt-request', agentId: 'a1', promptId: 'p1',
@@ -236,7 +236,7 @@ describe('IPC contract', () => {
   })
 
   it('types settings payloads without runtime error', () => {
-    const s: MeowSettings = {
+    const s: BsSettings = {
       providers: [{ id: 'deepseek', apiKey: 'k', baseUrl: 'https://api.deepseek.com/v1', model: 'deepseek-chat' }],
       defaultProvider: 'deepseek'
     }

@@ -32,11 +32,11 @@ export class TrayManager {
     } catch (err) {
       // No system tray (rare on headless/minimal Linux) — fall back to the
       // old behavior (close = quit) instead of trapping the user.
-      console.error('[meow] tray creation failed:', err)
+      console.error('[bs] tray creation failed:', err)
       return null
     }
     const manager = new TrayManager(tray, opts.getWindow, opts.onQuit, opts.userDataDir)
-    tray.setToolTip('Meow Coding')
+    tray.setToolTip('BS Coding')
     tray.setContextMenu(Menu.buildFromTemplate(manager.menuTemplate()))
     tray.on('click', () => manager.toggleWindow())
     return manager
@@ -50,7 +50,7 @@ export class TrayManager {
 
   private menuTemplate(): MenuItemConstructorOptions[] {
     return [
-      { label: 'Show Meow Coding', click: () => this.showWindow() },
+      { label: 'Show BS Coding', click: () => this.showWindow() },
       { type: 'separator' },
       { label: 'Exit', click: () => this.onQuit() }
     ]
@@ -94,8 +94,8 @@ export class TrayManager {
     const flag = path.join(this.userDataDir, 'tray-notified')
     if (existsSync(flag)) return
     const n = new Notification({
-      title: 'Meow Coding',
-      body: '[meow] Meow Coding vẫn đang chạy ngầm, click icon tray để mở lại.'
+      title: 'BS Coding',
+      body: '[bs] BS Coding vẫn đang chạy ngầm, click icon tray để mở lại.'
     })
     n.on('click', () => this.showWindow())
     n.show()

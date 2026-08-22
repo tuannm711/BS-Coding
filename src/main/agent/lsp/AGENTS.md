@@ -1,6 +1,6 @@
 # AGENTS.md — src/main/agent/lsp
 
-Language Server Protocol support for the Meow agent: spawns language servers, tracks open
+Language Server Protocol support for the Bs agent: spawns language servers, tracks open
 documents, and produces diagnostics text that the `lsp` tool feeds back into the agent context.
 
 ## Key files
@@ -15,4 +15,4 @@ documents, and produces diagnostics text that the `lsp` tool feeds back into the
 
 - Runs only in the **main process**; renderer never talks to LSP directly.
 - Errors are swallowed per-client (offline/unsupported language → no diagnostics, not a crash).
-- Disabled when `lsp.enabled` is false in config; `LspManager` is optional in `MeowAgentManagerDeps`.
+- Disabled when `lsp.enabled` is false in config; `LspManager` is optional in `BsAgentManagerDeps`.

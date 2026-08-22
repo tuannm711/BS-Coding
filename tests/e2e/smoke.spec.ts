@@ -6,7 +6,7 @@ import path from 'node:path'
 test('app launches and shows the main window', async () => {
   const app = await electron.launch({ args: ['.'] })
   const window = await app.firstWindow()
-  await expect(window).toHaveTitle(/Meow Coding/)
+  await expect(window).toHaveTitle(/BS Coding/)
   await expect(window.locator('.sidebar')).toBeVisible()
   // Version loads asynchronously via IPC; auto-wait for it to appear.
   const version = window.locator('.status-bar .sb-mono').last()
@@ -15,15 +15,15 @@ test('app launches and shows the main window', async () => {
   await app.close()
 })
 
-test('native meow agent renders a chat panel and sends a message', async () => {
-  const userData = mkdtempSync(path.join(tmpdir(), 'meow-ud-'))
-  const project = mkdtempSync(path.join(tmpdir(), 'meow-e2e-'))
+test('native bs agent renders a chat panel and sends a message', async () => {
+  const userData = mkdtempSync(path.join(tmpdir(), 'bs-ud-'))
+  const project = mkdtempSync(path.join(tmpdir(), 'bs-e2e-'))
   try {
     const workspaces = [{
       projectPath: project,
       name: 'E2E Project',
       agents: [
-        { id: 'e2e-meow', name: 'meow', templateId: 'meow', cwd: project, kind: 'native' }
+        { id: 'e2e-bs', name: 'bs', templateId: 'bs', cwd: project, kind: 'native' }
       ]
     }]
     writeFileSync(path.join(userData, 'workspaces.json'), JSON.stringify(workspaces, null, 2))
@@ -43,9 +43,9 @@ test('native meow agent renders a chat panel and sends a message', async () => {
       await expect(window.getByRole('button', { name: 'Remove' })).toBeVisible()
       await window.keyboard.press('Escape')
 
-      await window.locator('.chat-input-field').fill('hello meow')
+      await window.locator('.chat-input-field').fill('hello bs')
       await window.locator('.chat-input-field').press('Enter')
-      await expect(window.locator('.chat-msg.user').last()).toContainText('hello meow')
+      await expect(window.locator('.chat-msg.user').last()).toContainText('hello bs')
 
       await window.getByRole('button', { name: 'plan' }).click()
       await expect(window.locator('.chat-mode-hint')).toBeVisible()
@@ -67,8 +67,8 @@ test('native meow agent renders a chat panel and sends a message', async () => {
 })
 
 test('pasted/attached image previews render in input, feed, and lightbox', async () => {
-  const userData = mkdtempSync(path.join(tmpdir(), 'meow-ud-'))
-  const project = mkdtempSync(path.join(tmpdir(), 'meow-e2e-'))
+  const userData = mkdtempSync(path.join(tmpdir(), 'bs-ud-'))
+  const project = mkdtempSync(path.join(tmpdir(), 'bs-e2e-'))
   // 1x1 transparent PNG (valid image data so naturalWidth reflects a decode)
   const pngPath = path.join(project, 'pixel.png')
   writeFileSync(pngPath, Buffer.from(
@@ -80,7 +80,7 @@ test('pasted/attached image previews render in input, feed, and lightbox', async
       projectPath: project,
       name: 'E2E Project',
       agents: [
-        { id: 'e2e-meow', name: 'meow', templateId: 'meow', cwd: project, kind: 'native' }
+        { id: 'e2e-bs', name: 'bs', templateId: 'bs', cwd: project, kind: 'native' }
       ]
     }]
     writeFileSync(path.join(userData, 'workspaces.json'), JSON.stringify(workspaces, null, 2))
@@ -145,8 +145,8 @@ test('pasted/attached image previews render in input, feed, and lightbox', async
 })
 
 test('settings screen connects a provider and syncs models', async () => {
-  const userData = mkdtempSync(path.join(tmpdir(), 'meow-ud-'))
-  const project = mkdtempSync(path.join(tmpdir(), 'meow-e2e-'))
+  const userData = mkdtempSync(path.join(tmpdir(), 'bs-ud-'))
+  const project = mkdtempSync(path.join(tmpdir(), 'bs-e2e-'))
   try {
     writeFileSync(path.join(userData, 'workspaces.json'), JSON.stringify([]))
     // seed the models.dev cache so the test works offline

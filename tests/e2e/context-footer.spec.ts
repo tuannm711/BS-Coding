@@ -54,22 +54,22 @@ function cleanupDir(dir: string): void {
   rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 })
 }
 
-function seedUserData(userData: string, project: string, meowConfig: Record<string, unknown>): void {
+function seedUserData(userData: string, project: string, bsConfig: Record<string, unknown>): void {
   const workspaces = [{
     projectPath: project,
     name: 'E2E Project',
-    agents: [{ id: 'e2e-meow', name: 'meow', templateId: 'meow', cwd: project, kind: 'native' }]
+    agents: [{ id: 'e2e-bs', name: 'bs', templateId: 'bs', cwd: project, kind: 'native' }]
   }]
   writeFileSync(path.join(userData, 'workspaces.json'), JSON.stringify(workspaces, null, 2))
-  writeFileSync(path.join(userData, 'meow.json'), JSON.stringify(meowConfig, null, 2))
+  writeFileSync(path.join(userData, 'bs.json'), JSON.stringify(bsConfig, null, 2))
 }
 
 test('context footer shows real token usage, persists across reload, resets on new session', async () => {
   const { server, port } = await startMockLlm([
     { content: 'hi there', usage: { prompt_tokens: 3800, completion_tokens: 431, total_tokens: 4231 } }
   ])
-  const userData = mkdtempSync(path.join(tmpdir(), 'meow-ud-'))
-  const project = mkdtempSync(path.join(tmpdir(), 'meow-e2e-'))
+  const userData = mkdtempSync(path.join(tmpdir(), 'bs-ud-'))
+  const project = mkdtempSync(path.join(tmpdir(), 'bs-e2e-'))
   try {
     seedUserData(userData, project, {
       provider: { mock: { apiKey: 'test-key', baseUrl: `http://127.0.0.1:${port}`, models: ['mock-model'] } },
@@ -90,7 +90,7 @@ test('context footer shows real token usage, persists across reload, resets on n
     // No messages yet -> placeholder, not a stale number.
     await expect(window.locator('.context-footer')).toContainText('—')
 
-    await window.locator('.chat-input-field').fill('hello meow')
+    await window.locator('.chat-input-field').fill('hello bs')
     await window.locator('.chat-input-field').press('Enter')
     await expect(window.locator('.chat-msg.assistant').last()).toContainText('hi there')
 
@@ -128,8 +128,8 @@ test('context footer turns danger and shows the compacting note past the auto-co
   const { server, port } = await startMockLlm([
     { content: 'near limit', usage: { prompt_tokens: 900, completion_tokens: 100, total_tokens: 1000 } }
   ])
-  const userData = mkdtempSync(path.join(tmpdir(), 'meow-ud-'))
-  const project = mkdtempSync(path.join(tmpdir(), 'meow-e2e-'))
+  const userData = mkdtempSync(path.join(tmpdir(), 'bs-ud-'))
+  const project = mkdtempSync(path.join(tmpdir(), 'bs-e2e-'))
   try {
     // maxContextTokens 1100 - buffer 100 = compactThreshold 1000, matched
     // exactly by the mock's reported total_tokens so contextLevel lands on
@@ -148,7 +148,7 @@ test('context footer turns danger and shows the compacting note past the auto-co
     const window = await app.firstWindow()
     try {
       await window.locator('.project-row').click()
-      await window.locator('.chat-input-field').fill('hello meow')
+      await window.locator('.chat-input-field').fill('hello bs')
       await window.locator('.chat-input-field').press('Enter')
       await expect(window.locator('.chat-msg.assistant').last()).toContainText('near limit')
 

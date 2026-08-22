@@ -50,7 +50,7 @@ export function loadSkills(dir: string): Skill[] {
 }
 
 export function collectSkills(cwd: string, userSkillsDir?: string, builtinSkillsDir?: string): Skill[] {
-  const dirs = [path.join(cwd, '.meow', 'skills')]
+  const dirs = [path.join(cwd, '.bs', 'skills')]
   if (userSkillsDir) dirs.push(userSkillsDir)
   if (builtinSkillsDir) dirs.push(builtinSkillsDir)
   const seen = new Set<string>()

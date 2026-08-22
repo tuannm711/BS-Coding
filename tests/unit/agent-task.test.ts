@@ -27,7 +27,7 @@ vi.mock('../../src/main/agent/loop', async (importOriginal) => {
 const dirs: string[] = []
 
 function tempDir(): string {
-  const d = mkdtempSync(path.join(tmpdir(), 'meow-task-'))
+  const d = mkdtempSync(path.join(tmpdir(), 'bs-task-'))
   dirs.push(d)
   return d
 }
