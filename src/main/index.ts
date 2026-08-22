@@ -41,6 +41,7 @@ import { createChromeLauncher, ensureExtensionInstalled } from './browser/chrome
 import { RemoteManager } from './remote/remote-manager'
 import { RemoteSettingsStore } from './remote/remote-settings'
 import { RemotePairing } from './remote/remote-pairing'
+import { migrateLegacyUserData, resolveUserDataDir } from './bs-migration'
 import { Channels } from '../shared/ipc'
 import type { AgentState, Command, FileViewerPayload, ImageAttachment, MeowSettings, NewAgentInput, PromptResponse, Template, TerminalInfo, Workspace, WorkspaceRuntime } from '../shared/types'
 
@@ -48,7 +49,7 @@ let win: BrowserWindow | null = null
 let isQuitting = false
 let tray: TrayManager | null = null
 
-if (process.env.MEOW_USER_DATA) app.setPath('userData', process.env.MEOW_USER_DATA)
+if (process.env.BS_USER_DATA) app.setPath('userData', process.env.BS_USER_DATA)
 
 // Only one instance may run at a time. While the app is hidden to the tray,
 // double-clicking the desktop icon would otherwise spawn a second process
@@ -507,7 +508,7 @@ class MainApp {
   }
 }
 
-const mainApp = new MainApp()
+let mainApp!: MainApp
 
 function createWindow(): void {
   win = new BrowserWindow({
@@ -775,6 +776,12 @@ function registerIpcHandlers(): void {
 
 app.whenReady().then(async () => {
   if (!gotTheLock) return // secondary instance — already quitting
+  const userDataDir = resolveUserDataDir(process.env, app.getPath('userData'))
+  app.setPath('userData', userDataDir)
+  await migrateLegacyUserData(userDataDir, {
+    legacyDir: path.join(path.dirname(userDataDir), 'Meow Coding')
+  })
+  mainApp = new MainApp()
   mainApp.meowAgent.truncationCleanup()
   await mainApp.browserBridge.start().catch(err => {
     console.error('[meow] browser bridge start failed:', err)
