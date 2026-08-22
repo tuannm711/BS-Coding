@@ -49,8 +49,8 @@ async function assertProcessGoneByMarker(marker: string, attempts = 15, delayMs 
 
 describe('bash tool', () => {
   it('runs a command and captures output', async () => {
-    const r = await bashTool.run({ command: process.platform === 'win32' ? 'echo MEOW_OK' : 'echo MEOW_OK' }, ctx)
-    expect(r.output).toContain('MEOW_OK')
+    const r = await bashTool.run({ command: process.platform === 'win32' ? 'echo BS_OK' : 'echo BS_OK' }, ctx)
+    expect(r.output).toContain('BS_OK')
   }, 20000)
 
   it('reports a nonzero exit as an error with output', async () => {

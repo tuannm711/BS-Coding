@@ -80,7 +80,7 @@ test('context footer shows real token usage, persists across reload, resets on n
 
     let app = await electron.launch({
       args: ['.'],
-      env: { ...process.env as Record<string, string>, MEOW_USER_DATA: userData }
+      env: { ...process.env as Record<string, string>, BS_USER_DATA: userData }
     })
     let window = await app.firstWindow()
     await expect(window.locator('.project-row')).toBeVisible()
@@ -105,7 +105,7 @@ test('context footer shows real token usage, persists across reload, resets on n
     // persisted ChatMessage.tokens, not reset to the placeholder.
     app = await electron.launch({
       args: ['.'],
-      env: { ...process.env as Record<string, string>, MEOW_USER_DATA: userData }
+      env: { ...process.env as Record<string, string>, BS_USER_DATA: userData }
     })
     window = await app.firstWindow()
     await window.locator('.project-row').click()
@@ -143,7 +143,7 @@ test('context footer turns danger and shows the compacting note past the auto-co
 
     const app = await electron.launch({
       args: ['.'],
-      env: { ...process.env as Record<string, string>, MEOW_USER_DATA: userData }
+      env: { ...process.env as Record<string, string>, BS_USER_DATA: userData }
     })
     const window = await app.firstWindow()
     try {

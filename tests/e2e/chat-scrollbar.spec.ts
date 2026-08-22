@@ -46,7 +46,7 @@ test('chat feed scrollbar reflects the full transcript (no content-visibility co
 
     const app = await electron.launch({
       args: ['.'],
-      env: { ...process.env as Record<string, string>, MEOW_USER_DATA: userData }
+      env: { ...process.env as Record<string, string>, BS_USER_DATA: userData }
     })
     const window = await app.firstWindow()
     try {

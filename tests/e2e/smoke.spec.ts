@@ -30,7 +30,7 @@ test('native bs agent renders a chat panel and sends a message', async () => {
 
     const app = await electron.launch({
       args: ['.'],
-      env: { ...process.env as Record<string, string>, MEOW_USER_DATA: userData }
+      env: { ...process.env as Record<string, string>, BS_USER_DATA: userData }
     })
     const window = await app.firstWindow()
     try {
@@ -87,7 +87,7 @@ test('pasted/attached image previews render in input, feed, and lightbox', async
 
     const app = await electron.launch({
       args: ['.'],
-      env: { ...process.env as Record<string, string>, MEOW_USER_DATA: userData }
+      env: { ...process.env as Record<string, string>, BS_USER_DATA: userData }
     })
     const window = await app.firstWindow()
     try {
@@ -163,7 +163,7 @@ test('settings screen connects a provider and syncs models', async () => {
 
     const app = await electron.launch({
       args: ['.'],
-      env: { ...process.env as Record<string, string>, MEOW_USER_DATA: userData }
+      env: { ...process.env as Record<string, string>, BS_USER_DATA: userData }
     })
     const window = await app.firstWindow()
     try {

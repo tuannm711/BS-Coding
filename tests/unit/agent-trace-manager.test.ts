@@ -16,7 +16,7 @@ import type { TraceStore } from '../../src/main/agent/trace-store'
 import type { TraceEvent } from '../../src/shared/types'
 import type { AgentConfig } from '../../src/shared/types'
 
-const MEOW_AGENT: AgentConfig = {
+const BS_AGENT: AgentConfig = {
   id: 'a1', name: 'bs', templateId: 'bs', cwd: '/proj', kind: 'native'
 }
 
@@ -80,7 +80,7 @@ async function makeManager(opts: { trace?: boolean } = {}) {
 describe('BsAgentManager trace wiring', () => {
   it('skips trace writes when trace is disabled (default)', async () => {
     const { manager, trace } = await makeManager({ trace: false })
-    manager.addAgent(MEOW_AGENT)
+    manager.addAgent(BS_AGENT)
     manager.newSession('a1')
     manager.setOnEvent(() => {})
 
@@ -93,7 +93,7 @@ describe('BsAgentManager trace wiring', () => {
 
   it('writes trace events for chat events with turn attribution', async () => {
     const { manager, trace } = await makeManager()
-    manager.addAgent(MEOW_AGENT)
+    manager.addAgent(BS_AGENT)
     const sessionId = manager.newSession('a1').id
     manager.setOnEvent(() => {})
 
@@ -123,7 +123,7 @@ describe('BsAgentManager trace wiring', () => {
 
   it('increments the turn counter on each real turn', async () => {
     const { manager, trace } = await makeManager()
-    manager.addAgent(MEOW_AGENT)
+    manager.addAgent(BS_AGENT)
     manager.newSession('a1')
     manager.setOnEvent(() => {})
     // The stub LLM streams text + finish, so each send() is one complete turn.
@@ -135,7 +135,7 @@ describe('BsAgentManager trace wiring', () => {
 
   it('coalesces text deltas into a single full assistant message before a tool call', async () => {
     const { manager, trace } = await makeManager()
-    manager.addAgent(MEOW_AGENT)
+    manager.addAgent(BS_AGENT)
     manager.newSession('a1')
     manager.setOnEvent(() => {})
     const emit = (e: never) => (manager as unknown as { onEvent: (e: never) => void }).onEvent(e)
@@ -157,7 +157,7 @@ describe('BsAgentManager trace wiring', () => {
 
   it('coalesces reasoning and text deltas into one message with both', async () => {
     const { manager, trace } = await makeManager()
-    manager.addAgent(MEOW_AGENT)
+    manager.addAgent(BS_AGENT)
     manager.newSession('a1')
     manager.setOnEvent(() => {})
     const emit = (e: never) => (manager as unknown as { onEvent: (e: never) => void }).onEvent(e)
@@ -175,7 +175,7 @@ describe('BsAgentManager trace wiring', () => {
 
   it('deletes trace files when a session is deleted', async () => {
     const { manager, trace } = await makeManager()
-    manager.addAgent(MEOW_AGENT)
+    manager.addAgent(BS_AGENT)
     const sessionId = manager.newSession('a1').id
     manager.deleteSession('a1', sessionId)
     expect(trace.deleted).toContain(sessionId)
@@ -183,7 +183,7 @@ describe('BsAgentManager trace wiring', () => {
 
   it('deletes trace files for all sessions when an agent is removed', async () => {
     const { manager, trace } = await makeManager()
-    manager.addAgent(MEOW_AGENT)
+    manager.addAgent(BS_AGENT)
     const s1 = manager.newSession('a1').id
     const s2 = manager.newSession('a1').id
     manager.removeAgent('a1')

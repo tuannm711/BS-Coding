@@ -11,7 +11,7 @@ async function launchPrompt() {
     name: 'E2E',
     agents: [{ id: 'a1', name: 'bs', templateId: 'bs', cwd: project, kind: 'native' }]
   }]))
-  const app = await electron.launch({ args: ['.'], env: { ...process.env as Record<string, string>, MEOW_USER_DATA: userData } })
+  const app = await electron.launch({ args: ['.'], env: { ...process.env as Record<string, string>, BS_USER_DATA: userData } })
   const window = await app.firstWindow()
   await window.locator('.project-row').click()
   await expect(window.locator('.chat-panel')).toBeVisible()
@@ -54,7 +54,7 @@ async function launchQuestion() {
     name: 'E2E',
     agents: [{ id: 'a1', name: 'bs', templateId: 'bs', cwd: project, kind: 'native' }]
   }]))
-  const app = await electron.launch({ args: ['.'], env: { ...process.env as Record<string, string>, MEOW_USER_DATA: userData } })
+  const app = await electron.launch({ args: ['.'], env: { ...process.env as Record<string, string>, BS_USER_DATA: userData } })
   const window = await app.firstWindow()
   await window.locator('.project-row').click()
   await expect(window.locator('.chat-panel')).toBeVisible()

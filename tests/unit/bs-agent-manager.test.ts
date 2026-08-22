@@ -18,7 +18,7 @@ import type { SavedPermission } from '../../src/main/agent/saved-permissions'
 import type { LlmClient, LlmStreamOptions, LlmStreamPart } from '../../src/main/agent/llm'
 import type { AgentConfig, ChatEvent, PromptResponse } from '../../src/shared/types'
 
-const MEOW_AGENT: AgentConfig = {
+const BS_AGENT: AgentConfig = {
   id: 'a1', name: 'bs', templateId: 'bs', cwd: '/proj', kind: 'native'
 }
 const PTY_AGENT: AgentConfig = {
@@ -100,7 +100,7 @@ async function makeManager(opts: StubLlmOptions & {
     env: { ANTHROPIC_API_KEY: 'sk-test' } as NodeJS.ProcessEnv
   })
   manager.setOnEvent(e => events.push(e))
-  await manager.init([{ ...MEOW_AGENT }, { ...PTY_AGENT }])
+  await manager.init([{ ...BS_AGENT }, { ...PTY_AGENT }])
   return { manager, store, events, createLlm, savedPermissions, llmCalls, llmSystems, llmVariants, llmModels }
 }
 
@@ -122,7 +122,7 @@ describe('BsAgentManager', () => {
 
   it('seeds background state from the stored agent config on register', async () => {
     const { manager } = await makeManager()
-    manager.addAgent({ ...MEOW_AGENT, id: 'a9', background: true })
+    manager.addAgent({ ...BS_AGENT, id: 'a9', background: true })
     expect(manager.isBackground('a9')).toBe(true)
   })
 
@@ -206,7 +206,7 @@ describe('BsAgentManager', () => {
       env: {}
     })
     m2.setOnEvent(e => evts.push(e))
-    await m2.init([{ ...MEOW_AGENT }])
+    await m2.init([{ ...BS_AGENT }])
     await m2.send('a1', 'hi')
     rmSync(tmpDir, { recursive: true, force: true })
     expect(evts.some(e => e.type === 'error')).toBe(true)
@@ -826,7 +826,7 @@ describe('BsAgentManager', () => {
       writeFileSync(configPath, JSON.stringify({
         provider: {
           test: { apiKey: 'sk-test', models: ['test-model'] },
-          p1: { apiKeyEnv: 'MEOW_UNSET_KEY', models: ['m1', 'm2'] }
+          p1: { apiKeyEnv: 'BS_UNSET_KEY', models: ['m1', 'm2'] }
         },
         model: 'test',
         subagentModels: { research: { provider: 'p1', model: 'm2' } }
