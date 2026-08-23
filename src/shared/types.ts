@@ -1,4 +1,4 @@
-import type { ProviderModelCapabilities } from './providers'
+import type { ProviderModel, ProviderModelCapabilities } from './providers'
 
 export type AgentStatus = 'spawning' | 'running' | 'idle' | 'exited' | 'stopped' | 'error'
 export type AlertLevel = 'normal' | 'attention' | 'error'
@@ -113,6 +113,7 @@ export interface ToolCallData {
   id: string
   tool: string
   input: Record<string, unknown>
+  thoughtSignature?: string
   output?: string
   error?: string
   permission: 'pending' | 'allowed' | 'denied'
@@ -227,6 +228,20 @@ export interface ProviderSettings {
 
 export type AccountStatus = 'active' | 'disabled' | 'expired' | 'error'
 export type AuthMode = 'api-key' | 'oauth' | 'imported'
+export type ProviderErrorKind = 'auth' | 'quota-exhausted' | 'capacity-exhausted' | 'unavailable' | 'invalid-request' | 'unknown'
+export interface ProviderErrorState {
+  kind: ProviderErrorKind
+  message: string
+  statusCode?: number
+  retryAt?: number
+  updatedAt: number
+}
+export type ProviderRefreshStageStatus = 'idle' | 'refreshing' | 'ready' | 'error' | 'unavailable'
+export interface ProviderRefreshStages {
+  credentials: ProviderRefreshStageStatus
+  models: ProviderRefreshStageStatus
+  usage: ProviderRefreshStageStatus
+}
 
 /** Safe account metadata; secrets stay in the main-process vault. */
 export interface ProviderAccount {
@@ -242,8 +257,41 @@ export interface ProviderAccount {
   keyRef?: string
   capabilities?: ProviderModelCapabilities
   models?: string[]
+  modelCatalog?: ProviderModel[]
+  refreshStages?: ProviderRefreshStages
   lastError?: string
+  providerError?: ProviderErrorState
   usage?: ProviderUsage
+}
+
+export interface ProviderQuotaWindow {
+  id: string
+  label: string
+  kind: 'session' | 'weekly' | 'monthly' | 'additional' | 'unknown'
+  remainingPercent?: number
+  resetAt?: number
+  windowMinutes?: number
+  usageKnown: boolean
+  source: 'provider' | 'legacy-provider'
+}
+
+export interface ProviderQuotaGroup {
+  id: string
+  label: string
+  modelIds: string[]
+  windows: ProviderQuotaWindow[]
+}
+
+export interface ProviderTrackedUsage {
+  periodKey: string
+  periodStart: number
+  periodEnd?: number
+  requests: number
+  tokensInput: number
+  tokensCache: number
+  tokensOutput: number
+  estimatedBilled: number
+  source: 'bs-tracked'
 }
 
 export interface ProviderUsage {
@@ -262,11 +310,17 @@ export interface ProviderUsage {
   bankedLimit?: number
   primaryUsedPercent?: number
   secondaryUsedPercent?: number
+  modelQuotas?: Record<string, { remainingPercent: number; resetAt?: number }>
   tokensInput?: number
   tokensOutput?: number
   estimatedBilled?: number
   planName?: string
   subscriptionExpiresAt?: number
+  quotaGroups?: ProviderQuotaGroup[]
+  tracked?: ProviderTrackedUsage
+  lastSuccessfulRefreshAt?: number
+  stale?: boolean
+  refreshError?: string
   refreshedAt: number
   source: 'provider' | 'internal' | 'unavailable'
   status: 'ok' | 'near-limit' | 'expired' | 'unavailable'

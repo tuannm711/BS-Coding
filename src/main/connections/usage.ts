@@ -5,6 +5,21 @@ export interface UsageAdapter {
   fetch(account: ProviderAccount, secret: { accessToken?: string; apiKey?: string }): Promise<ProviderUsage>
 }
 
+export function normalizeResetAt(value: number | string | undefined, now = Date.now(), resetAfterSeconds?: number): number | undefined {
+  if (typeof value === 'number' && Number.isFinite(value)) return value < 10_000_000_000 ? value * 1000 : value
+  if (typeof value === 'string') {
+    const parsed = Date.parse(value)
+    if (Number.isFinite(parsed)) return parsed
+  }
+  return resetAfterSeconds === undefined ? undefined : now + resetAfterSeconds * 1000
+}
+
+export function toRemainingPercent(usedPercent: number | undefined): number | undefined {
+  return usedPercent === undefined || !Number.isFinite(usedPercent)
+    ? undefined
+    : Math.max(0, Math.min(100, 100 - usedPercent))
+}
+
 export function normalizeUsage(input: Partial<ProviderUsage> & Pick<ProviderUsage, 'accountId'>): ProviderUsage {
   const limit = input.tokenLimit ?? 0
   const used = input.tokensUsed ?? 0

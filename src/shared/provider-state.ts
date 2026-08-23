@@ -1,4 +1,6 @@
-import type { ProviderConnection, ProviderUsage } from './types'
+import type { ProviderErrorKind, ProviderErrorState, ProviderRefreshStages, ProviderUsage } from './types'
+export type { ProviderErrorKind, ProviderErrorState } from './types'
+import type { AuthMethodKind } from './providers'
 
 export type ProviderRuntimeKind = 'oauth' | 'api-key' | 'openai-compatible' | 'custom'
 export type ProviderModelDiscovery = 'static' | 'account' | 'remote'
@@ -8,7 +10,7 @@ export interface ProviderDefinitionSnapshot {
   id: string
   displayName: string
   description: string
-  methods: Array<{ id: string; label: string; kind: string; fields: string[]; supportsMultipleAccounts?: boolean }>
+  methods: Array<{ id: string; label: string; description?: string; kind: AuthMethodKind; fields: string[]; opensBrowser?: boolean; supportsMultipleAccounts?: boolean }>
   capabilities: {
     modelDiscovery: ProviderModelDiscovery
     runtime: ProviderRuntimeKind
@@ -28,16 +30,6 @@ export interface ProviderModelRef {
   }
 }
 
-export type ProviderErrorKind = 'auth' | 'quota-exhausted' | 'capacity-exhausted' | 'unavailable' | 'invalid-request' | 'unknown'
-
-export interface ProviderErrorState {
-  kind: ProviderErrorKind
-  message: string
-  statusCode?: number
-  retryAt?: number
-  updatedAt: number
-}
-
 export interface ProviderAccountSnapshot {
   id: string
   providerId: string
@@ -48,11 +40,13 @@ export interface ProviderAccountSnapshot {
   models: ProviderModelRef[]
   usage?: ProviderUsage
   error?: ProviderErrorState
+  refreshStages?: ProviderRefreshStages
   updatedAt: number
 }
 
 export interface AgentAssignmentSnapshot {
   agentId: string
+  profileName?: string
   providerId: string
   accountId?: string
   modelId: string
@@ -72,7 +66,6 @@ export interface AgentAssignmentSetRequest {
 export interface ProviderSnapshot {
   revision: number
   providers: ProviderDefinitionSnapshot[]
-  connections: ProviderConnection[]
   accounts: ProviderAccountSnapshot[]
   assignments: AgentAssignmentSnapshot[]
   updatedAt: number
@@ -87,9 +80,12 @@ export function isAssignmentCompatible(assignment: Pick<AgentAssignmentSnapshot,
 
 export function classifyProviderError(statusCode: number | undefined, message: string, now = Date.now()): ProviderErrorState {
   const normalized = message.toLowerCase()
+  const capacity = normalized.includes('capacity') || normalized.includes('model_out_of_compute') || normalized.includes('out_of_compute')
   const kind: ProviderErrorKind = statusCode === 401 || statusCode === 403
     ? 'auth'
-    : statusCode === 429 && normalized.includes('resource_exhausted')
+    : (statusCode === 429 || statusCode === 503) && capacity
+      ? 'capacity-exhausted'
+      : statusCode === 429 && (normalized.includes('resource_exhausted') || normalized.includes('quota'))
       ? 'quota-exhausted'
       : statusCode === 429
         ? 'capacity-exhausted'

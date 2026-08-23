@@ -1,7 +1,29 @@
 import { describe, expect, it } from 'vitest'
-import { extractOpenAISubscriptionMetadata, normalizeOpenAICodexUsage, normalizeUsage } from '../../src/main/connections/usage'
+import {
+  extractOpenAISubscriptionMetadata,
+  normalizeOpenAICodexUsage,
+  normalizeResetAt,
+  normalizeUsage,
+  toRemainingPercent
+} from '../../src/main/connections/usage'
 
 describe('provider usage normalization', () => {
+  it('normalizes provider reset timestamps to JavaScript milliseconds', () => {
+    const now = 1_700_000_000_000
+    expect(normalizeResetAt(1_800_000_000, now)).toBe(1_800_000_000_000)
+    expect(normalizeResetAt(1_800_000_000_000, now)).toBe(1_800_000_000_000)
+    expect(normalizeResetAt('2030-01-01T00:00:00.000Z', now)).toBe(Date.parse('2030-01-01T00:00:00.000Z'))
+    expect(normalizeResetAt(undefined, now, 120)).toBe(now + 120_000)
+    expect(normalizeResetAt('not-a-date', now)).toBeUndefined()
+  })
+
+  it('converts used quota to a clamped remaining percentage', () => {
+    expect(toRemainingPercent(42)).toBe(58)
+    expect(toRemainingPercent(-5)).toBe(100)
+    expect(toRemainingPercent(150)).toBe(0)
+    expect(toRemainingPercent(undefined)).toBeUndefined()
+  })
+
   it('marks usage near limit at 90 percent', () => {
     expect(normalizeUsage({ accountId: 'a', tokensUsed: 90, tokenLimit: 100, refreshedAt: 1 }).status).toBe('near-limit')
   })
