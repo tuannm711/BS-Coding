@@ -37,11 +37,13 @@ import { ModelsCatalog } from './models-catalog'
 import { getWindowChromeOptions } from './window-chrome'
 import { Vault } from './vault'
 import { ProviderManager } from './connections/manager'
+import { ProviderUsageLedger } from './connections/usage-ledger'
 import { ProviderRegistry } from './providers/registry'
 import { createOpenAiAdapter } from './providers/adapters/openai'
 import { createOpenAiCompatibleAdapter } from './providers/adapters/openai-compatible'
 import { createGitHubCopilotAdapter } from './providers/adapters/github-copilot'
 import { createAntigravityAdapter } from './providers/adapters/antigravity'
+import { planNativeAgentReconciliation } from './agent/workspace-reconcile'
 import { TrayManager } from './tray-manager'
 import { BrowserBridge } from './browser/bridge'
 import { createChromeLauncher, ensureExtensionInstalled } from './browser/chrome-launcher'
@@ -115,23 +117,25 @@ class MainApp {
   })
   traces = new TraceStore(path.join(app.getPath('userData'), 'traces'))
   vault = new Vault(path.join(app.getPath('userData'), 'connections', 'vault.json'))
+  usageLedger = new ProviderUsageLedger(path.join(app.getPath('userData'), 'connections', 'usage-ledger.json'))
   providerRegistry = new ProviderRegistry()
   providerManager = new ProviderManager({
     accountsFile: path.join(app.getPath('userData'), 'connections', 'accounts.json'),
-    codexAuthFile: path.join(os.homedir(), '.codex', 'auth.json'),
-    codexBackupFile: path.join(app.getPath('userData'), 'connections', 'codex-auth.json.backup'),
     openExternal: (url) => shell.openExternal(url),
     registry: this.providerRegistry,
     vault: this.vault,
+    usageLedger: this.usageLedger,
     onAccountsChanged: (connections) => {
-      mainApp?.providerManager.markSnapshotChanged()
+      mainApp?.bsAgent.revalidateAssignments()
       win?.webContents.send(Channels.EventProviderAccountsChanged, connections)
       win?.webContents.send(Channels.EventProviderSnapshotChanged, mainApp?.providerSnapshot())
     },
     onUsage: (usage) => {
-      mainApp?.providerManager.markSnapshotChanged()
       win?.webContents.send(Channels.EventProviderUsage, usage)
       win?.webContents.send(Channels.EventProviderSnapshotChanged, mainApp?.providerSnapshot())
+    },
+    onAuthorizationChanged: (session) => {
+      win?.webContents.send(Channels.EventProviderAuthorizationChanged, session)
     }
   })
   bsAgent = new BsAgentManager({
@@ -157,7 +161,11 @@ class MainApp {
     providerAccounts: () => this.providerManager.list(),
     providerRuntime: (providerId, accountId, modelId) => this.providerManager.createRuntime(providerId, accountId, modelId),
     assignmentPath: path.join(app.getPath('userData'), 'assignments.json'),
-    onAssignmentChanged: (assignment) => win?.webContents.send(Channels.EventAgentAssignmentChanged, assignment),
+    onAssignmentChanged: (assignment) => {
+      this.providerManager.markSnapshotChanged()
+      win?.webContents.send(Channels.EventAgentAssignmentChanged, assignment)
+      win?.webContents.send(Channels.EventProviderSnapshotChanged, mainApp?.providerSnapshot())
+    },
     notify: new NotificationService(() => !win || !win.isFocused()),
     onActivateAgent: () => {
       if (!win) return
@@ -202,7 +210,10 @@ class MainApp {
   private updater: Updater
 
   constructor() {
-    this.providerRegistry.register(createOpenAiAdapter())
+    this.providerRegistry.register(createOpenAiAdapter({
+      codexAuthFile: path.join(os.homedir(), '.codex', 'auth.json'),
+      codexBackupFile: path.join(app.getPath('userData'), 'connections', 'codex-auth.json.backup')
+    }))
     this.providerRegistry.register(createGitHubCopilotAdapter())
     this.providerRegistry.register(createAntigravityAdapter())
     const compatibleProviders: Array<[string, string, boolean]> = [
@@ -339,6 +350,39 @@ class MainApp {
       }),
       git: null
     }
+  }
+
+  async saveSettings(settings: BsSettings): Promise<BsSettings> {
+    const saved = await this.bsAgent.saveSettings(settings)
+    const projectPath = this.activeProject
+    const workspace = projectPath ? this.workspaces.get(projectPath) : undefined
+    if (!projectPath || !workspace) return saved
+
+    const reconciliation = planNativeAgentReconciliation(workspace.agents, saved.agents.map(agent => agent.name))
+    for (const agentId of reconciliation.remove) await this.removeWorkspaceAgent(projectPath, agentId)
+    for (const name of reconciliation.add) {
+      const next = this.workspaces.addAgent(projectPath, {
+        name,
+        templateId: 'bs',
+        cwd: projectPath,
+        kind: 'native'
+      })
+      const added = next.agents.find(agent => agent.name === name && agent.kind === 'native')
+      if (added) this.bsAgent.addAgent(added)
+    }
+
+    const fresh = this.workspaces.get(projectPath)
+    if (fresh) win?.webContents.send(Channels.EventWorkspaceRuntimeChanged, this.runtimeFor(fresh))
+    return saved
+  }
+
+  async removeWorkspaceAgent(projectPath: string, agentId: string): Promise<void> {
+    this.bsAgent.removeAgent(agentId)
+    await this.pty.stop(agentId)
+    this.workspaces.removeAgent(projectPath, agentId)
+    this.clearState(agentId)
+    this.alerts.clear(agentId)
+    this.logs.remove(agentId)
   }
 
   async startAgent(agentId: string): Promise<void> {
@@ -726,12 +770,7 @@ function registerIpcHandlers(): void {
   })
 
   ipcMain.handle(Channels.AgentRemove, async (_e, projectPath: string, agentId: string) => {
-    mainApp.bsAgent.removeAgent(agentId)
-    await mainApp.pty.stop(agentId)
-    mainApp.workspaces.removeAgent(projectPath, agentId)
-    mainApp.clearState(agentId)
-    mainApp.alerts.clear(agentId)
-    mainApp.logs.remove(agentId)
+    await mainApp.removeWorkspaceAgent(projectPath, agentId)
   })
 
   ipcMain.handle(Channels.AgentSetMode, (_e, agentId: string, mode: 'build' | 'plan') =>
@@ -761,6 +800,10 @@ function registerIpcHandlers(): void {
   ipcMain.handle(Channels.ProviderCatalog, () => mainApp.bsAgent.listProviderCatalog())
   ipcMain.handle(Channels.ProviderCapabilities, () => mainApp.providerManager.listCapabilities())
   ipcMain.handle(Channels.ProviderConnectMethod, (_e, request) => mainApp.providerManager.connectMethod(request))
+  ipcMain.handle(Channels.ProviderAuthorizationCreate, (_e, request) => mainApp.providerManager.createAuthorization(request))
+  ipcMain.handle(Channels.ProviderAuthorizationGet, (_e, loginId: string) => mainApp.providerManager.getAuthorization(loginId))
+  ipcMain.handle(Channels.ProviderAuthorizationOpen, (_e, loginId: string) => mainApp.providerManager.openAuthorization(loginId))
+  ipcMain.handle(Channels.ProviderAuthorizationCancel, (_e, loginId: string) => mainApp.providerManager.cancelAuthorization(loginId))
   ipcMain.handle(Channels.ProviderConnect, (_e, providerId: string, apiKey: string, baseUrl?: string) =>
     mainApp.bsAgent.connectProvider(providerId, apiKey, baseUrl))
   ipcMain.handle(Channels.ProviderDisconnect, (_e, providerId: string) =>
@@ -774,8 +817,6 @@ function registerIpcHandlers(): void {
   ipcMain.handle(Channels.ProviderAccountRefresh, (_e, providerId: string, accountId: string) => mainApp.providerManager.refreshAccount(providerId, accountId))
   ipcMain.handle(Channels.AgentAssignmentGetSnapshot, (_e, agentId: string) => mainApp.bsAgent.getAgentAssignmentSnapshot(agentId))
   ipcMain.handle(Channels.AgentAssignmentSetSnapshot, (_e, request) => mainApp.bsAgent.setAgentAssignmentSnapshot(request))
-  ipcMain.handle(Channels.ProviderLoginStart, (_e, providerId: string) => mainApp.providerManager.startLogin(providerId))
-  ipcMain.handle(Channels.ProviderLoginCancel, (_e, loginId: string) => mainApp.providerManager.cancelLogin(loginId))
   ipcMain.handle(Channels.ProviderAccountEnable, (_e, accountId: string) => mainApp.providerManager.setEnabled(accountId, true))
   ipcMain.handle(Channels.ProviderAccountDisable, (_e, accountId: string) => mainApp.providerManager.setEnabled(accountId, false))
   ipcMain.handle(Channels.ProviderAccountSwitch, (_e, providerId: string, accountId: string) => mainApp.providerManager.switch(providerId, accountId))
@@ -839,7 +880,7 @@ function registerIpcHandlers(): void {
   ipcMain.handle(Channels.TraceDelete, (_e, sessionId: string) => mainApp.traces.delete(sessionId))
   ipcMain.handle(Channels.SettingsGet, () => mainApp.bsAgent.getSettings())
   ipcMain.handle(Channels.SettingsSave, (_e, settings: BsSettings) =>
-    mainApp.bsAgent.saveSettings(settings))
+    mainApp.saveSettings(settings))
   ipcMain.handle(Channels.McpStatus, () => mainApp.bsAgent.getMcpStatus())
   ipcMain.handle(Channels.CommandList, (_e, projectPath: string) => mainApp.bsAgent.listCommands(projectPath))
   ipcMain.handle(Channels.CommandSave, (_e, command: Command) => mainApp.bsAgent.saveCommand(command))
