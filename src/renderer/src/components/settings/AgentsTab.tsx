@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { AgentSettings, BsSettings, ModelRef, ProviderConnection, SubagentType } from '@shared/types'
+import type { ProviderSnapshot } from '@shared/provider-state'
 import { OPENAI_OAUTH_MODELS, isOpenAiGenericModel } from '@shared/openai-oauth'
 import Modal from './Modal'
 
@@ -37,10 +38,11 @@ export default function AgentsTab({ agents, providers, subagentModels, onChangeA
   const [newName, setNewName] = useState('')
   const [newPrompt, setNewPrompt] = useState('')
   const [accounts, setAccounts] = useState<ProviderConnection[]>([])
+  const [snapshot, setSnapshot] = useState<ProviderSnapshot | null>(null)
 
   useEffect(() => {
-    void window.api.getProviderSnapshot().then(snapshot => setAccounts(snapshot.connections))
-    return window.api.onProviderSnapshotChanged(snapshot => setAccounts(snapshot.connections))
+    void window.api.getProviderSnapshot().then(next => { setSnapshot(next); setAccounts(next.connections) })
+    return window.api.onProviderSnapshotChanged(next => { setSnapshot(next); setAccounts(next.connections) })
   }, [])
 
   const effectiveProviders = useMemo(() => mergeProviderAccounts(providers, accounts), [accounts, providers])
@@ -108,8 +110,7 @@ export default function AgentsTab({ agents, providers, subagentModels, onChangeA
               value={a.provider ?? ''}
               onChange={e => {
                 const provider = e.target.value || undefined
-                const models = effectiveProviders.find(p => p.id === provider)?.models ?? []
-                updateAgent(i, { provider, model: models[0], accountId: provider ? (accounts.find(c => c.providerId === provider)?.activeAccountId ?? undefined) : undefined })
+                updateAgent(i, { provider, model: undefined, accountId: undefined })
               }}
             >
               <option value="">(default provider)</option>
@@ -121,7 +122,9 @@ export default function AgentsTab({ agents, providers, subagentModels, onChangeA
               disabled={!a.provider}
               onChange={e => updateAgent(i, { model: e.target.value })}
             >
-              {(effectiveProviders.find(p => p.id === a.provider)?.models ?? []).map(m => <option key={m} value={m}>{m}</option>)}
+              <option value="">Select model</option>
+              {a.model && !(snapshot?.accounts.filter(account => account.providerId === a.provider && account.status === 'active' && (!a.accountId || account.id === a.accountId)).flatMap(account => account.models).some(model => model.id === a.model)) && <option value={a.model}>{a.model} (needs review)</option>}
+              {(snapshot?.accounts.filter(account => account.providerId === a.provider && account.status === 'active' && (!a.accountId || account.id === a.accountId)).flatMap(account => account.models).map(model => model.id) ?? []).filter((model, index, all) => all.indexOf(model) === index).map(m => <option key={m} value={m}>{m}</option>)}
             </select>
             {a.provider && accounts.some(connection => connection.providerId === a.provider) && (
               <select
@@ -129,8 +132,8 @@ export default function AgentsTab({ agents, providers, subagentModels, onChangeA
                 value={a.accountId ?? ''}
                 onChange={e => {
                   const accountId = e.target.value || undefined
-                  const models = effectiveProviders.find(p => p.id === a.provider)?.models ?? []
-                  updateAgent(i, { accountId, model: a.model && models.includes(a.model) ? a.model : models[0] })
+                  const models = snapshot?.accounts.find(account => account.id === accountId)?.models.map(model => model.id) ?? []
+                  updateAgent(i, { accountId, model: a.model && models.includes(a.model) ? a.model : undefined })
                 }}
               >
                 <option value="">(active {a.provider} account)</option>
@@ -139,6 +142,10 @@ export default function AgentsTab({ agents, providers, subagentModels, onChangeA
                 ))}
               </select>
             )}
+            <select className="input" value={a.speed ?? 'standard'} onChange={e => updateAgent(i, { speed: e.target.value as 'standard' | 'fast' })}>
+              <option value="standard">Standard</option>
+              <option value="fast">Fast</option>
+            </select>
           </div>
         </div>
       ))}
