@@ -41,6 +41,7 @@ import { ProviderRegistry } from './providers/registry'
 import { createOpenAiAdapter } from './providers/adapters/openai'
 import { createOpenAiCompatibleAdapter } from './providers/adapters/openai-compatible'
 import { createGitHubCopilotAdapter } from './providers/adapters/github-copilot'
+import { createAntigravityAdapter } from './providers/adapters/antigravity'
 import { TrayManager } from './tray-manager'
 import { BrowserBridge } from './browser/bridge'
 import { createChromeLauncher, ensureExtensionInstalled } from './browser/chrome-launcher'
@@ -192,8 +193,9 @@ class MainApp {
   constructor() {
     this.providerRegistry.register(createOpenAiAdapter())
     this.providerRegistry.register(createGitHubCopilotAdapter())
+    this.providerRegistry.register(createAntigravityAdapter())
     const compatibleProviders: Array<[string, string, boolean]> = [
-      ['antigravity', 'Antigravity IDE', false], ['cursor', 'Cursor', false], ['windsurf', 'Windsurf', false],
+      ['cursor', 'Cursor', false], ['windsurf', 'Windsurf', false],
       ['kiro', 'Kiro', false], ['grok', 'Grok / xAI', true], ['codebuddy', 'CodeBuddy', false],
       ['codebuddy-cn', 'CodeBuddy CN', false], ['qoder', 'Qoder', false], ['trae', 'Trae', false],
       ['zed', 'Zed', false], ['zcode', 'ZCode', false]

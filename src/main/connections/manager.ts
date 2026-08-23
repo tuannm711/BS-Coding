@@ -7,6 +7,7 @@ import { CODEX_REDIRECT_URI, codexAuthorizeUrl, decodeJwtProfile, exchangeCodexC
 import { ProviderAccountStore } from './store'
 import type { Vault } from '../vault'
 import { ProviderRegistry } from '../providers/registry'
+import { antigravityAuthorizeUrl, exchangeAntigravityCode, fetchAntigravityProfile } from '../providers/auth/antigravity-oauth'
 
 interface PendingLogin {
   providerId: string
@@ -49,6 +50,9 @@ export class ProviderManager {
     if (request.providerId === 'openai' && request.methodId === 'oauth') {
       return this.startLogin('openai').then(login => ({ ...login, requiresBrowser: true }))
     }
+    if (request.providerId === 'antigravity' && request.methodId === 'oauth') {
+      return this.startLogin('antigravity').then(login => ({ ...login, requiresBrowser: true }))
+    }
     const result = await adapter.connect(request, {
       saveAccount: (account, secrets) => this.store.upsert(account, secrets)
     })
@@ -62,6 +66,7 @@ export class ProviderManager {
   }
 
   async startLogin(providerId: string): Promise<{ loginId: string; authUrl: string; expiresIn: number }> {
+    if (providerId === 'antigravity') return this.startAntigravityLogin()
     if (providerId !== 'openai') throw new Error('[bs] Provider OAuth chưa được hỗ trợ')
     const pkce = createPkce()
     const callback = listenForCallback(1455)
@@ -90,6 +95,25 @@ export class ProviderManager {
       this.pending.delete(loginId)
     })
     const authUrl = codexAuthorizeUrl(pkce)
+    await this.deps.openExternal?.(authUrl)
+    return { loginId, authUrl, expiresIn: 300 }
+  }
+
+  private async startAntigravityLogin(): Promise<{ loginId: string; authUrl: string; expiresIn: number }> {
+    const pkce = createPkce()
+    const callback = listenForCallback(1457)
+    const loginId = randomUUID()
+    this.pending.set(loginId, { providerId: 'antigravity', verifier: pkce.verifier, state: pkce.state, close: callback.close })
+    void callback.result.then(async result => {
+      const pending = this.pending.get(loginId)
+      this.pending.delete(loginId)
+      if (!pending || result.state !== pending.state) throw new Error('[bs] Antigravity OAuth state không hợp lệ')
+      const tokens = await exchangeAntigravityCode(result.code)
+      const profile = await fetchAntigravityProfile(tokens.accessToken)
+      this.store.upsert({ providerId: 'antigravity', label: profile.email ?? `Antigravity account ${new Date().toLocaleString()}`, authMode: 'oauth', status: 'active', profile: { email: profile.email, name: profile.name }, oauthExpiresAt: tokens.expiresAt }, tokens)
+      this.deps.onAccountsChanged?.(this.list())
+    }).catch(() => { this.pending.delete(loginId) })
+    const authUrl = antigravityAuthorizeUrl(pkce.state)
     await this.deps.openExternal?.(authUrl)
     return { loginId, authUrl, expiresIn: 300 }
   }
