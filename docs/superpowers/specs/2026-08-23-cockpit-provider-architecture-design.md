@@ -2,7 +2,7 @@
 
 ## Status
 
-Draft for review
+Approved design; implementation audited on 2026-08-23. See `docs/superpowers/audits/2026-08-23-cockpit-provider-implementation-audit.md` and the enforced v2 plan.
 
 ## Goal
 
@@ -199,3 +199,11 @@ Port each provider to the same adapter contracts, with provider-specific tests a
 - Automatically bypassing provider quota or account restrictions.
 - Supporting arbitrary external model endpoints through the Antigravity OAuth adapter.
 - Replacing the existing workspace/project model.
+
+## Completion integrity rules
+
+- A green legacy test suite is regression evidence only; it is not feature acceptance.
+- Every phase must add and pass new tests for its own acceptance criteria before being marked complete.
+- UI requirements require running-app evidence, not only TypeScript/build success.
+- A task must report changed files, test names/output, and known gaps at its checkpoint.
+- Any silent fallback to the first model, missing migration evidence, or missing provider-specific runtime test blocks completion.
