@@ -76,6 +76,74 @@ describe('ProviderManager adapter flow', () => {
     expect(ledger.aggregateAccount('failed-runtime', account.id, { key: `local:${account.createdAt}`, start: account.createdAt })).toBeUndefined()
   })
 
+  it('preserves last-known-good quota when an account refresh fails', async () => {
+    const adapter: ProviderAdapter = {
+      capability: { id: 'stale-usage', displayName: 'Stale usage', status: 'ready', methods: [] },
+      definition() { return this.capability },
+      async connect() { throw new Error('not used') },
+      async refreshAccount(account) { return account },
+      async listModels() { return [] },
+      createRuntime() { throw new Error('not used') },
+      async fetchUsage() { throw new Error('network down') }
+    }
+    const registry = new ProviderRegistry()
+    registry.register(adapter)
+    const manager = new ProviderManager({ accountsFile: path.join(mkdtempSync(path.join(tmpdir(), 'bs-stale-usage-')), 'accounts.json'), registry, vault: fakeVault() as never })
+    const previous = {
+      accountId: 'pending', refreshedAt: 100, source: 'provider' as const, status: 'ok' as const,
+      planName: 'pro', subscriptionExpiresAt: 1_900_000_000_000,
+      quotaGroups: [{ id: 'code', label: 'Code', modelIds: ['model'], windows: [{ id: 'weekly', label: 'Weekly', kind: 'weekly' as const, remainingPercent: 70, resetAt: 1_800_000_000_000, usageKnown: true, source: 'provider' as const }] }]
+    }
+    const account = manager.store.upsert({
+      providerId: 'stale-usage', label: 'Pro', authMode: 'oauth', status: 'active', usage: previous,
+      refreshStages: { credentials: 'ready', models: 'ready', usage: 'ready' }
+    }, { accessToken: 'token' })
+
+    await manager.refreshUsage('stale-usage', account.id)
+
+    expect(manager.getSnapshot().accounts[0].usage).toMatchObject({
+      quotaGroups: previous.quotaGroups,
+      planName: 'pro',
+      subscriptionExpiresAt: 1_900_000_000_000,
+      stale: true,
+      refreshError: 'Error: network down',
+      lastSuccessfulRefreshAt: 100
+    })
+    expect(manager.getSnapshot().accounts[0].refreshStages?.usage).toBe('error')
+  })
+
+  it('merges the active account-period ledger aggregate after a successful refresh', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'bs-usage-merge-'))
+    const ledger = new ProviderUsageLedger(path.join(dir, 'usage-ledger.json'))
+    const resetAt = 1_800_000_000_000
+    const trackedPeriod = { key: `weekly:${resetAt}`, start: resetAt - 10_080 * 60_000, end: resetAt }
+    ledger.record({ providerId: 'merged-usage', accountId: 'account-id', modelId: 'model-a', timestamp: 1, tokens: { input: 10, output: 2 }, estimatedCost: 0.01 }, trackedPeriod)
+    ledger.record({ providerId: 'merged-usage', accountId: 'account-id', modelId: 'model-b', timestamp: 2, tokens: { input: 20, output: 3, cacheRead: 4 }, estimatedCost: 0.02 }, trackedPeriod)
+    const adapter: ProviderAdapter = {
+      capability: { id: 'merged-usage', displayName: 'Merged usage', status: 'ready', methods: [] },
+      definition() { return this.capability },
+      async connect() { throw new Error('not used') },
+      async refreshAccount(account) { return account },
+      async listModels() { return [] },
+      createRuntime() { throw new Error('not used') },
+      async fetchUsage(account) {
+        return { accountId: account.id, refreshedAt: 200, source: 'provider', status: 'ok', quotaGroups: [{ id: 'code', label: 'Code', modelIds: ['model-a', 'model-b'], windows: [{ id: 'weekly', label: 'Weekly', kind: 'weekly', remainingPercent: 80, resetAt, windowMinutes: 10_080, usageKnown: true, source: 'provider' }] }] }
+      }
+    }
+    const registry = new ProviderRegistry()
+    registry.register(adapter)
+    const manager = new ProviderManager({ accountsFile: path.join(dir, 'accounts.json'), registry, vault: fakeVault() as never, usageLedger: ledger })
+    manager.store.upsert({ id: 'account-id', providerId: 'merged-usage', label: 'Pro', authMode: 'oauth', status: 'active' }, { accessToken: 'token' })
+
+    await manager.refreshUsage('merged-usage', 'account-id')
+
+    expect(manager.getSnapshot().accounts[0].usage).toMatchObject({
+      stale: false,
+      lastSuccessfulRefreshAt: 200,
+      tracked: { requests: 2, tokensInput: 34, tokensCache: 4, tokensOutput: 5, estimatedBilled: 0.03 }
+    })
+  })
+
   it('creates a link without opening it and completes through the adapter strategy', async () => {
     const opened: string[] = []
     const changes: ProviderAuthorizationSession[] = []

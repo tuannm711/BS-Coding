@@ -4,6 +4,8 @@ import {
   normalizeOpenAICodexUsage,
   normalizeResetAt,
   normalizeUsage,
+  retainLastKnownUsage,
+  selectTrackedPeriod,
   toRemainingPercent
 } from '../../src/main/connections/usage'
 
@@ -110,5 +112,31 @@ describe('provider usage normalization', () => {
 
   it('does not confuse OAuth token expiry with subscription expiry', () => {
     expect(extractOpenAISubscriptionMetadata({ oauth: { expires_at: 1_800_000_000 }, account: { plan_type: 'pro' } })).toEqual({ planName: 'pro' })
+  })
+
+  it('selects weekly first, then the longest reported window, then a local period', () => {
+    const usage = {
+      accountId: 'a', refreshedAt: 1, source: 'provider' as const, status: 'ok' as const,
+      quotaGroups: [{ id: 'g', label: 'Group', modelIds: [], windows: [
+        { id: 'short', label: 'Session', kind: 'session' as const, resetAt: 10_000, windowMinutes: 300, remainingPercent: 90, usageKnown: true, source: 'provider' as const },
+        { id: 'weekly', label: 'Weekly', kind: 'weekly' as const, resetAt: 20_000, windowMinutes: 10_080, remainingPercent: 80, usageKnown: true, source: 'provider' as const }
+      ] }]
+    }
+    expect(selectTrackedPeriod(usage, 500)).toEqual({ key: 'weekly:20000', start: 20_000 - 10_080 * 60_000, end: 20_000 })
+    expect(selectTrackedPeriod({ ...usage, quotaGroups: [{ ...usage.quotaGroups[0], windows: usage.quotaGroups[0].windows.slice(0, 1) }] }, 500)).toEqual({ key: 'session:10000', start: 10_000 - 300 * 60_000, end: 10_000 })
+    expect(selectTrackedPeriod(undefined, 500)).toEqual({ key: 'local:500', start: 500 })
+  })
+
+  it('retains last-known-good quota as stale when refresh fails', () => {
+    const previous = normalizeOpenAICodexUsage('a', { rate_limit: { primary_window: { used_percent: 20, reset_at: 1_800_000_000, limit_window_seconds: 18_000 } } }, 1_700_000_000_000)
+    const stale = retainLastKnownUsage(previous, new Error('network down'), 1_700_000_100_000)
+
+    expect(stale).toMatchObject({
+      quotaGroups: previous.quotaGroups,
+      stale: true,
+      refreshError: 'Error: network down',
+      lastSuccessfulRefreshAt: previous.refreshedAt,
+      refreshedAt: 1_700_000_100_000
+    })
   })
 })

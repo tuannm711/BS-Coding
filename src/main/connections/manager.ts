@@ -17,7 +17,8 @@ import { buildProviderSnapshot } from './snapshot'
 import { classifyProviderError, type ProviderSnapshot } from '../../shared/provider-state'
 import { AuthSessionCoordinator } from '../providers/auth/session'
 import { calcCost, type ModelPrice } from '../agent/usage'
-import { ProviderUsageLedger, type UsagePeriod } from './usage-ledger'
+import { ProviderUsageLedger } from './usage-ledger'
+import { retainLastKnownUsage, selectTrackedPeriod } from './usage'
 
 function runtimeProviderError(message: string) {
   const statusCode = Number(message.match(/\((\d{3})\)/)?.[1]) || undefined
@@ -156,7 +157,7 @@ export class ProviderManager {
     const account = this.store.get(accountId)
     if (!ledger || !account) return
     const now = Date.now()
-    const period = runtimeUsagePeriod(account.usage, account.createdAt || now)
+    const period = selectTrackedPeriod(account.usage, account.createdAt || now)
     const groupId = account.usage?.quotaGroups?.find(group => group.modelIds.includes(modelId))?.id
       ?? (account.usage?.quotaGroups?.length === 1 ? account.usage.quotaGroups[0].id : undefined)
     const tracked = ledger.record({
@@ -394,10 +395,24 @@ export class ProviderManager {
     for (const connection of connections) {
       for (const account of connection.accounts) {
         if (_accountId && account.id !== _accountId) continue
-        const next = await this.fetchUsage(connection.providerId, account)
+        let next = await this.fetchUsage(connection.providerId, account)
         const current = this.store.get(account.id)
         if (!current) continue
-        this.store.upsert({ ...current, usage: next, refreshStages: current.refreshStages ? { ...current.refreshStages, usage: next.status === 'unavailable' ? 'unavailable' : 'ready' } : undefined })
+        if (next.status === 'unavailable' && current.usage?.quotaGroups?.length) {
+          next = retainLastKnownUsage(current.usage, next.unavailableReason ?? 'Provider usage unavailable', next.refreshedAt)
+        } else if (next.status !== 'unavailable') {
+          const { refreshError: _refreshError, ...fresh } = next
+          const period = selectTrackedPeriod(next, current.createdAt || next.refreshedAt)
+          const tracked = this.deps.usageLedger?.aggregateAccount(connection.providerId, current.id, period)
+          next = {
+            ...fresh,
+            accountId: current.id,
+            lastSuccessfulRefreshAt: next.refreshedAt,
+            stale: false,
+            ...(tracked ? { tracked } : {})
+          }
+        }
+        this.store.upsert({ ...current, usage: next, refreshStages: current.refreshStages ? { ...current.refreshStages, usage: next.stale ? 'error' : next.status === 'unavailable' ? 'unavailable' : 'ready' } : undefined })
         usage.push(next)
         this.emitUsage(next)
       }
@@ -426,18 +441,6 @@ export class ProviderManager {
     this.authorizations.closeAll()
   }
 
-}
-
-function runtimeUsagePeriod(usage: ProviderUsage | undefined, firstObservedAt: number): UsagePeriod {
-  const windows = usage?.quotaGroups?.flatMap(group => group.windows) ?? []
-  const preferred = windows.find(window => window.kind === 'weekly' && window.resetAt !== undefined)
-    ?? windows.find(window => window.kind === 'monthly' && window.resetAt !== undefined)
-    ?? [...windows].filter(window => window.resetAt !== undefined).sort((a, b) => (b.windowMinutes ?? 0) - (a.windowMinutes ?? 0))[0]
-  if (!preferred?.resetAt) return { key: `local:${firstObservedAt}`, start: firstObservedAt }
-  const start = preferred.windowMinutes === undefined
-    ? firstObservedAt
-    : preferred.resetAt - preferred.windowMinutes * 60_000
-  return { key: `${preferred.kind}:${preferred.resetAt}`, start, end: preferred.resetAt }
 }
 
 function authorizationError(error: unknown): ProviderAuthorizationError {

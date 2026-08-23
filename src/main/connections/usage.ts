@@ -1,4 +1,5 @@
 import type { ProviderAccount, ProviderQuotaGroup, ProviderQuotaWindow, ProviderUsage } from '../../shared/types'
+import type { UsagePeriod } from './usage-ledger'
 
 export interface UsageAdapter {
   supports(providerId: string): boolean
@@ -18,6 +19,28 @@ export function toRemainingPercent(usedPercent: number | undefined): number | un
   return usedPercent === undefined || !Number.isFinite(usedPercent)
     ? undefined
     : Math.max(0, Math.min(100, 100 - usedPercent))
+}
+
+export function selectTrackedPeriod(usage: ProviderUsage | undefined, firstObservedAt: number): UsagePeriod {
+  const windows = usage?.quotaGroups?.flatMap(group => group.windows) ?? []
+  const preferred = windows.find(window => window.kind === 'weekly' && window.resetAt !== undefined)
+    ?? windows.find(window => window.kind === 'monthly' && window.resetAt !== undefined)
+    ?? [...windows].filter(window => window.resetAt !== undefined).sort((a, b) => (b.windowMinutes ?? 0) - (a.windowMinutes ?? 0))[0]
+  if (!preferred?.resetAt) return { key: `local:${firstObservedAt}`, start: firstObservedAt }
+  const start = preferred.windowMinutes === undefined
+    ? firstObservedAt
+    : preferred.resetAt - preferred.windowMinutes * 60_000
+  return { key: `${preferred.kind}:${preferred.resetAt}`, start, end: preferred.resetAt }
+}
+
+export function retainLastKnownUsage(previous: ProviderUsage, error: unknown, now = Date.now()): ProviderUsage {
+  return {
+    ...previous,
+    refreshedAt: now,
+    lastSuccessfulRefreshAt: previous.lastSuccessfulRefreshAt ?? previous.refreshedAt,
+    stale: true,
+    refreshError: String(error)
+  }
 }
 
 export function normalizeUsage(input: Partial<ProviderUsage> & Pick<ProviderUsage, 'accountId'>): ProviderUsage {
