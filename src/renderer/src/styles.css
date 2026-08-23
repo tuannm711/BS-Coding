@@ -1019,8 +1019,10 @@ select.input { width: 100%; }
 .agent-picker-trigger:hover { border-color: var(--accent-dim); background: var(--bg-hover); }
 .agent-picker-label { color: var(--text-faint); font-size: var(--fs-sm); text-transform: uppercase; letter-spacing: .05em; }
 .agent-picker-menu { position: absolute; bottom: calc(100% + 4px); left: 0; z-index: 40; width: 270px; max-height: 300px; overflow-y: auto; padding: 5px; display: flex; flex-direction: column; gap: 2px; background: var(--bg-raised); border: 1px solid var(--hairline); border-radius: var(--radius); box-shadow: var(--shadow-3); }
+.agent-picker-menu-portal { position: fixed; right: auto; bottom: auto; z-index: 200; width: min(270px, calc(100vw - 16px)); overscroll-behavior: contain; }
 .agent-picker-item { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 7px 9px; border: 0; border-left: 2px solid transparent; background: transparent; color: var(--text); text-align: left; cursor: pointer; border-radius: var(--radius-sm); }
 .agent-picker-item:hover, .agent-picker-item.active { background: var(--bg-active); border-left-color: var(--accent); }
+.agent-picker-item.focused { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
 .agent-picker-item span { color: var(--text-faint); font-family: var(--font-mono); font-size: var(--fs-sm); }
 
 /* Permissions tab */
