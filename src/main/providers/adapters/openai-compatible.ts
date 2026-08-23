@@ -24,6 +24,7 @@ export function createOpenAiCompatibleAdapter(providerId: string, displayName: s
   const capability: ProviderCapability = { id: providerId, displayName, description: 'Experimental in-app adapter using provider credentials and an OpenAI-compatible endpoint', methods, status: 'experimental' }
   return {
     capability,
+    definition() { return capability },
     async connect(request: ProviderConnectRequest, context) {
       const secret = request.methodId === 'imported' ? normalizeProviderImport(providerId, request.fields.credentialJson ?? '') : { apiKey: request.fields.apiKey, baseUrl: request.fields.baseUrl }
       if (!secret.apiKey && !secret.accessToken) throw new Error('[bs] Credential không có apiKey hoặc accessToken')
@@ -33,7 +34,8 @@ export function createOpenAiCompatibleAdapter(providerId: string, displayName: s
       const account = context.saveAccount({ providerId, label, authMode: request.methodId === 'api-key' ? 'api-key' : 'imported', status: 'active', models, profile: { name: label } }, secret)
       return { account }
     },
+    async refreshAccount(account) { return account },
     async listModels(account) { return (account.models ?? DEFAULT_MODELS[providerId]).map(id => ({ id, name: id, capabilities: { isCodeModel: true, supportsStreaming: true, supportsTools: true } })) as ProviderModel[] },
-    createClient(_account, secret, _model) { return createLlm('openai-compatible', secret.apiKey ?? secret.accessToken ?? '', secret.baseUrl) }
+    createRuntime(_account, secret, _model) { return createLlm('openai-compatible', secret.apiKey ?? secret.accessToken ?? '', secret.baseUrl) }
   }
 }

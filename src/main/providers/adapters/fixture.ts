@@ -17,13 +17,15 @@ export function createFixtureAdapter(): ProviderAdapter {
       ],
       status: 'ready'
     },
+    definition() { return this.capability },
     async connect(request, context) {
       const label = request.fields.label?.trim() || 'Fixture account'
       const account = context.saveAccount({ providerId: 'fixture', label, authMode: request.methodId === 'api-key' ? 'api-key' : 'imported', status: 'active', profile: { name: label } }, { apiKey: request.fields.apiKey ?? request.fields.credentialJson })
       return { account }
     },
+    async refreshAccount(account) { return account },
     async listModels(_account, _secret) { return models },
-    createClient(_account, secret, model) {
+    createRuntime(_account, secret, model) {
       return createLlm('openai-compatible', secret.apiKey ?? '', 'http://127.0.0.1:9', undefined)
     }
   }

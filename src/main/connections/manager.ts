@@ -54,6 +54,12 @@ export class ProviderManager {
   markSnapshotChanged(): void { this.snapshotRevision++ }
 
   async refreshAccount(providerId: string, accountId: string): Promise<ProviderSnapshot> {
+    const account = this.store.get(accountId)
+    const secret = this.store.getSecret(accountId)
+    const adapter = this.registry.get(providerId)
+    if (!account || account.providerId !== providerId || !secret || !adapter) throw new Error('[bs] Provider account không khả dụng')
+    const refreshedAccount = await adapter.refreshAccount(account, secret)
+    this.store.upsert(refreshedAccount)
     await this.refreshModels(providerId, accountId)
     await this.refreshUsage(providerId, accountId)
     this.markSnapshotChanged()
@@ -67,7 +73,7 @@ export class ProviderManager {
     const secret = this.store.getSecret(accountId)
     const model = account?.models?.find(item => item === modelId)
     if (!account || !adapter || !secret || !model) throw new Error(`[bs] Provider runtime unavailable for ${providerId}/${modelId}`)
-    return adapter.createClient(account, secret, { id: model, name: model, capabilities: { isCodeModel: true, supportsStreaming: true, supportsTools: true } })
+    return adapter.createRuntime(account, secret, { id: model, name: model, capabilities: { isCodeModel: true, supportsStreaming: true, supportsTools: true } })
   }
 
   async refreshModels(providerId?: string, accountId?: string): Promise<void> {

@@ -9,9 +9,11 @@ export interface ProviderAdapterContext {
 
 export interface ProviderAdapter {
   capability: ProviderCapability
+  definition(): ProviderCapability
   connect(request: ProviderConnectRequest, context: ProviderAdapterContext): Promise<{ account: ProviderAccount; login?: { loginId: string; authUrl: string; expiresIn: number } }>
+  refreshAccount(account: ProviderAccount, secret: ProviderSecrets): Promise<ProviderAccount>
   listModels(account: ProviderAccount, secret: ProviderSecrets): Promise<ProviderModel[]>
-  createClient(account: ProviderAccount, secret: ProviderSecrets, model: ProviderModel): LlmClient
+  createRuntime(account: ProviderAccount, secret: ProviderSecrets, model: ProviderModel): LlmClient
   fetchUsage?(account: ProviderAccount, secret: ProviderSecrets): Promise<ProviderUsage>
 }
 

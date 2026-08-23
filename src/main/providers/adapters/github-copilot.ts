@@ -17,6 +17,7 @@ export function createGitHubCopilotAdapter(): ProviderAdapter {
       ],
       status: 'experimental'
     },
+    definition() { return this.capability },
     async connect(request, context) {
       if (request.methodId === 'oauth') throw new Error('[bs] GitHub Copilot OAuth session chưa được bật trong runtime này')
       const secret = normalizeProviderImport('github-copilot', request.fields.credentialJson ?? '')
@@ -25,10 +26,11 @@ export function createGitHubCopilotAdapter(): ProviderAdapter {
       const account = context.saveAccount({ providerId: 'github-copilot', label, authMode: 'imported', status: 'active', models, profile: { name: label } }, secret)
       return { account }
     },
+    async refreshAccount(account) { return account },
     async listModels(account) {
       return (account.models ?? ['gpt-4.1', 'claude-sonnet-4']).map(id => ({ id, name: id, capabilities: { isCodeModel: true, supportsStreaming: true, supportsTools: true } }))
     },
-    createClient(_account, secret, _model) {
+    createRuntime(_account, secret, _model) {
       return createLlm('openai-compatible', secret.apiKey ?? secret.accessToken ?? '', COPILOT_BASE_URL, { 'editor-version': 'vscode/1.95.0', 'copilot-integration-id': 'vscode-chat' })
     }
   }

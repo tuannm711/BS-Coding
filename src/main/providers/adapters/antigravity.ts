@@ -22,7 +22,9 @@ export function createAntigravityAdapter(): ProviderAdapter {
       ],
       status: 'experimental'
     },
+    definition() { return this.capability },
     async connect() { throw new Error('[bs] Antigravity OAuth phải được bắt đầu qua login session') },
+    async refreshAccount(account) { return account },
     async listModels(_account, secret) {
       if (secret.accessToken) {
         const response = await fetch('https://cloudcode-pa.googleapis.com/v1internal:fetchAvailableModels', { method: 'POST', headers: { authorization: `Bearer ${secret.accessToken}`, 'content-type': 'application/json', 'user-agent': 'antigravity/1.15.8 windows/amd64' }, body: '{}' })
@@ -33,7 +35,7 @@ export function createAntigravityAdapter(): ProviderAdapter {
       }
       return ANTIGRAVITY_CODE_MODELS.map(model => ({ ...model, capabilities: { isCodeModel: true, supportsStreaming: true, supportsTools: true } }))
     },
-    createClient(_account, secret) {
+    createRuntime(_account, secret) {
       if (!secret.accessToken) throw new Error('[bs] Antigravity OAuth access token unavailable')
       return createAntigravityLlm(secret.accessToken)
     }

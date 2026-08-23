@@ -17,16 +17,18 @@ export function createOpenAiAdapter(): ProviderAdapter {
       ],
       status: 'ready'
     },
+    definition() { return this.capability },
     async connect(request, context) {
       if (request.methodId !== 'api-key') throw new Error('[bs] OpenAI OAuth cần được bắt đầu qua login session')
       const label = request.fields.label?.trim() || 'OpenAI API account'
       const account = context.saveAccount({ providerId: 'openai', label, authMode: 'api-key', status: 'active', profile: { name: label } }, { apiKey: request.fields.apiKey, baseUrl: request.fields.baseUrl })
       return { account }
     },
+    async refreshAccount(account) { return account },
     async listModels(account) {
       return account.authMode === 'oauth' ? models : models
     },
-    createClient(_account, secret, _model) {
+    createRuntime(_account, secret, _model) {
       return createLlm('openai', secret.apiKey ?? '', secret.baseUrl)
     }
   }
