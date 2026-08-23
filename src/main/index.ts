@@ -680,6 +680,9 @@ function registerIpcHandlers(): void {
     mainApp.bsAgent.getAvailableVariants(agentId))
   ipcMain.handle(Channels.AgentSetModel, (_e, agentId: string, provider: string, model: string) =>
     mainApp.setAgentModel(agentId, provider, model))
+  ipcMain.handle(Channels.AgentSetAccount, (_e, agentId: string, accountId: string | null) =>
+    mainApp.bsAgent.setAccount(agentId, accountId))
+  ipcMain.handle(Channels.AgentGetAssignment, (_e, agentId: string) => mainApp.bsAgent.getAgentAssignment(agentId))
   ipcMain.handle(Channels.AgentGetModel, (_e, agentId: string) => mainApp.bsAgent.getAgentModel(agentId))
   ipcMain.handle(Channels.AgentGetContext, (_e, agentId: string) => mainApp.bsAgent.getContextInfo(agentId))
   ipcMain.handle(Channels.AgentSetBackground, (_e, agentId: string, background: boolean) =>

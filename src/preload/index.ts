@@ -56,6 +56,9 @@ const api: AgentApi = {
     ipcRenderer.invoke(Channels.AgentGetVariants, agentId),
   setAgentModel: (agentId: string, provider: string, model: string) =>
     ipcRenderer.invoke(Channels.AgentSetModel, agentId, provider, model),
+  setAgentAccount: (agentId: string, accountId: string | null) =>
+    ipcRenderer.invoke(Channels.AgentSetAccount, agentId, accountId),
+  getAgentAssignment: (agentId: string) => ipcRenderer.invoke(Channels.AgentGetAssignment, agentId),
   getAgentModel: (agentId: string) => ipcRenderer.invoke(Channels.AgentGetModel, agentId),
   getContextInfo: (agentId: string) => ipcRenderer.invoke(Channels.AgentGetContext, agentId),
   getProviderModels: () => ipcRenderer.invoke(Channels.ProviderModels),

@@ -485,6 +485,25 @@ export class BsAgentManager {
     this.register(agent)
   }
 
+  setAccount(agentId: string, accountId: string | null): void {
+    const agent = this.agents.get(agentId)
+    if (!agent) return
+    agent.accountId = accountId || undefined
+    this.agents.set(agentId, agent)
+    this.runners.delete(agentId)
+    this.resolved.delete(agentId)
+    this.register(agent)
+  }
+
+  getAgentAssignment(agentId: string): { provider: string; accountId?: string; model: string; fallback?: Array<{ provider: string; accountId?: string; model: string }> } | null {
+    const agent = this.agents.get(agentId)
+    if (!agent) return null
+    const cfg = loadBsConfig(this.deps.configPath)
+    const resolved = this.resolveAgentConfig(cfg, agent.name, agent.model)
+    if (!resolved.provider || !resolved.model) return null
+    return { provider: resolved.provider, model: resolved.model, accountId: resolved.accountId, fallback: resolved.fallback }
+  }
+
   getAgentModel(agentId: string): ModelRef | null {
     const agent = this.agents.get(agentId)
     if (!agent) return null
@@ -916,13 +935,16 @@ export class BsAgentManager {
   }
 
   private resolveAgentConfig(cfg: BsConfig, agentName: string, agentModel?: string): ResolvedAgentConfig {
-    return resolveAgentConfig(
+    const resolved = resolveAgentConfig(
       cfg,
       agentName,
       this.deps.env,
       agentModel,
       this.deps.vault ? (ref: string) => this.deps.vault!.getSecret(ref) : undefined
     )
+    const agent = [...this.agents.values()].find(a => a.name === agentName)
+    if (agent?.accountId) resolved.accountId = agent.accountId
+    return resolved
   }
 
   private priceFor(provider: string, model: string): ModelPrice | undefined {

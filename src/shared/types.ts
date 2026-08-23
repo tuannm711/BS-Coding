@@ -23,6 +23,8 @@ export interface AgentConfig {
   mode?: AgentMode
   variant?: ModelVariant
   model?: string
+  accountId?: string
+  fallback?: Array<{ provider: string; accountId?: string; model: string }>
   background?: boolean
 }
 

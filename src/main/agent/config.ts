@@ -60,6 +60,8 @@ export interface BsConfig {
 export interface ResolvedAgentConfig {
   provider: string
   model: string
+  accountId?: string
+  fallback?: Array<{ provider: string; accountId?: string; model: string }>
   apiKey: string | null
   baseUrl?: string
   systemPrompt: string
@@ -321,12 +323,14 @@ export function resolveAgentConfig(
   }
   const provider = cfg.provider[providerName]
   if (!provider) {
-    return { provider: '', model: '', apiKey: null, systemPrompt: agent.systemPrompt }
+    return { provider: '', model: '', accountId: agent.accountId, fallback: agent.fallback, apiKey: null, systemPrompt: agent.systemPrompt }
   }
   const model = modelName && provider.models.includes(modelName) ? modelName : (provider.models[0] ?? '')
   return {
     provider: providerName,
     model,
+    accountId: agent.accountId,
+    fallback: agent.fallback,
     apiKey: resolveApiKey(provider, env, getSecret),
     baseUrl: provider.baseUrl,
     systemPrompt: agent.systemPrompt

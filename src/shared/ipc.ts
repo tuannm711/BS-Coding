@@ -1,5 +1,5 @@
 import type {
-  AgentConfig, AgentState, ArtifactEntry, CatalogProviderSummary, ChatEvent, ChatMessage, ChatTranscriptItem, Command,
+  AgentConfig, AgentModelAssignment, AgentState, ArtifactEntry, CatalogProviderSummary, ChatEvent, ChatMessage, ChatTranscriptItem, Command,
   ContextChangedEvent, ContextInfo, DirEntry, FileContentResult, FileSuggestion, FileViewerPayload,
   GitStatus, ImageAttachment, McpServerStatus, BsSettings, ModelRef, NewAgentInput, PromptResponse,
   ProviderAccount, ProviderConnection, ProviderUsage, SessionSummary, StatsSummary, Template, TerminalInfo, TodoItem, TraceEvent, TraceSummary, UpdaterStatusEvent, WorkspaceRuntime, WorkspaceSummary
@@ -24,6 +24,8 @@ export const Channels = {
   AgentSetVariant: 'agent:set-variant',
   AgentGetVariants: 'agent:get-variants',
   AgentSetModel: 'agent:set-model',
+  AgentSetAccount: 'agent:set-account',
+  AgentGetAssignment: 'agent:get-assignment',
   AgentGetModel: 'agent:get-model',
   AgentGetContext: 'agent:get-context',
   ProviderModels: 'provider:models',
@@ -165,6 +167,8 @@ export interface AgentApi {
   setAgentVariant(agentId: string, variant: string | null): Promise<void>
   getAgentVariants(agentId: string): Promise<string[]>
   setAgentModel(agentId: string, provider: string, model: string): Promise<void>
+  setAgentAccount(agentId: string, accountId: string | null): Promise<void>
+  getAgentAssignment(agentId: string): Promise<AgentModelAssignment | null>
   getAgentModel(agentId: string): Promise<ModelRef | null>
   getContextInfo(agentId: string): Promise<ContextInfo>
   getProviderModels(): Promise<ModelRef[]>
