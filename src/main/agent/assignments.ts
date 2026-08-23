@@ -1,5 +1,5 @@
 import type { AgentAssignmentSnapshot } from '../../shared/provider-state'
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 
 export interface AssignmentPersistence {
@@ -15,7 +15,9 @@ export function fileAssignmentPersistence(file: string): AssignmentPersistence {
     },
     save(value) {
       mkdirSync(path.dirname(file), { recursive: true })
-      writeFileSync(file, JSON.stringify(value, null, 2))
+      const temp = `${file}.${process.pid}.${Date.now()}.tmp`
+      writeFileSync(temp, JSON.stringify(value, null, 2))
+      renameSync(temp, file)
     }
   }
 }
@@ -54,6 +56,25 @@ export class AssignmentStore {
   remove(agentId: string): void {
     delete this.state.assignments[agentId]
     this.persistence.save(this.state)
+  }
+
+  migrate(settings: { agents?: Record<string, { provider?: string; model?: string; accountId?: string; speed?: 'standard' | 'fast' }> }, workspaceAgents: Array<{ id: string; name: string; model?: string; accountId?: string; speed?: 'standard' | 'fast' }>): { migrated: number; needsReview: string[] } {
+    let migrated = 0
+    const needsReview: string[] = []
+    for (const agent of workspaceAgents) {
+      if (this.state.assignments[agent.id]) continue
+      const profile = settings.agents?.[agent.name]
+      const encoded = profile?.model ?? agent.model ?? ''
+      const slash = encoded.indexOf('/')
+      const providerId = profile?.provider ?? (slash > 0 ? encoded.slice(0, slash) : '')
+      const modelId = slash > 0 ? encoded.slice(slash + 1) : encoded
+      const status = providerId && modelId ? 'ready' as const : 'needs-review' as const
+      this.state.assignments[agent.id] = { agentId: agent.id, providerId, modelId, accountId: profile?.accountId ?? agent.accountId, speed: profile?.speed ?? agent.speed ?? 'standard', revision: 1, status }
+      migrated++
+      if (status === 'needs-review') needsReview.push(agent.id)
+    }
+    if (migrated > 0) this.persistence.save(this.state)
+    return { migrated, needsReview }
   }
 
   private read(): AssignmentFile {

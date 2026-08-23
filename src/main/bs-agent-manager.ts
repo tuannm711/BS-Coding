@@ -167,6 +167,8 @@ export class BsAgentManager {
   }
 
   async init(agents: AgentConfig[]): Promise<void> {
+    const cfg = loadBsConfig(this.deps.configPath)
+    this.assignments.migrate(cfg, agents)
     await this.syncTools()
     await this.refreshModelLimits()
     for (const agent of agents) {
@@ -1033,7 +1035,7 @@ export class BsAgentManager {
     cfg = this.materializeConnectedProviders(cfg)
     const registeredAgent = [...this.agents.values()].find(a => a.name === agentName)
     const storedAssignment = registeredAgent ? this.assignments.get(registeredAgent.id) : undefined
-    const requestedModel = storedAssignment
+    const requestedModel = storedAssignment?.status === 'ready' && storedAssignment.providerId && storedAssignment.modelId
       ? `${storedAssignment.providerId}/${storedAssignment.modelId}`
       : agentModel
     const resolved = resolveAgentConfig(
@@ -1044,7 +1046,7 @@ export class BsAgentManager {
       this.deps.vault ? (ref: string) => this.deps.vault!.getSecret(ref) : undefined
     )
     const agent = registeredAgent
-    if (storedAssignment) resolved.accountId = storedAssignment.accountId
+    if (storedAssignment?.status === 'ready') resolved.accountId = storedAssignment.accountId
     if (agent?.accountId) resolved.accountId = agent.accountId
     if (resolved.provider) {
       const connection = this.deps.providerAccounts?.().find(c => c.providerId === resolved.provider)
