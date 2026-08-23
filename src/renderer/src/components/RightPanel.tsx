@@ -35,7 +35,7 @@ export default function RightPanel({
     const onMove = (ev: MouseEvent) => {
       if (!dragRef.current) return
       const delta = dragRef.current.startX - ev.clientX
-      const next = Math.min(600, Math.max(240, dragRef.current.startWidth + delta))
+      const next = Math.min(600, Math.max(300, dragRef.current.startWidth + delta))
       onWidthChange(next)
     }
     const onUp = () => {

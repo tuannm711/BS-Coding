@@ -47,7 +47,7 @@ export default function App() {
     localStorage.getItem('bs.rightpanel.tab') === 'artifacts' ? 'artifacts' : 'tree')
   const [rightWidth, setRightWidth] = useState(() => {
     const w = Number(localStorage.getItem('bs.rightpanel.width'))
-    return Number.isFinite(w) && w >= 240 && w <= 600 ? w : 280
+    return Number.isFinite(w) && w >= 300 && w <= 600 ? w : 340
   })
   const [artifacts, setArtifacts] = useState<Record<string, ArtifactEntry[]>>({})
   const termsRef = useRef<Map<string, Terminal>>(new Map())
