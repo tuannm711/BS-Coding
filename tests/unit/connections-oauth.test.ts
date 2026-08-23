@@ -10,8 +10,14 @@ describe('OAuth helpers', () => {
     const pkce = createPkce()
     expect(pkce.verifier.length).toBeGreaterThanOrEqual(43)
     expect(pkce.challenge).toMatch(/^[A-Za-z0-9_-]+$/)
-    expect(codexAuthorizeUrl(pkce)).toContain(`client_id=${CODEX_CLIENT_ID}`)
-    expect(codexAuthorizeUrl(pkce)).toContain('code_challenge_method=S256')
+    const url = new URL(codexAuthorizeUrl(pkce))
+    expect(url.searchParams.get('client_id')).toBe(CODEX_CLIENT_ID)
+    expect(url.searchParams.get('redirect_uri')).toBe('http://localhost:1455/auth/callback')
+    expect(url.searchParams.get('scope')).toBe('openid profile email offline_access')
+    expect(url.searchParams.get('code_challenge_method')).toBe('S256')
+    expect(url.searchParams.get('id_token_add_organizations')).toBe('true')
+    expect(url.searchParams.get('codex_cli_simplified_flow')).toBe('true')
+    expect(url.searchParams.get('originator')).toBe('codex_vscode')
   })
 
   it('extracts account metadata from an id token', () => {

@@ -5,7 +5,7 @@ import type { ProviderSecrets } from './types'
 export const CODEX_AUTHORIZE_URL = 'https://auth.openai.com/oauth/authorize'
 export const CODEX_TOKEN_URL = 'https://auth.openai.com/oauth/token'
 export const CODEX_CLIENT_ID = 'app_EMoamEEZ73f0CkXaXp7hrann'
-export const CODEX_REDIRECT_URI = 'http://127.0.0.1:1455/callback'
+export const CODEX_REDIRECT_URI = 'http://localhost:1455/auth/callback'
 export const CODEX_ORIGINATOR = 'codex_vscode'
 
 export interface CodexTokens extends ProviderSecrets {
@@ -21,10 +21,13 @@ export function codexAuthorizeUrl(pkce: { challenge: string; state: string }): s
     client_id: CODEX_CLIENT_ID,
     response_type: 'code',
     redirect_uri: CODEX_REDIRECT_URI,
-    scope: 'openid profile email offline_access api.connectors.read api.connectors.invoke',
+    scope: 'openid profile email offline_access',
     code_challenge: pkce.challenge,
     code_challenge_method: 'S256',
-    state: pkce.state
+    state: pkce.state,
+    id_token_add_organizations: 'true',
+    codex_cli_simplified_flow: 'true',
+    originator: CODEX_ORIGINATOR
   })
   return `${CODEX_AUTHORIZE_URL}?${params.toString()}`
 }

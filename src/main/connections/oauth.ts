@@ -40,7 +40,7 @@ export function listenForCallback(port = 1455, timeoutMs = 300_000): CallbackHan
   }
   server = createServer((req, res) => {
     const url = new URL(req.url ?? '/', `http://127.0.0.1:${port}`)
-    if (url.pathname !== '/callback') {
+    if (url.pathname !== '/auth/callback') {
       res.writeHead(404).end()
       return
     }
