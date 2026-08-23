@@ -34,7 +34,7 @@ export class ProviderManager {
   readonly store: ProviderAccountStore
   readonly registry: ProviderRegistry
   private pending = new Map<string, PendingLogin>()
-  private snapshotRevision = 0
+  private snapshotRevision = 1
 
   constructor(private readonly deps: ProviderManagerDeps) {
     this.store = new ProviderAccountStore(deps.accountsFile, deps.vault)
@@ -46,12 +46,15 @@ export class ProviderManager {
   }
 
   getSnapshot(): ProviderSnapshot {
-    return buildProviderSnapshot(++this.snapshotRevision, this.registry.listReady(), this.list())
+    return buildProviderSnapshot(this.snapshotRevision, this.registry.listReady(), this.list())
   }
+
+  markSnapshotChanged(): void { this.snapshotRevision++ }
 
   async refreshAccount(providerId: string, accountId: string): Promise<ProviderSnapshot> {
     await this.refreshModels(providerId, accountId)
     await this.refreshUsage(providerId, accountId)
+    this.markSnapshotChanged()
     return this.getSnapshot()
   }
 

@@ -124,10 +124,15 @@ class MainApp {
     registry: this.providerRegistry,
     vault: this.vault,
     onAccountsChanged: (connections) => {
+      mainApp?.providerManager.markSnapshotChanged()
       win?.webContents.send(Channels.EventProviderAccountsChanged, connections)
-      win?.webContents.send(Channels.EventProviderSnapshotChanged, mainApp?.providerManager.getSnapshot())
+      win?.webContents.send(Channels.EventProviderSnapshotChanged, mainApp?.providerSnapshot())
     },
-    onUsage: (usage) => win?.webContents.send(Channels.EventProviderUsage, usage)
+    onUsage: (usage) => {
+      mainApp?.providerManager.markSnapshotChanged()
+      win?.webContents.send(Channels.EventProviderUsage, usage)
+      win?.webContents.send(Channels.EventProviderSnapshotChanged, mainApp?.providerSnapshot())
+    }
   })
   bsAgent = new BsAgentManager({
     configPath: path.join(app.getPath('userData'), 'bs.json'),
@@ -558,6 +563,10 @@ class MainApp {
     if (agent) win?.webContents.send(Channels.EventAgentConfig, { agentId, config: agent })
   }
 
+  providerSnapshot() {
+    return { ...this.providerManager.getSnapshot(), assignments: this.bsAgent.listAgentAssignmentSnapshots() }
+  }
+
   resetActiveProject(): void {
     this.stopGitPoll()
     this.watcher?.stop()
@@ -760,7 +769,8 @@ function registerIpcHandlers(): void {
     await mainApp.providerManager.refreshModels(providerId)
     return mainApp.providerManager.list(providerId)
   })
-  ipcMain.handle(Channels.ProviderSnapshotGet, () => mainApp.providerManager.getSnapshot())
+
+  ipcMain.handle(Channels.ProviderSnapshotGet, () => mainApp.providerSnapshot())
   ipcMain.handle(Channels.ProviderAccountRefresh, (_e, providerId: string, accountId: string) => mainApp.providerManager.refreshAccount(providerId, accountId))
   ipcMain.handle(Channels.AgentAssignmentGetSnapshot, (_e, agentId: string) => mainApp.bsAgent.getAgentAssignmentSnapshot(agentId))
   ipcMain.handle(Channels.AgentAssignmentSetSnapshot, (_e, request) => mainApp.bsAgent.setAgentAssignmentSnapshot(request))

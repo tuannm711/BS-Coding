@@ -552,6 +552,10 @@ export class BsAgentManager {
     return this.assignments.get(agentId) ?? null
   }
 
+  listAgentAssignmentSnapshots(): AgentAssignmentSnapshot[] {
+    return Object.values(this.assignments.load())
+  }
+
   setAgentAssignmentSnapshot(request: AgentAssignmentSetRequest): AgentAssignmentSnapshot {
     const agent = this.agents.get(request.agentId)
     if (!agent) throw new Error('[bs] Agent không tồn tại')
