@@ -110,7 +110,12 @@ export class ProviderManager {
       if (!pending || result.state !== pending.state) throw new Error('[bs] Antigravity OAuth state không hợp lệ')
       const tokens = await exchangeAntigravityCode(result.code)
       const profile = await fetchAntigravityProfile(tokens.accessToken)
-      this.store.upsert({ providerId: 'antigravity', label: profile.email ?? `Antigravity account ${new Date().toLocaleString()}`, authMode: 'oauth', status: 'active', profile: { email: profile.email, name: profile.name }, oauthExpiresAt: tokens.expiresAt }, tokens)
+      const account = this.store.upsert({ providerId: 'antigravity', label: profile.email ?? `Antigravity account ${new Date().toLocaleString()}`, authMode: 'oauth', status: 'active', profile: { email: profile.email, name: profile.name }, oauthExpiresAt: tokens.expiresAt }, tokens)
+      const adapter = this.registry.get('antigravity')
+      if (adapter) {
+        const models = await adapter.listModels(account, tokens)
+        this.store.upsert({ ...account, models: models.map(model => model.id) })
+      }
       this.deps.onAccountsChanged?.(this.list())
     }).catch(() => { this.pending.delete(loginId) })
     const authUrl = antigravityAuthorizeUrl(pkce.state)

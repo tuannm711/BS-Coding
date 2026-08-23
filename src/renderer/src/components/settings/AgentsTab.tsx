@@ -18,6 +18,20 @@ interface Props {
   onChangeSubagentModels: (models?: Partial<Record<SubagentType, ModelRef>>) => void
 }
 
+export function mergeProviderAccounts(providers: BsSettings['providers'], accounts: ProviderConnection[]): BsSettings['providers'] {
+  const byProvider = new Map(providers.map(provider => [provider.id, { ...provider, models: [...provider.models] }]))
+  for (const connection of accounts) {
+    const current = byProvider.get(connection.providerId) ?? { id: connection.providerId, apiKey: '', models: [] }
+    for (const account of connection.accounts) if (account.status === 'active') current.models.push(...(account.models ?? []))
+    current.models = [...new Set(current.models)]
+    byProvider.set(connection.providerId, current)
+  }
+  const openai = byProvider.get('openai')
+  if (openai) openai.models = [...new Set([...openai.models.filter(model => !isOpenAiGenericModel(model)), ...OPENAI_OAUTH_MODELS])]
+  else if (accounts.some(connection => connection.providerId === 'openai' && connection.accounts.some(account => account.status === 'active'))) byProvider.set('openai', { id: 'openai', apiKey: '', models: [...OPENAI_OAUTH_MODELS] })
+  return [...byProvider.values()]
+}
+
 export default function AgentsTab({ agents, providers, subagentModels, onChangeAgents, onChangeSubagentModels }: Props) {
   const [adding, setAdding] = useState(false)
   const [newName, setNewName] = useState('')
@@ -29,11 +43,7 @@ export default function AgentsTab({ agents, providers, subagentModels, onChangeA
     return window.api.onProviderAccountsChanged(setAccounts)
   }, [])
 
-  const effectiveProviders = useMemo(() => {
-    const existing = providers.find(p => p.id === 'openai')
-    if (existing) return providers.map(p => p.id === 'openai' ? { ...p, models: [...new Set([...p.models.filter(model => !isOpenAiGenericModel(model)), ...OPENAI_OAUTH_MODELS])] } : p)
-    return [...providers, { id: 'openai', apiKey: '', models: [...OPENAI_OAUTH_MODELS] }]
-  }, [accounts, providers])
+  const effectiveProviders = useMemo(() => mergeProviderAccounts(providers, accounts), [accounts, providers])
 
   const setRole = (role: SubagentType, ref: ModelRef | undefined) => {
     const next = { ...(subagentModels ?? {}) }
@@ -99,7 +109,7 @@ export default function AgentsTab({ agents, providers, subagentModels, onChangeA
               onChange={e => {
                 const provider = e.target.value || undefined
                 const models = effectiveProviders.find(p => p.id === provider)?.models ?? []
-                updateAgent(i, { provider, model: models[0], accountId: provider === 'openai' ? (accounts.find(c => c.providerId === 'openai')?.activeAccountId ?? undefined) : undefined })
+                updateAgent(i, { provider, model: models[0], accountId: provider ? (accounts.find(c => c.providerId === provider)?.activeAccountId ?? undefined) : undefined })
               }}
             >
               <option value="">(default provider)</option>
@@ -113,14 +123,14 @@ export default function AgentsTab({ agents, providers, subagentModels, onChangeA
             >
               {(effectiveProviders.find(p => p.id === a.provider)?.models ?? []).map(m => <option key={m} value={m}>{m}</option>)}
             </select>
-            {a.provider === 'openai' && (
+            {a.provider && accounts.some(connection => connection.providerId === a.provider) && (
               <select
                 className="input"
                 value={a.accountId ?? ''}
                 onChange={e => updateAgent(i, { accountId: e.target.value || undefined })}
               >
-                <option value="">(active ChatGPT account)</option>
-                {(accounts.find(c => c.providerId === 'openai')?.accounts ?? []).filter(account => account.status === 'active').map(account => (
+                <option value="">(active {a.provider} account)</option>
+                {(accounts.find(c => c.providerId === a.provider)?.accounts ?? []).filter(account => account.status === 'active').map(account => (
                   <option key={account.id} value={account.id}>{account.label}</option>
                 ))}
               </select>
@@ -134,7 +144,7 @@ export default function AgentsTab({ agents, providers, subagentModels, onChangeA
         </p>
         {SUBMODEL_ROLES.map(role => {
           const ref = subagentModels?.[role]
-          const provider = providers.find(p => p.id === ref?.provider)
+          const provider = effectiveProviders.find(p => p.id === ref?.provider)
           return (
             <div className="settings-row agents-row" key={role}>
               <div className="agents-row-head">
@@ -145,10 +155,10 @@ export default function AgentsTab({ agents, providers, subagentModels, onChangeA
                 <select
                   className="input"
                   value={ref?.provider ?? ''}
-                  onChange={e => setRole(role, e.target.value ? { provider: e.target.value, model: providers.find(p => p.id === e.target.value)?.models[0] ?? '' } : undefined)}
+                  onChange={e => setRole(role, e.target.value ? { provider: e.target.value, model: effectiveProviders.find(p => p.id === e.target.value)?.models[0] ?? '' } : undefined)}
                 >
                   <option value="">(inherit main agent model)</option>
-                  {providers.map(p => <option key={p.id} value={p.id}>{p.id}</option>)}
+                  {effectiveProviders.map(p => <option key={p.id} value={p.id}>{p.id}</option>)}
                 </select>
                 <select
                   className="input"

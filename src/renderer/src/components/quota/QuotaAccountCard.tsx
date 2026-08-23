@@ -18,10 +18,11 @@ interface Props {
   onSpeedChange?: (agentId: string, speed: AgentSpeed) => void
   accountStatus?: 'active' | 'inactive'
   onAccountToggle?: (enabled: boolean) => void
+  providerLabel?: string
   compact?: boolean
 }
 
-export default function QuotaAccountCard({ usage, agents = [], onRefresh, onSpeedChange, accountStatus, onAccountToggle, compact = false }: Props) {
+export default function QuotaAccountCard({ usage, agents = [], onRefresh, onSpeedChange, accountStatus, onAccountToggle, providerLabel, compact = false }: Props) {
   const remaining = usageRemaining(usage)
   const accountLabel = usage?.accountLabel ?? 'ChatGPT account'
   const accountType = usage?.accountType === 'oauth' ? 'ChatGPT OAuth' : usage?.accountType === 'api-key' ? 'API key' : usage?.accountType ?? 'Account'
@@ -36,7 +37,7 @@ export default function QuotaAccountCard({ usage, agents = [], onRefresh, onSpee
         <div className="quota-account-identity">
           <span className="quota-account-avatar" aria-hidden="true">{accountLabel.slice(0, 1).toUpperCase()}</span>
           <div>
-            <strong title={accountLabel}>{accountLabel}</strong>
+            <strong title={accountLabel}>{providerLabel ? `${providerLabel} · ` : ''}{accountLabel}</strong>
             <span>{accountType} · {usage?.planName ?? 'Plan —'}</span>
           </div>
         </div>
