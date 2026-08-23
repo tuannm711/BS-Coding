@@ -61,6 +61,14 @@ export interface AgentAssignmentSnapshot {
   status?: 'ready' | 'needs-review' | 'error'
 }
 
+export interface AgentAssignmentSetRequest {
+  agentId: string
+  providerId: string
+  accountId?: string
+  modelId: string
+  speed: 'standard' | 'fast'
+}
+
 export interface ProviderSnapshot {
   revision: number
   providers: ProviderDefinitionSnapshot[]

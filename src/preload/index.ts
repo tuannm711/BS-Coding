@@ -6,7 +6,7 @@ import type { AgentApi, AgentConfigEvent, AgentStateEvent, BrowserInstallGuideEv
 import type { BrowserStatusInfo } from '../shared/browser-types'
 import type { RemoteStatus } from '../shared/remote-types'
 import type { ProviderConnectRequest } from '../shared/providers'
-import type { AgentAssignmentSnapshot } from '../shared/provider-state'
+import type { AgentAssignmentSetRequest, AgentAssignmentSnapshot } from '../shared/provider-state'
 import type { ProviderSnapshot } from '../shared/provider-state'
 
 function subscribe<T>(channel: string, cb: (e: T) => void): () => void {
@@ -163,6 +163,9 @@ const api: AgentApi = {
   onAgentAssignmentChanged: (cb: (e: AgentAssignmentSnapshot) => void) => subscribe(Channels.EventAgentAssignmentChanged, cb),
   getProviderSnapshot: () => ipcRenderer.invoke(Channels.ProviderSnapshotGet),
   onProviderSnapshotChanged: (cb: (e: ProviderSnapshot) => void) => subscribe(Channels.EventProviderSnapshotChanged, cb),
+  refreshProviderAccount: (providerId: string, accountId: string) => ipcRenderer.invoke(Channels.ProviderAccountRefresh, providerId, accountId),
+  getAgentAssignmentSnapshot: (agentId: string) => ipcRenderer.invoke(Channels.AgentAssignmentGetSnapshot, agentId),
+  setAgentAssignmentSnapshot: (request: AgentAssignmentSetRequest) => ipcRenderer.invoke(Channels.AgentAssignmentSetSnapshot, request),
   getBrowserStatus: () => ipcRenderer.invoke(Channels.BrowserGetStatus),
   pairBrowser: () => ipcRenderer.invoke(Channels.BrowserPair),
   openBrowserInstallGuide: () => ipcRenderer.invoke(Channels.BrowserOpenInstallGuide),

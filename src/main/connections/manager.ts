@@ -49,6 +49,12 @@ export class ProviderManager {
     return buildProviderSnapshot(++this.snapshotRevision, this.registry.listReady(), this.list())
   }
 
+  async refreshAccount(providerId: string, accountId: string): Promise<ProviderSnapshot> {
+    await this.refreshModels(providerId, accountId)
+    await this.refreshUsage(providerId, accountId)
+    return this.getSnapshot()
+  }
+
   createRuntime(providerId: string, accountId: string, modelId: string): LlmClient {
     const connection = this.store.list(providerId).find(item => item.accounts.some(account => account.id === accountId))
     const account = connection?.accounts.find(item => item.id === accountId)

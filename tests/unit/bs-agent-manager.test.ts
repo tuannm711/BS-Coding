@@ -139,6 +139,15 @@ describe('BsAgentManager', () => {
     expect(manager.getProviderModels()).toContainEqual({ provider: 'openai', model: 'gpt-5.6-sol' })
   })
 
+  it('validates and persists canonical provider account model assignments', async () => {
+    const providerAccounts: ProviderConnection[] = [{ providerId: 'test', activeAccountId: 'acct-1', accounts: [{ id: 'acct-1', providerId: 'test', label: 'test', authMode: 'api-key', status: 'active', models: ['test-model'], createdAt: 1, lastUsedAt: 1 }] }]
+    const { manager } = await makeManager({ providerAccounts })
+    const assignment = manager.setAgentAssignmentSnapshot({ agentId: 'a1', providerId: 'test', accountId: 'acct-1', modelId: 'test-model', speed: 'fast' })
+    expect(assignment).toMatchObject({ providerId: 'test', accountId: 'acct-1', modelId: 'test-model', speed: 'fast', status: 'ready' })
+    expect(manager.getAgentAssignmentSnapshot('a1')).toEqual(assignment)
+    expect(() => manager.setAgentAssignmentSnapshot({ agentId: 'a1', providerId: 'test', accountId: 'missing', modelId: 'test-model', speed: 'standard' })).toThrow('không hợp lệ')
+  })
+
   it('seeds background state from the stored agent config on register', async () => {
     const { manager } = await makeManager()
     manager.addAgent({ ...BS_AGENT, id: 'a9', background: true })

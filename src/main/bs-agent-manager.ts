@@ -38,7 +38,7 @@ import type { Vault } from './vault'
 import { TraceStore } from './agent/trace-store'
 import type { TraceEventInput } from './agent/trace-store'
 import { OPENAI_OAUTH_MODELS, isActiveOpenAiOAuthAccount, isOpenAiGenericModel, normalizeOpenAiCodexModel } from '../shared/openai-oauth'
-import type { AgentAssignmentSnapshot } from '../shared/provider-state'
+import type { AgentAssignmentSetRequest, AgentAssignmentSnapshot } from '../shared/provider-state'
 import { AssignmentStore, fileAssignmentPersistence } from './agent/assignments'
 
 export interface BsAgentManagerDeps {
@@ -544,6 +544,29 @@ export class BsAgentManager {
     const resolved = this.resolveAgentConfig(cfg, agent.name, agent.model)
     if (!resolved.provider || !resolved.model) return null
     return { provider: resolved.provider, model: resolved.model, accountId: resolved.accountId, speed: agent.speed ?? 'standard', fallback: resolved.fallback }
+  }
+
+  getAgentAssignmentSnapshot(agentId: string): AgentAssignmentSnapshot | null {
+    return this.assignments.get(agentId) ?? null
+  }
+
+  setAgentAssignmentSnapshot(request: AgentAssignmentSetRequest): AgentAssignmentSnapshot {
+    const agent = this.agents.get(request.agentId)
+    if (!agent) throw new Error('[bs] Agent không tồn tại')
+    const connection = this.deps.providerAccounts?.().find(item => item.providerId === request.providerId)
+    const account = request.accountId ? connection?.accounts.find(item => item.id === request.accountId && item.status === 'active') : connection?.accounts.find(item => item.status === 'active')
+    const models = account?.models ?? connection?.accounts.filter(item => item.status === 'active').flatMap(item => item.models ?? [])
+    if (!connection || (request.accountId && !account) || !models?.includes(request.modelId)) throw new Error('[bs] Agent assignment provider/account/model không hợp lệ')
+    agent.model = `${request.providerId}/${request.modelId}`
+    agent.accountId = account?.id
+    agent.speed = request.speed
+    this.agents.set(agent.id, agent)
+    const assignment = this.assignments.set({ ...request, accountId: account?.id, status: 'ready' })
+    this.runners.delete(agent.id)
+    this.resolved.delete(agent.id)
+    this.register(agent)
+    this.deps.onAssignmentChanged?.(assignment)
+    return assignment
   }
 
   getAgentModel(agentId: string): ModelRef | null {

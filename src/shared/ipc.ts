@@ -5,7 +5,7 @@ import type {
   ProviderAccount, ProviderConnection, ProviderUsage, SessionSummary, StatsSummary, Template, TerminalInfo, TodoItem, TraceEvent, TraceSummary, UpdaterStatusEvent, WorkspaceRuntime, WorkspaceSummary
 } from './types'
 import type { BrowserStatusInfo, PairingInfo } from './browser-types'
-import type { AgentAssignmentSnapshot } from './provider-state'
+import type { AgentAssignmentSetRequest, AgentAssignmentSnapshot } from './provider-state'
 import type { ProviderSnapshot } from './provider-state'
 import type { RemoteStatus } from './remote-types'
 import type { ProviderCapability, ProviderConnectRequest, ProviderConnectResult } from './providers'
@@ -133,6 +133,7 @@ export const Channels = {
   EventProviderAccountsChanged: 'provider:accounts-changed',
   EventProviderUsage: 'provider:usage',
   ProviderSnapshotGet: 'provider:snapshot-get',
+  ProviderAccountRefresh: 'provider:account-refresh',
   EventProviderSnapshotChanged: 'provider:snapshot-changed',
   AgentAssignmentGetSnapshot: 'agent:assignment-get-snapshot',
   AgentAssignmentSetSnapshot: 'agent:assignment-set-snapshot',
@@ -204,6 +205,9 @@ export interface AgentApi {
   onAgentAssignmentChanged(cb: (e: AgentAssignmentSnapshot) => void): () => void
   getProviderSnapshot(): Promise<ProviderSnapshot>
   onProviderSnapshotChanged(cb: (e: ProviderSnapshot) => void): () => void
+  refreshProviderAccount(providerId: string, accountId: string): Promise<ProviderSnapshot>
+  getAgentAssignmentSnapshot(agentId: string): Promise<AgentAssignmentSnapshot | null>
+  setAgentAssignmentSnapshot(request: AgentAssignmentSetRequest): Promise<AgentAssignmentSnapshot>
   listTemplates(): Promise<Template[]>
   saveTemplate(template: Template): Promise<Template>
   removeTemplate(id: string): Promise<void>
