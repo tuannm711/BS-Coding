@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { AgentModelAssignment, ProviderUsage } from '@shared/types'
+import { shouldAcceptSnapshot, type ProviderSnapshot } from '@shared/provider-state'
 import QuotaAccountCard from './quota/QuotaAccountCard'
 
 export interface QuotaAgent {
@@ -17,36 +18,36 @@ interface AgentUsageState {
 export default function RightPanelQuota({ agents }: { agents: QuotaAgent[] }) {
   const [states, setStates] = useState<Record<string, AgentUsageState>>({})
   const [providerUsage, setProviderUsage] = useState<Record<string, ProviderUsage>>({})
+  const snapshotRevision = useRef(0)
   const agentKey = agents.map(agent => agent.id).join('|')
 
+  const applySnapshot = (snapshot: ProviderSnapshot) => {
+    if (!shouldAcceptSnapshot(snapshotRevision.current, snapshot.revision)) return
+    snapshotRevision.current = snapshot.revision
+    setProviderUsage(Object.fromEntries(snapshot.accounts.filter(account => account.usage).map(account => [account.id, account.usage!])))
+    setStates(previous => Object.fromEntries(agents.map(agent => {
+      const stored = snapshot.assignments.find(assignment => assignment.agentId === agent.id)
+      const assignment = stored?.status === 'ready' ? { provider: stored.providerId, accountId: stored.accountId, model: stored.modelId, speed: stored.speed } : null
+      return [agent.id, { assignment, running: previous[agent.id]?.running ?? false, sessionTokens: previous[agent.id]?.sessionTokens, sessionCost: previous[agent.id]?.sessionCost }]
+    })))
+  }
+
   useEffect(() => {
-    let cancelled = false
-    void Promise.all(agents.map(async agent => ({ agent, assignment: await window.api.getAgentAssignment(agent.id) }))).then(rows => {
-      if (cancelled) return
-      setStates(previous => Object.fromEntries(rows.map(({ agent, assignment }) => [agent.id, {
-        assignment,
-        running: previous[agent.id]?.running ?? false,
-        sessionTokens: previous[agent.id]?.sessionTokens,
-        sessionCost: previous[agent.id]?.sessionCost
-      }])))
-    })
-    return () => { cancelled = true }
+    void window.api.getProviderSnapshot().then(applySnapshot)
+    return window.api.onProviderSnapshotChanged(applySnapshot)
   }, [agentKey])
 
   useEffect(() => window.api.onAgentAssignmentChanged(event => {
     if (!agents.some(agent => agent.id === event.agentId)) return
-    void window.api.getAgentAssignment(event.agentId).then(assignment => {
-      setStates(previous => previous[event.agentId] ? { ...previous, [event.agentId]: { ...previous[event.agentId], assignment } } : previous)
-    })
+    const assignment = event.status === 'ready' ? { provider: event.providerId, accountId: event.accountId, model: event.modelId, speed: event.speed } : null
+    setStates(previous => previous[event.agentId] ? { ...previous, [event.agentId]: { ...previous[event.agentId], assignment } } : previous)
   }), [agentKey])
 
   useEffect(() => {
     const refreshAssignment = (event: Event) => {
       const agentId = (event as CustomEvent<{ agentId?: string }>).detail?.agentId
       if (!agentId || !agents.some(agent => agent.id === agentId)) return
-      void window.api.getAgentAssignment(agentId).then(assignment => {
-        setStates(previous => previous[agentId] ? { ...previous, [agentId]: { ...previous[agentId], assignment } } : previous)
-      })
+      void window.api.getProviderSnapshot().then(applySnapshot)
     }
     window.addEventListener('bs:model-changed', refreshAssignment)
     return () => window.removeEventListener('bs:model-changed', refreshAssignment)
@@ -66,13 +67,6 @@ export default function RightPanelQuota({ agents }: { agents: QuotaAgent[] }) {
       } }))
     }
   }), [agentKey])
-
-  useEffect(() => window.api.onProviderUsage(usage => {
-    setProviderUsage(previous => ({ ...previous, [usage.accountId]: usage }))
-  }), [])
-  useEffect(() => {
-    void window.api.refreshProviderUsage().then(next => setProviderUsage(Object.fromEntries(next.map(item => [item.accountId, item]))))
-  }, [])
 
   const rows = useMemo(() => {
     const grouped = new Map<string, { assignment: AgentModelAssignment; agents: Array<{ id: string; name: string; assignment: AgentModelAssignment; input: number; output: number; cost: number }>; models: Set<string>; running: boolean }>()

@@ -100,3 +100,7 @@ export function classifyProviderError(statusCode: number | undefined, message: s
             : 'unknown'
   return { kind, message, statusCode, updatedAt: now }
 }
+
+export function shouldAcceptSnapshot(currentRevision: number, nextRevision: number): boolean {
+  return nextRevision >= currentRevision
+}

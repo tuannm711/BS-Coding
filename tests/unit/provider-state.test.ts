@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { classifyProviderError, isAssignmentCompatible, type ProviderSnapshot } from '../../src/shared/provider-state'
+import { classifyProviderError, isAssignmentCompatible, shouldAcceptSnapshot, type ProviderSnapshot } from '../../src/shared/provider-state'
 
 const snapshot: ProviderSnapshot = {
   revision: 4,
@@ -24,5 +24,11 @@ describe('provider state contracts', () => {
     expect(classifyProviderError(429, 'RESOURCE_EXHAUSTED').kind).toBe('quota-exhausted')
     expect(classifyProviderError(429, 'model capacity exhausted').kind).toBe('capacity-exhausted')
     expect(classifyProviderError(401, 'expired token').kind).toBe('auth')
+  })
+
+  it('rejects stale snapshot revisions', () => {
+    expect(shouldAcceptSnapshot(8, 7)).toBe(false)
+    expect(shouldAcceptSnapshot(8, 8)).toBe(true)
+    expect(shouldAcceptSnapshot(8, 9)).toBe(true)
   })
 })
