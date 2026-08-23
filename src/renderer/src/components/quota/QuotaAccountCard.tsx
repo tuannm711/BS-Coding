@@ -48,7 +48,7 @@ export default function QuotaAccountCard({ usage, agents = [], onRefresh, onSpee
         </div>
       </header>
       <div className="quota-account-subline">{usage?.subscriptionExpiresAt ? formatExpiry(usage.subscriptionExpiresAt) : 'Subscription expiry —'} · updated {formatAge(usage?.refreshedAt)}</div>
-      {usage?.status === 'unavailable' && <div className="quota-account-error" role="status">{usage.unavailableReason ?? 'Quota unavailable'}{onRefresh && <button className="btn small" onClick={onRefresh}>Retry</button>}</div>}
+      {usage?.unavailableReason && <div className="quota-account-error" role="status">{usage.unavailableReason}{onRefresh && <button className="btn small" onClick={onRefresh}>Retry</button>}</div>}
 
       {agents.length > 0 && <div className="quota-agent-list">
         {agents.map(agent => <div className="quota-agent-row" key={agent.id}>

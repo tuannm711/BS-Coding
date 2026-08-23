@@ -39,8 +39,8 @@ export default function AgentsTab({ agents, providers, subagentModels, onChangeA
   const [accounts, setAccounts] = useState<ProviderConnection[]>([])
 
   useEffect(() => {
-    void window.api.listProviderAccounts().then(setAccounts)
-    return window.api.onProviderAccountsChanged(setAccounts)
+    void window.api.getProviderSnapshot().then(snapshot => setAccounts(snapshot.connections))
+    return window.api.onProviderSnapshotChanged(snapshot => setAccounts(snapshot.connections))
   }, [])
 
   const effectiveProviders = useMemo(() => mergeProviderAccounts(providers, accounts), [accounts, providers])

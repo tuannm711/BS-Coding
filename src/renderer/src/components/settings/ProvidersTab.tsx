@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { BsSettings, CatalogProviderSummary, ProviderConnection, ProviderUsage } from '@shared/types'
+import type { ProviderSnapshot } from '@shared/provider-state'
 import { OPENAI_OAUTH_MODELS, isOpenAiGenericModel } from '@shared/openai-oauth'
 import QuotaAccountCard from '../quota/QuotaAccountCard'
 import AddProviderModal from './AddProviderModal'
@@ -11,10 +12,13 @@ export default function ProvidersTab({ settings, onChange }: Props) {
   const [status, setStatus] = useState('')
   const [accounts, setAccounts] = useState<ProviderConnection[]>([])
   const [usageByAccount, setUsageByAccount] = useState<Record<string, ProviderUsage>>({})
+  const [snapshot, setSnapshot] = useState<ProviderSnapshot | null>(null)
 
   const refreshAccounts = async () => setAccounts(await window.api.listProviderAccounts())
-  useEffect(() => { void refreshAccounts() }, [])
-  useEffect(() => window.api.onProviderAccountsChanged(next => setAccounts(next)), [])
+  useEffect(() => {
+    void window.api.getProviderSnapshot().then(next => { setSnapshot(next); setAccounts(next.connections) })
+    return window.api.onProviderSnapshotChanged(next => { setSnapshot(next); setAccounts(next.connections) })
+  }, [])
   useEffect(() => {
     void window.api.refreshProviderUsage().then(next => setUsageByAccount(Object.fromEntries(next.map(item => [item.accountId, item]))))
     return window.api.onProviderUsage(next => setUsageByAccount(previous => ({ ...previous, [next.accountId]: next })))
@@ -39,7 +43,7 @@ export default function ProvidersTab({ settings, onChange }: Props) {
     <div className="provider-connected">
       <h4>Connected accounts</h4>
       {accounts.flatMap(connection => connection.accounts.map(account => ({ connection, account }))).map(({ connection, account }) => {
-        const usage = usageByAccount[account.id] ?? { accountId: account.id, accountLabel: account.profile?.email ?? account.label, accountType: account.authMode === 'oauth' ? 'oauth' : 'api-key', refreshedAt: 0, source: 'unavailable' as const, status: 'unavailable' as const, unavailableReason: 'Quota not refreshed yet' }
+        const usage = usageByAccount[account.id] ?? snapshot?.accounts.find(item => item.id === account.id)?.usage ?? { accountId: account.id, accountLabel: account.profile?.email ?? account.label, accountType: account.authMode === 'oauth' ? 'oauth' : 'api-key', refreshedAt: 0, source: 'unavailable' as const, status: 'unavailable' as const, unavailableReason: 'Quota not refreshed yet' }
         const active = account.status === 'active'
         return <div className={`provider-account-block ${active ? '' : 'provider-account-disabled'}`} key={account.id}>
           <div className="provider-account-models" aria-label={`Models for ${account.label}`}>{(account.models ?? []).map(model => <code key={model}>{model}</code>)}</div>
