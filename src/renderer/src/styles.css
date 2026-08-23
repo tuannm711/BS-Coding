@@ -1634,7 +1634,20 @@ select.input { width: 100%; }
 .provider-account-block { display: grid; gap: 6px; margin: 0; }
 .provider-account-models { display: flex; flex-wrap: wrap; gap: 4px; }
 .provider-account-models code { background: var(--bg-code); border: 1px solid var(--hairline); border-radius: var(--radius-sm); color: var(--text-dim); font-family: var(--font-mono); font-size: var(--fs-sm); padding: 2px 6px; }
+.provider-refresh-stages { display: flex; flex-wrap: wrap; gap: 5px; }
+.provider-refresh-stage { border: 1px solid var(--hairline); border-radius: 999px; color: var(--text-faint); font-size: var(--fs-xs); padding: 2px 7px; text-transform: capitalize; }
+.provider-refresh-stage.ready { border-color: color-mix(in srgb, var(--green) 45%, var(--hairline)); color: var(--green); }
+.provider-refresh-stage.error { border-color: color-mix(in srgb, var(--red) 45%, var(--hairline)); color: var(--red); }
+.provider-refresh-stage.refreshing { border-color: color-mix(in srgb, var(--accent) 45%, var(--hairline)); color: var(--accent); }
 .provider-account-actions { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+.authorization-session { display: grid; gap: 10px; margin-top: 12px; padding: 12px; border: 1px solid var(--hairline); border-radius: 10px; background: color-mix(in srgb, var(--bg-panel) 94%, var(--accent) 6%); }
+.authorization-session.waiting { border-color: color-mix(in srgb, var(--accent) 48%, var(--hairline)); }
+.authorization-session.connected { border-color: color-mix(in srgb, var(--green) 48%, var(--hairline)); }
+.authorization-session.error, .authorization-session.expired { border-color: color-mix(in srgb, var(--red) 48%, var(--hairline)); }
+.authorization-session-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--text-strong); text-transform: capitalize; }
+.authorization-countdown { color: var(--accent); font-family: var(--font-mono); font-size: var(--fs-sm); }
+.authorization-url { width: 100%; min-width: 0; font-family: var(--font-mono); font-size: var(--fs-sm); }
+.authorization-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 .quota-account-card.compact { padding: 12px; }
 .quota-account-header, .quota-account-identity, .quota-account-actions, .quota-window-label, .quota-agent-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; flex-wrap: wrap; }
 .quota-account-status { font-size: var(--fs-sm); white-space: nowrap; }
@@ -1664,6 +1677,62 @@ select.input { width: 100%; }
 .quota-usage-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px; }
 .quota-metric { display: grid; gap: 2px; min-width: 0; padding: 6px 7px; border-radius: 6px; background: var(--bg-input); }
 .quota-metric strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-strong); font-family: var(--font-mono); font-size: var(--fs-sm); font-variant-numeric: tabular-nums; }
+.provider-group { gap: 8px; padding: 9px; }
+.provider-group-head { padding-bottom: 6px; }
+.provider-account-block { min-width: 0; }
+.quota-account-card { gap: 8px; width: 100%; padding: 10px; overflow: hidden; }
+.quota-account-card.chat { gap: 7px; padding: 9px; }
+.quota-account-header, .quota-account-badges, .quota-account-subline, .quota-window-label, .quota-agent-row, .quota-card-actions, .quota-model-summary { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.quota-account-header, .quota-account-subline, .quota-window-label, .quota-agent-row { justify-content: space-between; }
+.quota-account-badges, .quota-card-actions { flex-wrap: wrap; justify-content: flex-end; }
+.quota-account-subline { flex-wrap: wrap; color: var(--text-faint); font-size: var(--fs-xs); font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.quota-account-status { border-radius: 999px; padding: 2px 7px; background: var(--bg-input); font-weight: var(--fw-semibold); text-transform: capitalize; }
+.quota-account-status.active::before { content: '●'; margin-right: 4px; font-size: 8px; }
+.quota-account-status.inactive { color: var(--yellow); }
+.quota-account-identity { flex: 1 1 180px; min-width: 0; }
+.quota-account-identity strong { color: var(--text-strong); }
+.quota-account-avatar { width: 28px; height: 28px; flex-basis: 28px; }
+.quota-model-summary { position: relative; flex-wrap: wrap; padding: 5px 7px; border: 1px solid var(--hairline); border-radius: var(--radius-sm); background: var(--bg-input); color: var(--text-dim); font-size: var(--fs-sm); }
+.quota-model-summary > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.quota-model-toggle { display: inline-flex; align-items: center; gap: 3px; margin-left: auto; }
+.quota-model-list { flex: 1 0 100%; max-height: 116px; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 3px 7px; padding-top: 5px; border-top: 1px solid var(--hairline); }
+.quota-model-list code { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-dim); font-size: var(--fs-xs); }
+.quota-agent-list { padding: 5px 0; }
+.quota-agent-name { display: grid; gap: 1px; }
+.quota-agent-name strong, .quota-agent-name code { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.quota-agent-name code { font-size: var(--fs-xs); }
+.quota-speed-control button { min-height: 28px; padding-inline: 7px; }
+.quota-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 7px; min-width: 0; }
+.quota-group { display: grid; align-content: start; gap: 6px; min-width: 0; padding: 7px; border: 1px solid var(--hairline); border-radius: var(--radius-sm); background: color-mix(in srgb, var(--bg-input) 78%, transparent); }
+.quota-group h6 { margin: 0; color: var(--text-strong); font-size: var(--fs-sm); font-weight: var(--fw-semibold); }
+.quota-window + .quota-window { padding-top: 6px; border-top: 1px solid var(--hairline); }
+.quota-window-reset { font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
+.quota-window.state-exhausted .quota-progress > span, .quota-window.state-cooldown .quota-progress > span { background: var(--danger); }
+.quota-progress { height: 6px; }
+.quota-empty { padding: 6px 7px; border: 1px dashed var(--hairline); border-radius: var(--radius-sm); color: var(--text-faint); font-size: var(--fs-sm); }
+.quota-metrics { display: grid; grid-template-columns: auto repeat(4, minmax(0, 1fr)); gap: 4px; align-items: stretch; min-width: 0; }
+.quota-account-card.chat .quota-metrics { grid-template-columns: auto repeat(3, minmax(0, 1fr)); }
+.quota-metrics-source { display: flex; align-items: center; padding: 4px 6px; color: var(--accent); font-size: var(--fs-xs); font-weight: var(--fw-semibold); white-space: nowrap; }
+.quota-metric { padding: 4px 6px; }
+.quota-metric small { overflow: hidden; color: var(--text-faint); font-size: var(--fs-xs); text-overflow: ellipsis; white-space: nowrap; }
+.quota-card-actions { padding-top: 1px; }
+.quota-card-actions .btn { display: inline-flex; align-items: center; gap: 4px; min-height: 28px; }
+.quota-card-actions .btn:first-child { margin-right: auto; }
+.quota-account-error { padding: 5px 7px; overflow-wrap: anywhere; }
+.right-panel-quota-list { overflow-x: hidden; }
+.right-panel-quota-list .quota-groups { grid-template-columns: minmax(0, 1fr); }
+.right-panel-quota-list .quota-account-header { align-items: flex-start; }
+.right-panel-quota-list .quota-account-badges { justify-content: flex-start; }
+.right-panel-quota-list .quota-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.right-panel-quota-list .quota-metrics-source { grid-column: 1 / -1; padding: 0 2px; }
+.right-panel-quota-list .quota-agent-row { align-items: flex-start; }
+@media (max-width: 760px) {
+  .quota-groups { grid-template-columns: minmax(0, 1fr); }
+  .quota-metrics, .quota-account-card.chat .quota-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .quota-metrics-source { grid-column: 1 / -1; }
+  .quota-card-actions { justify-content: flex-start; }
+  .quota-card-actions .btn:first-child { margin-right: 0; }
+}
 @media (prefers-reduced-motion: reduce) { .quota-progress > span { transition: none; } }
 .right-panel-view {
   flex: 1; min-width: 0; min-height: 0;

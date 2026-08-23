@@ -112,16 +112,9 @@ export default function RightPanelQuota({ agents }: { agents: QuotaAgent[] }) {
         {rows.length === 0 && <span className="right-panel-quota-empty">No active model in this session</span>}
         {rows.map(row => {
           const providerLabel = snapshot?.providers.find(provider => provider.id === row.account?.providerId)?.displayName
-          const usage = row.usage ?? {
-            accountId: row.account?.id ?? row.key,
-            accountLabel: row.account?.profile?.email ?? row.account?.label,
-            accountType: row.account?.authMode === 'oauth' ? 'oauth' as const : 'api-key' as const,
-            refreshedAt: row.account?.updatedAt ?? 0,
-            source: 'unavailable' as const,
-            status: 'unavailable' as const,
-            unavailableReason: row.account?.error?.message ?? 'Usage unavailable'
-          }
-          return <QuotaAccountCard key={row.key} usage={usage} agents={row.agents} compact providerLabel={providerLabel} providerState={row.state} onSpeedChange={(agentId, speed) => {
+          const account = row.account ?? { id: row.key, providerId: row.agents[0]?.assignment.provider ?? 'provider', label: row.key, authMode: 'imported' as const, status: 'error' as const, models: [], updatedAt: 0 }
+          const session = row.agents.reduce((total, agent) => ({ input: total.input + agent.input, output: total.output + agent.output, estimatedCost: total.estimatedCost + agent.cost }), { input: 0, output: 0, estimatedCost: 0 })
+          return <QuotaAccountCard key={row.key} account={account} groups={row.groups} agents={row.agents} session={session} variant="chat" providerLabel={providerLabel} providerState={row.state} onSpeedChange={(agentId, speed) => {
             setSnapshot(previous => previous ? { ...previous, assignments: previous.assignments.map(assignment => assignment.agentId === agentId ? { ...assignment, speed } : assignment) } : previous)
             void window.api.setAgentSpeed(agentId, speed)
           }} />

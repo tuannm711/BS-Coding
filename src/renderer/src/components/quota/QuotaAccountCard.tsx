@@ -1,6 +1,7 @@
-import type { AgentModelAssignment, AgentSpeed, ProviderUsage } from '@shared/types'
-import { Gauge, RefreshCw, Zap } from 'lucide-react'
-import { formatAge, formatCountdown, formatCount, formatExpiry, formatMoney, formatPercent, formatProviderAccountType, usageRemaining } from './quota-view'
+import type { AgentModelAssignment, AgentSpeed, ProviderQuotaGroup, ProviderTrackedUsage } from '@shared/types'
+import type { ProviderAccountSnapshot } from '@shared/provider-state'
+import { ChevronDown, Gauge, Link2, Power, RefreshCw, Trash2, Zap } from 'lucide-react'
+import { formatAge, formatCountdown, formatCount, formatExpiry, formatMoney, formatPercent, formatProviderAccountType, quotaWindowState } from './quota-view'
 
 export interface QuotaCardAgent {
   id: string
@@ -9,77 +10,139 @@ export interface QuotaCardAgent {
   input?: number
   output?: number
   cost?: number
+  modelLabel?: string
 }
 
 interface Props {
-  usage?: ProviderUsage
-  agents?: QuotaCardAgent[]
-  onRefresh?: () => void
-  onSpeedChange?: (agentId: string, speed: AgentSpeed) => void
-  accountStatus?: 'active' | 'inactive'
-  onAccountToggle?: (enabled: boolean) => void
+  account: ProviderAccountSnapshot
+  groups: ProviderQuotaGroup[]
   providerLabel?: string
-  compact?: boolean
+  tracked?: ProviderTrackedUsage
+  session?: { input: number; output: number; estimatedCost: number }
+  agents?: QuotaCardAgent[]
+  variant: 'provider' | 'chat'
+  providerState?: 'ready' | 'unavailable' | 'quota-exhausted' | 'capacity-exhausted' | 'cooldown' | 'auth-error'
+  expandedModels?: boolean
+  refreshing?: boolean
+  onToggleModels?: () => void
+  onRefresh?: () => void
+  onReconnect?: () => void
+  onAccountToggle?: () => void
+  onRemove?: () => void
+  onSpeedChange?: (agentId: string, speed: AgentSpeed) => void
 }
 
-export default function QuotaAccountCard({ usage, agents = [], onRefresh, onSpeedChange, accountStatus, onAccountToggle, providerLabel, compact = false }: Props) {
-  const remaining = usageRemaining(usage)
-  const accountLabel = usage?.accountLabel ?? 'ChatGPT account'
-  const accountType = formatProviderAccountType(providerLabel, usage?.accountType)
-  const local = agents.reduce((sum, agent) => ({ input: sum.input + (agent.input ?? 0), output: sum.output + (agent.output ?? 0), cost: sum.cost + (agent.cost ?? 0) }), { input: 0, output: 0, cost: 0 })
-  const input = usage?.tokensInput ?? (local.input || undefined)
-  const output = usage?.tokensOutput ?? (local.output || undefined)
-  const billed = usage?.estimatedBilled ?? (local.cost || undefined)
+const STATE_LABELS = { ready: 'Ready', unavailable: 'Usage unavailable', 'quota-exhausted': 'Quota exhausted', 'capacity-exhausted': 'Capacity exhausted', cooldown: 'Cooldown', 'auth-error': 'Auth error' } as const
+
+export default function QuotaAccountCard({
+  account, groups, providerLabel, tracked, session, agents = [], variant, providerState,
+  expandedModels = false, refreshing = false, onToggleModels, onRefresh, onReconnect,
+  onAccountToggle, onRemove, onSpeedChange
+}: Props) {
+  const usage = account.usage
+  const accountLabel = account.profile?.email ?? account.profile?.name ?? account.label
+  const planName = usage?.planName ?? account.profile?.planName
+  const accountType = formatProviderAccountType(account.providerId, account.authMode)
+  const active = account.status === 'active'
+  const modelNames = account.models.map(model => model.name)
+  const stageDetails = Object.entries(account.refreshStages ?? {}).filter(([, status]) => status === 'refreshing' || status === 'error')
 
   return (
-    <section className={`quota-account-card ${compact ? 'compact' : ''}`} aria-label={`Quota for ${accountLabel}`}>
+    <section className={`quota-account-card ${variant}`} aria-label={`Quota for ${accountLabel}`}>
       <header className="quota-account-header">
         <div className="quota-account-identity">
           <span className="quota-account-avatar" aria-hidden="true">{accountLabel.slice(0, 1).toUpperCase()}</span>
           <div>
-            <strong title={accountLabel}>{providerLabel ? `${providerLabel} · ` : ''}{accountLabel}</strong>
-            <span>{accountType} · {usage?.planName ?? 'Plan —'}</span>
+            <strong title={accountLabel}>{accountLabel}</strong>
+            <span>{providerLabel ?? account.providerId} · {accountType}</span>
           </div>
         </div>
-        <div className="quota-account-actions">
-          {accountStatus && <><span className={`quota-account-status ${accountStatus}`}>{accountStatus === 'active' ? '● Active' : '● Inactive'}</span><button className={`btn small ${accountStatus === 'active' ? 'danger' : ''}`} onClick={() => onAccountToggle?.(accountStatus !== 'active')}>{accountStatus === 'active' ? 'Deactivate' : 'Activate'}</button></>}
-          <span className="quota-plan-badge">{usage?.planName ?? '—'}</span>
-          {onRefresh && <button className="icon-btn quota-refresh" aria-label="Refresh quota" title="Refresh quota" onClick={onRefresh}><RefreshCw size={14} /></button>}
+        <div className="quota-account-badges">
+          <span className={`quota-account-status ${active ? 'active' : 'inactive'}`}>{active ? 'Active' : account.status}</span>
+          {planName ? <span className="quota-plan-badge">{planName}</span> : null}
+          {providerState ? <span className={`quota-plan-badge quota-state-${providerState}`} role="status">{STATE_LABELS[providerState]}</span> : null}
         </div>
       </header>
-      <div className="quota-account-subline">{usage?.subscriptionExpiresAt ? formatExpiry(usage.subscriptionExpiresAt) : 'Subscription expiry —'} · updated {formatAge(usage?.refreshedAt)}</div>
-      {usage?.unavailableReason && <div className="quota-account-error" role="status">{usage.unavailableReason}{onRefresh && <button className="btn small" onClick={onRefresh}>Retry</button>}</div>}
 
-      {agents.length > 0 && <div className="quota-agent-list">
+      <div className="quota-account-subline">
+        <span>{usage?.subscriptionExpiresAt ? formatExpiry(usage.subscriptionExpiresAt) : 'Subscription expiry not reported'}</span>
+        <span>{usage?.stale ? `Stale · ${formatAge(usage.lastSuccessfulRefreshAt ?? usage.refreshedAt)}` : `Updated ${formatAge(usage?.refreshedAt)}`}</span>
+      </div>
+
+      {stageDetails.length > 0 ? <div className="provider-refresh-stages" aria-label={`Refresh stages for ${accountLabel}`}>
+        {stageDetails.map(([stage, status]) => <span key={stage} className={`provider-refresh-stage ${status}`}>{stage} · {status}</span>)}
+      </div> : null}
+      {usage?.refreshError || usage?.unavailableReason ? <div className="quota-account-error" role="status">{usage.refreshError ?? usage.unavailableReason}</div> : null}
+
+      {variant === 'provider' ? <div className="quota-model-summary">
+        <span><strong>{account.models.length}</strong> code model{account.models.length === 1 ? '' : 's'}{modelNames.length > 0 ? ` · ${modelNames.slice(0, 3).join(' · ')}` : ''}</span>
+        {account.models.length > 0 ? <button className="btn small quota-model-toggle" type="button" aria-expanded={expandedModels} onClick={onToggleModels}>View <ChevronDown size={13} aria-hidden="true" /></button> : null}
+        {expandedModels ? <div className="quota-model-list">{account.models.map(model => <code key={model.id} title={model.id}>{model.name}</code>)}</div> : null}
+      </div> : null}
+
+      {agents.length > 0 ? <div className="quota-agent-list">
         {agents.map(agent => <div className="quota-agent-row" key={agent.id}>
-          <span className="quota-agent-name">{agent.name} <code>{agent.assignment?.model ?? '—'}</code></span>
+          <span className="quota-agent-name"><strong>{agent.name}</strong><code title={agent.assignment?.model}>{agent.modelLabel ?? agent.assignment?.model ?? 'Model not assigned'}</code></span>
           <span className="quota-speed-control" role="group" aria-label={`Speed for ${agent.name}`}>
-            {(['standard', 'fast'] as const).map(speed => <button key={speed} className={agent.assignment?.speed === speed || (!agent.assignment?.speed && speed === 'standard') ? 'active' : ''} aria-pressed={agent.assignment?.speed === speed || (!agent.assignment?.speed && speed === 'standard')} onClick={() => onSpeedChange?.(agent.id, speed)}><span>{speed === 'fast' ? <Zap size={12} /> : <Gauge size={12} />}</span>{speed === 'fast' ? 'Fast' : 'Standard'}</button>)}
+            {(['standard', 'fast'] as const).map(speed => {
+              const selected = agent.assignment?.speed === speed || (!agent.assignment?.speed && speed === 'standard')
+              return <button key={speed} type="button" className={selected ? 'active' : ''} aria-pressed={selected} onClick={() => onSpeedChange?.(agent.id, speed)}>
+                {speed === 'fast' ? <Zap size={12} aria-hidden="true" /> : <Gauge size={12} aria-hidden="true" />}{speed === 'fast' ? 'Fast' : 'Standard'}
+              </button>
+            })}
           </span>
         </div>)}
-      </div>}
+      </div> : null}
 
-      <QuotaWindow label="5-hour window" remaining={remaining.primary} resetAt={usage?.resetAt} />
-      <QuotaWindow label="Weekly window" remaining={remaining.secondary} resetAt={usage?.secondaryResetAt} />
+      {groups.length > 0 ? <div className="quota-groups">
+        {groups.map(group => <section className="quota-group" key={group.id} aria-label={group.label}>
+          <h6>{group.label}</h6>
+          {group.windows.map(window => <QuotaWindow key={window.id} window={window} />)}
+        </section>)}
+      </div> : <div className="quota-empty">Quota not reported by provider</div>}
 
-      <div className="quota-usage-grid">
-        <Metric label="Requests" value={formatCount(usage?.requestsUsed)} />
-        <Metric label="Token in" value={formatCount(input)} />
-        <Metric label="Token out" value={formatCount(output)} />
-        <Metric label="Account billed" value={formatMoney(billed)} />
-      </div>
+      {variant === 'provider' ? <ProviderMetrics tracked={tracked} /> : <SessionMetrics session={session} />}
+
+      {variant === 'provider' ? <footer className="quota-card-actions">
+        <button className="btn small" type="button" disabled={refreshing} onClick={onRefresh}><RefreshCw size={13} aria-hidden="true" />{refreshing ? 'Refreshing…' : 'Refresh'}</button>
+        <button className="btn small" type="button" disabled={refreshing} onClick={onReconnect}><Link2 size={13} aria-hidden="true" />Reconnect</button>
+        <button className={`btn small ${active ? 'danger' : ''}`} type="button" disabled={refreshing} onClick={onAccountToggle}><Power size={13} aria-hidden="true" />{active ? 'Deactivate' : 'Activate'}</button>
+        <button className="btn small danger" type="button" disabled={refreshing} onClick={onRemove}><Trash2 size={13} aria-hidden="true" />Remove</button>
+      </footer> : null}
     </section>
   )
 }
 
-function QuotaWindow({ label, remaining, resetAt }: { label: string; remaining?: number; resetAt?: number }) {
-  return <div className="quota-window">
-    <div className="quota-window-label"><span>{label}</span><strong>{formatPercent(remaining)} left</strong></div>
-    <div className="quota-progress" role="progressbar" aria-label={`${label} remaining`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={remaining ?? 0}><span style={{ width: `${remaining ?? 0}%` }} /></div>
-    <span className="quota-window-reset">Next reset · {formatCountdown(resetAt)}</span>
+function QuotaWindow({ window }: { window: ProviderQuotaGroup['windows'][number] }) {
+  const known = window.usageKnown && window.remainingPercent !== undefined
+  const state = quotaWindowState(window)
+  return <div className={`quota-window state-${state}`}>
+    <div className="quota-window-label"><span>{window.label}</span><strong>{known ? `${formatPercent(window.remainingPercent)} left` : 'Not reported'}</strong></div>
+    {known ? <div className="quota-progress" role="progressbar" aria-label={`${window.label} remaining`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={window.remainingPercent}><span style={{ width: `${window.remainingPercent}%` }} /></div> : null}
+    <span className="quota-window-reset">{window.resetAt ? `Next reset · ${formatCountdown(window.resetAt)}` : 'Reset not reported'}</span>
+  </div>
+}
+
+function ProviderMetrics({ tracked }: { tracked?: ProviderTrackedUsage }) {
+  if (!tracked) return <div className="quota-empty">BS usage not tracked yet</div>
+  return <div className="quota-metrics">
+    <span className="quota-metrics-source">BS tracked</span>
+    <Metric label="Requests" value={formatCount(tracked.requests)} />
+    <Metric label="Token in" value={formatCount(tracked.tokensInput)} />
+    <Metric label="Token out" value={formatCount(tracked.tokensOutput)} />
+    <Metric label="Estimated" value={formatMoney(tracked.estimatedBilled)} />
+  </div>
+}
+
+function SessionMetrics({ session }: { session?: Props['session'] }) {
+  return <div className="quota-metrics">
+    <span className="quota-metrics-source">Session estimate</span>
+    <Metric label="Token in" value={formatCount(session?.input ?? 0)} />
+    <Metric label="Token out" value={formatCount(session?.output ?? 0)} />
+    <Metric label="Estimated" value={formatMoney(session?.estimatedCost ?? 0)} />
   </div>
 }
 
 function Metric({ label, value }: { label: string; value: string }) {
-  return <div className="quota-metric"><span>{label}</span><strong>{value}</strong></div>
+  return <span className="quota-metric"><small>{label}</small><strong>{value}</strong></span>
 }

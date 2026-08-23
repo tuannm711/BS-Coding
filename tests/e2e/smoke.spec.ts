@@ -1,18 +1,23 @@
 import { test, expect, _electron as electron } from '@playwright/test'
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync, mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 
 test('app launches and shows the main window', async () => {
-  const app = await electron.launch({ args: ['.'] })
-  const window = await app.firstWindow()
-  await expect(window).toHaveTitle(/BS Coding/)
-  await expect(window.locator('.sidebar')).toBeVisible()
-  // Version loads asynchronously via IPC; auto-wait for it to appear.
-  const version = window.locator('.status-bar .sb-mono').last()
-  await expect(version).toHaveText(/^v\d+\.\d+\.\d+$/)
-  expect(await version.textContent()).not.toBe('v0.1.0')
-  await app.close()
+  const userData = mkdtempSync(path.join(tmpdir(), 'bs-ud-launch-'))
+  try {
+    const app = await electron.launch({ args: ['.'], env: { ...process.env as Record<string, string>, BS_USER_DATA: userData } })
+    const window = await app.firstWindow()
+    await expect(window).toHaveTitle(/BS Coding/)
+    await expect(window.locator('.sidebar')).toBeVisible()
+    // Version loads asynchronously via IPC; auto-wait for it to appear.
+    const version = window.locator('.status-bar .sb-mono').last()
+    await expect(version).toHaveText(/^v\d+\.\d+\.\d+$/)
+    expect(await version.textContent()).not.toBe('v0.1.0')
+    await app.close()
+  } finally {
+    rmSync(userData, { recursive: true, force: true })
+  }
 })
 
 test('native bs agent renders a chat panel and sends a message', async () => {
@@ -155,23 +160,101 @@ test('settings screen connects a provider account through the capability modal',
     })
     const window = await app.firstWindow()
     try {
-      await window.getByRole('button', { name: 'Menu' }).click()
+      await window.getByRole('button', { name: 'Menu', exact: true }).click()
       await window.getByRole('button', { name: 'Settings' }).click()
       await expect(window.locator('.settings-dialog')).toBeVisible()
       await expect(window.locator('.settings-nav-item', { hasText: 'Providers' })).toBeVisible()
 
       await window.getByRole('button', { name: /Add provider/ }).click()
-      const popup = window.locator('.dialog:not(.settings-dialog)')
+      let popup = window.locator('.dialog:not(.settings-dialog)')
       await expect(popup).toBeVisible()
+
+      await expect(popup.getByRole('button', { name: 'Create authorization link' })).toBeVisible()
+      await popup.getByRole('button', { name: 'Create authorization link' }).click()
+      await expect(popup.getByLabel('Authorization link')).toBeVisible()
+      await expect(popup.getByRole('button', { name: 'Copy link' })).toBeVisible()
+      await expect(popup.getByRole('button', { name: 'Open browser' })).toBeVisible()
+      await expect(popup.locator('.authorization-countdown')).toBeVisible()
+      await popup.getByRole('button', { name: 'Cancel' }).click()
+      await expect(popup).toHaveCount(0)
+
+      await window.getByRole('button', { name: /Add provider/ }).click()
+      popup = window.locator('.dialog:not(.settings-dialog)')
+      await popup.getByRole('button', { name: 'Create authorization link' }).click()
+      await expect(popup.getByLabel('Authorization link')).toBeVisible()
+      await popup.getByRole('button', { name: 'Cancel' }).click()
+      await expect(popup).toHaveCount(0)
+
+      await window.getByRole('button', { name: /Add provider/ }).click()
+      popup = window.locator('.dialog:not(.settings-dialog)')
       await popup.locator('#provider-method').selectOption('api-key')
+      await expect(popup.getByRole('button', { name: 'Create authorization link' })).toHaveCount(0)
+      await expect(popup.getByRole('button', { name: 'Open browser' })).toHaveCount(0)
       await popup.locator('input[placeholder="apiKey"]').fill('sk-test')
       await popup.locator('.submit').click()
 
       await expect(window.locator('.provider-connected')).toContainText('OpenAI')
       await expect(window.locator('.provider-connected')).toContainText('Deactivate')
       await expect(window.locator('.provider-connected')).toContainText('gpt-5.6-sol')
+      const providerCard = window.locator('.quota-account-card.provider').first()
+      await expect(providerCard).toBeInViewport()
+      await expect(providerCard.getByRole('button', { name: 'Refresh' })).toBeVisible()
+      await expect(providerCard.getByRole('button', { name: 'Reconnect' })).toBeVisible()
+      await expect(providerCard.getByRole('button', { name: 'Deactivate' })).toBeVisible()
+      await expect(providerCard.getByRole('button', { name: 'Remove' })).toBeVisible()
+      expect(await providerCard.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true)
+      await expect(providerCard.locator('.quota-model-list')).toHaveCount(0)
+      await providerCard.getByRole('button', { name: /View/ }).click()
+      await expect(providerCard.locator('.quota-model-list')).toBeVisible()
       await window.getByRole('button', { name: 'Cancel' }).click()
       await expect(window.locator('.settings-dialog')).toHaveCount(0)
+    } finally {
+      await app.close()
+    }
+  } finally {
+    rmSync(userData, { recursive: true, force: true })
+    rmSync(project, { recursive: true, force: true })
+  }
+})
+
+test('settings agent list immediately reconciles the active workspace', async () => {
+  const userData = mkdtempSync(path.join(tmpdir(), 'bs-ud-'))
+  const project = mkdtempSync(path.join(tmpdir(), 'bs-e2e-'))
+  try {
+    writeFileSync(path.join(userData, 'workspaces.json'), JSON.stringify([{
+      projectPath: project,
+      name: 'Agent Sync Project',
+      agents: [{ id: 'sync-bs', name: 'bs', templateId: 'bs', cwd: project, kind: 'native' }]
+    }], null, 2))
+    const app = await electron.launch({
+      args: ['.'],
+      env: { ...process.env as Record<string, string>, BS_USER_DATA: userData }
+    })
+    const window = await app.firstWindow()
+    try {
+      await window.locator('.project-row').click()
+      await expect(window.locator('.pane-title', { hasText: 'bs' })).toBeVisible()
+      await window.getByRole('button', { name: 'Menu', exact: true }).click()
+      await window.getByRole('button', { name: 'Settings' }).click()
+      const settings = window.locator('.settings-dialog')
+      await settings.locator('.settings-nav-item', { hasText: 'Agents' }).click()
+
+      await settings.getByRole('button', { name: '+ Add agent' }).click()
+      const addDialog = window.locator('.dialog:not(.settings-dialog)')
+      await addDialog.locator('#agent-name').fill('reviewer')
+      await addDialog.getByRole('button', { name: 'Add' }).click()
+      await settings.getByRole('button', { name: 'Save' }).click()
+
+      await expect(window.locator('.pane-title', { hasText: 'reviewer' })).toBeVisible()
+      const reviewerRow = settings.locator('.agents-row').filter({ hasText: 'reviewer' })
+      await reviewerRow.getByRole('button', { name: 'Remove' }).click()
+      await settings.getByRole('button', { name: 'Save' }).click()
+
+      await expect(window.locator('.pane-title', { hasText: 'reviewer' })).toHaveCount(0)
+      await expect(window.locator('.pane.active .pane-title')).toHaveText('bs')
+      await expect(window.locator('.chat-panel')).toBeVisible()
+      const stored = JSON.parse(readFileSync(path.join(userData, 'workspaces.json'), 'utf8'))
+      expect(stored[0].agents.map((agent: { name: string }) => agent.name)).toEqual(['bs'])
     } finally {
       await app.close()
     }
