@@ -6,6 +6,7 @@ import type { ModelMessage } from 'ai'
 import type { MessageTokens } from '../../shared/types'
 import { normalizeToolInput, toToolDefinition } from './message'
 import type { ToolDefinition } from './tools/types'
+import { OpenAIResponsesClient } from './openai-responses'
 
 export interface LlmStreamPart {
   kind: 'text' | 'reasoning' | 'tool-call' | 'finish' | 'error'
@@ -132,6 +133,9 @@ export function createOpenAICompatibleLlm(opts: { apiKey: string; baseUrl?: stri
 }
 
 export function createLlm(provider: string, apiKey: string, baseUrl?: string): LlmClient {
+  if (provider === 'openai' && (!baseUrl || /api\.openai\.com\/v1\/?$/.test(baseUrl))) {
+    return new OpenAIResponsesClient({ apiKey, baseUrl })
+  }
   const isDeepSeek = provider === 'deepseek' || isDeepSeekEndpoint(baseUrl)
   const model = (modelId: string) => {
     if (provider === 'anthropic') {
