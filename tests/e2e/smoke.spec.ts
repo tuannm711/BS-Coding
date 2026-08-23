@@ -144,23 +144,11 @@ test('pasted/attached image previews render in input, feed, and lightbox', async
   }
 })
 
-test('settings screen connects a provider and syncs models', async () => {
+test('settings screen connects a provider account through the capability modal', async () => {
   const userData = mkdtempSync(path.join(tmpdir(), 'bs-ud-'))
   const project = mkdtempSync(path.join(tmpdir(), 'bs-e2e-'))
   try {
     writeFileSync(path.join(userData, 'workspaces.json'), JSON.stringify([]))
-    // seed the models.dev cache so the test works offline
-    writeFileSync(path.join(userData, 'models.json'), JSON.stringify({
-      fetchedAt: Date.now(),
-      providers: {
-        deepseek: {
-          name: 'DeepSeek',
-          api: 'https://api.deepseek.com',
-          models: ['deepseek-chat', 'deepseek-reasoner']
-        }
-      }
-    }))
-
     const app = await electron.launch({
       args: ['.'],
       env: { ...process.env as Record<string, string>, BS_USER_DATA: userData }
@@ -172,31 +160,16 @@ test('settings screen connects a provider and syncs models', async () => {
       await expect(window.locator('.settings-dialog')).toBeVisible()
       await expect(window.locator('.settings-nav-item', { hasText: 'Providers' })).toBeVisible()
 
-      await window.locator('.provider-search').fill('deepseek')
-      await window.locator('.provider-catalog-row', { hasText: 'deepseek' }).getByRole('button', { name: 'connect' }).click()
+      await window.getByRole('button', { name: /Add provider/ }).click()
       const popup = window.locator('.dialog:not(.settings-dialog)')
       await expect(popup).toBeVisible()
-      await popup.locator('.provider-key').fill('sk-test')
+      await popup.locator('#provider-method').selectOption('api-key')
+      await popup.locator('input[placeholder="apiKey"]').fill('sk-test')
       await popup.locator('.submit').click()
 
-      await expect(window.locator('.provider-connected')).toContainText('deepseek')
-      await expect(window.locator('.settings-status').last()).toContainText('2 model(s) synced')
-      // deepseek is the first provider, so it auto-becomes default.
-      await expect(window.getByRole('button', { name: 'default', exact: true })).toBeVisible()
-      // Add a second provider so 'set default' is exercised on deepseek.
-      await window.getByRole('button', { name: '+ Connect provider' }).click()
-      const manualPopup = window.locator('.dialog:not(.settings-dialog)')
-      await manualPopup.getByPlaceholder('provider id (e.g. deepseek)').fill('other')
-      await manualPopup.getByPlaceholder('api key').fill('sk-other')
-      await manualPopup.locator('.submit').click()
-      await expect(window.locator('.provider-connected')).toContainText('other')
-      // 'other' auto-becomes default; deepseek now offers 'set default'.
-      await expect(window.getByRole('button', { name: 'set default' })).toBeVisible()
-      await window.getByRole('button', { name: 'set default' }).click()
-      // Clicking persists immediately and flips the label.
-      await expect(window.getByRole('button', { name: 'default', exact: true })).toBeVisible()
-      await window.getByRole('button', { name: 'Save' }).click()
-      await expect(window.locator('.settings-status').last()).toContainText('saved')
+      await expect(window.locator('.provider-connected')).toContainText('OpenAI')
+      await expect(window.locator('.provider-connected')).toContainText('Deactivate')
+      await expect(window.locator('.provider-connected')).toContainText('gpt-5.6-sol')
       await window.getByRole('button', { name: 'Cancel' }).click()
       await expect(window.locator('.settings-dialog')).toHaveCount(0)
     } finally {

@@ -42,6 +42,7 @@ export default function ProvidersTab({ settings, onChange }: Props) {
         const usage = usageByAccount[account.id] ?? { accountId: account.id, accountLabel: account.profile?.email ?? account.label, accountType: account.authMode === 'oauth' ? 'oauth' : 'api-key', refreshedAt: 0, source: 'unavailable' as const, status: 'unavailable' as const, unavailableReason: 'Quota not refreshed yet' }
         const active = account.status === 'active'
         return <div className={`provider-account-block ${active ? '' : 'provider-account-disabled'}`} key={account.id}>
+          <div className="provider-account-models" aria-label={`Models for ${account.label}`}>{(account.models ?? []).map(model => <code key={model}>{model}</code>)}</div>
           <QuotaAccountCard usage={usage} accountStatus={active ? 'active' : 'inactive'} onAccountToggle={enabled => void toggleAccount(account.id, enabled)} onRefresh={() => void window.api.refreshProviderUsage(connection.providerId, account.id)} />
           <div className="provider-account-actions"><span className={`mcp-dot ${active ? 'connected' : ''}`} /><span className="settings-hint">{account.authMode}</span><button className="btn small danger" onClick={() => void window.api.removeProviderAccount(account.id).then(refreshAccounts)}>Remove</button></div>
         </div>
