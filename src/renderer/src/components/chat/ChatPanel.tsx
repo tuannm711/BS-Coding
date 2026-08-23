@@ -11,6 +11,7 @@ import SessionBar from './SessionBar'
 import ModelPicker from './ModelPicker'
 import VariantPicker from './VariantPicker'
 import ContextFooter from './ContextFooter'
+import AgentUsageCard from './AgentUsageCard'
 
 type FeedItem =
   | { kind: 'message'; id: string; role: ChatMessage['role']; text: string; reasoning?: string; images?: ImageAttachment[] }
@@ -957,7 +958,16 @@ if (e.type === 'usage') {
             )}
           </div>
         )}
-        <div className="chat-mode">
+      <div className="chat-mode">
+          <AgentUsageCard
+            agentId={agentId}
+            running={running}
+            contextUsed={contextUsed}
+            contextLimit={contextLimit}
+            compactThreshold={compactThreshold}
+            sessionTokens={sessionTokens}
+            onStop={handleStop}
+          />
           <span className="chat-mode-label">mode</span>
           <button
             className={`btn small mode-build ${currentMode === 'build' ? 'active' : ''}`}
