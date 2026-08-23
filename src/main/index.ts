@@ -746,7 +746,10 @@ function registerIpcHandlers(): void {
     mainApp.bsAgent.connectProvider(providerId, apiKey, baseUrl))
   ipcMain.handle(Channels.ProviderDisconnect, (_e, providerId: string) =>
     mainApp.bsAgent.disconnectProvider(providerId))
-  ipcMain.handle(Channels.ProviderAccounts, (_e, providerId?: string) => mainApp.providerManager.list(providerId))
+  ipcMain.handle(Channels.ProviderAccounts, async (_e, providerId?: string) => {
+    await mainApp.providerManager.refreshModels(providerId)
+    return mainApp.providerManager.list(providerId)
+  })
   ipcMain.handle(Channels.ProviderLoginStart, (_e, providerId: string) => mainApp.providerManager.startLogin(providerId))
   ipcMain.handle(Channels.ProviderLoginCancel, (_e, loginId: string) => mainApp.providerManager.cancelLogin(loginId))
   ipcMain.handle(Channels.ProviderAccountEnable, (_e, accountId: string) => mainApp.providerManager.setEnabled(accountId, true))

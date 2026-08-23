@@ -41,6 +41,24 @@ export class ProviderManager {
     return this.store.list(providerId)
   }
 
+  async refreshModels(providerId?: string, accountId?: string): Promise<void> {
+    for (const connection of this.list(providerId)) {
+      const adapter = this.registry.get(connection.providerId)
+      if (!adapter) continue
+      for (const account of connection.accounts) {
+        if (accountId && account.id !== accountId) continue
+        const secret = this.store.getSecret(account.id)
+        if (!secret) continue
+        try {
+          const models = await adapter.listModels(account, secret)
+          if (models.length > 0) this.store.upsert({ ...account, models: models.map(model => model.id) }, secret)
+        } catch (error) {
+          this.store.upsert({ ...account, lastError: String(error) })
+        }
+      }
+    }
+  }
+
   listCapabilities(): ProviderCapability[] {
     return this.registry.listReady()
   }

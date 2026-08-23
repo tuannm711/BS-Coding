@@ -1,6 +1,6 @@
 import type { AgentModelAssignment, AgentSpeed, ProviderUsage } from '@shared/types'
 import { Gauge, RefreshCw, Zap } from 'lucide-react'
-import { formatAge, formatCountdown, formatCount, formatExpiry, formatMoney, formatPercent, usageRemaining } from './quota-view'
+import { formatAge, formatCountdown, formatCount, formatExpiry, formatMoney, formatPercent, formatProviderAccountType, usageRemaining } from './quota-view'
 
 export interface QuotaCardAgent {
   id: string
@@ -25,7 +25,7 @@ interface Props {
 export default function QuotaAccountCard({ usage, agents = [], onRefresh, onSpeedChange, accountStatus, onAccountToggle, providerLabel, compact = false }: Props) {
   const remaining = usageRemaining(usage)
   const accountLabel = usage?.accountLabel ?? 'ChatGPT account'
-  const accountType = usage?.accountType === 'oauth' ? 'ChatGPT OAuth' : usage?.accountType === 'api-key' ? 'API key' : usage?.accountType ?? 'Account'
+  const accountType = formatProviderAccountType(providerLabel, usage?.accountType)
   const local = agents.reduce((sum, agent) => ({ input: sum.input + (agent.input ?? 0), output: sum.output + (agent.output ?? 0), cost: sum.cost + (agent.cost ?? 0) }), { input: 0, output: 0, cost: 0 })
   const input = usage?.tokensInput ?? (local.input || undefined)
   const output = usage?.tokensOutput ?? (local.output || undefined)

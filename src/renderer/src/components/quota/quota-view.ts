@@ -49,3 +49,8 @@ export function usageRemaining(usage?: ProviderUsage): { primary?: number; secon
     secondary: remainingPercent(usage?.secondaryUsedPercent)
   }
 }
+
+export function formatProviderAccountType(providerId: string | undefined, authMode: string | undefined): string {
+  const name = providerId === 'antigravity' ? 'Antigravity' : providerId === 'openai' ? 'ChatGPT' : providerId ? providerId : 'Provider'
+  return authMode === 'oauth' ? `${name} OAuth` : authMode === 'api-key' ? `${name} API key` : `${name} ${authMode ?? 'Account'}`
+}
