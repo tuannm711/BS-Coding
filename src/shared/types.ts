@@ -219,6 +219,54 @@ export interface ProviderSettings {
   models: string[]
 }
 
+export type AccountStatus = 'active' | 'disabled' | 'expired' | 'error'
+export type AuthMode = 'api-key' | 'oauth' | 'imported'
+
+/** Safe account metadata; secrets stay in the main-process vault. */
+export interface ProviderAccount {
+  id: string
+  providerId: string
+  label: string
+  authMode: AuthMode
+  status: AccountStatus
+  profile?: { email?: string; name?: string; planName?: string }
+  createdAt: number
+  lastUsedAt: number
+  oauthExpiresAt?: number
+  keyRef?: string
+  usage?: ProviderUsage
+}
+
+export interface ProviderUsage {
+  accountId: string
+  periodStart?: number
+  periodEnd?: number
+  resetAt?: number
+  requestsUsed?: number
+  requestLimit?: number
+  tokensUsed?: number
+  tokenLimit?: number
+  bankedUsed?: number
+  bankedLimit?: number
+  subscriptionExpiresAt?: number
+  refreshedAt: number
+  source: 'provider' | 'internal' | 'unavailable'
+  status: 'ok' | 'near-limit' | 'expired' | 'unavailable'
+}
+
+export interface ProviderConnection {
+  providerId: string
+  accounts: ProviderAccount[]
+  activeAccountId: string | null
+}
+
+export interface AgentModelAssignment {
+  provider: string
+  accountId?: string
+  model: string
+  fallback?: Array<{ provider: string; accountId?: string; model: string }>
+}
+
 export type PermissionRule = 'allow' | 'ask' | 'deny'
 
 export interface McpServerConfig {
@@ -252,6 +300,8 @@ export interface AgentSettings {
   systemPrompt: string
   provider?: string
   model?: string
+  accountId?: string
+  fallback?: Array<{ provider: string; accountId?: string; model: string }>
 }
 
 export interface BsSettings {

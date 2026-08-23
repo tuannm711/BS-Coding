@@ -1,7 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { Channels } from '../shared/ipc'
 import type { ArtifactsChangedEvent } from '../shared/ipc'
-import type { ChatEvent, Command, ContextChangedEvent, FileViewerPayload, ImageAttachment, BsSettings, NewAgentInput, PromptResponse, Template, TraceEvent, UpdaterStatusEvent } from '../shared/types'
+import type { ChatEvent, Command, ContextChangedEvent, FileViewerPayload, ImageAttachment, BsSettings, NewAgentInput, PromptResponse, ProviderConnection, ProviderUsage, Template, TraceEvent, UpdaterStatusEvent } from '../shared/types'
 import type { AgentApi, AgentConfigEvent, AgentStateEvent, BrowserInstallGuideEvent, GitStatusEvent, PtyDataEvent, TerminalExitEvent, WindowMaximizedChangeEvent } from '../shared/ipc'
 import type { BrowserStatusInfo } from '../shared/browser-types'
 import type { RemoteStatus } from '../shared/remote-types'
@@ -64,6 +64,16 @@ const api: AgentApi = {
   connectProvider: (providerId: string, apiKey: string, baseUrl?: string) =>
     ipcRenderer.invoke(Channels.ProviderConnect, providerId, apiKey, baseUrl),
   disconnectProvider: (providerId: string) => ipcRenderer.invoke(Channels.ProviderDisconnect, providerId),
+  listProviderAccounts: (providerId?: string) => ipcRenderer.invoke(Channels.ProviderAccounts, providerId),
+  startProviderLogin: (providerId: string) => ipcRenderer.invoke(Channels.ProviderLoginStart, providerId),
+  cancelProviderLogin: (loginId: string) => ipcRenderer.invoke(Channels.ProviderLoginCancel, loginId),
+  setProviderAccountEnabled: (accountId: string, enabled: boolean) =>
+    ipcRenderer.invoke(enabled ? Channels.ProviderAccountEnable : Channels.ProviderAccountDisable, accountId),
+  switchProviderAccount: (providerId: string, accountId: string) =>
+    ipcRenderer.invoke(Channels.ProviderAccountSwitch, providerId, accountId),
+  removeProviderAccount: (accountId: string) => ipcRenderer.invoke(Channels.ProviderAccountRemove, accountId),
+  refreshProviderUsage: (providerId?: string, accountId?: string) =>
+    ipcRenderer.invoke(Channels.ProviderUsageRefresh, providerId, accountId),
   listTemplates: () => ipcRenderer.invoke(Channels.TemplateList),
   saveTemplate: (template: Template) => ipcRenderer.invoke(Channels.TemplateSave, template),
   removeTemplate: (id: string) => ipcRenderer.invoke(Channels.TemplateRemove, id),
@@ -135,6 +145,9 @@ const api: AgentApi = {
   onGitStatus: (cb: (e: GitStatusEvent) => void) => subscribe(Channels.EventGitStatus, cb),
   onContextChanged: (cb: (e: ContextChangedEvent) => void) => subscribe(Channels.EventContextChanged, cb),
   onChatEvent: (cb: (e: ChatEvent) => void) => subscribe(Channels.EventChat, cb),
+  onProviderAccountsChanged: (cb: (e: ProviderConnection[]) => void) =>
+    subscribe(Channels.EventProviderAccountsChanged, cb),
+  onProviderUsage: (cb: (e: ProviderUsage) => void) => subscribe(Channels.EventProviderUsage, cb),
   getBrowserStatus: () => ipcRenderer.invoke(Channels.BrowserGetStatus),
   pairBrowser: () => ipcRenderer.invoke(Channels.BrowserPair),
   openBrowserInstallGuide: () => ipcRenderer.invoke(Channels.BrowserOpenInstallGuide),

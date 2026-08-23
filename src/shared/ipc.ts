@@ -2,7 +2,7 @@ import type {
   AgentConfig, AgentState, ArtifactEntry, CatalogProviderSummary, ChatEvent, ChatMessage, ChatTranscriptItem, Command,
   ContextChangedEvent, ContextInfo, DirEntry, FileContentResult, FileSuggestion, FileViewerPayload,
   GitStatus, ImageAttachment, McpServerStatus, BsSettings, ModelRef, NewAgentInput, PromptResponse,
-  SessionSummary, StatsSummary, Template, TerminalInfo, TodoItem, TraceEvent, TraceSummary, UpdaterStatusEvent, WorkspaceRuntime, WorkspaceSummary
+  ProviderAccount, ProviderConnection, ProviderUsage, SessionSummary, StatsSummary, Template, TerminalInfo, TodoItem, TraceEvent, TraceSummary, UpdaterStatusEvent, WorkspaceRuntime, WorkspaceSummary
 } from './types'
 import type { BrowserStatusInfo, PairingInfo } from './browser-types'
 import type { RemoteStatus } from './remote-types'
@@ -31,6 +31,14 @@ export const Channels = {
   ProviderCatalog: 'provider:catalog',
   ProviderConnect: 'provider:connect',
   ProviderDisconnect: 'provider:disconnect',
+  ProviderAccounts: 'provider:accounts',
+  ProviderLoginStart: 'provider:login-start',
+  ProviderLoginCancel: 'provider:login-cancel',
+  ProviderAccountEnable: 'provider:account-enable',
+  ProviderAccountDisable: 'provider:account-disable',
+  ProviderAccountSwitch: 'provider:account-switch',
+  ProviderAccountRemove: 'provider:account-remove',
+  ProviderUsageRefresh: 'provider:usage-refresh',
   TemplateList: 'template:list',
   TemplateSave: 'template:save',
   TemplateRemove: 'template:remove',
@@ -112,7 +120,9 @@ export const Channels = {
   DirList: 'dir:list',
   ArtifactsList: 'artifacts:list',
   ArtifactsClear: 'artifacts:clear',
-  EventArtifactsChanged: 'artifacts:changed'
+  EventArtifactsChanged: 'artifacts:changed',
+  EventProviderAccountsChanged: 'provider:accounts-changed',
+  EventProviderUsage: 'provider:usage'
 } as const
 
 export interface PtyDataEvent { agentId: string; data: string }
@@ -162,6 +172,15 @@ export interface AgentApi {
   listProviderCatalog(): Promise<CatalogProviderSummary[]>
   connectProvider(providerId: string, apiKey: string, baseUrl?: string): Promise<BsSettings>
   disconnectProvider(providerId: string): Promise<BsSettings>
+  listProviderAccounts(providerId?: string): Promise<ProviderConnection[]>
+  startProviderLogin(providerId: string): Promise<{ loginId: string; authUrl: string; expiresIn: number }>
+  cancelProviderLogin(loginId: string): Promise<void>
+  setProviderAccountEnabled(accountId: string, enabled: boolean): Promise<void>
+  switchProviderAccount(providerId: string, accountId: string): Promise<void>
+  removeProviderAccount(accountId: string): Promise<void>
+  refreshProviderUsage(providerId?: string, accountId?: string): Promise<ProviderUsage[]>
+  onProviderAccountsChanged(cb: (e: ProviderConnection[]) => void): () => void
+  onProviderUsage(cb: (e: ProviderUsage) => void): () => void
   listTemplates(): Promise<Template[]>
   saveTemplate(template: Template): Promise<Template>
   removeTemplate(id: string): Promise<void>
