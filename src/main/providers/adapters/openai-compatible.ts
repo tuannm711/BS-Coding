@@ -1,8 +1,8 @@
 import type { AuthMethodDescriptor, ProviderCapability, ProviderConnectRequest, ProviderModel } from '../../../shared/providers'
-import type { ProviderSecrets } from '../../connections/types'
 import type { ProviderAccount } from '../../../shared/types'
 import type { ProviderAdapter } from '../types'
 import { createLlm } from '../../agent/llm'
+import { normalizeProviderImport } from '../auth/import-normalizer'
 
 const DEFAULT_MODELS: Record<string, string[]> = {
   'github-copilot': ['gpt-4.1', 'claude-sonnet-4'],
@@ -18,18 +18,6 @@ const DEFAULT_MODELS: Record<string, string[]> = {
   zcode: ['glm-4.5']
 }
 
-function normalizeImported(value: string): ProviderSecrets {
-  try {
-    const parsed = JSON.parse(value) as Record<string, unknown>
-    return {
-      apiKey: typeof parsed.apiKey === 'string' ? parsed.apiKey : undefined,
-      accessToken: typeof parsed.accessToken === 'string' ? parsed.accessToken : undefined,
-      baseUrl: typeof parsed.baseUrl === 'string' ? parsed.baseUrl : undefined,
-      accountId: typeof parsed.accountId === 'string' ? parsed.accountId : undefined
-    }
-  } catch { throw new Error('[bs] Credential JSON không hợp lệ') }
-}
-
 export function createOpenAiCompatibleAdapter(providerId: string, displayName: string, apiKey = false): ProviderAdapter {
   const methods: AuthMethodDescriptor[] = [{ id: 'imported', label: 'Import credentials', description: 'Paste a provider credential JSON with apiKey/accessToken and baseUrl', kind: 'imported', fields: ['credentialJson'], supportsMultipleAccounts: true }]
   if (apiKey) methods.unshift({ id: 'api-key', label: 'API key', description: 'Use an API key and optional OpenAI-compatible base URL', kind: 'api-key' as const, fields: ['apiKey', 'baseUrl'], supportsMultipleAccounts: true })
@@ -37,7 +25,7 @@ export function createOpenAiCompatibleAdapter(providerId: string, displayName: s
   return {
     capability,
     async connect(request: ProviderConnectRequest, context) {
-      const secret = request.methodId === 'imported' ? normalizeImported(request.fields.credentialJson ?? '') : { apiKey: request.fields.apiKey, baseUrl: request.fields.baseUrl }
+      const secret = request.methodId === 'imported' ? normalizeProviderImport(providerId, request.fields.credentialJson ?? '') : { apiKey: request.fields.apiKey, baseUrl: request.fields.baseUrl }
       if (!secret.apiKey && !secret.accessToken) throw new Error('[bs] Credential không có apiKey hoặc accessToken')
       if (!secret.baseUrl) throw new Error('[bs] Credential cần baseUrl OpenAI-compatible')
       const label = request.fields.label?.trim() || `${displayName} account`
