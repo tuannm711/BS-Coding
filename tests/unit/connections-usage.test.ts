@@ -41,7 +41,16 @@ describe('provider usage normalization', () => {
     })
     expect(usage.primaryUsedPercent).toBe(42)
     expect(usage.secondaryUsedPercent).toBe(18)
-    expect(usage.resetAt).toBe(123)
+    expect(usage.resetAt).toBe(123_000)
+    expect(usage.quotaGroups).toEqual([{
+      id: 'openai-base',
+      label: 'Codex',
+      modelIds: [],
+      windows: [
+        { id: 'primary', label: 'Session', kind: 'session', remainingPercent: 58, resetAt: 123_000, usageKnown: true, source: 'provider' },
+        { id: 'secondary', label: 'Weekly', kind: 'weekly', remainingPercent: 82, resetAt: 456_000, usageKnown: true, source: 'provider' }
+      ]
+    }])
   })
 
   it('maps the ChatGPT wham usage response shape', () => {
@@ -54,11 +63,52 @@ describe('provider usage normalization', () => {
     })
     expect(usage.primaryUsedPercent).toBe(42)
     expect(usage.secondaryUsedPercent).toBe(18)
-    expect(usage.resetAt).toBe(123)
+    expect(usage.resetAt).toBe(123_000)
     expect(usage.status).toBe('ok')
+    expect(usage.quotaGroups?.[0].windows).toEqual([
+      { id: 'primary', label: '5-hour', kind: 'session', remainingPercent: 58, resetAt: 123_000, windowMinutes: 300, usageKnown: true, source: 'provider' },
+      { id: 'secondary', label: 'Weekly', kind: 'weekly', remainingPercent: 82, resetAt: expect.any(Number), windowMinutes: 10_080, usageKnown: true, source: 'provider' }
+    ])
+  })
+
+  it('does not synthesize a secondary window when OpenAI only reports primary', () => {
+    const usage = normalizeOpenAICodexUsage('a', {
+      rate_limit: { primary_window: { used_percent: 40, reset_at: 1_800_000_000, limit_window_seconds: 18_000 } }
+    }, 1_700_000_000_000)
+
+    expect(usage.quotaGroups?.[0].windows).toEqual([
+      { id: 'primary', label: '5-hour', kind: 'session', remainingPercent: 60, resetAt: 1_800_000_000_000, windowMinutes: 300, usageKnown: true, source: 'provider' }
+    ])
+  })
+
+  it('preserves additional OpenAI rate limits as separate stable groups', () => {
+    const usage = normalizeOpenAICodexUsage('a', {
+      rate_limit: { primary_window: { used_percent: 42, limit_window_seconds: 18_000 } },
+      additional_rate_limits: [{
+        limit_name: 'Code review',
+        rate_limit: { primary_window: { used_percent: 25, reset_after_seconds: 90 } }
+      }]
+    }, 1_700_000_000_000)
+
+    expect(usage.quotaGroups).toEqual([
+      {
+        id: 'openai-base', label: 'Codex', modelIds: [], windows: [
+          { id: 'primary', label: '5-hour', kind: 'session', remainingPercent: 58, windowMinutes: 300, usageKnown: true, source: 'provider' }
+        ]
+      },
+      {
+        id: 'openai-code-review', label: 'Code review', modelIds: [], windows: [
+          { id: 'code-review-primary', label: 'Additional limit', kind: 'additional', remainingPercent: 75, resetAt: 1_700_000_090_000, usageKnown: true, source: 'provider' }
+        ]
+      }
+    ])
   })
 
   it('extracts plan and subscription expiry from nested account responses', () => {
     expect(extractOpenAISubscriptionMetadata({ account: { plan_type: 'plus', subscription_active_until: 1_800_000_000 } })).toEqual({ planName: 'plus', subscriptionExpiresAt: 1_800_000_000_000 })
+  })
+
+  it('does not confuse OAuth token expiry with subscription expiry', () => {
+    expect(extractOpenAISubscriptionMetadata({ oauth: { expires_at: 1_800_000_000 }, account: { plan_type: 'pro' } })).toEqual({ planName: 'pro' })
   })
 })

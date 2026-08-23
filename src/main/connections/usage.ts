@@ -1,4 +1,4 @@
-import type { ProviderAccount, ProviderUsage } from '../../shared/types'
+import type { ProviderAccount, ProviderQuotaGroup, ProviderQuotaWindow, ProviderUsage } from '../../shared/types'
 
 export interface UsageAdapter {
   supports(providerId: string): boolean
@@ -33,27 +33,45 @@ export function normalizeUsage(input: Partial<ProviderUsage> & Pick<ProviderUsag
   }
 }
 
-export function normalizeOpenAICodexUsage(accountId: string, raw: unknown): ProviderUsage {
+export function normalizeOpenAICodexUsage(accountId: string, raw: unknown, now = Date.now()): ProviderUsage {
   const value = raw as {
     usage?: { requests?: number; tokens?: number; input_tokens?: number; output_tokens?: number; inputTokens?: number; outputTokens?: number }
     limit?: { requests?: number; tokens?: number }
     reset_at?: number
     plan_type?: string
     planName?: string
-    subscription_expires_at?: number
+    subscription_expires_at?: number | string
     primary_window?: WindowUsage
     secondary_window?: WindowUsage
     banked?: { used?: number; limit?: number }
     rate_limit?: { primary_window?: WindowUsage; secondary_window?: WindowUsage }
     rate_limits?: { primary?: WindowUsage; secondary?: WindowUsage }
+    additional_rate_limits?: AdditionalRateLimit[]
   }
   // ChatGPT's current endpoint wraps the windows in `rate_limit`; older
   // snapshots used `rate_limits` or placed them at the response root.
   const primary = value.primary_window ?? value.rate_limit?.primary_window ?? value.rate_limits?.primary
   const secondary = value.secondary_window ?? value.rate_limit?.secondary_window ?? value.rate_limits?.secondary
   const tokensUsed = value.usage?.tokens ?? (primary?.used_percent !== undefined && primary.limit ? Math.round(primary.limit * primary.used_percent / 100) : undefined)
-  const resetAt = value.reset_at ?? primary?.reset_at ?? (primary?.reset_after_seconds !== undefined ? Date.now() + primary.reset_after_seconds * 1000 : undefined)
-  const secondaryResetAt = secondary?.reset_at ?? (secondary?.reset_after_seconds !== undefined ? Date.now() + secondary.reset_after_seconds * 1000 : undefined)
+  const resetAt = normalizeResetAt(value.reset_at ?? primary?.reset_at, now, primary?.reset_after_seconds)
+  const secondaryResetAt = normalizeResetAt(secondary?.reset_at, now, secondary?.reset_after_seconds)
+  const baseWindows = [
+    primary ? openAiWindow('primary', primary, now, false) : undefined,
+    secondary ? openAiWindow('secondary', secondary, now, false) : undefined
+  ].filter((window): window is ProviderQuotaWindow => Boolean(window))
+  const quotaGroups: ProviderQuotaGroup[] = baseWindows.length > 0
+    ? [{ id: 'openai-base', label: 'Codex', modelIds: [], windows: baseWindows }]
+    : []
+  for (const [index, additional] of (value.additional_rate_limits ?? []).entries()) {
+    const label = additional.limit_name ?? additional.name ?? additional.label ?? `Additional limit ${index + 1}`
+    const key = slug(additional.id ?? label) || `additional-${index + 1}`
+    const rateLimit = additional.rate_limit ?? additional
+    const windows = [
+      rateLimit.primary_window ? openAiWindow(`${key}-primary`, rateLimit.primary_window, now, true) : undefined,
+      rateLimit.secondary_window ? openAiWindow(`${key}-secondary`, rateLimit.secondary_window, now, true) : undefined
+    ].filter((window): window is ProviderQuotaWindow => Boolean(window))
+    if (windows.length > 0) quotaGroups.push({ id: `openai-${key}`, label, modelIds: [], windows })
+  }
   return normalizeUsage({
     accountId,
     requestsUsed: value.usage?.requests,
@@ -68,8 +86,9 @@ export function normalizeOpenAICodexUsage(accountId: string, raw: unknown): Prov
     bankedLimit: value.banked?.limit,
     primaryUsedPercent: primary?.used_percent,
     secondaryUsedPercent: secondary?.used_percent,
-    subscriptionExpiresAt: value.subscription_expires_at,
+    subscriptionExpiresAt: normalizeResetAt(value.subscription_expires_at, now),
     planName: value.plan_type ?? value.planName,
+    quotaGroups,
     source: 'provider'
   })
 }
@@ -80,7 +99,7 @@ export function extractOpenAISubscriptionMetadata(raw: unknown): Pick<ProviderUs
     if (!value || typeof value !== 'object' || found.planName && found.subscriptionExpiresAt) return
     for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
       if (!found.planName && ['plan_type', 'planType', 'plan_name', 'planName'].includes(key) && typeof child === 'string' && child.trim()) found.planName = child
-      if (!found.subscriptionExpiresAt && ['subscription_active_until', 'subscriptionExpiresAt', 'expires_at', 'expiresAt', 'end_date', 'ends_at'].includes(key)) {
+      if (!found.subscriptionExpiresAt && ['subscription_active_until', 'subscriptionExpiresAt', 'subscription_expires_at', 'end_date', 'ends_at'].includes(key)) {
         const parsed = typeof child === 'number' ? child : typeof child === 'string' ? Date.parse(child) : NaN
         if (Number.isFinite(parsed)) found.subscriptionExpiresAt = parsed > 10_000_000_000 ? parsed : parsed * 1000
       }
@@ -93,10 +112,55 @@ export function extractOpenAISubscriptionMetadata(raw: unknown): Pick<ProviderUs
 
 interface WindowUsage {
   used_percent?: number
-  reset_at?: number
+  reset_at?: number | string
   reset_after_seconds?: number
   limit_window_seconds?: number
   limit?: number
+  label?: string
+  name?: string
+  description?: string
+}
+
+interface AdditionalRateLimit {
+  id?: string
+  limit_name?: string
+  name?: string
+  label?: string
+  rate_limit?: { primary_window?: WindowUsage; secondary_window?: WindowUsage }
+  primary_window?: WindowUsage
+  secondary_window?: WindowUsage
+}
+
+function slug(value: string): string {
+  return value.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+}
+
+function openAiWindow(id: string, input: WindowUsage, now: number, additional: boolean): ProviderQuotaWindow {
+  const windowMinutes = input.limit_window_seconds === undefined ? undefined : input.limit_window_seconds / 60
+  const resetAt = normalizeResetAt(input.reset_at, now, input.reset_after_seconds)
+  const label = additional
+    ? input.label ?? input.name ?? input.description ?? 'Additional limit'
+    : windowMinutes === 300
+      ? '5-hour'
+      : windowMinutes === 10_080
+        ? 'Weekly'
+        : input.label ?? input.name ?? input.description ?? (id === 'secondary' ? 'Weekly' : 'Session')
+  const kind: ProviderQuotaWindow['kind'] = additional
+    ? 'additional'
+    : windowMinutes === 10_080 || id === 'secondary'
+      ? 'weekly'
+      : 'session'
+  const remainingPercent = toRemainingPercent(input.used_percent)
+  return {
+    id,
+    label,
+    kind,
+    ...(remainingPercent === undefined ? {} : { remainingPercent }),
+    ...(resetAt === undefined ? {} : { resetAt }),
+    ...(windowMinutes === undefined ? {} : { windowMinutes }),
+    usageKnown: remainingPercent !== undefined,
+    source: 'provider'
+  }
 }
 
 export class UsageScheduler {
