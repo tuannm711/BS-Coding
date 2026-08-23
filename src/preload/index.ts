@@ -5,6 +5,7 @@ import type { ChatEvent, Command, ContextChangedEvent, FileViewerPayload, ImageA
 import type { AgentApi, AgentConfigEvent, AgentStateEvent, BrowserInstallGuideEvent, GitStatusEvent, PtyDataEvent, TerminalExitEvent, WindowMaximizedChangeEvent } from '../shared/ipc'
 import type { BrowserStatusInfo } from '../shared/browser-types'
 import type { RemoteStatus } from '../shared/remote-types'
+import type { ProviderConnectRequest } from '../shared/providers'
 
 function subscribe<T>(channel: string, cb: (e: T) => void): () => void {
   const listener = (_event: unknown, payload: T) => cb(payload)
@@ -68,6 +69,8 @@ const api: AgentApi = {
   getProviderModels: () => ipcRenderer.invoke(Channels.ProviderModels),
   fetchProviderModels: (providerId: string) => ipcRenderer.invoke(Channels.ProviderFetchModels, providerId),
   listProviderCatalog: () => ipcRenderer.invoke(Channels.ProviderCatalog),
+  listProviderCapabilities: () => ipcRenderer.invoke(Channels.ProviderCapabilities),
+  connectProviderMethod: (request: ProviderConnectRequest) => ipcRenderer.invoke(Channels.ProviderConnectMethod, request),
   connectProvider: (providerId: string, apiKey: string, baseUrl?: string) =>
     ipcRenderer.invoke(Channels.ProviderConnect, providerId, apiKey, baseUrl),
   disconnectProvider: (providerId: string) => ipcRenderer.invoke(Channels.ProviderDisconnect, providerId),

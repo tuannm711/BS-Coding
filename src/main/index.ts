@@ -37,6 +37,8 @@ import { ModelsCatalog } from './models-catalog'
 import { getWindowChromeOptions } from './window-chrome'
 import { Vault } from './vault'
 import { ProviderManager } from './connections/manager'
+import { ProviderRegistry } from './providers/registry'
+import { createOpenAiAdapter } from './providers/adapters/openai'
 import { TrayManager } from './tray-manager'
 import { BrowserBridge } from './browser/bridge'
 import { createChromeLauncher, ensureExtensionInstalled } from './browser/chrome-launcher'
@@ -110,11 +112,14 @@ class MainApp {
   })
   traces = new TraceStore(path.join(app.getPath('userData'), 'traces'))
   vault = new Vault(path.join(app.getPath('userData'), 'connections', 'vault.json'))
+  providerRegistry = new ProviderRegistry()
   providerManager = new ProviderManager({
     accountsFile: path.join(app.getPath('userData'), 'connections', 'accounts.json'),
     codexAuthFile: path.join(os.homedir(), '.codex', 'auth.json'),
     codexBackupFile: path.join(app.getPath('userData'), 'connections', 'codex-auth.json.backup'),
     openExternal: (url) => shell.openExternal(url),
+    registry: this.providerRegistry,
+    vault: this.vault,
     onAccountsChanged: (connections) => win?.webContents.send(Channels.EventProviderAccountsChanged, connections),
     onUsage: (usage) => win?.webContents.send(Channels.EventProviderUsage, usage)
   })
@@ -183,6 +188,7 @@ class MainApp {
   private updater: Updater
 
   constructor() {
+    this.providerRegistry.register(createOpenAiAdapter())
     this.pty.on('data', ({ agentId, data }) => {
       if (this.pty.isTerminal(agentId)) {
         win?.webContents.send(Channels.EventPtyData, { agentId, data })
@@ -722,6 +728,8 @@ function registerIpcHandlers(): void {
   ipcMain.handle(Channels.ProviderFetchModels, (_e, providerId: string) =>
     mainApp.bsAgent.fetchProviderModels(providerId))
   ipcMain.handle(Channels.ProviderCatalog, () => mainApp.bsAgent.listProviderCatalog())
+  ipcMain.handle(Channels.ProviderCapabilities, () => mainApp.providerManager.listCapabilities())
+  ipcMain.handle(Channels.ProviderConnectMethod, (_e, request) => mainApp.providerManager.connectMethod(request))
   ipcMain.handle(Channels.ProviderConnect, (_e, providerId: string, apiKey: string, baseUrl?: string) =>
     mainApp.bsAgent.connectProvider(providerId, apiKey, baseUrl))
   ipcMain.handle(Channels.ProviderDisconnect, (_e, providerId: string) =>

@@ -16,10 +16,12 @@ interface Props {
   agents?: QuotaCardAgent[]
   onRefresh?: () => void
   onSpeedChange?: (agentId: string, speed: AgentSpeed) => void
+  accountStatus?: 'active' | 'inactive'
+  onAccountToggle?: (enabled: boolean) => void
   compact?: boolean
 }
 
-export default function QuotaAccountCard({ usage, agents = [], onRefresh, onSpeedChange, compact = false }: Props) {
+export default function QuotaAccountCard({ usage, agents = [], onRefresh, onSpeedChange, accountStatus, onAccountToggle, compact = false }: Props) {
   const remaining = usageRemaining(usage)
   const accountLabel = usage?.accountLabel ?? 'ChatGPT account'
   const accountType = usage?.accountType === 'oauth' ? 'ChatGPT OAuth' : usage?.accountType === 'api-key' ? 'API key' : usage?.accountType ?? 'Account'
@@ -39,6 +41,7 @@ export default function QuotaAccountCard({ usage, agents = [], onRefresh, onSpee
           </div>
         </div>
         <div className="quota-account-actions">
+          {accountStatus && <><span className={`quota-account-status ${accountStatus}`}>{accountStatus === 'active' ? '● Active' : '● Inactive'}</span><button className={`btn small ${accountStatus === 'active' ? 'danger' : ''}`} onClick={() => onAccountToggle?.(accountStatus !== 'active')}>{accountStatus === 'active' ? 'Deactivate' : 'Activate'}</button></>}
           <span className="quota-plan-badge">{usage?.planName ?? '—'}</span>
           {onRefresh && <button className="icon-btn quota-refresh" aria-label="Refresh quota" title="Refresh quota" onClick={onRefresh}><RefreshCw size={14} /></button>}
         </div>

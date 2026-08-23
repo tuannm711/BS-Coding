@@ -6,6 +6,7 @@ import type {
 } from './types'
 import type { BrowserStatusInfo, PairingInfo } from './browser-types'
 import type { RemoteStatus } from './remote-types'
+import type { ProviderCapability, ProviderConnectRequest, ProviderConnectResult } from './providers'
 
 export const Channels = {
   WorkspaceList: 'workspace:list',
@@ -43,6 +44,8 @@ export const Channels = {
   ProviderAccountSwitch: 'provider:account-switch',
   ProviderAccountRemove: 'provider:account-remove',
   ProviderUsageRefresh: 'provider:usage-refresh',
+  ProviderCapabilities: 'provider:capabilities',
+  ProviderConnectMethod: 'provider:connect-method',
   TemplateList: 'template:list',
   TemplateSave: 'template:save',
   TemplateRemove: 'template:remove',
@@ -178,6 +181,8 @@ export interface AgentApi {
   getProviderModels(): Promise<ModelRef[]>
   fetchProviderModels(providerId: string): Promise<string[]>
   listProviderCatalog(): Promise<CatalogProviderSummary[]>
+  listProviderCapabilities(): Promise<ProviderCapability[]>
+  connectProviderMethod(request: ProviderConnectRequest): Promise<ProviderConnectResult>
   connectProvider(providerId: string, apiKey: string, baseUrl?: string): Promise<BsSettings>
   disconnectProvider(providerId: string): Promise<BsSettings>
   listProviderAccounts(providerId?: string): Promise<ProviderConnection[]>

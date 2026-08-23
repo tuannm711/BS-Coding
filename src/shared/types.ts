@@ -1,3 +1,5 @@
+import type { ProviderModelCapabilities } from './providers'
+
 export type AgentStatus = 'spawning' | 'running' | 'idle' | 'exited' | 'stopped' | 'error'
 export type AlertLevel = 'normal' | 'attention' | 'error'
 export type AgentKind = 'pty' | 'native'
@@ -238,6 +240,9 @@ export interface ProviderAccount {
   lastUsedAt: number
   oauthExpiresAt?: number
   keyRef?: string
+  capabilities?: ProviderModelCapabilities
+  models?: string[]
+  lastError?: string
   usage?: ProviderUsage
 }
 

@@ -1,9 +1,12 @@
 import { randomUUID } from 'node:crypto'
 import type { ProviderAccount, ProviderConnection, ProviderUsage } from '../../shared/types'
+import type { ProviderConnectRequest, ProviderCapability, ProviderConnectResult } from '../../shared/providers'
 import { extractOpenAISubscriptionMetadata, normalizeOpenAICodexUsage } from './usage'
 import { createPkce, listenForCallback } from './oauth'
 import { CODEX_REDIRECT_URI, codexAuthorizeUrl, decodeJwtProfile, exchangeCodexCode, mergeCodexAuthFile } from './codex'
 import { ProviderAccountStore } from './store'
+import type { Vault } from '../vault'
+import { ProviderRegistry } from '../providers/registry'
 
 interface PendingLogin {
   providerId: string
@@ -19,18 +22,43 @@ export interface ProviderManagerDeps {
   openExternal?: (url: string) => Promise<void> | void
   onAccountsChanged?: (connections: ProviderConnection[]) => void
   onUsage?: (usage: ProviderUsage) => void
+  registry?: ProviderRegistry
+  vault?: Vault
 }
 
 export class ProviderManager {
   readonly store: ProviderAccountStore
+  readonly registry: ProviderRegistry
   private pending = new Map<string, PendingLogin>()
 
   constructor(private readonly deps: ProviderManagerDeps) {
-    this.store = new ProviderAccountStore(deps.accountsFile)
+    this.store = new ProviderAccountStore(deps.accountsFile, deps.vault)
+    this.registry = deps.registry ?? new ProviderRegistry()
   }
 
   list(providerId?: string): ProviderConnection[] {
     return this.store.list(providerId)
+  }
+
+  listCapabilities(): ProviderCapability[] {
+    return this.registry.listReady()
+  }
+
+  async connectMethod(request: ProviderConnectRequest): Promise<ProviderConnectResult> {
+    const adapter = this.registry.resolveRequest(request)
+    if (request.providerId === 'openai' && request.methodId === 'oauth') {
+      return this.startLogin('openai').then(login => ({ ...login, requiresBrowser: true }))
+    }
+    const result = await adapter.connect(request, {
+      saveAccount: (account, secrets) => this.store.upsert(account, secrets)
+    })
+    const secret = this.store.getSecret(result.account.id)
+    if (secret) {
+      const models = await adapter.listModels(result.account, secret)
+      this.store.upsert({ ...result.account, models: models.map(model => model.id) })
+    }
+    this.deps.onAccountsChanged?.(this.list())
+    return { accountId: result.account.id, ...(result.login ? { ...result.login, requiresBrowser: true } : {}) }
   }
 
   async startLogin(providerId: string): Promise<{ loginId: string; authUrl: string; expiresIn: number }> {

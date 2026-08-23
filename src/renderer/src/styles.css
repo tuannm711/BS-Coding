@@ -931,6 +931,9 @@ select.input { width: 100%; }
 .settings-error { color: var(--red); font-size: var(--fs-md); }
 .providers-dialog { width: 560px; max-height: 80vh; overflow-y: auto; }
 .provider-actions { display: flex; align-items: center; gap: 8px; }
+.settings-field-label { color: var(--text-faint); font-size: var(--fs-sm); font-weight: var(--fw-semibold); }
+.provider-account-disabled { opacity: .72; }
+.provider-account-actions .danger { color: var(--danger); }
 .provider-manual { display: flex; flex-direction: column; gap: 6px; padding: 8px 0; }
 .provider-manual-id, .provider-manual-key, .provider-manual-baseurl { width: 100%; }
 .provider-connect { display: flex; flex-direction: column; gap: 6px; }
@@ -1628,6 +1631,9 @@ select.input { width: 100%; }
 .provider-account-actions { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
 .quota-account-card.compact { padding: 12px; }
 .quota-account-header, .quota-account-identity, .quota-account-actions, .quota-window-label, .quota-agent-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; flex-wrap: wrap; }
+.quota-account-status { font-size: var(--fs-sm); white-space: nowrap; }
+.quota-account-status.active { color: var(--green); }
+.quota-account-status.inactive { color: var(--yellow); }
 .quota-account-identity { justify-content: flex-start; }
 .quota-account-avatar { display: grid; place-items: center; width: 24px; height: 24px; flex: 0 0 24px; border-radius: 7px; background: var(--accent); color: var(--bg); font-size: var(--fs-sm); font-weight: 700; }
 .quota-account-identity > div { display: grid; gap: 1px; min-width: 0; }

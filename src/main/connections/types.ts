@@ -4,6 +4,7 @@ export type { ProviderAccount, ProviderConnection, ProviderUsage }
 
 export interface ProviderSecrets {
   apiKey?: string
+  baseUrl?: string
   accessToken?: string
   refreshToken?: string
   idToken?: string

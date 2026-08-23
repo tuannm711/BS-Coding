@@ -8,5 +8,5 @@
     "noEmit": true,
     "types": ["node"]
   },
-  "include": ["*.ts", "../src/shared/remote-types.ts", "../src/shared/types.ts"]
+  "include": ["*.ts", "../src/shared/remote-types.ts", "../src/shared/providers.ts", "../src/shared/types.ts"]
 }

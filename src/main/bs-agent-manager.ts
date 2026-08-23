@@ -575,6 +575,15 @@ export class BsAgentManager {
         if (!refs.some(ref => ref.provider === 'openai' && ref.model === model)) refs.push({ provider: 'openai', model })
       }
     }
+    for (const connection of this.deps.providerAccounts?.() ?? []) {
+      for (const account of connection.accounts) {
+        if (account.status !== 'active') continue
+        for (const model of account.models ?? []) {
+          if (connection.providerId === 'openai' && isOpenAiGenericModel(model)) continue
+          if (!refs.some(ref => ref.provider === connection.providerId && ref.model === model)) refs.push({ provider: connection.providerId, model })
+        }
+      }
+    }
     return refs
   }
 
@@ -985,25 +994,28 @@ export class BsAgentManager {
     )
     const agent = [...this.agents.values()].find(a => a.name === agentName)
     if (agent?.accountId) resolved.accountId = agent.accountId
-    if (resolved.provider === 'openai' && !resolved.accountId) {
-      const active = this.deps.providerAccounts?.().find(c => c.providerId === 'openai')?.accounts.find(a => a.status === 'active' && a.authMode === 'oauth')
+    if (resolved.provider && !resolved.accountId) {
+      const active = this.deps.providerAccounts?.().find(c => c.providerId === resolved.provider)?.accounts.find(a => a.status === 'active')
       if (active) resolved.accountId = active.id
     }
-    this.applyOAuthCredentials(resolved)
+    this.applyAccountCredentials(resolved)
     return resolved
   }
 
-  private applyOAuthCredentials(resolved: ResolvedAgentConfig): void {
-    if (resolved.provider !== 'openai' || !resolved.accountId || !this.deps.vault) return
+  private applyAccountCredentials(resolved: ResolvedAgentConfig): void {
+    if (!resolved.provider || !resolved.accountId || !this.deps.vault) return
     const account = this.deps.providerAccounts?.().flatMap(connection => connection.accounts).find(item => item.id === resolved.accountId)
-    if (!account || account.authMode !== 'oauth' || !account.keyRef) return
+    if (!account?.keyRef) return
     const raw = this.deps.vault.getSecret(account.keyRef)
     if (!raw) return
     try {
-      const secret = JSON.parse(raw) as { accessToken?: string }
-      if (secret.accessToken) {
+      const secret = JSON.parse(raw) as { apiKey?: string; accessToken?: string; baseUrl?: string }
+      if (secret.accessToken && account.providerId === 'openai') {
         resolved.apiKey = secret.accessToken
         resolved.baseUrl = 'https://chatgpt.com/backend-api/codex'
+      } else if (secret.apiKey) {
+        resolved.apiKey = secret.apiKey
+        resolved.baseUrl = secret.baseUrl ?? resolved.baseUrl
       }
     } catch { /* legacy non-JSON secrets are API keys, not OAuth tokens */ }
   }
