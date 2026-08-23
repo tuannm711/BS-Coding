@@ -272,7 +272,20 @@ export class ProviderManager {
         response = await fetch('https://cloudcode-pa.googleapis.com/v1internal:fetchAvailableModels', { method: 'POST', headers: { authorization: `Bearer ${refreshed.accessToken}`, 'content-type': 'application/json', 'user-agent': 'antigravity/1.15.8 windows/amd64' }, body: '{}' })
       }
       const raw = await response.text()
-      if (!response.ok) return { accountId: account.id, ...metadata, refreshedAt: Date.now(), source: 'unavailable', status: response.status === 429 ? 'near-limit' : 'unavailable', unavailableReason: `Quota request failed (${response.status})` }
+      if (!response.ok) {
+        const retryAfter = Number(response.headers.get('retry-after') ?? 0)
+        const next: ProviderUsage = {
+          accountId: account.id,
+          ...metadata,
+          refreshedAt: Date.now(),
+          source: 'provider',
+          status: response.status === 429 ? 'near-limit' : 'unavailable',
+          unavailableReason: response.status === 429 ? 'Quota exhausted' : response.status === 503 ? 'Model capacity exhausted' : response.status === 401 || response.status === 403 ? 'Authentication expired' : `Quota request failed (${response.status})`,
+          ...(retryAfter > 0 ? { resetAt: Date.now() + retryAfter * 1000 } : {})
+        }
+        this.store.setUsage(account.id, next)
+        return next
+      }
       const normalized = parseAntigravityUsage(account.id, JSON.parse(raw), { ...metadata, planName: account.profile?.planName })
       account.usage = normalized
       this.store.setUsage(account.id, normalized)
