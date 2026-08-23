@@ -3,6 +3,7 @@ import { spawn } from 'node:child_process'
 import { existsSync, rmSync } from 'node:fs'
 import { stat } from 'node:fs/promises'
 import { randomUUID } from 'node:crypto'
+import os from 'node:os'
 import path from 'node:path'
 import { createJsonStore } from './json-store'
 import { TemplateManager } from './template-manager'
@@ -35,6 +36,7 @@ import { LspManager } from './agent/lsp/manager'
 import { ModelsCatalog } from './models-catalog'
 import { getWindowChromeOptions } from './window-chrome'
 import { Vault } from './vault'
+import { ProviderManager } from './connections/manager'
 import { TrayManager } from './tray-manager'
 import { BrowserBridge } from './browser/bridge'
 import { createChromeLauncher, ensureExtensionInstalled } from './browser/chrome-launcher'
@@ -108,6 +110,14 @@ class MainApp {
   })
   traces = new TraceStore(path.join(app.getPath('userData'), 'traces'))
   vault = new Vault(path.join(app.getPath('userData'), 'connections', 'vault.json'))
+  providerManager = new ProviderManager({
+    accountsFile: path.join(app.getPath('userData'), 'connections', 'accounts.json'),
+    codexAuthFile: path.join(os.homedir(), '.codex', 'auth.json'),
+    codexBackupFile: path.join(app.getPath('userData'), 'connections', 'codex-auth.json.backup'),
+    openExternal: (url) => shell.openExternal(url),
+    onAccountsChanged: (connections) => win?.webContents.send(Channels.EventProviderAccountsChanged, connections),
+    onUsage: (usage) => win?.webContents.send(Channels.EventProviderUsage, usage)
+  })
   bsAgent = new BsAgentManager({
     configPath: path.join(app.getPath('userData'), 'bs.json'),
     vault: this.vault,
@@ -684,6 +694,14 @@ function registerIpcHandlers(): void {
     mainApp.bsAgent.connectProvider(providerId, apiKey, baseUrl))
   ipcMain.handle(Channels.ProviderDisconnect, (_e, providerId: string) =>
     mainApp.bsAgent.disconnectProvider(providerId))
+  ipcMain.handle(Channels.ProviderAccounts, (_e, providerId?: string) => mainApp.providerManager.list(providerId))
+  ipcMain.handle(Channels.ProviderLoginStart, (_e, providerId: string) => mainApp.providerManager.startLogin(providerId))
+  ipcMain.handle(Channels.ProviderLoginCancel, (_e, loginId: string) => mainApp.providerManager.cancelLogin(loginId))
+  ipcMain.handle(Channels.ProviderAccountEnable, (_e, accountId: string) => mainApp.providerManager.setEnabled(accountId, true))
+  ipcMain.handle(Channels.ProviderAccountDisable, (_e, accountId: string) => mainApp.providerManager.setEnabled(accountId, false))
+  ipcMain.handle(Channels.ProviderAccountSwitch, (_e, providerId: string, accountId: string) => mainApp.providerManager.switch(providerId, accountId))
+  ipcMain.handle(Channels.ProviderAccountRemove, (_e, accountId: string) => mainApp.providerManager.remove(accountId))
+  ipcMain.handle(Channels.ProviderUsageRefresh, (_e, providerId?: string, accountId?: string) => mainApp.providerManager.refreshUsage(providerId, accountId))
 
   ipcMain.handle(Channels.TemplateList, () => mainApp.templates.list())
   ipcMain.handle(Channels.TemplateSave, (_e, t: Template) => mainApp.templates.save(t))
