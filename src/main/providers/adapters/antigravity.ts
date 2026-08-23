@@ -1,4 +1,5 @@
 import type { ProviderAdapter } from '../types'
+import { createAntigravityLlm } from '../../agent/antigravity-llm'
 
 const ANTIGRAVITY_CODE_MODELS = [
   { id: 'gemini-3.1-pro-high', name: 'Gemini 3.1 Pro (High)' },
@@ -24,6 +25,9 @@ export function createAntigravityAdapter(): ProviderAdapter {
     async listModels() {
       return ANTIGRAVITY_CODE_MODELS.map(model => ({ ...model, capabilities: { isCodeModel: true, supportsStreaming: true, supportsTools: true } }))
     },
-    createClient() { throw new Error('[bs] Antigravity model runtime chưa khả dụng') }
+    createClient(_account, secret) {
+      if (!secret.accessToken) throw new Error('[bs] Antigravity OAuth access token unavailable')
+      return createAntigravityLlm(secret.accessToken)
+    }
   }
 }

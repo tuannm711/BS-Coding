@@ -8,6 +8,7 @@ import { ProviderAccountStore } from './store'
 import type { Vault } from '../vault'
 import { ProviderRegistry } from '../providers/registry'
 import { antigravityAuthorizeUrl, exchangeAntigravityCode, fetchAntigravityProfile } from '../providers/auth/antigravity-oauth'
+import type { LlmClient } from '../agent/llm'
 
 interface PendingLogin {
   providerId: string
@@ -39,6 +40,16 @@ export class ProviderManager {
 
   list(providerId?: string): ProviderConnection[] {
     return this.store.list(providerId)
+  }
+
+  createRuntime(providerId: string, accountId: string, modelId: string): LlmClient {
+    const connection = this.store.list(providerId).find(item => item.accounts.some(account => account.id === accountId))
+    const account = connection?.accounts.find(item => item.id === accountId)
+    const adapter = this.registry.get(providerId)
+    const secret = this.store.getSecret(accountId)
+    const model = account?.models?.find(item => item === modelId)
+    if (!account || !adapter || !secret || !model) throw new Error(`[bs] Provider runtime unavailable for ${providerId}/${modelId}`)
+    return adapter.createClient(account, secret, { id: model, name: model, capabilities: { isCodeModel: true, supportsStreaming: true, supportsTools: true } })
   }
 
   async refreshModels(providerId?: string, accountId?: string): Promise<void> {

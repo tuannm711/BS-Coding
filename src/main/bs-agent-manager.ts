@@ -69,6 +69,7 @@ export interface BsAgentManagerDeps {
   providerAccounts?: () => ProviderConnection[]
   onAssignmentChanged?: (assignment: AgentAssignmentSnapshot) => void
   assignmentPath?: string
+  providerRuntime?: (providerId: string, accountId: string, modelId: string) => LlmClient
 }
 
 export class BsAgentManager {
@@ -866,7 +867,9 @@ export class BsAgentManager {
     // prompt (opencode-style); module-level ones attach on read via loop.ts.
     const instructionFiles = loadInstructions(agent.cwd)
     const instructions = instructionsText(instructionFiles)
-    const llmClient = (this.deps.createLlm ?? createLlm)(resolved.provider, resolved.apiKey ?? '', resolved.baseUrl, this.oauthHeaders(resolved))
+    const llmClient = resolved.accountId && this.deps.providerRuntime
+      ? this.deps.providerRuntime(resolved.provider, resolved.accountId, resolved.model)
+      : (this.deps.createLlm ?? createLlm)(resolved.provider, resolved.apiKey ?? '', resolved.baseUrl, this.oauthHeaders(resolved))
     const resolveSubagent = (type: SubagentType): ResolvedSubagentModel | undefined => {
       const ref = cfg.subagentModels?.[type]
       if (!ref) return undefined
