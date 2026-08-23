@@ -1,4 +1,4 @@
-import type { ProviderUsage } from '@shared/types'
+import type { ProviderQuotaGroup, ProviderQuotaWindow, ProviderUsage } from '@shared/types'
 
 export function remainingPercent(used?: number): number | undefined {
   if (used === undefined || !Number.isFinite(used)) return undefined
@@ -43,11 +43,79 @@ export function formatAge(timestamp: number | undefined, now = Date.now()): stri
   return `${Math.floor(minutes / 60)}h ago`
 }
 
-export function usageRemaining(usage?: ProviderUsage): { primary?: number; secondary?: number } {
+export function usageRemaining(usage?: ProviderUsage, providerState?: string): { primary?: number; secondary?: number } {
+  const primary = providerState === 'quota-exhausted' ? 0 : remainingPercent(usage?.primaryUsedPercent)
   return {
-    primary: remainingPercent(usage?.primaryUsedPercent),
+    primary,
     secondary: remainingPercent(usage?.secondaryUsedPercent)
   }
+}
+
+export function providerQuotaGroups(usage?: ProviderUsage): ProviderQuotaGroup[] {
+  if (!usage) return []
+  if (usage.quotaGroups?.length) return usage.quotaGroups
+  const windows: ProviderQuotaWindow[] = []
+  if (usage.primaryUsedPercent !== undefined || usage.resetAt !== undefined) {
+    const value = remainingPercent(usage.primaryUsedPercent)
+    windows.push({
+      id: 'legacy-primary', label: 'Primary limit', kind: 'unknown',
+      ...(value === undefined ? {} : { remainingPercent: value }),
+      ...(usage.resetAt === undefined ? {} : { resetAt: usage.resetAt }),
+      usageKnown: value !== undefined, source: 'legacy-provider'
+    })
+  }
+  if (usage.secondaryUsedPercent !== undefined || usage.secondaryResetAt !== undefined) {
+    const value = remainingPercent(usage.secondaryUsedPercent)
+    windows.push({
+      id: 'legacy-secondary', label: 'Secondary limit', kind: 'unknown',
+      ...(value === undefined ? {} : { remainingPercent: value }),
+      ...(usage.secondaryResetAt === undefined ? {} : { resetAt: usage.secondaryResetAt }),
+      usageKnown: value !== undefined, source: 'legacy-provider'
+    })
+  }
+  if (windows.length > 0) return [{ id: 'legacy-base', label: 'Quota', modelIds: [], windows }]
+  return legacyModelQuotaGroup(usage, Object.keys(usage.modelQuotas ?? {}))
+}
+
+export function chatQuotaGroups(usage: ProviderUsage | undefined, modelIds: string[]): ProviderQuotaGroup[] {
+  if (!usage) return []
+  if (!usage.quotaGroups?.length) {
+    const selectedLegacy = legacyModelQuotaGroup(usage, modelIds)
+    return selectedLegacy.length > 0 ? selectedLegacy : providerQuotaGroups(usage)
+  }
+  const families = new Set(modelIds.flatMap(modelId => {
+    const normalized = modelId.toLowerCase()
+    if (normalized.includes('gemini')) return ['gemini']
+    if (normalized.includes('claude') || normalized.includes('gpt') || normalized.startsWith('3p-')) return ['claude-gpt']
+    return []
+  }))
+  return usage.quotaGroups.filter(group =>
+    group.modelIds.some(modelId => modelIds.includes(modelId))
+    || group.modelIds.length === 0 && (families.size === 0 || !['gemini', 'claude-gpt'].includes(group.id) || families.has(group.id))
+  )
+}
+
+export function quotaWindowState(window: ProviderQuotaWindow, now = Date.now()): 'ready' | 'exhausted' | 'cooldown' | 'unknown' {
+  if (!window.usageKnown || window.remainingPercent === undefined) return 'unknown'
+  if (window.remainingPercent > 0) return 'ready'
+  return window.resetAt !== undefined && window.resetAt > now ? 'cooldown' : 'exhausted'
+}
+
+function legacyModelQuotaGroup(usage: ProviderUsage, modelIds: string[]): ProviderQuotaGroup[] {
+  const selected = [...new Set(modelIds)].flatMap(modelId => {
+    const quota = usage.modelQuotas?.[modelId]
+    return quota ? [{ modelId, quota }] : []
+  })
+  if (selected.length === 0) return []
+  const remainingPercent = Math.min(...selected.map(item => item.quota.remainingPercent))
+  const resetAt = selected.map(item => item.quota.resetAt).filter((value): value is number => value !== undefined).sort((a, b) => a - b)[0]
+  return [{
+    id: 'legacy-models', label: 'Model quota', modelIds: selected.map(item => item.modelId),
+    windows: [{
+      id: 'legacy-model', label: 'Model quota', kind: 'unknown', remainingPercent,
+      ...(resetAt === undefined ? {} : { resetAt }), usageKnown: true, source: 'legacy-provider'
+    }]
+  }]
 }
 
 export function formatProviderAccountType(providerId: string | undefined, authMode: string | undefined): string {

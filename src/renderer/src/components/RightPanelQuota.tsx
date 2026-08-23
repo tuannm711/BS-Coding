@@ -1,89 +1,106 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { AgentModelAssignment, ProviderUsage } from '@shared/types'
-import { shouldAcceptSnapshot, type ProviderSnapshot } from '@shared/provider-state'
+import type { AgentModelAssignment, ProviderQuotaGroup, ProviderUsage } from '@shared/types'
+import { shouldAcceptSnapshot, type AgentAssignmentSnapshot, type ProviderAccountSnapshot, type ProviderSnapshot } from '@shared/provider-state'
 import QuotaAccountCard from './quota/QuotaAccountCard'
+import { chatQuotaGroups } from './quota/quota-view'
 
 export interface QuotaAgent {
   id: string
   name: string
 }
 
-interface AgentUsageState {
-  assignment: AgentModelAssignment | null
-  running: boolean
+interface SessionTelemetry {
+  running?: boolean
   sessionTokens?: { input: number; output: number }
   sessionCost?: number
 }
 
+export type QuotaAccountUiState = 'ready' | 'unavailable' | 'quota-exhausted' | 'capacity-exhausted' | 'cooldown' | 'auth-error'
+
+export interface QuotaRow {
+  key: string
+  account?: ProviderAccountSnapshot
+  usage?: ProviderUsage
+  groups: ProviderQuotaGroup[]
+  state: QuotaAccountUiState
+  models: string[]
+  agents: Array<{ id: string; name: string; assignment: AgentModelAssignment; modelLabel?: string; input: number; output: number; cost: number }>
+  running: boolean
+}
+
+export function quotaAccountState(account: ProviderAccountSnapshot | undefined, now = Date.now()): QuotaAccountUiState {
+  if (!account) return 'unavailable'
+  if (account.error?.retryAt && account.error.retryAt > now) return 'cooldown'
+  if (account.usage?.resetAt && account.usage.resetAt > now && /quota exhausted|capacity exhausted/i.test(account.usage.unavailableReason ?? '')) return 'cooldown'
+  if (account.error?.kind === 'quota-exhausted' || account.usage?.unavailableReason?.toLowerCase().includes('quota exhausted')) return 'quota-exhausted'
+  if (account.error?.kind === 'capacity-exhausted' || account.usage?.unavailableReason?.toLowerCase().includes('capacity exhausted')) return 'capacity-exhausted'
+  if (account.error?.kind === 'auth' || account.usage?.unavailableReason?.toLowerCase().includes('authentication')) return 'auth-error'
+  if (!account.usage || account.usage.status === 'unavailable') return 'unavailable'
+  return 'ready'
+}
+
+export function buildQuotaRows(agents: QuotaAgent[], snapshot: ProviderSnapshot | null, telemetry: Record<string, SessionTelemetry>): QuotaRow[] {
+  if (!snapshot) return []
+  const grouped = new Map<string, QuotaRow>()
+  for (const agent of agents) {
+    const stored = snapshot.assignments.find(assignment => assignment.agentId === agent.id && assignment.status === 'ready')
+    if (!stored) continue
+    const assignment: AgentModelAssignment = { provider: stored.providerId, accountId: stored.accountId, model: stored.modelId, speed: stored.speed }
+    const key = stored.accountId ? `${stored.providerId}/${stored.accountId}` : `${stored.providerId}/${stored.modelId}`
+    const account = stored.accountId ? snapshot.accounts.find(item => item.id === stored.accountId && item.providerId === stored.providerId) : undefined
+    const current = grouped.get(key) ?? { key, account, usage: account?.usage, groups: [], state: quotaAccountState(account), models: [], agents: [], running: false }
+    const local = telemetry[agent.id]
+    const modelLabel = account?.models.find(model => model.id === stored.modelId)?.name
+    current.models.push(stored.modelId)
+    current.agents.push({ id: agent.id, name: agent.name, assignment, modelLabel, input: local?.sessionTokens?.input ?? 0, output: local?.sessionTokens?.output ?? 0, cost: local?.sessionCost ?? 0 })
+    current.running ||= local?.running ?? false
+    grouped.set(key, current)
+  }
+  return [...grouped.values()].map(row => {
+    const models = [...new Set(row.models)]
+    return { ...row, models, groups: chatQuotaGroups(row.usage, models) }
+  })
+}
+
+export function mergeAssignmentEvent(snapshot: ProviderSnapshot, event: AgentAssignmentSnapshot): ProviderSnapshot {
+  const current = snapshot.assignments.find(assignment => assignment.agentId === event.agentId)
+  if (current && current.revision > event.revision) return snapshot
+  return { ...snapshot, assignments: [...snapshot.assignments.filter(assignment => assignment.agentId !== event.agentId), event] }
+}
+
 export default function RightPanelQuota({ agents }: { agents: QuotaAgent[] }) {
-  const [states, setStates] = useState<Record<string, AgentUsageState>>({})
-  const [providerUsage, setProviderUsage] = useState<Record<string, ProviderUsage>>({})
+  const [snapshot, setSnapshot] = useState<ProviderSnapshot | null>(null)
+  const [telemetry, setTelemetry] = useState<Record<string, SessionTelemetry>>({})
   const snapshotRevision = useRef(0)
   const agentKey = agents.map(agent => agent.id).join('|')
 
-  const applySnapshot = (snapshot: ProviderSnapshot) => {
-    if (!shouldAcceptSnapshot(snapshotRevision.current, snapshot.revision)) return
-    snapshotRevision.current = snapshot.revision
-    setProviderUsage(Object.fromEntries(snapshot.accounts.filter(account => account.usage).map(account => [account.id, account.usage!])))
-    setStates(previous => Object.fromEntries(agents.map(agent => {
-      const stored = snapshot.assignments.find(assignment => assignment.agentId === agent.id)
-      const assignment = stored?.status === 'ready' ? { provider: stored.providerId, accountId: stored.accountId, model: stored.modelId, speed: stored.speed } : null
-      return [agent.id, { assignment, running: previous[agent.id]?.running ?? false, sessionTokens: previous[agent.id]?.sessionTokens, sessionCost: previous[agent.id]?.sessionCost }]
-    })))
+  const applySnapshot = (next: ProviderSnapshot) => {
+    if (!shouldAcceptSnapshot(snapshotRevision.current, next.revision)) return
+    snapshotRevision.current = next.revision
+    setSnapshot(next)
   }
 
   useEffect(() => {
     void window.api.getProviderSnapshot().then(applySnapshot)
     return window.api.onProviderSnapshotChanged(applySnapshot)
-  }, [agentKey])
+  }, [])
 
   useEffect(() => window.api.onAgentAssignmentChanged(event => {
-    if (!agents.some(agent => agent.id === event.agentId)) return
-    const assignment = event.status === 'ready' ? { provider: event.providerId, accountId: event.accountId, model: event.modelId, speed: event.speed } : null
-    setStates(previous => previous[event.agentId] ? { ...previous, [event.agentId]: { ...previous[event.agentId], assignment } } : previous)
-  }), [agentKey])
-
-  useEffect(() => {
-    const refreshAssignment = (event: Event) => {
-      const agentId = (event as CustomEvent<{ agentId?: string }>).detail?.agentId
-      if (!agentId || !agents.some(agent => agent.id === agentId)) return
-      void window.api.getProviderSnapshot().then(applySnapshot)
-    }
-    window.addEventListener('bs:model-changed', refreshAssignment)
-    return () => window.removeEventListener('bs:model-changed', refreshAssignment)
-  }, [agentKey])
+    setSnapshot(previous => previous ? mergeAssignmentEvent(previous, event) : previous)
+  }), [])
 
   useEffect(() => window.api.onChatEvent(event => {
     if (!agents.some(agent => agent.id === event.agentId)) return
     if (event.type === 'turn-started') {
-      setStates(previous => ({ ...previous, [event.agentId]: { ...(previous[event.agentId] ?? { assignment: null }), running: true } }))
+      setTelemetry(previous => ({ ...previous, [event.agentId]: { ...previous[event.agentId], running: true } }))
     } else if (event.type === 'done' || event.type === 'error') {
-      setStates(previous => ({ ...previous, [event.agentId]: { ...(previous[event.agentId] ?? { assignment: null }), running: false } }))
+      setTelemetry(previous => ({ ...previous, [event.agentId]: { ...previous[event.agentId], running: false } }))
     } else if (event.type === 'usage') {
-      setStates(previous => ({ ...previous, [event.agentId]: {
-        ...(previous[event.agentId] ?? { assignment: null, running: true }),
-        sessionTokens: event.sessionTokens,
-        sessionCost: event.sessionCost
-      } }))
+      setTelemetry(previous => ({ ...previous, [event.agentId]: { ...previous[event.agentId], running: true, sessionTokens: event.sessionTokens, sessionCost: event.sessionCost } }))
     }
   }), [agentKey])
 
-  const rows = useMemo(() => {
-    const grouped = new Map<string, { assignment: AgentModelAssignment; agents: Array<{ id: string; name: string; assignment: AgentModelAssignment; input: number; output: number; cost: number }>; models: Set<string>; running: boolean }>()
-    for (const agent of agents) {
-      const state = states[agent.id]
-      if (!state?.assignment) continue
-      const key = state.assignment.accountId
-        ? `${state.assignment.provider}/${state.assignment.accountId}`
-        : `${state.assignment.provider}/${state.assignment.model}`
-      const row = grouped.get(key) ?? { assignment: state.assignment, agents: [], models: new Set<string>(), running: false }
-      row.agents.push({ id: agent.id, name: agent.name, assignment: state.assignment, input: state.sessionTokens?.input ?? 0, output: state.sessionTokens?.output ?? 0, cost: state.sessionCost ?? 0 })
-      row.models.add(state.assignment.model)
-      row.running ||= state.running
-      grouped.set(key, row)
-    }
-    return [...grouped.entries()]
-  }, [agents, states])
+  const rows = useMemo(() => buildQuotaRows(agents, snapshot, telemetry), [agents, snapshot, telemetry])
 
   return (
     <section className="right-panel-quota" aria-label="Session model quota">
@@ -93,13 +110,19 @@ export default function RightPanelQuota({ agents }: { agents: QuotaAgent[] }) {
       </div>
       <div className="right-panel-quota-list">
         {rows.length === 0 && <span className="right-panel-quota-empty">No active model in this session</span>}
-        {rows.map(([key, row]) => {
-          const quota = row.assignment.accountId ? providerUsage[row.assignment.accountId] : undefined
-          return <QuotaAccountCard key={key} usage={quota} agents={row.agents} compact onSpeedChange={(agentId, speed) => {
-            setStates(previous => {
-              const current = previous[agentId]
-              return current?.assignment ? { ...previous, [agentId]: { ...current, assignment: { ...current.assignment, speed } } } : previous
-            })
+        {rows.map(row => {
+          const providerLabel = snapshot?.providers.find(provider => provider.id === row.account?.providerId)?.displayName
+          const usage = row.usage ?? {
+            accountId: row.account?.id ?? row.key,
+            accountLabel: row.account?.profile?.email ?? row.account?.label,
+            accountType: row.account?.authMode === 'oauth' ? 'oauth' as const : 'api-key' as const,
+            refreshedAt: row.account?.updatedAt ?? 0,
+            source: 'unavailable' as const,
+            status: 'unavailable' as const,
+            unavailableReason: row.account?.error?.message ?? 'Usage unavailable'
+          }
+          return <QuotaAccountCard key={row.key} usage={usage} agents={row.agents} compact providerLabel={providerLabel} providerState={row.state} onSpeedChange={(agentId, speed) => {
+            setSnapshot(previous => previous ? { ...previous, assignments: previous.assignments.map(assignment => assignment.agentId === agentId ? { ...assignment, speed } : assignment) } : previous)
             void window.api.setAgentSpeed(agentId, speed)
           }} />
         })}
