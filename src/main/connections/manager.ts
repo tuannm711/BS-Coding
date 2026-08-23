@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import type { ProviderConnection, ProviderUsage } from '../../shared/types'
 import { createPkce, listenForCallback } from './oauth'
-import { CODEX_REDIRECT_URI, codexAuthorizeUrl, decodeJwtProfile, exchangeCodexCode } from './codex'
+import { CODEX_REDIRECT_URI, codexAuthorizeUrl, decodeJwtProfile, exchangeCodexCode, mergeCodexAuthFile } from './codex'
 import { ProviderAccountStore } from './store'
 
 interface PendingLogin {
@@ -53,7 +53,6 @@ export class ProviderManager {
         oauthExpiresAt: tokens.expiresAt
       }, { accessToken: tokens.accessToken, refreshToken: tokens.refreshToken, idToken: tokens.idToken, accountId: profile.accountId })
       if (this.deps.codexAuthFile) {
-        const { mergeCodexAuthFile } = await import('./codex')
         mergeCodexAuthFile(this.deps.codexAuthFile, { ...tokens, accountId: profile.accountId }, this.deps.codexBackupFile)
       }
       this.deps.onAccountsChanged?.(this.list())

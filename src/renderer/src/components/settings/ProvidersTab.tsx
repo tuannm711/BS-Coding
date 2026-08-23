@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import type { CatalogProviderSummary, BsSettings } from '@shared/types'
+import { useEffect, useState } from 'react'
+import type { CatalogProviderSummary, BsSettings, ProviderConnection } from '@shared/types'
 import Modal from './Modal'
 
 interface Props {
@@ -22,8 +22,27 @@ export default function ProvidersTab({ settings, catalog, onChange }: Props) {
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [models, setModels] = useState<string[]>([])
   const [status, setStatus] = useState('')
+  const [accounts, setAccounts] = useState<ProviderConnection[]>([])
+  const [loginBusy, setLoginBusy] = useState(false)
 
   const connected = settings.providers
+
+  const refreshAccounts = async () => setAccounts(await window.api.listProviderAccounts())
+  useEffect(() => { void refreshAccounts() }, [])
+
+  const loginWithChatGpt = async () => {
+    setLoginBusy(true)
+    setStatus('')
+    try {
+      await window.api.startProviderLogin('openai')
+      setStatus('ChatGPT login started in your browser. Complete it to add the account.')
+      await refreshAccounts()
+    } catch (err) {
+      setStatus(String(err))
+    } finally {
+      setLoginBusy(false)
+    }
+  }
 
   const filtered = catalog.filter(c =>
     !search ||
@@ -92,6 +111,9 @@ export default function ProvidersTab({ settings, catalog, onChange }: Props) {
     <div className="settings-tab providers-tab">
       <div className="provider-actions">
         <button className="btn" onClick={openManual}>+ Connect provider</button>
+        <button className="btn" onClick={() => void loginWithChatGpt()} disabled={loginBusy}>
+          {loginBusy ? 'Opening ChatGPT…' : 'Sign in with ChatGPT'}
+        </button>
       </div>
       <p className="settings-hint">
         Find a provider below and enter your API key, or use "+ Connect provider". Models are synced
@@ -153,6 +175,17 @@ export default function ProvidersTab({ settings, catalog, onChange }: Props) {
                 {models.length > 0 ? models.map(m => <code key={m}>{m}</code>) : <span className="settings-hint">Loading models…</span>}
               </div>
             )}
+            {(accounts.find(c => c.providerId === p.id)?.accounts ?? []).map(account => (
+              <div className="provider-account-row" key={account.id}>
+                <span className={`mcp-dot ${account.status === 'active' ? 'connected' : ''}`} />
+                <span>{account.label}</span>
+                <span className="settings-hint">{account.authMode} · {account.status}</span>
+                <button className="btn small" onClick={() => void window.api.setProviderAccountEnabled(account.id, account.status !== 'active').then(refreshAccounts)}>
+                  {account.status === 'active' ? 'Disable' : 'Enable'}
+                </button>
+                <button className="btn small" onClick={() => void window.api.removeProviderAccount(account.id).then(refreshAccounts)}>Remove</button>
+              </div>
+            ))}
           </div>
         ))}
         {connected.length === 0 && <p className="settings-hint">No providers connected yet.</p>}
