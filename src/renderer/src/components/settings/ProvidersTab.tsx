@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { CatalogProviderSummary, BsSettings, ProviderConnection } from '@shared/types'
+import type { CatalogProviderSummary, BsSettings, ProviderConnection, ProviderSettings } from '@shared/types'
 import Modal from './Modal'
 
 interface Props {
@@ -26,9 +26,16 @@ export default function ProvidersTab({ settings, catalog, onChange }: Props) {
   const [loginBusy, setLoginBusy] = useState(false)
 
   const connected = settings.providers
+  const visibleProviders: ProviderSettings[] = [
+    ...connected,
+    ...accounts
+      .filter(connection => !connected.some(provider => provider.id === connection.providerId))
+      .map(connection => ({ id: connection.providerId, apiKey: '', models: [] } satisfies ProviderSettings))
+  ]
 
   const refreshAccounts = async () => setAccounts(await window.api.listProviderAccounts())
   useEffect(() => { void refreshAccounts() }, [])
+  useEffect(() => window.api.onProviderAccountsChanged(next => setAccounts(next)), [])
 
   const loginWithChatGpt = async () => {
     setLoginBusy(true)
@@ -152,7 +159,7 @@ export default function ProvidersTab({ settings, catalog, onChange }: Props) {
 
       <div className="provider-connected">
         <h4>Connected</h4>
-        {connected.map(p => (
+        {visibleProviders.map(p => (
           <div key={p.id}>
             <div className="provider-connected-row">
               <button className="provider-connected-toggle" onClick={() => void viewModels(p.id)}>

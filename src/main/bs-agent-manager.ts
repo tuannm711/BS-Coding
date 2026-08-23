@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { writeFileSync } from 'node:fs'
-import type { ChatEvent, ChatMessage, ChatTranscriptItem, ContextInfo, FileSuggestion, ImageAttachment, McpServerStatus, BsSettings, MessageTokens, ModelUsage, NotificationsSettings, PromptResponse, QueuedMessage, StatsSummary, TodoItem, TraceEvent, UsageSummary } from '../shared/types'
+import type { ChatEvent, ChatMessage, ChatTranscriptItem, ContextInfo, FileSuggestion, ImageAttachment, McpServerStatus, BsSettings, MessageTokens, ModelUsage, NotificationsSettings, PromptResponse, QueuedMessage, StatsSummary, TodoItem, TraceEvent, UsageSummary, ProviderConnection } from '../shared/types'
 import type { AgentConfig, AgentMode, ArtifactEntry, CatalogProviderSummary, Command, ModelRef, SubagentType } from '../shared/types'
 import {
   configToSettings, loadBsConfig, resolveAgentConfig, settingsToConfig, writeBsConfig,
@@ -63,6 +63,7 @@ export interface BsAgentManagerDeps {
   onBackgroundChange?: (agentId: string, background: boolean) => void
   onArtifact?: (entry: Omit<ArtifactEntry, 'id' | 'ts'>) => void
   notifications?: NotificationsSettings
+  providerAccounts?: () => ProviderConnection[]
 }
 
 export class BsAgentManager {
@@ -535,6 +536,13 @@ export class BsAgentManager {
     const refs: ModelRef[] = []
     for (const [provider, p] of Object.entries(cfg.provider)) {
       for (const model of p.models) refs.push({ provider, model })
+    }
+    const hasOAuth = this.deps.providerAccounts?.().some(connection =>
+      connection.providerId === 'openai' && connection.accounts.some(account => account.authMode === 'oauth' && account.status === 'active'))
+    if (hasOAuth) {
+      for (const model of ['gpt-5.2-codex', 'gpt-5.1-codex', 'gpt-5-codex', 'codex-mini-latest']) {
+        if (!refs.some(ref => ref.provider === 'openai' && ref.model === model)) refs.push({ provider: 'openai', model })
+      }
     }
     return refs
   }

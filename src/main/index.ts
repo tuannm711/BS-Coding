@@ -138,6 +138,7 @@ class MainApp {
     catalog: new ModelsCatalog(path.join(app.getPath('userData'), 'models.json')),
     commands: new CommandStore(path.join(app.getPath('userData'), 'commands.json')),
     lsp: new LspManager(),
+    providerAccounts: () => this.providerManager.list(),
     notify: new NotificationService(() => !win || !win.isFocused()),
     onActivateAgent: () => {
       if (!win) return
