@@ -102,6 +102,7 @@ export default function RightPanelQuota({ agents }: { agents: QuotaAgent[] }) {
 
 function formatQuota(usage?: ProviderUsage): string {
   if (!usage) return 'Unavailable'
+  if (usage.status === 'unavailable') return usage.unavailableReason ?? 'Unavailable'
   if (usage.primaryUsedPercent !== undefined) return `${usage.primaryUsedPercent}% used`
   if (usage.tokensUsed === undefined) return 'Unavailable'
   return `${usage.tokensUsed.toLocaleString()}${usage.tokenLimit ? ` / ${usage.tokenLimit.toLocaleString()}` : ''}`

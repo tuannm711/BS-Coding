@@ -108,14 +108,19 @@ export class ProviderManager {
     const secret = this.store.getSecret(account.id)
     if (!secret?.accessToken) return { accountId: account.id, refreshedAt: Date.now(), source: 'unavailable', status: 'unavailable', unavailableReason: 'OAuth access token unavailable' }
     try {
-      const headers: Record<string, string> = { authorization: `Bearer ${secret.accessToken}`, originator: 'codex_vscode', accept: 'application/json' }
+      const headers: Record<string, string> = { authorization: `Bearer ${secret.accessToken}`, originator: 'codex_vscode', 'user-agent': 'codex_vscode/0.146.0', accept: 'application/json' }
       if (secret.accountId) headers['ChatGPT-Account-ID'] = secret.accountId
-      const response = await fetch('https://chatgpt.com/backend-api/codex/usage', { headers })
-      if (!response.ok) return { accountId: account.id, refreshedAt: Date.now(), source: 'unavailable', status: 'unavailable', unavailableReason: `Quota request failed (${response.status})` }
-      const normalized = normalizeOpenAICodexUsage(account.id, await response.json())
-      account.usage = normalized
-      this.store.setUsage(account.id, normalized)
-      return normalized
+      const endpoints = ['https://chatgpt.com/backend-api/codex/usage', 'https://chatgpt.com/backend-api/wham/usage']
+      let lastStatus = 0
+      for (const endpoint of endpoints) {
+        const response = await fetch(endpoint, { headers })
+        if (!response.ok) { lastStatus = response.status; continue }
+        const normalized = normalizeOpenAICodexUsage(account.id, await response.json())
+        account.usage = normalized
+        this.store.setUsage(account.id, normalized)
+        return normalized
+      }
+      return { accountId: account.id, refreshedAt: Date.now(), source: 'unavailable', status: 'unavailable', unavailableReason: `Quota request failed (${lastStatus || 'network error'})` }
     } catch (error) {
       return { accountId: account.id, refreshedAt: Date.now(), source: 'unavailable', status: 'unavailable', unavailableReason: String(error) }
     }

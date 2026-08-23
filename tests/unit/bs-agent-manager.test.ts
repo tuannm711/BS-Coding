@@ -133,10 +133,10 @@ describe('BsAgentManager', () => {
     }]
     const { manager } = await makeManager({ providerAccounts })
     manager.setModel('a1', 'openai', 'gpt-5.5')
-    expect(manager.getAgentModel('a1')).toEqual({ provider: 'openai', model: 'gpt-5.5' })
-    expect(manager.getAgentAssignment('a1')).toMatchObject({ provider: 'openai', model: 'gpt-5.5', accountId: 'oauth-1' })
-    expect(manager.getProviderModels()).toContainEqual({ provider: 'openai', model: 'gpt-5.5' })
-    expect(manager.getProviderModels()).toContainEqual({ provider: 'openai', model: 'gpt-5.6' })
+    expect(manager.getAgentModel('a1')).toEqual({ provider: 'openai', model: 'gpt-5.6-sol' })
+    expect(manager.getAgentAssignment('a1')).toMatchObject({ provider: 'openai', model: 'gpt-5.6-sol', accountId: 'oauth-1' })
+    expect(manager.getProviderModels()).not.toContainEqual({ provider: 'openai', model: 'gpt-5.5' })
+    expect(manager.getProviderModels()).toContainEqual({ provider: 'openai', model: 'gpt-5.6-sol' })
   })
 
   it('seeds background state from the stored agent config on register', async () => {

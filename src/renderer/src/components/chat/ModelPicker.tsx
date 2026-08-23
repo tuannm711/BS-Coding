@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ModelRef } from '@shared/types'
+import { isOpenAiGenericModel } from '@shared/openai-oauth'
 
 interface Props {
   agentId: string
@@ -40,6 +41,7 @@ export default function ModelPicker({ agentId }: Props) {
     const q = search.trim().toLowerCase()
     const byProvider = new Map<string, string[]>()
     for (const m of models) {
+      if (m.provider === 'openai' && isOpenAiGenericModel(m.model)) continue
       if (q && !m.model.toLowerCase().includes(q) && !m.provider.toLowerCase().includes(q)) continue
       const list = byProvider.get(m.provider) ?? []
       list.push(m.model)

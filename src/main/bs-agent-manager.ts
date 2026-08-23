@@ -37,7 +37,7 @@ import type { NotificationService } from './notification-service'
 import type { Vault } from './vault'
 import { TraceStore } from './agent/trace-store'
 import type { TraceEventInput } from './agent/trace-store'
-import { OPENAI_OAUTH_MODELS, isActiveOpenAiOAuthAccount } from '../shared/openai-oauth'
+import { OPENAI_OAUTH_MODELS, isActiveOpenAiOAuthAccount, isOpenAiGenericModel, normalizeOpenAiCodexModel } from '../shared/openai-oauth'
 
 export interface BsAgentManagerDeps {
   configPath: string
@@ -480,6 +480,7 @@ export class BsAgentManager {
   setModel(agentId: string, provider: string, model: string): void {
     const agent = this.agents.get(agentId)
     if (!agent) return
+    if (provider === 'openai') model = normalizeOpenAiCodexModel(model)
     agent.model = `${provider}/${model}`
     this.agents.set(agentId, agent)
     this.runners.delete(agentId)
@@ -551,7 +552,10 @@ export class BsAgentManager {
     const cfg = loadBsConfig(this.deps.configPath)
     const refs: ModelRef[] = []
     for (const [provider, p] of Object.entries(cfg.provider)) {
-      for (const model of p.models) refs.push({ provider, model })
+      for (const model of p.models) {
+        if (provider === 'openai' && isOpenAiGenericModel(model)) continue
+        refs.push({ provider, model })
+      }
     }
     const hasOAuth = this.deps.providerAccounts?.().some(connection =>
       connection.accounts.some(account => isActiveOpenAiOAuthAccount(connection.providerId, account.authMode, account.status)))
@@ -1023,7 +1027,7 @@ export class BsAgentManager {
         ...cfg.provider,
         openai: {
           ...(current ?? {}),
-          models: [...new Set([...(current?.models ?? []), ...OPENAI_OAUTH_MODELS])]
+          models: [...new Set([...(current?.models ?? []).filter(model => !isOpenAiGenericModel(model)), ...OPENAI_OAUTH_MODELS])]
         }
       }
     }

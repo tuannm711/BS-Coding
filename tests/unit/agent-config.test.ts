@@ -113,6 +113,13 @@ describe('resolveAgentConfig', () => {
     expect(resolved.model).toBe('qwen')
   })
 
+  it('maps legacy unsupported ChatGPT gpt-5.6 assignment to a Codex model', () => {
+    const cfg = cfgWithProviders()
+    cfg.provider.openai.models = ['gpt-5.6-sol']
+    const resolved = resolveAgentConfig(cfg, 'bs', {}, 'openai/gpt-5.6')
+    expect(resolved.model).toBe('gpt-5.6-sol')
+  })
+
   it('uses a legacy agent.model provider reference', () => {
     const cfg = cfgWithProviders()
     cfg.agents.bs = { model: 'openai', systemPrompt: 'p' }

@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import type { AgentSettings, CompactionSettings, BsSettings, ModelRef, NotificationsSettings, PermissionRule, SubagentType } from '../../shared/types'
 import type { McpServerConfig } from './mcp/manager'
+import { normalizeOpenAiCodexModel } from '../../shared/openai-oauth'
 
 export type { PermissionRule }
 export type { McpServerConfig }
@@ -321,6 +322,7 @@ export function resolveAgentConfig(
       providerName = agent.model
     }
   }
+  if (providerName === 'openai' && modelName) modelName = normalizeOpenAiCodexModel(modelName)
   const provider = cfg.provider[providerName]
   if (!provider) {
     return { provider: '', model: '', accountId: agent.accountId, fallback: agent.fallback, apiKey: null, systemPrompt: agent.systemPrompt }

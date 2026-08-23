@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { CatalogProviderSummary, BsSettings, ProviderConnection, ProviderSettings, ProviderUsage } from '@shared/types'
-import { OPENAI_OAUTH_MODELS } from '@shared/openai-oauth'
+import { OPENAI_OAUTH_MODELS, isOpenAiGenericModel } from '@shared/openai-oauth'
 import Modal from './Modal'
 
 interface Props {
@@ -46,7 +46,7 @@ export default function ProvidersTab({ settings, catalog, onChange }: Props) {
     const oauth = accounts.find(c => c.providerId === 'openai')?.accounts.some(a => a.authMode === 'oauth' && a.status === 'active')
     if (!oauth) return
     const current = settings.providers.find(p => p.id === 'openai')
-    const models = [...new Set([...(current?.models ?? []), ...OPENAI_OAUTH_MODELS])]
+    const models = [...new Set([...(current?.models ?? []).filter(model => !isOpenAiGenericModel(model)), ...OPENAI_OAUTH_MODELS])]
     const unchanged = current?.models.length === models.length && current.models.every((model, index) => model === models[index])
     if (!current || !unchanged) {
       onChange({

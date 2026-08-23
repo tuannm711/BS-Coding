@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { AgentSettings, BsSettings, ModelRef, ProviderConnection, SubagentType } from '@shared/types'
-import { OPENAI_OAUTH_MODELS } from '@shared/openai-oauth'
+import { OPENAI_OAUTH_MODELS, isOpenAiGenericModel } from '@shared/openai-oauth'
 import Modal from './Modal'
 
 const SUBMODEL_ROLES = ['research', 'general', 'reviewer'] as const
@@ -30,10 +30,8 @@ export default function AgentsTab({ agents, providers, subagentModels, onChangeA
   }, [])
 
   const effectiveProviders = useMemo(() => {
-    const oauth = accounts.find(c => c.providerId === 'openai')?.accounts.some(a => a.authMode === 'oauth' && a.status === 'active')
-    if (!oauth) return providers
     const existing = providers.find(p => p.id === 'openai')
-    if (existing) return providers.map(p => p.id === 'openai' ? { ...p, models: [...new Set([...p.models, ...OPENAI_OAUTH_MODELS])] } : p)
+    if (existing) return providers.map(p => p.id === 'openai' ? { ...p, models: [...new Set([...p.models.filter(model => !isOpenAiGenericModel(model)), ...OPENAI_OAUTH_MODELS])] } : p)
     return [...providers, { id: 'openai', apiKey: '', models: [...OPENAI_OAUTH_MODELS] }]
   }, [accounts, providers])
 
