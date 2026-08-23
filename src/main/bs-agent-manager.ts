@@ -38,6 +38,7 @@ import type { Vault } from './vault'
 import { TraceStore } from './agent/trace-store'
 import type { TraceEventInput } from './agent/trace-store'
 import { OPENAI_OAUTH_MODELS, isActiveOpenAiOAuthAccount, isOpenAiGenericModel, normalizeOpenAiCodexModel } from '../shared/openai-oauth'
+import type { AgentAssignmentSnapshot } from '../shared/provider-state'
 
 export interface BsAgentManagerDeps {
   configPath: string
@@ -65,6 +66,7 @@ export interface BsAgentManagerDeps {
   onArtifact?: (entry: Omit<ArtifactEntry, 'id' | 'ts'>) => void
   notifications?: NotificationsSettings
   providerAccounts?: () => ProviderConnection[]
+  onAssignmentChanged?: (assignment: AgentAssignmentSnapshot) => void
 }
 
 export class BsAgentManager {
@@ -731,6 +733,10 @@ export class BsAgentManager {
     writeBsConfig(this.deps.configPath, cfg)
     this.deps = { ...this.deps, notifications: cfg.notifications }
     await this.reload()
+    for (const agent of this.agents.values()) {
+      const assignment = this.getAgentAssignment(agent.id)
+      if (assignment) this.deps.onAssignmentChanged?.({ agentId: agent.id, providerId: assignment.provider, accountId: assignment.accountId, modelId: assignment.model, speed: assignment.speed ?? 'standard', revision: Date.now(), status: 'ready' })
+    }
     return configToSettings(cfg)
   }
 

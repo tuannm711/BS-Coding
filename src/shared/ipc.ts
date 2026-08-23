@@ -5,6 +5,7 @@ import type {
   ProviderAccount, ProviderConnection, ProviderUsage, SessionSummary, StatsSummary, Template, TerminalInfo, TodoItem, TraceEvent, TraceSummary, UpdaterStatusEvent, WorkspaceRuntime, WorkspaceSummary
 } from './types'
 import type { BrowserStatusInfo, PairingInfo } from './browser-types'
+import type { AgentAssignmentSnapshot } from './provider-state'
 import type { RemoteStatus } from './remote-types'
 import type { ProviderCapability, ProviderConnectRequest, ProviderConnectResult } from './providers'
 
@@ -199,6 +200,7 @@ export interface AgentApi {
   refreshProviderUsage(providerId?: string, accountId?: string): Promise<ProviderUsage[]>
   onProviderAccountsChanged(cb: (e: ProviderConnection[]) => void): () => void
   onProviderUsage(cb: (e: ProviderUsage) => void): () => void
+  onAgentAssignmentChanged(cb: (e: AgentAssignmentSnapshot) => void): () => void
   listTemplates(): Promise<Template[]>
   saveTemplate(template: Template): Promise<Template>
   removeTemplate(id: string): Promise<void>

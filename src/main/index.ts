@@ -147,6 +147,7 @@ class MainApp {
     commands: new CommandStore(path.join(app.getPath('userData'), 'commands.json')),
     lsp: new LspManager(),
     providerAccounts: () => this.providerManager.list(),
+    onAssignmentChanged: (assignment) => win?.webContents.send(Channels.EventAgentAssignmentChanged, assignment),
     notify: new NotificationService(() => !win || !win.isFocused()),
     onActivateAgent: () => {
       if (!win) return

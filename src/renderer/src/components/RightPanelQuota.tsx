@@ -33,6 +33,13 @@ export default function RightPanelQuota({ agents }: { agents: QuotaAgent[] }) {
     return () => { cancelled = true }
   }, [agentKey])
 
+  useEffect(() => window.api.onAgentAssignmentChanged(event => {
+    if (!agents.some(agent => agent.id === event.agentId)) return
+    void window.api.getAgentAssignment(event.agentId).then(assignment => {
+      setStates(previous => previous[event.agentId] ? { ...previous, [event.agentId]: { ...previous[event.agentId], assignment } } : previous)
+    })
+  }), [agentKey])
+
   useEffect(() => {
     const refreshAssignment = (event: Event) => {
       const agentId = (event as CustomEvent<{ agentId?: string }>).detail?.agentId

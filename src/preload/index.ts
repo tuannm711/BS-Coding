@@ -6,6 +6,7 @@ import type { AgentApi, AgentConfigEvent, AgentStateEvent, BrowserInstallGuideEv
 import type { BrowserStatusInfo } from '../shared/browser-types'
 import type { RemoteStatus } from '../shared/remote-types'
 import type { ProviderConnectRequest } from '../shared/providers'
+import type { AgentAssignmentSnapshot } from '../shared/provider-state'
 
 function subscribe<T>(channel: string, cb: (e: T) => void): () => void {
   const listener = (_event: unknown, payload: T) => cb(payload)
@@ -158,6 +159,7 @@ const api: AgentApi = {
   onProviderAccountsChanged: (cb: (e: ProviderConnection[]) => void) =>
     subscribe(Channels.EventProviderAccountsChanged, cb),
   onProviderUsage: (cb: (e: ProviderUsage) => void) => subscribe(Channels.EventProviderUsage, cb),
+  onAgentAssignmentChanged: (cb: (e: AgentAssignmentSnapshot) => void) => subscribe(Channels.EventAgentAssignmentChanged, cb),
   getBrowserStatus: () => ipcRenderer.invoke(Channels.BrowserGetStatus),
   pairBrowser: () => ipcRenderer.invoke(Channels.BrowserPair),
   openBrowserInstallGuide: () => ipcRenderer.invoke(Channels.BrowserOpenInstallGuide),
