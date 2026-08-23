@@ -28,13 +28,47 @@ interface CloudCodeQuotaGroup {
   buckets?: CloudCodeQuotaBucket[]
 }
 
+interface CanonicalAntigravityModel {
+  id: string
+  displayName: string
+  modelConstant: string
+  aliases: string[]
+}
+
+const CANONICAL_MODELS: CanonicalAntigravityModel[] = [
+  { id: 'gemini-3.1-pro-high', displayName: 'Gemini 3.1 Pro (High)', modelConstant: 'MODEL_PLACEHOLDER_M37', aliases: ['gemini-3-pro-high', 'MODEL_PLACEHOLDER_M8'] },
+  { id: 'gemini-3.1-pro-low', displayName: 'Gemini 3.1 Pro (Low)', modelConstant: 'MODEL_PLACEHOLDER_M36', aliases: ['gemini-3-pro-low', 'MODEL_PLACEHOLDER_M7'] },
+  { id: 'gemini-3-flash', displayName: 'Gemini 3 Flash', modelConstant: 'MODEL_PLACEHOLDER_M18', aliases: [] },
+  { id: 'claude-sonnet-4-6', displayName: 'Claude Sonnet 4.6 (Thinking)', modelConstant: 'MODEL_PLACEHOLDER_M35', aliases: ['claude-sonnet-4-6-thinking', 'claude-sonnet-4-5', 'claude-sonnet-4-5-thinking'] },
+  { id: 'claude-opus-4-6-thinking', displayName: 'Claude Opus 4.6 (Thinking)', modelConstant: 'MODEL_PLACEHOLDER_M26', aliases: ['claude-opus-4-6', 'claude-opus-4-5-thinking', 'MODEL_PLACEHOLDER_M12'] },
+  { id: 'gpt-oss-120b-medium', displayName: 'GPT-OSS 120B (Medium)', modelConstant: 'MODEL_OPENAI_GPT_OSS_120B_MEDIUM', aliases: [] }
+]
+
+const CANONICAL_BY_ALIAS = new Map(CANONICAL_MODELS.flatMap(model =>
+  [model.id, model.displayName, model.modelConstant, ...model.aliases].map(alias => [normalizeIdentity(alias), model] as const)
+))
+
 export function parseAntigravityModels(payload: unknown): ProviderModel[] {
   const models = (payload as { models?: Record<string, CloudCodeModel> })?.models ?? {}
-  return Object.entries(models).map(([key, value]) => ({ id: value.model ?? key, runtimeId: key, name: value.displayName ?? key, capabilities: { isCodeModel: true, supportsStreaming: true, supportsTools: true } }))
+  return Object.entries(models).map(([key, value]) => {
+    const canonical = resolveCanonicalModel(key, value.model, value.displayName)
+    const transportId = [key, value.model].find(candidate => candidate && /^MODEL_/i.test(candidate))
+      ?? key
+    const persistedCandidate = [value.model, key].find(candidate => candidate && !/^MODEL_/i.test(candidate))
+      ?? value.model
+      ?? key
+    return {
+      id: canonical?.id ?? canonicalAntigravityModelId(persistedCandidate),
+      runtimeId: transportId,
+      name: value.displayName ?? canonical?.displayName ?? persistedCandidate,
+      capabilities: { isCodeModel: true, supportsStreaming: true, supportsTools: true }
+    }
+  })
 }
 
 export function canonicalAntigravityModelId(id: string): string {
-  return id.trim()
+  const trimmed = id.trim()
+  return CANONICAL_BY_ALIAS.get(normalizeIdentity(trimmed))?.id ?? trimmed
 }
 
 export function antigravityQuotaGroupForModel(id: string): 'gemini' | 'claude-gpt' | undefined {
@@ -167,4 +201,17 @@ function earliestReset(values: Array<number | undefined>): number | undefined {
 
 function fractionPercent(fraction: number): number {
   return Math.round(Math.max(0, Math.min(1, fraction)) * 10_000) / 100
+}
+
+function normalizeIdentity(value: string): string {
+  return value.trim().toLowerCase().replace(/[^a-z0-9]/g, '')
+}
+
+function resolveCanonicalModel(...identities: Array<string | undefined>): CanonicalAntigravityModel | undefined {
+  for (const identity of identities) {
+    if (!identity) continue
+    const found = CANONICAL_BY_ALIAS.get(normalizeIdentity(identity))
+    if (found) return found
+  }
+  return undefined
 }
