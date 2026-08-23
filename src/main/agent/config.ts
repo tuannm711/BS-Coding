@@ -18,6 +18,8 @@ export interface BsProviderConfig {
 export interface BsAgentConfig {
   provider?: string
   model?: string
+  accountId?: string
+  fallback?: Array<{ provider: string; accountId?: string; model: string }>
   systemPrompt: string
 }
 
@@ -142,6 +144,7 @@ function normalizeProvider(raw: RawProvider): BsProviderConfig {
   return {
     apiKeyEnv: raw.apiKeyEnv,
     apiKey: raw.apiKey,
+    keyRef: raw.keyRef,
     baseUrl: raw.baseUrl,
     models
   }
@@ -159,6 +162,11 @@ function normalizeAgents(raw: Record<string, unknown> | undefined): Record<strin
     out[name] = {
       provider: typeof v.provider === 'string' ? v.provider : (isProviderRef ? legacyModel : undefined),
       model: typeof v.model === 'string' && !isProviderRef ? v.model : undefined,
+      accountId: typeof v.accountId === 'string' ? v.accountId : undefined,
+      fallback: Array.isArray(v.fallback)
+        ? v.fallback.filter((f): f is { provider: string; accountId?: string; model: string } =>
+          typeof f === 'object' && f !== null && typeof (f as Record<string, unknown>).provider === 'string' && typeof (f as Record<string, unknown>).model === 'string')
+        : undefined,
       systemPrompt: typeof v.systemPrompt === 'string' ? v.systemPrompt : (base[name]?.systemPrompt ?? base.bs.systemPrompt)
     }
   }
@@ -339,7 +347,9 @@ export function configToSettings(cfg: BsConfig): BsSettings {
       name,
       systemPrompt: a.systemPrompt,
       provider: a.provider,
-      model: a.model
+      model: a.model,
+      accountId: a.accountId,
+      fallback: a.fallback
     })),
     permission: cfg.permission,
     mcp: cfg.mcp,
@@ -374,6 +384,8 @@ export function settingsToConfig(settings: BsSettings, base: BsConfig = DEFAULT_
     agents[a.name.trim()] = {
       provider: a.provider,
       model: a.model,
+      accountId: a.accountId,
+      fallback: a.fallback,
       systemPrompt: a.systemPrompt
     }
   }
