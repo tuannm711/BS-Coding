@@ -11,6 +11,8 @@ import { antigravityAuthorizeUrl, exchangeAntigravityCode, fetchAntigravityProfi
 import type { LlmClient } from '../agent/llm'
 import { buildProviderSnapshot } from './snapshot'
 import type { ProviderSnapshot } from '../../shared/provider-state'
+import { parseAntigravityUsage } from '../providers/antigravity-models'
+import { refreshAntigravityToken } from '../providers/auth/antigravity-oauth'
 
 interface PendingLogin {
   providerId: string
@@ -253,19 +255,19 @@ export class ProviderManager {
     const secret = this.store.getSecret(account.id)
     if (!secret?.accessToken) return { accountId: account.id, ...metadata, refreshedAt: Date.now(), source: 'unavailable', status: 'unavailable', unavailableReason: 'OAuth access token unavailable' }
     try {
-      const response = await fetch('https://cloudcode-pa.googleapis.com/v1internal:fetchAvailableModels', {
+      let response = await fetch('https://cloudcode-pa.googleapis.com/v1internal:fetchAvailableModels', {
         method: 'POST',
         headers: { authorization: `Bearer ${secret.accessToken}`, 'content-type': 'application/json', 'user-agent': 'antigravity/1.15.8 windows/amd64' },
         body: JSON.stringify({})
       })
+      if ((response.status === 401 || response.status === 403) && secret.refreshToken) {
+        const refreshed = await refreshAntigravityToken(secret.refreshToken)
+        this.store.upsert({ ...account, oauthExpiresAt: refreshed.expiresAt }, refreshed)
+        response = await fetch('https://cloudcode-pa.googleapis.com/v1internal:fetchAvailableModels', { method: 'POST', headers: { authorization: `Bearer ${refreshed.accessToken}`, 'content-type': 'application/json', 'user-agent': 'antigravity/1.15.8 windows/amd64' }, body: '{}' })
+      }
       const raw = await response.text()
       if (!response.ok) return { accountId: account.id, ...metadata, refreshedAt: Date.now(), source: 'unavailable', status: response.status === 429 ? 'near-limit' : 'unavailable', unavailableReason: `Quota request failed (${response.status})` }
-      const parsed = JSON.parse(raw) as { models?: Record<string, { quotaInfo?: { remainingFraction?: number; resetTime?: string } }> }
-      const quotas = Object.values(parsed.models ?? {}).map(item => item.quotaInfo).filter((item): item is NonNullable<typeof item> => Boolean(item?.remainingFraction !== undefined))
-      if (quotas.length === 0) return { accountId: account.id, ...metadata, refreshedAt: Date.now(), source: 'unavailable', status: 'unavailable', unavailableReason: 'No quota data returned by Cloud Code' }
-      const remaining = Math.max(0, Math.min(...quotas.map(item => item.remainingFraction ?? 0)))
-      const resetAt = quotas.map(item => item.resetTime ? Date.parse(item.resetTime) : 0).filter(Boolean).sort((a, b) => a - b)[0]
-      const normalized: ProviderUsage = { accountId: account.id, ...metadata, refreshedAt: Date.now(), source: 'provider', status: remaining <= 0 ? 'near-limit' : remaining <= 0.2 ? 'near-limit' : 'ok', primaryUsedPercent: (1 - remaining) * 100, resetAt: resetAt || undefined, planName: account.profile?.planName }
+      const normalized = parseAntigravityUsage(account.id, JSON.parse(raw), { ...metadata, planName: account.profile?.planName })
       account.usage = normalized
       this.store.setUsage(account.id, normalized)
       return normalized

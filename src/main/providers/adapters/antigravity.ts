@@ -1,5 +1,6 @@
 import type { ProviderAdapter } from '../types'
 import { createAntigravityLlm } from '../../agent/antigravity-llm'
+import { parseAntigravityModels } from '../antigravity-models'
 
 const ANTIGRAVITY_CODE_MODELS = [
   { id: 'gemini-3.1-pro-high', name: 'Gemini 3.1 Pro (High)' },
@@ -22,7 +23,14 @@ export function createAntigravityAdapter(): ProviderAdapter {
       status: 'experimental'
     },
     async connect() { throw new Error('[bs] Antigravity OAuth phải được bắt đầu qua login session') },
-    async listModels() {
+    async listModels(_account, secret) {
+      if (secret.accessToken) {
+        const response = await fetch('https://cloudcode-pa.googleapis.com/v1internal:fetchAvailableModels', { method: 'POST', headers: { authorization: `Bearer ${secret.accessToken}`, 'content-type': 'application/json', 'user-agent': 'antigravity/1.15.8 windows/amd64' }, body: '{}' })
+        if (response.ok) {
+          const discovered = parseAntigravityModels(await response.json())
+          if (discovered.length > 0) return discovered
+        }
+      }
       return ANTIGRAVITY_CODE_MODELS.map(model => ({ ...model, capabilities: { isCodeModel: true, supportsStreaming: true, supportsTools: true } }))
     },
     createClient(_account, secret) {
