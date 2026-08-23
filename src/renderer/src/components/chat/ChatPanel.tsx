@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import { ChevronDown } from 'lucide-react'
-import type { AgentMode, ChatEvent, ChatMessage, Command, ImageAttachment, QuestionOption, QueuedMessage, SessionSummary, TodoItem, TodoStatus, ToolCallData } from '@shared/types'
+import type { AgentConfig, AgentMode, ChatEvent, ChatMessage, Command, ImageAttachment, QuestionOption, QueuedMessage, SessionSummary, TodoItem, TodoStatus, ToolCallData } from '@shared/types'
 import { appendStreamDelta } from '@shared/text'
 import { contextTokens } from '@shared/usage'
 import ChatInput from './ChatInput'
@@ -101,7 +101,8 @@ const FeedMessage = memo(function FeedMessage({ role, text, reasoning, images, c
 
 interface Props {
   agentId: string
-  agentName?: string
+  agents: AgentConfig[]
+  onAgentChange: (agentId: string) => void
   cwd: string
   mode?: AgentMode
   variant?: string
@@ -109,7 +110,7 @@ interface Props {
   onVariantChange?: (variant: string | undefined) => void
 }
 
-function ChatPanel({ agentId, agentName = 'bs', cwd, mode = 'build', variant, onModeChange, onVariantChange }: Props) {
+function ChatPanel({ agentId, agents, onAgentChange, cwd, mode = 'build', variant, onModeChange, onVariantChange }: Props) {
   const [items, setItems] = useState<FeedItem[]>([])
   const [running, setRunning] = useState(false)
   const [currentMode, setCurrentMode] = useState<AgentMode>(mode)
@@ -150,6 +151,7 @@ function ChatPanel({ agentId, agentName = 'bs', cwd, mode = 'build', variant, on
   const deltaBufRef = useRef<{ text: string; reasoning: string }>({ text: '', reasoning: '' })
   const rafRef = useRef<number | null>(null)
   const pinRafRef = useRef<number | null>(null)
+  const pinningToEndRef = useRef(false)
   const prevLastIdRef = useRef<string | null>(null)
   const stuckRef = useRef(true)
   const [showJumpToEnd, setShowJumpToEnd] = useState(false)
@@ -268,6 +270,7 @@ function ChatPanel({ agentId, agentName = 'bs', cwd, mode = 'build', variant, on
   const onFeedScroll = useCallback(() => {
     const el = feedRef.current
     if (!el) return
+    if (pinningToEndRef.current) return
     // Stay glued to the bottom unless the user scrolls up to read history.
     const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80
     stuckRef.current = atBottom
@@ -304,10 +307,16 @@ function ChatPanel({ agentId, agentName = 'bs', cwd, mode = 'build', variant, on
       // every frame for a while (or until the user scrolls up) to land at the
       // real end of the feed when opening a project/session.
       let frames = 0
+      pinningToEndRef.current = true
       const pin = () => {
-        if (!stuckRef.current) return
         feed.scrollTop = feed.scrollHeight
-        if (frames++ < 60) pinRafRef.current = requestAnimationFrame(pin)
+        if (frames++ < 60) {
+          pinRafRef.current = requestAnimationFrame(pin)
+        } else {
+          pinningToEndRef.current = false
+          stuckRef.current = true
+          setShowJumpToEnd(false)
+        }
       }
       pin()
       pinRafRef.current = requestAnimationFrame(pin)
@@ -354,6 +363,7 @@ function ChatPanel({ agentId, agentName = 'bs', cwd, mode = 'build', variant, on
   useEffect(() => () => {
     if (rafRef.current != null) cancelAnimationFrame(rafRef.current)
     if (pinRafRef.current != null) cancelAnimationFrame(pinRafRef.current)
+    pinningToEndRef.current = false
   }, [])
 
   // Close the subagent live popup on Escape only (backdrop click no longer closes).
@@ -975,7 +985,7 @@ if (e.type === 'usage') {
           </button>
           {currentMode === 'plan' && <span className="chat-mode-hint">read-only — edits denied</span>}
           <div className="chat-mode-tools">
-            <AgentPicker agentId={agentId} currentName={agentName} />
+            <AgentPicker agents={agents} value={agentId} onChange={onAgentChange} />
             {availableVariants.length > 0 && (
               <VariantPicker
                 variants={availableVariants}

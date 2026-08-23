@@ -5,9 +5,12 @@ import XtermHost from './XtermHost'
 import PaneHeader from './PaneHeader'
 import ChatPanel from './chat/ChatPanel'
 import TracePanel from './trace/TracePanel'
+import type { AgentConfig } from '@shared/types'
 
 interface Props {
   pane: PaneModel
+  nativeAgents: AgentConfig[]
+  onSelectNativeAgent: (agentId: string) => void
   background: boolean
   isTerminal: boolean
   zoomed: boolean
@@ -20,7 +23,7 @@ interface Props {
 }
 
 export default function Pane({
-  pane, background, isTerminal, zoomed, active, onFocus, onZoom, onRemove, onRegisterTerminal, onUnregisterTerminal
+  pane, nativeAgents, onSelectNativeAgent, background, isTerminal, zoomed, active, onFocus, onZoom, onRemove, onRegisterTerminal, onUnregisterTerminal
 }: Props) {
   const id = pane.agent.id
   const write = (data: string) => void window.api.writeInput(id, data)
@@ -86,8 +89,10 @@ export default function Pane({
             <TracePanel agentId={id} />
           ) : (
             <ChatPanel
+              key={id}
               agentId={id}
-              agentName={pane.agent.name}
+              agents={nativeAgents}
+              onAgentChange={onSelectNativeAgent}
               cwd={pane.agent.cwd}
               mode={pane.agent.mode ?? 'build'}
               variant={pane.agent.variant}
