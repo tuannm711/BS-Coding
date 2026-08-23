@@ -33,6 +33,18 @@ export default function RightPanelQuota({ agents }: { agents: QuotaAgent[] }) {
     return () => { cancelled = true }
   }, [agentKey])
 
+  useEffect(() => {
+    const refreshAssignment = (event: Event) => {
+      const agentId = (event as CustomEvent<{ agentId?: string }>).detail?.agentId
+      if (!agentId || !agents.some(agent => agent.id === agentId)) return
+      void window.api.getAgentAssignment(agentId).then(assignment => {
+        setStates(previous => previous[agentId] ? { ...previous, [agentId]: { ...previous[agentId], assignment } } : previous)
+      })
+    }
+    window.addEventListener('bs:model-changed', refreshAssignment)
+    return () => window.removeEventListener('bs:model-changed', refreshAssignment)
+  }, [agentKey])
+
   useEffect(() => window.api.onChatEvent(event => {
     if (!agents.some(agent => agent.id === event.agentId)) return
     if (event.type === 'turn-started') {

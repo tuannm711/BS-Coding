@@ -984,7 +984,7 @@ export class BsAgentManager {
   }
 
   private resolveAgentConfig(cfg: BsConfig, agentName: string, agentModel?: string): ResolvedAgentConfig {
-    cfg = this.materializeOAuthProviders(cfg)
+    cfg = this.materializeConnectedProviders(cfg)
     const resolved = resolveAgentConfig(
       cfg,
       agentName,
@@ -994,8 +994,10 @@ export class BsAgentManager {
     )
     const agent = [...this.agents.values()].find(a => a.name === agentName)
     if (agent?.accountId) resolved.accountId = agent.accountId
-    if (resolved.provider && !resolved.accountId) {
-      const active = this.deps.providerAccounts?.().find(c => c.providerId === resolved.provider)?.accounts.find(a => a.status === 'active')
+    if (resolved.provider) {
+      const connection = this.deps.providerAccounts?.().find(c => c.providerId === resolved.provider)
+      const selected = resolved.accountId ? connection?.accounts.find(account => account.id === resolved.accountId && account.status === 'active') : undefined
+      const active = selected ?? connection?.accounts.find(account => account.status === 'active')
       if (active) resolved.accountId = active.id
     }
     this.applyAccountCredentials(resolved)
@@ -1013,6 +1015,12 @@ export class BsAgentManager {
       if (secret.accessToken && account.providerId === 'openai') {
         resolved.apiKey = secret.accessToken
         resolved.baseUrl = 'https://chatgpt.com/backend-api/codex'
+      } else if (secret.accessToken) {
+        // OAuth-backed providers expose their bearer token through the same
+        // client credential slot as API-key providers. Provider adapters can
+        // then apply provider-specific transport/authentication.
+        resolved.apiKey = secret.accessToken
+        resolved.baseUrl = secret.baseUrl ?? resolved.baseUrl
       } else if (secret.apiKey) {
         resolved.apiKey = secret.apiKey
         resolved.baseUrl = secret.baseUrl ?? resolved.baseUrl
@@ -1055,6 +1063,18 @@ export class BsAgentManager {
         }
       }
     }
+  }
+
+  private materializeConnectedProviders(cfg: BsConfig): BsConfig {
+    const nextProviders = { ...cfg.provider }
+    for (const connection of this.deps.providerAccounts?.() ?? []) {
+      const activeModels = connection.accounts.filter(account => account.status === 'active').flatMap(account => account.models ?? [])
+      if (activeModels.length === 0) continue
+      const current = nextProviders[connection.providerId]
+      nextProviders[connection.providerId] = { ...(current ?? {}), models: [...new Set([...(current?.models ?? []), ...activeModels])] }
+    }
+    const next = { ...cfg, provider: nextProviders }
+    return this.materializeOAuthProviders(next)
   }
 
   private priceFor(provider: string, model: string): ModelPrice | undefined {

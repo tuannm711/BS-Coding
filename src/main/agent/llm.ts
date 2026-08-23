@@ -7,6 +7,7 @@ import type { MessageTokens } from '../../shared/types'
 import { normalizeToolInput, toToolDefinition } from './message'
 import type { ToolDefinition } from './tools/types'
 import { OpenAIResponsesClient } from './openai-responses'
+import { createAntigravityLlm } from './antigravity-llm'
 
 export interface LlmStreamPart {
   kind: 'text' | 'reasoning' | 'tool-call' | 'finish' | 'error'
@@ -134,6 +135,9 @@ export function createOpenAICompatibleLlm(opts: { apiKey: string; baseUrl?: stri
 }
 
 export function createLlm(provider: string, apiKey: string, baseUrl?: string, headers?: Record<string, string>): LlmClient {
+  if (provider === 'antigravity') {
+    return createAntigravityLlm(apiKey, baseUrl)
+  }
   if (provider === 'openai' && (!baseUrl || /api\.openai\.com\/v1\/?$/.test(baseUrl) || /chatgpt\.com\/backend-api\/codex\/?$/.test(baseUrl))) {
     return new OpenAIResponsesClient({ apiKey, baseUrl, headers })
   }

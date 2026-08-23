@@ -410,6 +410,10 @@ class MainApp {
   }
 
   private async prepareWorkspace(ws: Workspace): Promise<void> {
+    // Hydrate OAuth account model catalogs before native agents resolve their
+    // provider/model assignments. This also migrates accounts created by older
+    // builds to the current provider model list on the first workspace open.
+    await this.providerManager.refreshModels()
     await this.bsAgent.init(ws.agents)
     await Promise.all(ws.agents.map(a => this.startAgent(a.id)))
   }

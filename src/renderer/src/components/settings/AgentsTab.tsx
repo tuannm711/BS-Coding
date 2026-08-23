@@ -127,7 +127,11 @@ export default function AgentsTab({ agents, providers, subagentModels, onChangeA
               <select
                 className="input"
                 value={a.accountId ?? ''}
-                onChange={e => updateAgent(i, { accountId: e.target.value || undefined })}
+                onChange={e => {
+                  const accountId = e.target.value || undefined
+                  const models = effectiveProviders.find(p => p.id === a.provider)?.models ?? []
+                  updateAgent(i, { accountId, model: a.model && models.includes(a.model) ? a.model : models[0] })
+                }}
               >
                 <option value="">(active {a.provider} account)</option>
                 {(accounts.find(c => c.providerId === a.provider)?.accounts ?? []).filter(account => account.status === 'active').map(account => (
