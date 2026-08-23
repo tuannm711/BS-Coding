@@ -108,14 +108,27 @@ export class ProviderManager {
     const secret = this.store.getSecret(account.id)
     if (!secret?.accessToken) return { accountId: account.id, refreshedAt: Date.now(), source: 'unavailable', status: 'unavailable', unavailableReason: 'OAuth access token unavailable' }
     try {
-      const headers: Record<string, string> = { authorization: `Bearer ${secret.accessToken}`, originator: 'codex_vscode', 'user-agent': 'codex_vscode/0.146.0', accept: 'application/json' }
+      const headers: Record<string, string> = {
+        authorization: `Bearer ${secret.accessToken}`,
+        originator: 'codex_vscode',
+        'user-agent': 'codex_vscode/0.146.0',
+        accept: 'application/json',
+        origin: 'https://chatgpt.com',
+        referer: 'https://chatgpt.com/'
+      }
       if (secret.accountId) headers['ChatGPT-Account-ID'] = secret.accountId
-      const endpoints = ['https://chatgpt.com/backend-api/codex/usage', 'https://chatgpt.com/backend-api/wham/usage']
+      const endpoints = ['https://chatgpt.com/backend-api/wham/usage', 'https://chatgpt.com/backend-api/codex/usage']
       let lastStatus = 0
       for (const endpoint of endpoints) {
         const response = await fetch(endpoint, { headers })
-        if (!response.ok) { lastStatus = response.status; continue }
-        const normalized = normalizeOpenAICodexUsage(account.id, await response.json())
+        const body = await response.text()
+        if (!response.ok) {
+          lastStatus = response.status
+          continue
+        }
+        let parsed: unknown
+        try { parsed = JSON.parse(body) } catch { return { accountId: account.id, refreshedAt: Date.now(), source: 'unavailable', status: 'unavailable', unavailableReason: 'Quota response was not valid JSON' } }
+        const normalized = normalizeOpenAICodexUsage(account.id, parsed)
         account.usage = normalized
         this.store.setUsage(account.id, normalized)
         return normalized

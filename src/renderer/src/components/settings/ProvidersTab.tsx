@@ -276,7 +276,8 @@ function formatAccountQuota(usage?: ProviderUsage): string {
     ? ` · banked ${usage.secondaryUsedPercent}% used`
     : usage.bankedUsed !== undefined ? ` · banked ${usage.bankedUsed.toLocaleString()}${usage.bankedLimit ? ` / ${usage.bankedLimit.toLocaleString()}` : ''}` : ''
   const reset = usage.resetAt ? ` · reset ${formatCountdown(usage.resetAt)}` : ''
-  return `${primary}${banked}${reset}`
+  const bankedReset = usage.secondaryResetAt ? ` · banked reset ${formatCountdown(usage.secondaryResetAt)}` : ''
+  return `${usage.planName ? `${usage.planName} · ` : ''}${primary}${banked}${reset}${bankedReset}`
 }
 
 function formatCountdown(resetAt: number): string {

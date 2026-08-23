@@ -90,7 +90,7 @@ export default function RightPanelQuota({ agents }: { agents: QuotaAgent[] }) {
               <div className="right-panel-quota-meta">
                 <span>{row.agents.join(', ')}</span>
                 <span>{row.input.toLocaleString()} in · {row.output.toLocaleString()} out</span>
-                <span>Quota {formatQuota(quota)} · Reset {quota?.resetAt ? formatCountdown(quota.resetAt) : '—'}{quota?.secondaryUsedPercent !== undefined ? ` · banked ${quota.secondaryUsedPercent}% used` : quota?.bankedUsed !== undefined ? ` · banked ${quota.bankedUsed.toLocaleString()}${quota.bankedLimit ? ` / ${quota.bankedLimit.toLocaleString()}` : ''}` : ''}</span>
+                <span>{quota?.planName ? `${quota.planName} · ` : ''}Quota {formatQuota(quota)} · Reset {quota?.resetAt ? formatCountdown(quota.resetAt) : '—'}{quota?.secondaryUsedPercent !== undefined ? ` · banked ${quota.secondaryUsedPercent}% used` : quota?.bankedUsed !== undefined ? ` · banked ${quota.bankedUsed.toLocaleString()}${quota.bankedLimit ? ` / ${quota.bankedLimit.toLocaleString()}` : ''}` : ''}{quota?.secondaryResetAt ? ` · banked reset ${formatCountdown(quota.secondaryResetAt)}` : ''}</span>
               </div>
             </div>
           )

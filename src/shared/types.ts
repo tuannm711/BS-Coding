@@ -244,6 +244,7 @@ export interface ProviderUsage {
   periodStart?: number
   periodEnd?: number
   resetAt?: number
+  secondaryResetAt?: number
   requestsUsed?: number
   requestLimit?: number
   tokensUsed?: number
@@ -252,6 +253,7 @@ export interface ProviderUsage {
   bankedLimit?: number
   primaryUsedPercent?: number
   secondaryUsedPercent?: number
+  planName?: string
   subscriptionExpiresAt?: number
   refreshedAt: number
   source: 'provider' | 'internal' | 'unavailable'

@@ -21,4 +21,18 @@ describe('provider usage normalization', () => {
     expect(usage.secondaryUsedPercent).toBe(18)
     expect(usage.resetAt).toBe(123)
   })
+
+  it('maps the ChatGPT wham usage response shape', () => {
+    const usage = normalizeOpenAICodexUsage('a', {
+      plan_type: 'plus',
+      rate_limit: {
+        primary_window: { used_percent: 42, reset_at: 123, limit_window_seconds: 18000 },
+        secondary_window: { used_percent: 18, reset_after_seconds: 3600, limit_window_seconds: 604800 }
+      }
+    })
+    expect(usage.primaryUsedPercent).toBe(42)
+    expect(usage.secondaryUsedPercent).toBe(18)
+    expect(usage.resetAt).toBe(123)
+    expect(usage.status).toBe('ok')
+  })
 })
