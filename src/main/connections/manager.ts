@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
-import type { ProviderConnection, ProviderUsage } from '../../shared/types'
+import type { ProviderAccount, ProviderConnection, ProviderUsage } from '../../shared/types'
+import { normalizeOpenAICodexUsage } from './usage'
 import { createPkce, listenForCallback } from './oauth'
 import { CODEX_REDIRECT_URI, codexAuthorizeUrl, decodeJwtProfile, exchangeCodexCode, mergeCodexAuthFile } from './codex'
 import { ProviderAccountStore } from './store'
@@ -86,19 +87,38 @@ export class ProviderManager {
     this.deps.onAccountsChanged?.(this.list())
   }
 
-  refreshUsage(_providerId?: string, _accountId?: string): ProviderUsage[] {
+  async refreshUsage(_providerId?: string, _accountId?: string): Promise<ProviderUsage[]> {
     const connections = this.list(_providerId)
     const usage: ProviderUsage[] = []
     for (const connection of connections) {
       for (const account of connection.accounts) {
         if (_accountId && account.id !== _accountId) continue
-        if (account.usage) {
-          usage.push(account.usage)
-          this.deps.onUsage?.(account.usage)
-        }
+        const next = await this.fetchUsage(connection.providerId, account)
+        usage.push(next)
+        this.deps.onUsage?.(next)
       }
     }
     return usage
+  }
+
+  private async fetchUsage(providerId: string, account: ProviderAccount): Promise<ProviderUsage> {
+    if (providerId !== 'openai' || account.authMode !== 'oauth' || !account.keyRef) {
+      return account.usage ?? { accountId: account.id, refreshedAt: Date.now(), source: 'unavailable', status: 'unavailable', unavailableReason: 'Provider quota adapter unavailable' }
+    }
+    const secret = this.store.getSecret(account.id)
+    if (!secret?.accessToken) return { accountId: account.id, refreshedAt: Date.now(), source: 'unavailable', status: 'unavailable', unavailableReason: 'OAuth access token unavailable' }
+    try {
+      const headers: Record<string, string> = { authorization: `Bearer ${secret.accessToken}`, originator: 'codex_vscode', accept: 'application/json' }
+      if (secret.accountId) headers['ChatGPT-Account-ID'] = secret.accountId
+      const response = await fetch('https://chatgpt.com/backend-api/codex/usage', { headers })
+      if (!response.ok) return { accountId: account.id, refreshedAt: Date.now(), source: 'unavailable', status: 'unavailable', unavailableReason: `Quota request failed (${response.status})` }
+      const normalized = normalizeOpenAICodexUsage(account.id, await response.json())
+      account.usage = normalized
+      this.store.setUsage(account.id, normalized)
+      return normalized
+    } catch (error) {
+      return { accountId: account.id, refreshedAt: Date.now(), source: 'unavailable', status: 'unavailable', unavailableReason: String(error) }
+    }
   }
 
   close(): void {

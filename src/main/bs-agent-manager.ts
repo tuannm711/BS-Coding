@@ -37,6 +37,7 @@ import type { NotificationService } from './notification-service'
 import type { Vault } from './vault'
 import { TraceStore } from './agent/trace-store'
 import type { TraceEventInput } from './agent/trace-store'
+import { OPENAI_OAUTH_MODELS, isActiveOpenAiOAuthAccount } from '../shared/openai-oauth'
 
 export interface BsAgentManagerDeps {
   configPath: string
@@ -45,7 +46,7 @@ export interface BsAgentManagerDeps {
   trace?: TraceStore
   onTrace?: (e: TraceEvent) => void
   tools: Map<string, ToolDefinition>
-  createLlm?: (provider: string, apiKey: string, baseUrl?: string) => LlmClient
+  createLlm?: (provider: string, apiKey: string, baseUrl?: string, headers?: Record<string, string>) => LlmClient
   env?: NodeJS.ProcessEnv
   userSkillsDir?: string
   userToolsDir?: string
@@ -486,6 +487,21 @@ export class BsAgentManager {
     this.register(agent)
   }
 
+  setProfile(agentId: string, profileName: string): void {
+    const agent = this.agents.get(agentId)
+    if (!agent) return
+    const cfg = loadBsConfig(this.deps.configPath)
+    const profile = cfg.agents[profileName]
+    if (!profile) return
+    agent.name = profileName
+    agent.model = profile.model ?? (profile.provider ? `${profile.provider}/${cfg.provider[profile.provider]?.models[0] ?? ''}` : undefined)
+    agent.accountId = profile.accountId
+    this.agents.set(agentId, agent)
+    this.runners.delete(agentId)
+    this.resolved.delete(agentId)
+    this.register(agent)
+  }
+
   setAccount(agentId: string, accountId: string | null): void {
     const agent = this.agents.get(agentId)
     if (!agent) return
@@ -538,9 +554,9 @@ export class BsAgentManager {
       for (const model of p.models) refs.push({ provider, model })
     }
     const hasOAuth = this.deps.providerAccounts?.().some(connection =>
-      connection.providerId === 'openai' && connection.accounts.some(account => account.authMode === 'oauth' && account.status === 'active'))
+      connection.accounts.some(account => isActiveOpenAiOAuthAccount(connection.providerId, account.authMode, account.status)))
     if (hasOAuth) {
-      for (const model of ['gpt-5.2-codex', 'gpt-5.1-codex', 'gpt-5-codex', 'codex-mini-latest']) {
+      for (const model of OPENAI_OAUTH_MODELS) {
         if (!refs.some(ref => ref.provider === 'openai' && ref.model === model)) refs.push({ provider: 'openai', model })
       }
     }
@@ -806,7 +822,7 @@ export class BsAgentManager {
     // prompt (opencode-style); module-level ones attach on read via loop.ts.
     const instructionFiles = loadInstructions(agent.cwd)
     const instructions = instructionsText(instructionFiles)
-    const llmClient = (this.deps.createLlm ?? createLlm)(resolved.provider, resolved.apiKey ?? '', resolved.baseUrl)
+    const llmClient = (this.deps.createLlm ?? createLlm)(resolved.provider, resolved.apiKey ?? '', resolved.baseUrl, this.oauthHeaders(resolved))
     const resolveSubagent = (type: SubagentType): ResolvedSubagentModel | undefined => {
       const ref = cfg.subagentModels?.[type]
       if (!ref) return undefined
@@ -943,6 +959,7 @@ export class BsAgentManager {
   }
 
   private resolveAgentConfig(cfg: BsConfig, agentName: string, agentModel?: string): ResolvedAgentConfig {
+    cfg = this.materializeOAuthProviders(cfg)
     const resolved = resolveAgentConfig(
       cfg,
       agentName,
@@ -952,7 +969,64 @@ export class BsAgentManager {
     )
     const agent = [...this.agents.values()].find(a => a.name === agentName)
     if (agent?.accountId) resolved.accountId = agent.accountId
+    if (resolved.provider === 'openai' && !resolved.accountId) {
+      const active = this.deps.providerAccounts?.().find(c => c.providerId === 'openai')?.accounts.find(a => a.status === 'active' && a.authMode === 'oauth')
+      if (active) resolved.accountId = active.id
+    }
+    this.applyOAuthCredentials(resolved)
     return resolved
+  }
+
+  private applyOAuthCredentials(resolved: ResolvedAgentConfig): void {
+    if (resolved.provider !== 'openai' || !resolved.accountId || !this.deps.vault) return
+    const account = this.deps.providerAccounts?.().flatMap(connection => connection.accounts).find(item => item.id === resolved.accountId)
+    if (!account || account.authMode !== 'oauth' || !account.keyRef) return
+    const raw = this.deps.vault.getSecret(account.keyRef)
+    if (!raw) return
+    try {
+      const secret = JSON.parse(raw) as { accessToken?: string }
+      if (secret.accessToken) {
+        resolved.apiKey = secret.accessToken
+        resolved.baseUrl = 'https://chatgpt.com/backend-api/codex'
+      }
+    } catch { /* legacy non-JSON secrets are API keys, not OAuth tokens */ }
+  }
+
+  private oauthHeaders(resolved: ResolvedAgentConfig): Record<string, string> | undefined {
+    if (resolved.provider !== 'openai' || resolved.baseUrl !== 'https://chatgpt.com/backend-api/codex' || !resolved.accountId) return undefined
+    const account = this.deps.providerAccounts?.().flatMap(connection => connection.accounts).find(item => item.id === resolved.accountId)
+    if (!account?.keyRef || !this.deps.vault) return undefined
+    const raw = this.deps.vault.getSecret(account.keyRef)
+    if (!raw) return undefined
+    try {
+      const secret = JSON.parse(raw) as { accountId?: string }
+      return {
+        ...(secret.accountId ? { 'ChatGPT-Account-ID': secret.accountId } : {}),
+        originator: 'codex_vscode',
+        'OpenAI-Beta': 'responses_websockets=2026-02-06',
+        'x-openai-internal-codex-residency': 'us',
+        accept: 'text/event-stream'
+      }
+    } catch {
+      return { originator: 'codex_vscode', 'OpenAI-Beta': 'responses_websockets=2026-02-06', 'x-openai-internal-codex-residency': 'us', accept: 'text/event-stream' }
+    }
+  }
+
+  private materializeOAuthProviders(cfg: BsConfig): BsConfig {
+    const account = this.deps.providerAccounts?.().find(connection =>
+      connection.accounts.some(item => isActiveOpenAiOAuthAccount(connection.providerId, item.authMode, item.status)))
+    if (!account) return cfg
+    const current = cfg.provider.openai
+    return {
+      ...cfg,
+      provider: {
+        ...cfg.provider,
+        openai: {
+          ...(current ?? {}),
+          models: [...new Set([...(current?.models ?? []), ...OPENAI_OAUTH_MODELS])]
+        }
+      }
+    }
   }
 
   private priceFor(provider: string, model: string): ModelPrice | undefined {

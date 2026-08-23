@@ -9,9 +9,9 @@ import ToolCallCard from './ToolCallCard'
 import MarkdownText from './MarkdownText'
 import SessionBar from './SessionBar'
 import ModelPicker from './ModelPicker'
+import AgentPicker from './AgentPicker'
 import VariantPicker from './VariantPicker'
 import ContextFooter from './ContextFooter'
-import AgentUsageCard from './AgentUsageCard'
 
 type FeedItem =
   | { kind: 'message'; id: string; role: ChatMessage['role']; text: string; reasoning?: string; images?: ImageAttachment[] }
@@ -101,6 +101,7 @@ const FeedMessage = memo(function FeedMessage({ role, text, reasoning, images, c
 
 interface Props {
   agentId: string
+  agentName?: string
   cwd: string
   mode?: AgentMode
   variant?: string
@@ -108,7 +109,7 @@ interface Props {
   onVariantChange?: (variant: string | undefined) => void
 }
 
-function ChatPanel({ agentId, cwd, mode = 'build', variant, onModeChange, onVariantChange }: Props) {
+function ChatPanel({ agentId, agentName = 'bs', cwd, mode = 'build', variant, onModeChange, onVariantChange }: Props) {
   const [items, setItems] = useState<FeedItem[]>([])
   const [running, setRunning] = useState(false)
   const [currentMode, setCurrentMode] = useState<AgentMode>(mode)
@@ -959,15 +960,6 @@ if (e.type === 'usage') {
           </div>
         )}
       <div className="chat-mode">
-          <AgentUsageCard
-            agentId={agentId}
-            running={running}
-            contextUsed={contextUsed}
-            contextLimit={contextLimit}
-            compactThreshold={compactThreshold}
-            sessionTokens={sessionTokens}
-            onStop={handleStop}
-          />
           <span className="chat-mode-label">mode</span>
           <button
             className={`btn small mode-build ${currentMode === 'build' ? 'active' : ''}`}
@@ -983,7 +975,7 @@ if (e.type === 'usage') {
           </button>
           {currentMode === 'plan' && <span className="chat-mode-hint">read-only — edits denied</span>}
           <div className="chat-mode-tools">
-            <ModelPicker agentId={agentId} />
+            <AgentPicker agentId={agentId} currentName={agentName} />
             {availableVariants.length > 0 && (
               <VariantPicker
                 variants={availableVariants}

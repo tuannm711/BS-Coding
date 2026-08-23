@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import type { CatalogProviderSummary, BsSettings, ProviderConnection, ProviderSettings } from '@shared/types'
+import type { CatalogProviderSummary, BsSettings, ProviderConnection, ProviderSettings, ProviderUsage } from '@shared/types'
+import { OPENAI_OAUTH_MODELS } from '@shared/openai-oauth'
 import Modal from './Modal'
 
 interface Props {
@@ -24,6 +25,7 @@ export default function ProvidersTab({ settings, catalog, onChange }: Props) {
   const [status, setStatus] = useState('')
   const [accounts, setAccounts] = useState<ProviderConnection[]>([])
   const [loginBusy, setLoginBusy] = useState(false)
+  const [usageByAccount, setUsageByAccount] = useState<Record<string, ProviderUsage>>({})
 
   const connected = settings.providers
   const visibleProviders: ProviderSettings[] = [
@@ -36,6 +38,24 @@ export default function ProvidersTab({ settings, catalog, onChange }: Props) {
   const refreshAccounts = async () => setAccounts(await window.api.listProviderAccounts())
   useEffect(() => { void refreshAccounts() }, [])
   useEffect(() => window.api.onProviderAccountsChanged(next => setAccounts(next)), [])
+  useEffect(() => {
+    void window.api.refreshProviderUsage().then(next => setUsageByAccount(Object.fromEntries(next.map(item => [item.accountId, item]))))
+    return window.api.onProviderUsage(next => setUsageByAccount(previous => ({ ...previous, [next.accountId]: next })))
+  }, [])
+  useEffect(() => {
+    const oauth = accounts.find(c => c.providerId === 'openai')?.accounts.some(a => a.authMode === 'oauth' && a.status === 'active')
+    if (!oauth) return
+    const current = settings.providers.find(p => p.id === 'openai')
+    const models = [...new Set([...(current?.models ?? []), ...OPENAI_OAUTH_MODELS])]
+    const unchanged = current?.models.length === models.length && current.models.every((model, index) => model === models[index])
+    if (!current || !unchanged) {
+      onChange({
+        providers: current
+          ? settings.providers.map(p => p.id === 'openai' ? { ...p, models } : p)
+          : [...settings.providers, { id: 'openai', apiKey: '', models }]
+      })
+    }
+  }, [accounts, onChange, settings.providers])
 
   const loginWithChatGpt = async () => {
     setLoginBusy(true)
@@ -160,7 +180,7 @@ export default function ProvidersTab({ settings, catalog, onChange }: Props) {
       <div className="provider-connected">
         <h4>Connected</h4>
         {visibleProviders.map(p => (
-          <div key={p.id}>
+          <div className="provider-card" key={p.id}>
             <div className="provider-connected-row">
               <button className="provider-connected-toggle" onClick={() => void viewModels(p.id)}>
                 <span className="mcp-dot connected" />
@@ -187,6 +207,10 @@ export default function ProvidersTab({ settings, catalog, onChange }: Props) {
                 <span className={`mcp-dot ${account.status === 'active' ? 'connected' : ''}`} />
                 <span>{account.label}</span>
                 <span className="settings-hint">{account.authMode} · {account.status}</span>
+                <span className="provider-account-quota">
+                  {formatAccountQuota(usageByAccount[account.id])}
+                </span>
+                <button className="btn small" onClick={() => void window.api.refreshProviderUsage(p.id, account.id)}>Refresh quota</button>
                 <button className="btn small" onClick={() => void window.api.setProviderAccountEnabled(account.id, account.status !== 'active').then(refreshAccounts)}>
                   {account.status === 'active' ? 'Disable' : 'Enable'}
                 </button>
@@ -195,7 +219,7 @@ export default function ProvidersTab({ settings, catalog, onChange }: Props) {
             ))}
           </div>
         ))}
-        {connected.length === 0 && <p className="settings-hint">No providers connected yet.</p>}
+        {visibleProviders.length === 0 && <p className="settings-hint">No providers connected yet.</p>}
       </div>
 
       {status && <div className="settings-status">{status}</div>}
@@ -238,4 +262,26 @@ export default function ProvidersTab({ settings, catalog, onChange }: Props) {
       )}
     </div>
   )
+}
+
+function formatAccountQuota(usage?: ProviderUsage): string {
+  if (!usage) return 'Quota unavailable'
+  if (usage.status === 'unavailable') return usage.unavailableReason ?? 'Quota unavailable'
+  const primary = usage.primaryUsedPercent !== undefined
+    ? `${usage.primaryUsedPercent}% used`
+    : usage.tokensUsed !== undefined
+    ? `${usage.tokensUsed.toLocaleString()}${usage.tokenLimit ? ` / ${usage.tokenLimit.toLocaleString()}` : ''}`
+    : '—'
+  const banked = usage.secondaryUsedPercent !== undefined
+    ? ` · banked ${usage.secondaryUsedPercent}% used`
+    : usage.bankedUsed !== undefined ? ` · banked ${usage.bankedUsed.toLocaleString()}${usage.bankedLimit ? ` / ${usage.bankedLimit.toLocaleString()}` : ''}` : ''
+  const reset = usage.resetAt ? ` · reset ${formatCountdown(usage.resetAt)}` : ''
+  return `${primary}${banked}${reset}`
+}
+
+function formatCountdown(resetAt: number): string {
+  const seconds = Math.max(0, Math.round((resetAt - Date.now()) / 1000))
+  const hours = Math.floor(seconds / 3600)
+  const minutes = Math.floor((seconds % 3600) / 60)
+  return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`
 }

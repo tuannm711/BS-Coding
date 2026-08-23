@@ -499,6 +499,19 @@ class MainApp {
     }
   }
 
+  setAgentProfile(agentId: string, profileName: string): void {
+    this.bsAgent.setProfile(agentId, profileName)
+    const ws = this.findWorkspaceByAgent(agentId)
+    if (ws) {
+      const assignment = this.bsAgent.getAgentModel(agentId)
+      const updated = this.workspaces.updateAgent(ws.projectPath, agentId, {
+        name: profileName,
+        model: assignment ? `${assignment.provider}/${assignment.model}` : undefined
+      })
+      this.pushAgentConfig(updated, agentId)
+    }
+  }
+
   // Keep the renderer's AgentConfig (mode/variant/model) fresh after a change
   // so remounted chat panels don't revert to the pre-change values.
   private pushAgentConfig(ws: Workspace, agentId: string): void {
@@ -681,6 +694,8 @@ function registerIpcHandlers(): void {
     mainApp.bsAgent.getAvailableVariants(agentId))
   ipcMain.handle(Channels.AgentSetModel, (_e, agentId: string, provider: string, model: string) =>
     mainApp.setAgentModel(agentId, provider, model))
+  ipcMain.handle(Channels.AgentSetProfile, (_e, agentId: string, profileName: string) =>
+    mainApp.setAgentProfile(agentId, profileName))
   ipcMain.handle(Channels.AgentSetAccount, (_e, agentId: string, accountId: string | null) =>
     mainApp.bsAgent.setAccount(agentId, accountId))
   ipcMain.handle(Channels.AgentGetAssignment, (_e, agentId: string) => mainApp.bsAgent.getAgentAssignment(agentId))

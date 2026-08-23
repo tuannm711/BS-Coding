@@ -24,6 +24,7 @@ export const Channels = {
   AgentSetVariant: 'agent:set-variant',
   AgentGetVariants: 'agent:get-variants',
   AgentSetModel: 'agent:set-model',
+  AgentSetProfile: 'agent:set-profile',
   AgentSetAccount: 'agent:set-account',
   AgentGetAssignment: 'agent:get-assignment',
   AgentGetModel: 'agent:get-model',
@@ -167,6 +168,7 @@ export interface AgentApi {
   setAgentVariant(agentId: string, variant: string | null): Promise<void>
   getAgentVariants(agentId: string): Promise<string[]>
   setAgentModel(agentId: string, provider: string, model: string): Promise<void>
+  setAgentProfile(agentId: string, profileName: string): Promise<void>
   setAgentAccount(agentId: string, accountId: string | null): Promise<void>
   getAgentAssignment(agentId: string): Promise<AgentModelAssignment | null>
   getAgentModel(agentId: string): Promise<ModelRef | null>

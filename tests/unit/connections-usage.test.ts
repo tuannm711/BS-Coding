@@ -9,4 +9,16 @@ describe('provider usage normalization', () => {
   it('maps Codex usage fields', () => {
     expect(normalizeOpenAICodexUsage('a', { usage: { requests: 2, tokens: 20 }, limit: { requests: 10, tokens: 100 }, reset_at: 123 }).tokensUsed).toBe(20)
   })
+
+  it('maps Codex rate-limit windows to account-level percentages', () => {
+    const usage = normalizeOpenAICodexUsage('a', {
+      rate_limits: {
+        primary: { used_percent: 42, reset_at: 123 },
+        secondary: { used_percent: 18, reset_at: 456 }
+      }
+    })
+    expect(usage.primaryUsedPercent).toBe(42)
+    expect(usage.secondaryUsedPercent).toBe(18)
+    expect(usage.resetAt).toBe(123)
+  })
 })

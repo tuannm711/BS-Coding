@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import type { ProviderAccount, ProviderConnection } from '../../shared/types'
+import type { ProviderAccount, ProviderConnection, ProviderUsage } from '../../shared/types'
 import type { ProviderSecrets, StoredProviderAccounts } from './types'
 import { Vault } from '../vault'
 
@@ -71,6 +71,14 @@ export class ProviderAccountStore {
     found.account.status = enabled ? 'active' : 'disabled'
     if (enabled) found.connection.activeAccountId = accountId
     else if (found.connection.activeAccountId === accountId) found.connection.activeAccountId = null
+    this.save(state)
+  }
+
+  setUsage(accountId: string, usage: ProviderUsage): void {
+    const state = this.load()
+    const found = this.find(state.connections, accountId)
+    if (!found) return
+    found.account.usage = usage
     this.save(state)
   }
 

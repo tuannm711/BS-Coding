@@ -132,9 +132,9 @@ export function createOpenAICompatibleLlm(opts: { apiKey: string; baseUrl?: stri
   return createLlm('openai', opts.apiKey, opts.baseUrl)
 }
 
-export function createLlm(provider: string, apiKey: string, baseUrl?: string): LlmClient {
-  if (provider === 'openai' && (!baseUrl || /api\.openai\.com\/v1\/?$/.test(baseUrl))) {
-    return new OpenAIResponsesClient({ apiKey, baseUrl })
+export function createLlm(provider: string, apiKey: string, baseUrl?: string, headers?: Record<string, string>): LlmClient {
+  if (provider === 'openai' && (!baseUrl || /api\.openai\.com\/v1\/?$/.test(baseUrl) || /chatgpt\.com\/backend-api\/codex\/?$/.test(baseUrl))) {
+    return new OpenAIResponsesClient({ apiKey, baseUrl, headers })
   }
   const isDeepSeek = provider === 'deepseek' || isDeepSeekEndpoint(baseUrl)
   const model = (modelId: string) => {

@@ -301,6 +301,7 @@ export default function App() {
             tab={rightTab}
             width={rightWidth}
             artifacts={artifacts[runtime?.workspace.projectPath ?? ''] ?? []}
+            agents={panes.filter(pane => pane.agent.kind === 'native').map(pane => ({ id: pane.agent.id, name: pane.agent.name }))}
             onTabChange={setRightTab}
             onWidthChange={setRightWidth}
             onClearArtifacts={() => {

@@ -1,5 +1,6 @@
-import { useState } from 'react'
-import type { AgentSettings, BsSettings, ModelRef, SubagentType } from '@shared/types'
+import { useEffect, useMemo, useState } from 'react'
+import type { AgentSettings, BsSettings, ModelRef, ProviderConnection, SubagentType } from '@shared/types'
+import { OPENAI_OAUTH_MODELS } from '@shared/openai-oauth'
 import Modal from './Modal'
 
 const SUBMODEL_ROLES = ['research', 'general', 'reviewer'] as const
@@ -21,6 +22,20 @@ export default function AgentsTab({ agents, providers, subagentModels, onChangeA
   const [adding, setAdding] = useState(false)
   const [newName, setNewName] = useState('')
   const [newPrompt, setNewPrompt] = useState('')
+  const [accounts, setAccounts] = useState<ProviderConnection[]>([])
+
+  useEffect(() => {
+    void window.api.listProviderAccounts().then(setAccounts)
+    return window.api.onProviderAccountsChanged(setAccounts)
+  }, [])
+
+  const effectiveProviders = useMemo(() => {
+    const oauth = accounts.find(c => c.providerId === 'openai')?.accounts.some(a => a.authMode === 'oauth' && a.status === 'active')
+    if (!oauth) return providers
+    const existing = providers.find(p => p.id === 'openai')
+    if (existing) return providers.map(p => p.id === 'openai' ? { ...p, models: [...new Set([...p.models, ...OPENAI_OAUTH_MODELS])] } : p)
+    return [...providers, { id: 'openai', apiKey: '', models: [...OPENAI_OAUTH_MODELS] }]
+  }, [accounts, providers])
 
   const setRole = (role: SubagentType, ref: ModelRef | undefined) => {
     const next = { ...(subagentModels ?? {}) }
@@ -79,6 +94,40 @@ export default function AgentsTab({ agents, providers, subagentModels, onChangeA
             value={a.systemPrompt}
             onChange={e => updateAgent(i, { systemPrompt: e.target.value })}
           />
+          <div className="submodel-fields">
+            <select
+              className="input"
+              value={a.provider ?? ''}
+              onChange={e => {
+                const provider = e.target.value || undefined
+                const models = effectiveProviders.find(p => p.id === provider)?.models ?? []
+                updateAgent(i, { provider, model: models[0], accountId: provider === 'openai' ? (accounts.find(c => c.providerId === 'openai')?.activeAccountId ?? undefined) : undefined })
+              }}
+            >
+              <option value="">(default provider)</option>
+              {effectiveProviders.map(p => <option key={p.id} value={p.id}>{p.id}</option>)}
+            </select>
+            <select
+              className="input"
+              value={a.model ?? ''}
+              disabled={!a.provider}
+              onChange={e => updateAgent(i, { model: e.target.value })}
+            >
+              {(effectiveProviders.find(p => p.id === a.provider)?.models ?? []).map(m => <option key={m} value={m}>{m}</option>)}
+            </select>
+            {a.provider === 'openai' && (
+              <select
+                className="input"
+                value={a.accountId ?? ''}
+                onChange={e => updateAgent(i, { accountId: e.target.value || undefined })}
+              >
+                <option value="">(active ChatGPT account)</option>
+                {(accounts.find(c => c.providerId === 'openai')?.accounts ?? []).filter(account => account.status === 'active').map(account => (
+                  <option key={account.id} value={account.id}>{account.label}</option>
+                ))}
+              </select>
+            )}
+          </div>
         </div>
       ))}
       <div>

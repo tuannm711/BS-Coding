@@ -25,6 +25,8 @@ export default function ModelPicker({ agentId }: Props) {
     if (open) refresh()
   }, [open, refresh])
 
+  useEffect(() => window.api.onProviderAccountsChanged(() => refresh()), [refresh])
+
   useEffect(() => {
     const onDocClick = (e: MouseEvent) => {
       const target = e.target as Node

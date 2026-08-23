@@ -20,6 +20,7 @@ export interface ResponsesState {
 export interface OpenAIResponsesOptions {
   apiKey: string
   baseUrl?: string
+  headers?: Record<string, string>
   state?: ResponsesState
   fetchImpl?: typeof fetch
 }
@@ -67,15 +68,24 @@ export class OpenAIResponsesClient implements LlmClient {
       input,
       tools: toTools(opts.tools),
       stream: true,
+      store: false,
       ...(this.state.previousResponseId ? { previous_response_id: this.state.previousResponseId } : {})
     }
     const response = await this.fetchImpl(`${this.baseUrl}/responses`, {
       method: 'POST',
-      headers: { authorization: `Bearer ${this.opts.apiKey}`, 'content-type': 'application/json' },
+      headers: { authorization: `Bearer ${this.opts.apiKey}`, 'content-type': 'application/json', ...this.opts.headers },
       body: JSON.stringify(body),
       signal: opts.signal
     })
-    if (!response.ok) throw new Error(`OpenAI Responses API error (${response.status})`)
+    if (!response.ok) {
+      let detail = ''
+      try {
+        const errorBody = await response.text()
+        const parsed = JSON.parse(errorBody) as { error?: { message?: string; detail?: string }; detail?: string; message?: string }
+        detail = parsed.error?.message ?? parsed.error?.detail ?? parsed.detail ?? parsed.message ?? errorBody
+      } catch { /* preserve the status when the response is not JSON */ }
+      throw new Error(`OpenAI Responses API error (${response.status})${detail ? `: ${detail}` : ''}`)
+    }
     if (!response.body || !(response.headers.get('content-type') ?? '').includes('text/event-stream')) {
       const json = await response.json() as Record<string, unknown>
       yield* this.consumeCompleted(json)
@@ -119,7 +129,7 @@ export class OpenAIResponsesClient implements LlmClient {
   async compact(messages: ModelMessage[], model: string, system?: string): Promise<boolean> {
     const response = await this.fetchImpl(`${this.baseUrl}/responses/compact`, {
       method: 'POST',
-      headers: { authorization: `Bearer ${this.opts.apiKey}`, 'content-type': 'application/json' },
+      headers: { authorization: `Bearer ${this.opts.apiKey}`, 'content-type': 'application/json', ...this.opts.headers },
       body: JSON.stringify({ model, input: toInput(messages), instructions: system })
     })
     if (!response.ok) return false

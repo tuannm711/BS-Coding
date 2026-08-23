@@ -16,7 +16,7 @@ import { CommandStore } from '../../src/main/agent/commands'
 import { SavedPermissions } from '../../src/main/agent/saved-permissions'
 import type { SavedPermission } from '../../src/main/agent/saved-permissions'
 import type { LlmClient, LlmStreamOptions, LlmStreamPart } from '../../src/main/agent/llm'
-import type { AgentConfig, ChatEvent, PromptResponse } from '../../src/shared/types'
+import type { AgentConfig, ChatEvent, PromptResponse, ProviderConnection } from '../../src/shared/types'
 
 const BS_AGENT: AgentConfig = {
   id: 'a1', name: 'bs', templateId: 'bs', cwd: '/proj', kind: 'native'
@@ -33,6 +33,7 @@ interface StubLlmOptions {
 async function makeManager(opts: StubLlmOptions & {
   configPath?: string
   catalog?: ModelsCatalog
+  providerAccounts?: ProviderConnection[]
 } = {}) {
   const cfgDir = mkdtempSync(path.join(tmpdir(), 'bs-mgr-cfg-'))
   const defaultCfg = path.join(cfgDir, 'bs.json')
@@ -97,7 +98,8 @@ async function makeManager(opts: StubLlmOptions & {
     truncation: new TruncationStore(path.join(cfgDir, 'truncation')),
     commands: new CommandStore(path.join(cfgDir, 'commands.json')),
     prices: { 'test/test-model': { input: 1, output: 2 } },
-    env: { ANTHROPIC_API_KEY: 'sk-test' } as NodeJS.ProcessEnv
+    env: { ANTHROPIC_API_KEY: 'sk-test' } as NodeJS.ProcessEnv,
+    providerAccounts: opts.providerAccounts ? () => opts.providerAccounts! : undefined
   })
   manager.setOnEvent(e => events.push(e))
   await manager.init([{ ...BS_AGENT }, { ...PTY_AGENT }])
@@ -118,6 +120,23 @@ describe('BsAgentManager', () => {
     expect(manager.isBackground('a1')).toBe(true)
     manager.setBackground('a1', false)
     expect(manager.isBackground('a1')).toBe(false)
+  })
+
+  it('materializes an OAuth-only OpenAI provider for assignment and model selection', async () => {
+    const providerAccounts: ProviderConnection[] = [{
+      providerId: 'openai',
+      activeAccountId: 'oauth-1',
+      accounts: [{
+        id: 'oauth-1', providerId: 'openai', label: 'plus@example.com', authMode: 'oauth', status: 'active',
+        createdAt: 1, lastUsedAt: 1
+      }]
+    }]
+    const { manager } = await makeManager({ providerAccounts })
+    manager.setModel('a1', 'openai', 'gpt-5.5')
+    expect(manager.getAgentModel('a1')).toEqual({ provider: 'openai', model: 'gpt-5.5' })
+    expect(manager.getAgentAssignment('a1')).toMatchObject({ provider: 'openai', model: 'gpt-5.5', accountId: 'oauth-1' })
+    expect(manager.getProviderModels()).toContainEqual({ provider: 'openai', model: 'gpt-5.5' })
+    expect(manager.getProviderModels()).toContainEqual({ provider: 'openai', model: 'gpt-5.6' })
   })
 
   it('seeds background state from the stored agent config on register', async () => {

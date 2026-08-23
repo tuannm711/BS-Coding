@@ -250,10 +250,13 @@ export interface ProviderUsage {
   tokenLimit?: number
   bankedUsed?: number
   bankedLimit?: number
+  primaryUsedPercent?: number
+  secondaryUsedPercent?: number
   subscriptionExpiresAt?: number
   refreshedAt: number
   source: 'provider' | 'internal' | 'unavailable'
   status: 'ok' | 'near-limit' | 'expired' | 'unavailable'
+  unavailableReason?: string
 }
 
 export interface ProviderConnection {

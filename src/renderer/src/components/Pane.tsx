@@ -87,6 +87,7 @@ export default function Pane({
           ) : (
             <ChatPanel
               agentId={id}
+              agentName={pane.agent.name}
               cwd={pane.agent.cwd}
               mode={pane.agent.mode ?? 'build'}
               variant={pane.agent.variant}
