@@ -1627,7 +1627,11 @@ select.input { width: 100%; }
 .right-panel-quota-meta { margin-top: 4px; display: grid; gap: 2px; color: var(--text-dim); font-family: var(--font-mono); font-size: var(--fs-sm); font-variant-numeric: tabular-nums; }
 
 .quota-account-card { display: grid; gap: 10px; padding: 13px; border: 1px solid var(--hairline); border-radius: 10px; background: color-mix(in srgb, var(--bg-panel) 90%, var(--accent) 10%); min-width: 0; font-size: var(--fs-base); }
-.provider-account-block { display: grid; gap: 6px; margin: 8px 0 0 20px; }
+.provider-group { display: grid; gap: 9px; margin-top: 10px; padding: 12px; border: 1px solid var(--hairline); border-radius: 10px; background: color-mix(in srgb, var(--bg-panel) 94%, var(--accent) 6%); }
+.provider-group-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--hairline); }
+.provider-group-head h5 { margin: 0; color: var(--text-strong); font-family: var(--font-display); font-size: var(--fs-md); }
+.provider-group-head span:not(.quota-plan-badge) { display: block; margin-top: 2px; color: var(--text-faint); font-size: var(--fs-sm); }
+.provider-account-block { display: grid; gap: 6px; margin: 0; }
 .provider-account-models { display: flex; flex-wrap: wrap; gap: 4px; }
 .provider-account-models code { background: var(--bg-code); border: 1px solid var(--hairline); border-radius: var(--radius-sm); color: var(--text-dim); font-family: var(--font-mono); font-size: var(--fs-sm); padding: 2px 6px; }
 .provider-account-actions { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
