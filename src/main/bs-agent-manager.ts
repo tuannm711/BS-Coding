@@ -39,6 +39,7 @@ import { TraceStore } from './agent/trace-store'
 import type { TraceEventInput } from './agent/trace-store'
 import { OPENAI_OAUTH_MODELS, isActiveOpenAiOAuthAccount, isOpenAiGenericModel, normalizeOpenAiCodexModel } from '../shared/openai-oauth'
 import type { AgentAssignmentSnapshot } from '../shared/provider-state'
+import { AssignmentStore, fileAssignmentPersistence } from './agent/assignments'
 
 export interface BsAgentManagerDeps {
   configPath: string
@@ -67,6 +68,7 @@ export interface BsAgentManagerDeps {
   notifications?: NotificationsSettings
   providerAccounts?: () => ProviderConnection[]
   onAssignmentChanged?: (assignment: AgentAssignmentSnapshot) => void
+  assignmentPath?: string
 }
 
 export class BsAgentManager {
@@ -94,11 +96,13 @@ export class BsAgentManager {
   private compacting = new Set<string>()
   private lastCompactionAt = new Map<string, number>()
   private idleCompactTimer: ReturnType<typeof setInterval> | null = null
+  private assignments: AssignmentStore
 
   constructor(private deps: BsAgentManagerDeps) {
     this.tools = new Map(deps.tools)
     const cfg = loadBsConfig(deps.configPath)
     this.deps = { ...deps, notifications: cfg.notifications }
+    this.assignments = new AssignmentStore(fileAssignmentPersistence(deps.assignmentPath ?? `${deps.configPath}.assignments.json`))
     this.traceEnabled = cfg.trace?.enabled ?? false
     // Auto-compact when a session sits over its context limit while idle
     // (compaction otherwise only runs at the start of a turn step).
@@ -484,6 +488,7 @@ export class BsAgentManager {
     if (!agent) return
     if (provider === 'openai') model = normalizeOpenAiCodexModel(model)
     agent.model = `${provider}/${model}`
+    this.persistAssignment(agentId, provider, model, agent.accountId, agent.speed)
     this.agents.set(agentId, agent)
     this.runners.delete(agentId)
     this.resolved.delete(agentId)
@@ -494,6 +499,8 @@ export class BsAgentManager {
     const agent = this.agents.get(agentId)
     if (!agent) return
     agent.speed = speed
+    const current = this.assignments.get(agentId)
+    if (current) this.assignments.set({ ...current, speed })
     this.agents.set(agentId, agent)
     this.runners.delete(agentId)
     this.resolved.delete(agentId)
@@ -510,6 +517,7 @@ export class BsAgentManager {
     agent.model = profile.model ?? (profile.provider ? `${profile.provider}/${cfg.provider[profile.provider]?.models[0] ?? ''}` : undefined)
     agent.accountId = profile.accountId
     agent.speed = profile.speed ?? 'standard'
+    if (profile.provider && profile.model) this.persistAssignment(agentId, profile.provider, profile.model, profile.accountId, agent.speed)
     this.agents.set(agentId, agent)
     this.runners.delete(agentId)
     this.resolved.delete(agentId)
@@ -520,6 +528,8 @@ export class BsAgentManager {
     const agent = this.agents.get(agentId)
     if (!agent) return
     agent.accountId = accountId || undefined
+    const current = this.assignments.get(agentId)
+    if (current) this.persistAssignment(agentId, current.providerId, current.modelId, agent.accountId, current.speed)
     this.agents.set(agentId, agent)
     this.runners.delete(agentId)
     this.resolved.delete(agentId)
@@ -733,6 +743,10 @@ export class BsAgentManager {
     writeBsConfig(this.deps.configPath, cfg)
     this.deps = { ...this.deps, notifications: cfg.notifications }
     await this.reload()
+    for (const agent of this.agents.values()) {
+      const profile = cfg.agents[agent.name]
+      if (profile?.provider && profile.model) this.persistAssignment(agent.id, profile.provider, profile.model, profile.accountId, profile.speed ?? 'standard')
+    }
     for (const agent of this.agents.values()) {
       const assignment = this.getAgentAssignment(agent.id)
       if (assignment) this.deps.onAssignmentChanged?.({ agentId: agent.id, providerId: assignment.provider, accountId: assignment.accountId, modelId: assignment.model, speed: assignment.speed ?? 'standard', revision: Date.now(), status: 'ready' })
@@ -1008,6 +1022,11 @@ export class BsAgentManager {
     }
     this.applyAccountCredentials(resolved)
     return resolved
+  }
+
+  private persistAssignment(agentId: string, providerId: string, modelId: string, accountId?: string, speed: 'standard' | 'fast' = 'standard'): void {
+    const assignment = this.assignments.set({ agentId, providerId, modelId, accountId, speed, status: 'ready' })
+    this.deps.onAssignmentChanged?.(assignment)
   }
 
   private applyAccountCredentials(resolved: ResolvedAgentConfig): void {
