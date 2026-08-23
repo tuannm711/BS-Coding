@@ -129,7 +129,12 @@ export const Channels = {
   ArtifactsClear: 'artifacts:clear',
   EventArtifactsChanged: 'artifacts:changed',
   EventProviderAccountsChanged: 'provider:accounts-changed',
-  EventProviderUsage: 'provider:usage'
+  EventProviderUsage: 'provider:usage',
+  ProviderSnapshotGet: 'provider:snapshot-get',
+  EventProviderSnapshotChanged: 'provider:snapshot-changed',
+  AgentAssignmentGetSnapshot: 'agent:assignment-get-snapshot',
+  AgentAssignmentSetSnapshot: 'agent:assignment-set-snapshot',
+  EventAgentAssignmentChanged: 'agent:assignment-changed'
 } as const
 
 export interface PtyDataEvent { agentId: string; data: string }
