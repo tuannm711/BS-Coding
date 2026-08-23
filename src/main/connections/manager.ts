@@ -9,6 +9,8 @@ import type { Vault } from '../vault'
 import { ProviderRegistry } from '../providers/registry'
 import { antigravityAuthorizeUrl, exchangeAntigravityCode, fetchAntigravityProfile } from '../providers/auth/antigravity-oauth'
 import type { LlmClient } from '../agent/llm'
+import { buildProviderSnapshot } from './snapshot'
+import type { ProviderSnapshot } from '../../shared/provider-state'
 
 interface PendingLogin {
   providerId: string
@@ -32,6 +34,7 @@ export class ProviderManager {
   readonly store: ProviderAccountStore
   readonly registry: ProviderRegistry
   private pending = new Map<string, PendingLogin>()
+  private snapshotRevision = 0
 
   constructor(private readonly deps: ProviderManagerDeps) {
     this.store = new ProviderAccountStore(deps.accountsFile, deps.vault)
@@ -40,6 +43,10 @@ export class ProviderManager {
 
   list(providerId?: string): ProviderConnection[] {
     return this.store.list(providerId)
+  }
+
+  getSnapshot(): ProviderSnapshot {
+    return buildProviderSnapshot(++this.snapshotRevision, this.registry.listReady(), this.list())
   }
 
   createRuntime(providerId: string, accountId: string, modelId: string): LlmClient {

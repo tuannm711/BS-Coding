@@ -123,7 +123,10 @@ class MainApp {
     openExternal: (url) => shell.openExternal(url),
     registry: this.providerRegistry,
     vault: this.vault,
-    onAccountsChanged: (connections) => win?.webContents.send(Channels.EventProviderAccountsChanged, connections),
+    onAccountsChanged: (connections) => {
+      win?.webContents.send(Channels.EventProviderAccountsChanged, connections)
+      win?.webContents.send(Channels.EventProviderSnapshotChanged, mainApp?.providerManager.getSnapshot())
+    },
     onUsage: (usage) => win?.webContents.send(Channels.EventProviderUsage, usage)
   })
   bsAgent = new BsAgentManager({
@@ -757,6 +760,7 @@ function registerIpcHandlers(): void {
     await mainApp.providerManager.refreshModels(providerId)
     return mainApp.providerManager.list(providerId)
   })
+  ipcMain.handle(Channels.ProviderSnapshotGet, () => mainApp.providerManager.getSnapshot())
   ipcMain.handle(Channels.ProviderLoginStart, (_e, providerId: string) => mainApp.providerManager.startLogin(providerId))
   ipcMain.handle(Channels.ProviderLoginCancel, (_e, loginId: string) => mainApp.providerManager.cancelLogin(loginId))
   ipcMain.handle(Channels.ProviderAccountEnable, (_e, accountId: string) => mainApp.providerManager.setEnabled(accountId, true))

@@ -6,6 +6,7 @@ import type {
 } from './types'
 import type { BrowserStatusInfo, PairingInfo } from './browser-types'
 import type { AgentAssignmentSnapshot } from './provider-state'
+import type { ProviderSnapshot } from './provider-state'
 import type { RemoteStatus } from './remote-types'
 import type { ProviderCapability, ProviderConnectRequest, ProviderConnectResult } from './providers'
 
@@ -201,6 +202,8 @@ export interface AgentApi {
   onProviderAccountsChanged(cb: (e: ProviderConnection[]) => void): () => void
   onProviderUsage(cb: (e: ProviderUsage) => void): () => void
   onAgentAssignmentChanged(cb: (e: AgentAssignmentSnapshot) => void): () => void
+  getProviderSnapshot(): Promise<ProviderSnapshot>
+  onProviderSnapshotChanged(cb: (e: ProviderSnapshot) => void): () => void
   listTemplates(): Promise<Template[]>
   saveTemplate(template: Template): Promise<Template>
   removeTemplate(id: string): Promise<void>
