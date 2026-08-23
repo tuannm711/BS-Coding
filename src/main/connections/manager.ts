@@ -196,6 +196,7 @@ export class ProviderManager {
 
   private async fetchUsage(providerId: string, account: ProviderAccount): Promise<ProviderUsage> {
     const metadata = { accountLabel: account.profile?.email ?? account.label, accountType: account.authMode === 'oauth' ? 'oauth' as const : account.authMode === 'api-key' ? 'api-key' as const : 'session' as const }
+    if (providerId === 'antigravity' && account.authMode === 'oauth') return this.fetchAntigravityUsage(account, metadata)
     if (providerId !== 'openai' || account.authMode !== 'oauth' || !account.keyRef) {
       return account.usage ?? { accountId: account.id, ...metadata, refreshedAt: Date.now(), source: 'unavailable', status: 'unavailable', unavailableReason: 'Provider quota adapter unavailable' }
     }
@@ -234,6 +235,31 @@ export class ProviderManager {
         return normalized
       }
       return { accountId: account.id, ...metadata, refreshedAt: Date.now(), source: 'unavailable', status: 'unavailable', unavailableReason: `Quota request failed (${lastStatus || 'network error'})` }
+    } catch (error) {
+      return { accountId: account.id, ...metadata, refreshedAt: Date.now(), source: 'unavailable', status: 'unavailable', unavailableReason: String(error) }
+    }
+  }
+
+  private async fetchAntigravityUsage(account: ProviderAccount, metadata: { accountLabel: string; accountType: 'oauth' | 'api-key' | 'session' }): Promise<ProviderUsage> {
+    const secret = this.store.getSecret(account.id)
+    if (!secret?.accessToken) return { accountId: account.id, ...metadata, refreshedAt: Date.now(), source: 'unavailable', status: 'unavailable', unavailableReason: 'OAuth access token unavailable' }
+    try {
+      const response = await fetch('https://cloudcode-pa.googleapis.com/v1internal:fetchAvailableModels', {
+        method: 'POST',
+        headers: { authorization: `Bearer ${secret.accessToken}`, 'content-type': 'application/json', 'user-agent': 'antigravity/1.15.8 windows/amd64' },
+        body: JSON.stringify({})
+      })
+      const raw = await response.text()
+      if (!response.ok) return { accountId: account.id, ...metadata, refreshedAt: Date.now(), source: 'unavailable', status: response.status === 429 ? 'near-limit' : 'unavailable', unavailableReason: `Quota request failed (${response.status})` }
+      const parsed = JSON.parse(raw) as { models?: Record<string, { quotaInfo?: { remainingFraction?: number; resetTime?: string } }> }
+      const quotas = Object.values(parsed.models ?? {}).map(item => item.quotaInfo).filter((item): item is NonNullable<typeof item> => Boolean(item?.remainingFraction !== undefined))
+      if (quotas.length === 0) return { accountId: account.id, ...metadata, refreshedAt: Date.now(), source: 'unavailable', status: 'unavailable', unavailableReason: 'No quota data returned by Cloud Code' }
+      const remaining = Math.max(0, Math.min(...quotas.map(item => item.remainingFraction ?? 0)))
+      const resetAt = quotas.map(item => item.resetTime ? Date.parse(item.resetTime) : 0).filter(Boolean).sort((a, b) => a - b)[0]
+      const normalized: ProviderUsage = { accountId: account.id, ...metadata, refreshedAt: Date.now(), source: 'provider', status: remaining <= 0 ? 'near-limit' : remaining <= 0.2 ? 'near-limit' : 'ok', primaryUsedPercent: (1 - remaining) * 100, resetAt: resetAt || undefined, planName: account.profile?.planName }
+      account.usage = normalized
+      this.store.setUsage(account.id, normalized)
+      return normalized
     } catch (error) {
       return { accountId: account.id, ...metadata, refreshedAt: Date.now(), source: 'unavailable', status: 'unavailable', unavailableReason: String(error) }
     }
