@@ -88,7 +88,18 @@ export class ProviderManager {
   }
 
   refreshUsage(_providerId?: string, _accountId?: string): ProviderUsage[] {
-    return []
+    const connections = this.list(_providerId)
+    const usage: ProviderUsage[] = []
+    for (const connection of connections) {
+      for (const account of connection.accounts) {
+        if (_accountId && account.id !== _accountId) continue
+        if (account.usage) {
+          usage.push(account.usage)
+          this.deps.onUsage?.(account.usage)
+        }
+      }
+    }
+    return usage
   }
 
   close(): void {
