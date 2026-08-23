@@ -742,11 +742,11 @@ export class BsAgentManager {
     const cfg = settingsToConfig(settings, current)
     writeBsConfig(this.deps.configPath, cfg)
     this.deps = { ...this.deps, notifications: cfg.notifications }
-    await this.reload()
     for (const agent of this.agents.values()) {
       const profile = cfg.agents[agent.name]
       if (profile?.provider && profile.model) this.persistAssignment(agent.id, profile.provider, profile.model, profile.accountId, profile.speed ?? 'standard')
     }
+    await this.reload()
     for (const agent of this.agents.values()) {
       const assignment = this.getAgentAssignment(agent.id)
       if (assignment) this.deps.onAssignmentChanged?.({ agentId: agent.id, providerId: assignment.provider, accountId: assignment.accountId, modelId: assignment.model, speed: assignment.speed ?? 'standard', revision: Date.now(), status: 'ready' })
@@ -1005,14 +1005,20 @@ export class BsAgentManager {
 
   private resolveAgentConfig(cfg: BsConfig, agentName: string, agentModel?: string): ResolvedAgentConfig {
     cfg = this.materializeConnectedProviders(cfg)
+    const registeredAgent = [...this.agents.values()].find(a => a.name === agentName)
+    const storedAssignment = registeredAgent ? this.assignments.get(registeredAgent.id) : undefined
+    const requestedModel = storedAssignment
+      ? `${storedAssignment.providerId}/${storedAssignment.modelId}`
+      : agentModel
     const resolved = resolveAgentConfig(
       cfg,
       agentName,
       this.deps.env,
-      agentModel,
+      requestedModel,
       this.deps.vault ? (ref: string) => this.deps.vault!.getSecret(ref) : undefined
     )
-    const agent = [...this.agents.values()].find(a => a.name === agentName)
+    const agent = registeredAgent
+    if (storedAssignment) resolved.accountId = storedAssignment.accountId
     if (agent?.accountId) resolved.accountId = agent.accountId
     if (resolved.provider) {
       const connection = this.deps.providerAccounts?.().find(c => c.providerId === resolved.provider)
