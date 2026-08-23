@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import type { ProviderAccount, ProviderConnection, ProviderUsage } from '../../shared/types'
-import { normalizeOpenAICodexUsage } from './usage'
+import { extractOpenAISubscriptionMetadata, normalizeOpenAICodexUsage } from './usage'
 import { createPkce, listenForCallback } from './oauth'
 import { CODEX_REDIRECT_URI, codexAuthorizeUrl, decodeJwtProfile, exchangeCodexCode, mergeCodexAuthFile } from './codex'
 import { ProviderAccountStore } from './store'
@@ -102,11 +102,12 @@ export class ProviderManager {
   }
 
   private async fetchUsage(providerId: string, account: ProviderAccount): Promise<ProviderUsage> {
+    const metadata = { accountLabel: account.profile?.email ?? account.label, accountType: account.authMode === 'oauth' ? 'oauth' as const : account.authMode === 'api-key' ? 'api-key' as const : 'session' as const }
     if (providerId !== 'openai' || account.authMode !== 'oauth' || !account.keyRef) {
-      return account.usage ?? { accountId: account.id, refreshedAt: Date.now(), source: 'unavailable', status: 'unavailable', unavailableReason: 'Provider quota adapter unavailable' }
+      return account.usage ?? { accountId: account.id, ...metadata, refreshedAt: Date.now(), source: 'unavailable', status: 'unavailable', unavailableReason: 'Provider quota adapter unavailable' }
     }
     const secret = this.store.getSecret(account.id)
-    if (!secret?.accessToken) return { accountId: account.id, refreshedAt: Date.now(), source: 'unavailable', status: 'unavailable', unavailableReason: 'OAuth access token unavailable' }
+    if (!secret?.accessToken) return { accountId: account.id, ...metadata, refreshedAt: Date.now(), source: 'unavailable', status: 'unavailable', unavailableReason: 'OAuth access token unavailable' }
     try {
       const headers: Record<string, string> = {
         authorization: `Bearer ${secret.accessToken}`,
@@ -127,16 +128,38 @@ export class ProviderManager {
           continue
         }
         let parsed: unknown
-        try { parsed = JSON.parse(body) } catch { return { accountId: account.id, refreshedAt: Date.now(), source: 'unavailable', status: 'unavailable', unavailableReason: 'Quota response was not valid JSON' } }
+        try { parsed = JSON.parse(body) } catch { return { accountId: account.id, ...metadata, refreshedAt: Date.now(), source: 'unavailable', status: 'unavailable', unavailableReason: 'Quota response was not valid JSON' } }
         const normalized = normalizeOpenAICodexUsage(account.id, parsed)
+        normalized.accountLabel = account.profile?.email ?? account.label
+        normalized.accountType = account.authMode === 'oauth' ? 'oauth' : account.authMode === 'api-key' ? 'api-key' : 'session'
+        normalized.planName = normalized.planName ?? account.profile?.planName
+        const subscription = await this.fetchSubscriptionMetadata(headers, secret.accountId)
+        normalized.planName = normalized.planName ?? subscription.planName
+        normalized.subscriptionExpiresAt = subscription.subscriptionExpiresAt ?? normalized.subscriptionExpiresAt
         account.usage = normalized
         this.store.setUsage(account.id, normalized)
         return normalized
       }
-      return { accountId: account.id, refreshedAt: Date.now(), source: 'unavailable', status: 'unavailable', unavailableReason: `Quota request failed (${lastStatus || 'network error'})` }
+      return { accountId: account.id, ...metadata, refreshedAt: Date.now(), source: 'unavailable', status: 'unavailable', unavailableReason: `Quota request failed (${lastStatus || 'network error'})` }
     } catch (error) {
-      return { accountId: account.id, refreshedAt: Date.now(), source: 'unavailable', status: 'unavailable', unavailableReason: String(error) }
+      return { accountId: account.id, ...metadata, refreshedAt: Date.now(), source: 'unavailable', status: 'unavailable', unavailableReason: String(error) }
     }
+  }
+
+  private async fetchSubscriptionMetadata(headers: Record<string, string>, accountId?: string): Promise<Pick<ProviderUsage, 'planName' | 'subscriptionExpiresAt'>> {
+    const endpoints = [
+      'https://chatgpt.com/backend-api/accounts/check/v4-2023-04-27?timezone_offset_min=420',
+      ...(accountId ? [`https://chatgpt.com/backend-api/subscriptions?account_id=${encodeURIComponent(accountId)}`] : [])
+    ]
+    for (const endpoint of endpoints) {
+      try {
+        const response = await fetch(endpoint, { headers })
+        if (!response.ok) continue
+        const metadata = extractOpenAISubscriptionMetadata(await response.json())
+        if (metadata.planName || metadata.subscriptionExpiresAt) return metadata
+      } catch { /* quota remains useful when subscription metadata is unavailable */ }
+    }
+    return {}
   }
 
   close(): void {

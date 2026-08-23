@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { normalizeOpenAICodexUsage, normalizeUsage } from '../../src/main/connections/usage'
+import { extractOpenAISubscriptionMetadata, normalizeOpenAICodexUsage, normalizeUsage } from '../../src/main/connections/usage'
 
 describe('provider usage normalization', () => {
   it('marks usage near limit at 90 percent', () => {
@@ -34,5 +34,9 @@ describe('provider usage normalization', () => {
     expect(usage.secondaryUsedPercent).toBe(18)
     expect(usage.resetAt).toBe(123)
     expect(usage.status).toBe('ok')
+  })
+
+  it('extracts plan and subscription expiry from nested account responses', () => {
+    expect(extractOpenAISubscriptionMetadata({ account: { plan_type: 'plus', subscription_active_until: 1_800_000_000 } })).toEqual({ planName: 'plus', subscriptionExpiresAt: 1_800_000_000_000 })
   })
 })

@@ -21,6 +21,7 @@ export interface BsAgentConfig {
   model?: string
   accountId?: string
   fallback?: Array<{ provider: string; accountId?: string; model: string }>
+  speed?: 'standard' | 'fast'
   systemPrompt: string
 }
 
@@ -166,6 +167,7 @@ function normalizeAgents(raw: Record<string, unknown> | undefined): Record<strin
       provider: typeof v.provider === 'string' ? v.provider : (isProviderRef ? legacyModel : undefined),
       model: typeof v.model === 'string' && !isProviderRef ? v.model : undefined,
       accountId: typeof v.accountId === 'string' ? v.accountId : undefined,
+      speed: v.speed === 'fast' ? 'fast' : 'standard',
       fallback: Array.isArray(v.fallback)
         ? v.fallback.filter((f): f is { provider: string; accountId?: string; model: string } =>
           typeof f === 'object' && f !== null && typeof (f as Record<string, unknown>).provider === 'string' && typeof (f as Record<string, unknown>).model === 'string')
@@ -355,7 +357,8 @@ export function configToSettings(cfg: BsConfig): BsSettings {
       provider: a.provider,
       model: a.model,
       accountId: a.accountId,
-      fallback: a.fallback
+      fallback: a.fallback,
+      speed: a.speed
     })),
     permission: cfg.permission,
     mcp: cfg.mcp,
@@ -392,6 +395,7 @@ export function settingsToConfig(settings: BsSettings, base: BsConfig = DEFAULT_
       model: a.model,
       accountId: a.accountId,
       fallback: a.fallback,
+      speed: a.speed,
       systemPrompt: a.systemPrompt
     }
   }

@@ -20,7 +20,7 @@ export function normalizeUsage(input: Partial<ProviderUsage> & Pick<ProviderUsag
 
 export function normalizeOpenAICodexUsage(accountId: string, raw: unknown): ProviderUsage {
   const value = raw as {
-    usage?: { requests?: number; tokens?: number }
+    usage?: { requests?: number; tokens?: number; input_tokens?: number; output_tokens?: number; inputTokens?: number; outputTokens?: number }
     limit?: { requests?: number; tokens?: number }
     reset_at?: number
     plan_type?: string
@@ -44,6 +44,8 @@ export function normalizeOpenAICodexUsage(accountId: string, raw: unknown): Prov
     requestsUsed: value.usage?.requests,
     requestLimit: value.limit?.requests,
     tokensUsed,
+    tokensInput: value.usage?.input_tokens ?? value.usage?.inputTokens,
+    tokensOutput: value.usage?.output_tokens ?? value.usage?.outputTokens,
     tokenLimit: value.limit?.tokens ?? primary?.limit,
     resetAt,
     secondaryResetAt,
@@ -55,6 +57,23 @@ export function normalizeOpenAICodexUsage(accountId: string, raw: unknown): Prov
     planName: value.plan_type ?? value.planName,
     source: 'provider'
   })
+}
+
+export function extractOpenAISubscriptionMetadata(raw: unknown): Pick<ProviderUsage, 'planName' | 'subscriptionExpiresAt'> {
+  const found: { planName?: string; subscriptionExpiresAt?: number } = {}
+  const visit = (value: unknown): void => {
+    if (!value || typeof value !== 'object' || found.planName && found.subscriptionExpiresAt) return
+    for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
+      if (!found.planName && ['plan_type', 'planType', 'plan_name', 'planName'].includes(key) && typeof child === 'string' && child.trim()) found.planName = child
+      if (!found.subscriptionExpiresAt && ['subscription_active_until', 'subscriptionExpiresAt', 'expires_at', 'expiresAt', 'end_date', 'ends_at'].includes(key)) {
+        const parsed = typeof child === 'number' ? child : typeof child === 'string' ? Date.parse(child) : NaN
+        if (Number.isFinite(parsed)) found.subscriptionExpiresAt = parsed > 10_000_000_000 ? parsed : parsed * 1000
+      }
+      visit(child)
+    }
+  }
+  visit(raw)
+  return found
 }
 
 interface WindowUsage {

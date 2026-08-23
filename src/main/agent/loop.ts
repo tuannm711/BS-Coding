@@ -43,6 +43,7 @@ export interface LoopDeps {
   takeSteers?: () => QueuedMessage[]
   setTodos?: (todos: TodoItem[]) => void
   variantOptions?: Record<string, unknown>
+  serviceTier?: 'priority'
   onUsage?: (tokens: MessageTokens) => void
   computeCost?: (usage: { input: number; output: number; cacheRead?: number; cacheWrite?: number }) => number
   diagnostics?: (filePath: string, text: string) => Promise<string>
@@ -125,7 +126,8 @@ export class SessionRunner {
           messages: llmMessages,
           tools: isLastStep ? [] : this.visibleToolDefs(),
           signal,
-          variantOptions: this.deps.variantOptions
+          variantOptions: this.deps.variantOptions,
+          serviceTier: this.deps.serviceTier
         })
         for await (const part of stream) {
           if (signal?.aborted) {

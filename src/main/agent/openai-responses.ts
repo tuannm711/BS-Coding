@@ -69,7 +69,8 @@ export class OpenAIResponsesClient implements LlmClient {
       tools: toTools(opts.tools),
       stream: true,
       store: false,
-      ...(this.state.previousResponseId ? { previous_response_id: this.state.previousResponseId } : {})
+      ...(this.state.previousResponseId ? { previous_response_id: this.state.previousResponseId } : {}),
+      ...(opts.serviceTier ? { service_tier: opts.serviceTier } : {})
     }
     const response = await this.fetchImpl(`${this.baseUrl}/responses`, {
       method: 'POST',

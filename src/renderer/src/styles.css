@@ -1622,6 +1622,37 @@ select.input { width: 100%; }
 .right-panel-quota-model .agent-usage-status { flex: 0 0 7px; width: 7px; height: 7px; border-radius: 50%; background: var(--text-faint); }
 .right-panel-quota-model .agent-usage-status.running { background: var(--accent); box-shadow: 0 0 0 2px var(--accent-dim); }
 .right-panel-quota-meta { margin-top: 4px; display: grid; gap: 2px; color: var(--text-dim); font-family: var(--font-mono); font-size: var(--fs-sm); font-variant-numeric: tabular-nums; }
+
+.quota-account-card { display: grid; gap: 9px; padding: 10px; border: 1px solid var(--hairline); border-radius: 10px; background: color-mix(in srgb, var(--bg-panel) 90%, var(--accent) 10%); min-width: 0; }
+.provider-account-block { display: grid; gap: 6px; margin: 8px 0 0 20px; }
+.provider-account-actions { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+.quota-account-card.compact { padding: 9px; }
+.quota-account-header, .quota-account-identity, .quota-account-actions, .quota-window-label, .quota-agent-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; }
+.quota-account-identity { justify-content: flex-start; }
+.quota-account-avatar { display: grid; place-items: center; width: 24px; height: 24px; flex: 0 0 24px; border-radius: 7px; background: var(--accent); color: var(--bg); font-size: var(--fs-sm); font-weight: 700; }
+.quota-account-identity > div { display: grid; gap: 1px; min-width: 0; }
+.quota-account-identity strong, .quota-account-identity span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.quota-account-identity > div > span, .quota-account-subline, .quota-window-reset, .quota-metric span { color: var(--text-faint); font-size: var(--fs-sm); }
+.quota-plan-badge { border: 1px solid var(--accent-border); border-radius: 999px; padding: 2px 7px; color: var(--accent); font-size: var(--fs-sm); white-space: nowrap; }
+.quota-refresh { flex: 0 0 auto; }
+.quota-account-subline { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.quota-account-error { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 8px; border: 1px solid color-mix(in srgb, var(--danger) 45%, transparent); border-radius: 6px; color: var(--danger); font-size: var(--fs-sm); }
+.quota-agent-list { display: grid; gap: 5px; padding: 6px 0 2px; border-top: 1px solid var(--hairline); border-bottom: 1px solid var(--hairline); }
+.quota-agent-name { display: flex; align-items: center; gap: 5px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.quota-agent-name code { color: var(--text-faint); overflow: hidden; text-overflow: ellipsis; }
+.quota-speed-control { display: inline-flex; gap: 3px; flex: 0 0 auto; }
+.quota-speed-control button { display: inline-flex; align-items: center; gap: 3px; min-height: 25px; padding: 3px 6px; border: 1px solid var(--hairline); border-radius: 5px; color: var(--text-faint); background: transparent; font-size: var(--fs-sm); cursor: pointer; }
+.quota-speed-control button:hover, .quota-speed-control button:focus-visible { border-color: var(--accent-border); color: var(--text-strong); }
+.quota-speed-control button.active { border-color: var(--accent-border); background: var(--accent-dim); color: var(--accent); }
+.quota-window { display: grid; gap: 4px; }
+.quota-window-label { font-size: var(--fs-sm); }
+.quota-window-label strong { color: var(--text-strong); font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.quota-progress { height: 7px; overflow: hidden; border-radius: 999px; background: var(--bg-input); }
+.quota-progress > span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 55%, white)); transition: width 200ms ease; }
+.quota-usage-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px; }
+.quota-metric { display: grid; gap: 2px; min-width: 0; padding: 6px 7px; border-radius: 6px; background: var(--bg-input); }
+.quota-metric strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-strong); font-family: var(--font-mono); font-size: var(--fs-sm); font-variant-numeric: tabular-nums; }
+@media (prefers-reduced-motion: reduce) { .quota-progress > span { transition: none; } }
 .right-panel-view {
   flex: 1; min-width: 0; min-height: 0;
   display: flex; flex-direction: column; overflow: hidden;

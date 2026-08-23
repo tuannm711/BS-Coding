@@ -3,6 +3,7 @@ export type AlertLevel = 'normal' | 'attention' | 'error'
 export type AgentKind = 'pty' | 'native'
 export type AgentMode = 'build' | 'plan'
 export type ModelVariant = string
+export type AgentSpeed = 'standard' | 'fast'
 export type ChatRole = 'user' | 'assistant'
 
 export interface Template {
@@ -22,6 +23,7 @@ export interface AgentConfig {
   kind?: AgentKind
   mode?: AgentMode
   variant?: ModelVariant
+  speed?: AgentSpeed
   model?: string
   accountId?: string
   fallback?: Array<{ provider: string; accountId?: string; model: string }>
@@ -241,6 +243,8 @@ export interface ProviderAccount {
 
 export interface ProviderUsage {
   accountId: string
+  accountLabel?: string
+  accountType?: 'oauth' | 'api-key' | 'session'
   periodStart?: number
   periodEnd?: number
   resetAt?: number
@@ -253,6 +257,9 @@ export interface ProviderUsage {
   bankedLimit?: number
   primaryUsedPercent?: number
   secondaryUsedPercent?: number
+  tokensInput?: number
+  tokensOutput?: number
+  estimatedBilled?: number
   planName?: string
   subscriptionExpiresAt?: number
   refreshedAt: number
@@ -271,6 +278,7 @@ export interface AgentModelAssignment {
   provider: string
   accountId?: string
   model: string
+  speed?: AgentSpeed
   fallback?: Array<{ provider: string; accountId?: string; model: string }>
 }
 
@@ -309,6 +317,7 @@ export interface AgentSettings {
   model?: string
   accountId?: string
   fallback?: Array<{ provider: string; accountId?: string; model: string }>
+  speed?: AgentSpeed
 }
 
 export interface BsSettings {

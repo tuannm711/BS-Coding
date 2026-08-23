@@ -499,14 +499,25 @@ class MainApp {
     }
   }
 
+  setAgentSpeed(agentId: string, speed: 'standard' | 'fast'): void {
+    this.bsAgent.setSpeed(agentId, speed)
+    const ws = this.findWorkspaceByAgent(agentId)
+    if (ws) {
+      const updated = this.workspaces.updateAgent(ws.projectPath, agentId, { speed })
+      this.pushAgentConfig(updated, agentId)
+    }
+  }
+
   setAgentProfile(agentId: string, profileName: string): void {
     this.bsAgent.setProfile(agentId, profileName)
     const ws = this.findWorkspaceByAgent(agentId)
     if (ws) {
       const assignment = this.bsAgent.getAgentModel(agentId)
+      const profile = this.bsAgent.getAgentAssignment(agentId)
       const updated = this.workspaces.updateAgent(ws.projectPath, agentId, {
         name: profileName,
-        model: assignment ? `${assignment.provider}/${assignment.model}` : undefined
+        model: assignment ? `${assignment.provider}/${assignment.model}` : undefined,
+        speed: profile?.speed
       })
       this.pushAgentConfig(updated, agentId)
     }
@@ -694,6 +705,8 @@ function registerIpcHandlers(): void {
     mainApp.bsAgent.getAvailableVariants(agentId))
   ipcMain.handle(Channels.AgentSetModel, (_e, agentId: string, provider: string, model: string) =>
     mainApp.setAgentModel(agentId, provider, model))
+  ipcMain.handle(Channels.AgentSetSpeed, (_e, agentId: string, speed: 'standard' | 'fast') =>
+    mainApp.setAgentSpeed(agentId, speed))
   ipcMain.handle(Channels.AgentSetProfile, (_e, agentId: string, profileName: string) =>
     mainApp.setAgentProfile(agentId, profileName))
   ipcMain.handle(Channels.AgentSetAccount, (_e, agentId: string, accountId: string | null) =>

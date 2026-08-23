@@ -35,4 +35,11 @@ describe('OpenAIResponsesClient', () => {
       headers: expect.objectContaining({ authorization: 'Bearer oauth-token', 'ChatGPT-Account-ID': 'acct-1', originator: 'codex_vscode' })
     }))
   })
+
+  it('sends priority service tier for Fast Codex turns', async () => {
+    const fetchImpl = vi.fn(async () => new Response(JSON.stringify({ output: [] }), { status: 200 })) as unknown as typeof fetch
+    const client = new OpenAIResponsesClient({ apiKey: 'oauth-token', fetchImpl })
+    for await (const _part of client.stream({ model: 'gpt-5.6-sol', system: 'sys', messages: [], tools: [], serviceTier: 'priority' })) { /* consume */ }
+    expect(JSON.parse(String(fetchImpl.mock.calls[0]?.[1] && (fetchImpl.mock.calls[0]?.[1] as RequestInit).body))).toMatchObject({ service_tier: 'priority' })
+  })
 })

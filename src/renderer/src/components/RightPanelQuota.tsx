@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { AgentModelAssignment, ProviderUsage } from '@shared/types'
+import QuotaAccountCard from './quota/QuotaAccountCard'
 
 export interface QuotaAgent {
   id: string
@@ -10,6 +11,7 @@ interface AgentUsageState {
   assignment: AgentModelAssignment | null
   running: boolean
   sessionTokens?: { input: number; output: number }
+  sessionCost?: number
 }
 
 export default function RightPanelQuota({ agents }: { agents: QuotaAgent[] }) {
@@ -24,7 +26,8 @@ export default function RightPanelQuota({ agents }: { agents: QuotaAgent[] }) {
       setStates(previous => Object.fromEntries(rows.map(({ agent, assignment }) => [agent.id, {
         assignment,
         running: previous[agent.id]?.running ?? false,
-        sessionTokens: previous[agent.id]?.sessionTokens
+        sessionTokens: previous[agent.id]?.sessionTokens,
+        sessionCost: previous[agent.id]?.sessionCost
       }])))
     })
     return () => { cancelled = true }
@@ -39,7 +42,8 @@ export default function RightPanelQuota({ agents }: { agents: QuotaAgent[] }) {
     } else if (event.type === 'usage') {
       setStates(previous => ({ ...previous, [event.agentId]: {
         ...(previous[event.agentId] ?? { assignment: null, running: true }),
-        sessionTokens: event.sessionTokens
+        sessionTokens: event.sessionTokens,
+        sessionCost: event.sessionCost
       } }))
     }
   }), [agentKey])
@@ -52,19 +56,17 @@ export default function RightPanelQuota({ agents }: { agents: QuotaAgent[] }) {
   }, [])
 
   const rows = useMemo(() => {
-    const grouped = new Map<string, { assignment: AgentModelAssignment; agents: string[]; models: Set<string>; running: boolean; input: number; output: number }>()
+    const grouped = new Map<string, { assignment: AgentModelAssignment; agents: Array<{ id: string; name: string; assignment: AgentModelAssignment; input: number; output: number; cost: number }>; models: Set<string>; running: boolean }>()
     for (const agent of agents) {
       const state = states[agent.id]
       if (!state?.assignment) continue
       const key = state.assignment.accountId
         ? `${state.assignment.provider}/${state.assignment.accountId}`
         : `${state.assignment.provider}/${state.assignment.model}`
-      const row = grouped.get(key) ?? { assignment: state.assignment, agents: [], models: new Set<string>(), running: false, input: 0, output: 0 }
-      row.agents.push(agent.name)
+      const row = grouped.get(key) ?? { assignment: state.assignment, agents: [], models: new Set<string>(), running: false }
+      row.agents.push({ id: agent.id, name: agent.name, assignment: state.assignment, input: state.sessionTokens?.input ?? 0, output: state.sessionTokens?.output ?? 0, cost: state.sessionCost ?? 0 })
       row.models.add(state.assignment.model)
       row.running ||= state.running
-      row.input += state.sessionTokens?.input ?? 0
-      row.output += state.sessionTokens?.output ?? 0
       grouped.set(key, row)
     }
     return [...grouped.entries()]
@@ -80,37 +82,15 @@ export default function RightPanelQuota({ agents }: { agents: QuotaAgent[] }) {
         {rows.length === 0 && <span className="right-panel-quota-empty">No active model in this session</span>}
         {rows.map(([key, row]) => {
           const quota = row.assignment.accountId ? providerUsage[row.assignment.accountId] : undefined
-          return (
-            <div className="right-panel-quota-row" key={key}>
-              <div className="right-panel-quota-model">
-                <span className={`agent-usage-status ${row.running ? 'running' : 'idle'}`} />
-                <code title={key}>{[...row.models].join(', ')}</code>
-                <span>{row.assignment.provider}</span>
-              </div>
-              <div className="right-panel-quota-meta">
-                <span>{row.agents.join(', ')}</span>
-                <span>{row.input.toLocaleString()} in · {row.output.toLocaleString()} out</span>
-                <span>{quota?.planName ? `${quota.planName} · ` : ''}Quota {formatQuota(quota)} · Reset {quota?.resetAt ? formatCountdown(quota.resetAt) : '—'}{quota?.secondaryUsedPercent !== undefined ? ` · banked ${quota.secondaryUsedPercent}% used` : quota?.bankedUsed !== undefined ? ` · banked ${quota.bankedUsed.toLocaleString()}${quota.bankedLimit ? ` / ${quota.bankedLimit.toLocaleString()}` : ''}` : ''}{quota?.secondaryResetAt ? ` · banked reset ${formatCountdown(quota.secondaryResetAt)}` : ''}</span>
-              </div>
-            </div>
-          )
+          return <QuotaAccountCard key={key} usage={quota} agents={row.agents} compact onSpeedChange={(agentId, speed) => {
+            setStates(previous => {
+              const current = previous[agentId]
+              return current?.assignment ? { ...previous, [agentId]: { ...current, assignment: { ...current.assignment, speed } } } : previous
+            })
+            void window.api.setAgentSpeed(agentId, speed)
+          }} />
         })}
       </div>
     </section>
   )
-}
-
-function formatQuota(usage?: ProviderUsage): string {
-  if (!usage) return 'Unavailable'
-  if (usage.status === 'unavailable') return usage.unavailableReason ?? 'Unavailable'
-  if (usage.primaryUsedPercent !== undefined) return `${usage.primaryUsedPercent}% used`
-  if (usage.tokensUsed === undefined) return 'Unavailable'
-  return `${usage.tokensUsed.toLocaleString()}${usage.tokenLimit ? ` / ${usage.tokenLimit.toLocaleString()}` : ''}`
-}
-
-function formatCountdown(resetAt: number): string {
-  const seconds = Math.max(0, Math.round((resetAt - Date.now()) / 1000))
-  const hours = Math.floor(seconds / 3600)
-  const minutes = Math.floor((seconds % 3600) / 60)
-  return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`
 }

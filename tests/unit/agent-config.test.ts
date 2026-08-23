@@ -120,6 +120,14 @@ describe('resolveAgentConfig', () => {
     expect(resolved.model).toBe('gpt-5.6-sol')
   })
 
+  it('persists per-agent speed with settings conversion', () => {
+    const cfg = cfgWithProviders()
+    cfg.agents.bs.speed = 'fast'
+    const settings = configToSettings(cfg)
+    expect(settings.agents.find(agent => agent.name === 'bs')?.speed).toBe('fast')
+    expect(settingsToConfig(settings, cfg).agents.bs.speed).toBe('fast')
+  })
+
   it('uses a legacy agent.model provider reference', () => {
     const cfg = cfgWithProviders()
     cfg.agents.bs = { model: 'openai', systemPrompt: 'p' }

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { CatalogProviderSummary, BsSettings, ProviderConnection, ProviderSettings, ProviderUsage } from '@shared/types'
 import { OPENAI_OAUTH_MODELS, isOpenAiGenericModel } from '@shared/openai-oauth'
+import QuotaAccountCard from '../quota/QuotaAccountCard'
 import Modal from './Modal'
 
 interface Props {
@@ -203,18 +204,16 @@ export default function ProvidersTab({ settings, catalog, onChange }: Props) {
               </div>
             )}
             {(accounts.find(c => c.providerId === p.id)?.accounts ?? []).map(account => (
-              <div className="provider-account-row" key={account.id}>
-                <span className={`mcp-dot ${account.status === 'active' ? 'connected' : ''}`} />
-                <span>{account.label}</span>
-                <span className="settings-hint">{account.authMode} · {account.status}</span>
-                <span className="provider-account-quota">
-                  {formatAccountQuota(usageByAccount[account.id])}
-                </span>
-                <button className="btn small" onClick={() => void window.api.refreshProviderUsage(p.id, account.id)}>Refresh quota</button>
-                <button className="btn small" onClick={() => void window.api.setProviderAccountEnabled(account.id, account.status !== 'active').then(refreshAccounts)}>
-                  {account.status === 'active' ? 'Disable' : 'Enable'}
-                </button>
-                <button className="btn small" onClick={() => void window.api.removeProviderAccount(account.id).then(refreshAccounts)}>Remove</button>
+              <div className="provider-account-block" key={account.id}>
+                <QuotaAccountCard usage={usageByAccount[account.id] ?? { accountId: account.id, accountLabel: account.label, accountType: account.authMode === 'oauth' ? 'oauth' : 'api-key', refreshedAt: 0, source: 'unavailable', status: 'unavailable', unavailableReason: 'Quota not refreshed yet' }} onRefresh={() => void window.api.refreshProviderUsage(p.id, account.id)} />
+                <div className="provider-account-actions">
+                  <span className={`mcp-dot ${account.status === 'active' ? 'connected' : ''}`} />
+                  <span className="settings-hint">{account.authMode} · {account.status}</span>
+                  <button className="btn small" onClick={() => void window.api.setProviderAccountEnabled(account.id, account.status !== 'active').then(refreshAccounts)}>
+                    {account.status === 'active' ? 'Disable' : 'Enable'}
+                  </button>
+                  <button className="btn small" onClick={() => void window.api.removeProviderAccount(account.id).then(refreshAccounts)}>Remove</button>
+                </div>
               </div>
             ))}
           </div>
@@ -262,27 +261,4 @@ export default function ProvidersTab({ settings, catalog, onChange }: Props) {
       )}
     </div>
   )
-}
-
-function formatAccountQuota(usage?: ProviderUsage): string {
-  if (!usage) return 'Quota unavailable'
-  if (usage.status === 'unavailable') return usage.unavailableReason ?? 'Quota unavailable'
-  const primary = usage.primaryUsedPercent !== undefined
-    ? `${usage.primaryUsedPercent}% used`
-    : usage.tokensUsed !== undefined
-    ? `${usage.tokensUsed.toLocaleString()}${usage.tokenLimit ? ` / ${usage.tokenLimit.toLocaleString()}` : ''}`
-    : '—'
-  const banked = usage.secondaryUsedPercent !== undefined
-    ? ` · banked ${usage.secondaryUsedPercent}% used`
-    : usage.bankedUsed !== undefined ? ` · banked ${usage.bankedUsed.toLocaleString()}${usage.bankedLimit ? ` / ${usage.bankedLimit.toLocaleString()}` : ''}` : ''
-  const reset = usage.resetAt ? ` · reset ${formatCountdown(usage.resetAt)}` : ''
-  const bankedReset = usage.secondaryResetAt ? ` · banked reset ${formatCountdown(usage.secondaryResetAt)}` : ''
-  return `${usage.planName ? `${usage.planName} · ` : ''}${primary}${banked}${reset}${bankedReset}`
-}
-
-function formatCountdown(resetAt: number): string {
-  const seconds = Math.max(0, Math.round((resetAt - Date.now()) / 1000))
-  const hours = Math.floor(seconds / 3600)
-  const minutes = Math.floor((seconds % 3600) / 60)
-  return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`
 }

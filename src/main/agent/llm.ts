@@ -26,6 +26,7 @@ export interface LlmStreamOptions {
   tools: ToolDefinition[]
   signal?: AbortSignal
   variantOptions?: Record<string, unknown>
+  serviceTier?: 'priority'
 }
 
 export interface LlmClient {

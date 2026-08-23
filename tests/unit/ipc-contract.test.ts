@@ -9,7 +9,7 @@ describe('IPC contract', () => {
     const required: (keyof AgentApi)[] = [
       'listWorkspaces', 'addWorkspace', 'removeWorkspace', 'openWorkspace', 'openInEditor',
       'openFolder', 'openTerminal', 'closeTerminal',
-      'addAgent', 'removeAgent', 'setAgentMode', 'setAgentVariant', 'getAgentVariants', 'setAgentModel', 'getAgentModel', 'getContextInfo', 'getProviderModels', 'fetchProviderModels',
+      'addAgent', 'removeAgent', 'setAgentMode', 'setAgentVariant', 'getAgentVariants', 'setAgentModel', 'setAgentSpeed', 'getAgentModel', 'getContextInfo', 'getProviderModels', 'fetchProviderModels',
       'listProviderCatalog', 'connectProvider', 'disconnectProvider',
       'listTemplates', 'saveTemplate', 'removeTemplate',
       'pickFolder', 'startAgent', 'stopAgent', 'restartAgent',
@@ -43,6 +43,7 @@ describe('IPC contract', () => {
       setAgentVariant: async () => {},
       getAgentVariants: async () => [],
       setAgentModel: async () => {},
+      setAgentSpeed: async () => {},
       getAgentModel: async () => null,
       getContextInfo: async () => ({ limit: null, compactThreshold: null, sessionCost: 0 }),
       getProviderModels: async () => [],
@@ -168,6 +169,7 @@ describe('IPC contract', () => {
     expect(Channels.AgentSetVariant).toBe('agent:set-variant')
     expect(Channels.AgentGetVariants).toBe('agent:get-variants')
     expect(Channels.AgentSetModel).toBe('agent:set-model')
+    expect(Channels.AgentSetSpeed).toBe('agent:set-speed')
     expect(Channels.AgentGetModel).toBe('agent:get-model')
     expect(Channels.AgentGetContext).toBe('agent:get-context')
     expect(Channels.ProviderModels).toBe('provider:models')

@@ -488,6 +488,16 @@ export class BsAgentManager {
     this.register(agent)
   }
 
+  setSpeed(agentId: string, speed: 'standard' | 'fast'): void {
+    const agent = this.agents.get(agentId)
+    if (!agent) return
+    agent.speed = speed
+    this.agents.set(agentId, agent)
+    this.runners.delete(agentId)
+    this.resolved.delete(agentId)
+    this.register(agent)
+  }
+
   setProfile(agentId: string, profileName: string): void {
     const agent = this.agents.get(agentId)
     if (!agent) return
@@ -497,6 +507,7 @@ export class BsAgentManager {
     agent.name = profileName
     agent.model = profile.model ?? (profile.provider ? `${profile.provider}/${cfg.provider[profile.provider]?.models[0] ?? ''}` : undefined)
     agent.accountId = profile.accountId
+    agent.speed = profile.speed ?? 'standard'
     this.agents.set(agentId, agent)
     this.runners.delete(agentId)
     this.resolved.delete(agentId)
@@ -513,13 +524,13 @@ export class BsAgentManager {
     this.register(agent)
   }
 
-  getAgentAssignment(agentId: string): { provider: string; accountId?: string; model: string; fallback?: Array<{ provider: string; accountId?: string; model: string }> } | null {
+  getAgentAssignment(agentId: string): { provider: string; accountId?: string; model: string; speed?: 'standard' | 'fast'; fallback?: Array<{ provider: string; accountId?: string; model: string }> } | null {
     const agent = this.agents.get(agentId)
     if (!agent) return null
     const cfg = loadBsConfig(this.deps.configPath)
     const resolved = this.resolveAgentConfig(cfg, agent.name, agent.model)
     if (!resolved.provider || !resolved.model) return null
-    return { provider: resolved.provider, model: resolved.model, accountId: resolved.accountId, fallback: resolved.fallback }
+    return { provider: resolved.provider, model: resolved.model, accountId: resolved.accountId, speed: agent.speed ?? 'standard', fallback: resolved.fallback }
   }
 
   getAgentModel(agentId: string): ModelRef | null {
@@ -921,6 +932,7 @@ export class BsAgentManager {
         this.emit({ type: 'todo-updated', agentId: agent.id, todos })
       },
       variantOptions,
+      serviceTier: agent.speed === 'fast' && resolved.provider === 'openai' ? 'priority' : undefined,
       diagnostics: cfg.lsp.enabled && this.deps.lsp
         ? (filePath, text) => this.deps.lsp!.diagnosticsText(filePath, text)
         : undefined,
