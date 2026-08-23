@@ -39,6 +39,7 @@ import { Vault } from './vault'
 import { ProviderManager } from './connections/manager'
 import { ProviderRegistry } from './providers/registry'
 import { createOpenAiAdapter } from './providers/adapters/openai'
+import { createOpenAiCompatibleAdapter } from './providers/adapters/openai-compatible'
 import { TrayManager } from './tray-manager'
 import { BrowserBridge } from './browser/bridge'
 import { createChromeLauncher, ensureExtensionInstalled } from './browser/chrome-launcher'
@@ -189,6 +190,13 @@ class MainApp {
 
   constructor() {
     this.providerRegistry.register(createOpenAiAdapter())
+    const compatibleProviders: Array<[string, string, boolean]> = [
+      ['github-copilot', 'GitHub Copilot', false], ['cursor', 'Cursor', false], ['windsurf', 'Windsurf', false],
+      ['kiro', 'Kiro', false], ['grok', 'Grok / xAI', true], ['codebuddy', 'CodeBuddy', false],
+      ['codebuddy-cn', 'CodeBuddy CN', false], ['qoder', 'Qoder', false], ['trae', 'Trae', false],
+      ['zed', 'Zed', false], ['zcode', 'ZCode', false]
+    ]
+    for (const [id, name, apiKey] of compatibleProviders) this.providerRegistry.register(createOpenAiCompatibleAdapter(id, name, apiKey))
     this.pty.on('data', ({ agentId, data }) => {
       if (this.pty.isTerminal(agentId)) {
         win?.webContents.send(Channels.EventPtyData, { agentId, data })
