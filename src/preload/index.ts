@@ -1,11 +1,11 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { Channels } from '../shared/ipc'
 import type { ArtifactsChangedEvent } from '../shared/ipc'
-import type { ChatEvent, Command, ContextChangedEvent, FileViewerPayload, ImageAttachment, BsSettings, NewAgentInput, PromptResponse, ProviderConnection, ProviderUsage, Template, TraceEvent, UpdaterStatusEvent } from '../shared/types'
+import type { ChatEvent, Command, ContextChangedEvent, FileViewerPayload, ImageAttachment, BsSettings, NewAgentInput, PromptResponse, ProviderConnection, ProviderUsage, Template, TraceEvent, UpdaterStatusEvent, WorkspaceRuntime } from '../shared/types'
 import type { AgentApi, AgentConfigEvent, AgentStateEvent, BrowserInstallGuideEvent, GitStatusEvent, PtyDataEvent, TerminalExitEvent, WindowMaximizedChangeEvent } from '../shared/ipc'
 import type { BrowserStatusInfo } from '../shared/browser-types'
 import type { RemoteStatus } from '../shared/remote-types'
-import type { ProviderConnectRequest } from '../shared/providers'
+import type { ProviderAuthorizationRequest, ProviderAuthorizationSession, ProviderConnectRequest } from '../shared/providers'
 import type { AgentAssignmentSetRequest, AgentAssignmentSnapshot } from '../shared/provider-state'
 import type { ProviderSnapshot } from '../shared/provider-state'
 
@@ -23,6 +23,8 @@ const api: AgentApi = {
     ipcRenderer.invoke(Channels.WorkspaceRemove, projectPath),
   openWorkspace: (projectPath: string) =>
     ipcRenderer.invoke(Channels.WorkspaceOpen, projectPath),
+  onWorkspaceRuntimeChanged: (cb: (runtime: WorkspaceRuntime) => void) =>
+    subscribe(Channels.EventWorkspaceRuntimeChanged, cb),
   openInEditor: (projectPath: string) =>
     ipcRenderer.invoke(Channels.ProjectOpenInEditor, projectPath),
   openFolder: (projectPath: string) =>
@@ -73,12 +75,14 @@ const api: AgentApi = {
   listProviderCatalog: () => ipcRenderer.invoke(Channels.ProviderCatalog),
   listProviderCapabilities: () => ipcRenderer.invoke(Channels.ProviderCapabilities),
   connectProviderMethod: (request: ProviderConnectRequest) => ipcRenderer.invoke(Channels.ProviderConnectMethod, request),
+  createProviderAuthorization: (request: ProviderAuthorizationRequest) => ipcRenderer.invoke(Channels.ProviderAuthorizationCreate, request),
+  getProviderAuthorization: (loginId: string) => ipcRenderer.invoke(Channels.ProviderAuthorizationGet, loginId),
+  openProviderAuthorization: (loginId: string) => ipcRenderer.invoke(Channels.ProviderAuthorizationOpen, loginId),
+  cancelProviderAuthorization: (loginId: string) => ipcRenderer.invoke(Channels.ProviderAuthorizationCancel, loginId),
   connectProvider: (providerId: string, apiKey: string, baseUrl?: string) =>
     ipcRenderer.invoke(Channels.ProviderConnect, providerId, apiKey, baseUrl),
   disconnectProvider: (providerId: string) => ipcRenderer.invoke(Channels.ProviderDisconnect, providerId),
   listProviderAccounts: (providerId?: string) => ipcRenderer.invoke(Channels.ProviderAccounts, providerId),
-  startProviderLogin: (providerId: string) => ipcRenderer.invoke(Channels.ProviderLoginStart, providerId),
-  cancelProviderLogin: (loginId: string) => ipcRenderer.invoke(Channels.ProviderLoginCancel, loginId),
   setProviderAccountEnabled: (accountId: string, enabled: boolean) =>
     ipcRenderer.invoke(enabled ? Channels.ProviderAccountEnable : Channels.ProviderAccountDisable, accountId),
   switchProviderAccount: (providerId: string, accountId: string) =>
@@ -180,6 +184,7 @@ const api: AgentApi = {
   onAgentAssignmentChanged: (cb: (e: AgentAssignmentSnapshot) => void) => subscribe(Channels.EventAgentAssignmentChanged, cb),
   getProviderSnapshot: () => ipcRenderer.invoke(Channels.ProviderSnapshotGet),
   onProviderSnapshotChanged: (cb: (e: ProviderSnapshot) => void) => subscribe(Channels.EventProviderSnapshotChanged, cb),
+  onProviderAuthorizationChanged: (cb: (e: ProviderAuthorizationSession) => void) => subscribe(Channels.EventProviderAuthorizationChanged, cb),
   refreshProviderAccount: (providerId: string, accountId: string) => ipcRenderer.invoke(Channels.ProviderAccountRefresh, providerId, accountId),
   getAgentAssignmentSnapshot: (agentId: string) => ipcRenderer.invoke(Channels.AgentAssignmentGetSnapshot, agentId),
   setAgentAssignmentSnapshot: (request: AgentAssignmentSetRequest) => ipcRenderer.invoke(Channels.AgentAssignmentSetSnapshot, request),

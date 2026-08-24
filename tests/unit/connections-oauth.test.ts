@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
+import { get } from 'node:http'
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { createPkce } from '../../src/main/connections/oauth'
+import { createPkce, listenForCallback } from '../../src/main/connections/oauth'
 import { CODEX_CLIENT_ID, codexAuthorizeUrl, decodeJwtProfile, mergeCodexAuthFile } from '../../src/main/connections/codex'
 
 describe('OAuth helpers', () => {
@@ -34,5 +35,24 @@ describe('OAuth helpers', () => {
     expect(next.custom).toBe(true)
     expect(next.tokens.access_token).toBe('a')
     expect(next.tokens.old).toBe('x')
+  })
+
+  it('allocates a dynamic loopback port and returns callback state', async () => {
+    const callback = await listenForCallback({ port: 0, path: '/callback', timeoutMs: 1_000 })
+    get(`${callback.callbackUrl}?code=oauth-code&state=state-value`).on('error', () => {})
+
+    await expect(callback.result).resolves.toEqual({ code: 'oauth-code', state: 'state-value' })
+    expect(callback.port).toBeGreaterThan(0)
+    expect(callback.callbackUrl).toBe(`http://127.0.0.1:${callback.port}/callback`)
+  })
+
+  it('classifies a denied callback without exposing query details', async () => {
+    const callback = await listenForCallback({ port: 0, path: '/callback', timeoutMs: 1_000 })
+    get(`${callback.callbackUrl}?error=access_denied&error_description=No`).on('error', () => {})
+
+    await expect(callback.result).rejects.toMatchObject({
+      kind: 'authorization-denied',
+      message: '[bs] OAuth authorization was denied'
+    })
   })
 })

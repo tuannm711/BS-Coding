@@ -8,9 +8,12 @@ describe('IPC contract', () => {
   it('defines all channels used by the preload api', () => {
     const required: (keyof AgentApi)[] = [
       'listWorkspaces', 'addWorkspace', 'removeWorkspace', 'openWorkspace', 'openInEditor',
+      'onWorkspaceRuntimeChanged',
       'openFolder', 'openTerminal', 'closeTerminal',
       'addAgent', 'removeAgent', 'setAgentMode', 'setAgentVariant', 'getAgentVariants', 'setAgentModel', 'setAgentSpeed', 'getAgentModel', 'getContextInfo', 'getProviderModels', 'fetchProviderModels',
       'listProviderCatalog', 'connectProvider', 'disconnectProvider',
+      'createProviderAuthorization', 'getProviderAuthorization', 'openProviderAuthorization',
+      'cancelProviderAuthorization', 'onProviderAuthorizationChanged',
       'listTemplates', 'saveTemplate', 'removeTemplate',
       'pickFolder', 'startAgent', 'stopAgent', 'restartAgent',
       'writeInput', 'injectPrompt', 'resizePty', 'openLog', 'getLogPath', 'quit', 'getAppVersion',
@@ -36,6 +39,7 @@ describe('IPC contract', () => {
       addWorkspace: async () => null,
       removeWorkspace: async () => {},
       openWorkspace: async () => ({ workspace: { projectPath: '', name: '', agents: [] }, agents: [], git: null }),
+      onWorkspaceRuntimeChanged: () => () => {},
       openInEditor: async () => {},
       openFolder: async () => {},
       openTerminal: async () => ({ id: '', cwd: '', name: '', status: 'running' }),
@@ -54,6 +58,11 @@ describe('IPC contract', () => {
       listProviderCatalog: async () => [],
       listProviderCapabilities: async () => [],
       connectProviderMethod: async () => ({}),
+      createProviderAuthorization: async () => ({ loginId: '', providerId: '', methodId: 'oauth', authUrl: '', expiresAt: 0, status: 'waiting' }),
+      getProviderAuthorization: async () => undefined,
+      openProviderAuthorization: async () => {},
+      cancelProviderAuthorization: async () => undefined,
+      onProviderAuthorizationChanged: () => () => {},
       connectProvider: async () => ({ providers: [], defaultProvider: '' }),
       disconnectProvider: async () => ({ providers: [], defaultProvider: '' }),
       listTemplates: async () => [],
@@ -158,6 +167,7 @@ describe('IPC contract', () => {
   it('maps event channel names to the AgentApi method names', () => {
     expect(Channels.EventPtyData).toBe('pty:data')
     expect(Channels.EventAgentState).toBe('agent:state')
+    expect(Channels.EventWorkspaceRuntimeChanged).toBe('workspace:runtime-changed')
     expect(Channels.EventGitStatus).toBe('git:status')
     expect(Channels.PtyInput).toBe('pty:input')
     expect(Channels.ChatSend).toBe('chat:send')

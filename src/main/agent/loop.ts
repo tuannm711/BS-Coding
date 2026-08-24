@@ -154,6 +154,7 @@ export class SessionRunner {
               id: part.toolCallId ?? randomUUID(),
               tool: part.toolName ?? 'unknown',
               input: part.toolInput ?? {},
+              thoughtSignature: part.thoughtSignature,
               permission: 'pending'
             }
             calls.push(call)

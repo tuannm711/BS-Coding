@@ -2,7 +2,6 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import type { AgentSettings, CompactionSettings, BsSettings, ModelRef, NotificationsSettings, PermissionRule, SubagentType } from '../../shared/types'
 import type { McpServerConfig } from './mcp/manager'
-import { normalizeOpenAiCodexModel } from '../../shared/openai-oauth'
 
 export type { PermissionRule }
 export type { McpServerConfig }
@@ -156,13 +155,17 @@ function normalizeProvider(raw: RawProvider): BsProviderConfig {
 
 function normalizeAgents(raw: Record<string, unknown> | undefined): Record<string, BsAgentConfig> {
   const base = DEFAULT_BS_CONFIG.agents
-  if (!raw) return base
+  const defaults = Object.fromEntries(Object.entries(base).map(([name, agent]) => [name, {
+    ...agent,
+    fallback: agent.fallback?.map(item => ({ ...item }))
+  }]))
+  if (!raw) return defaults
   const out: Record<string, BsAgentConfig> = {}
   for (const [name, value] of Object.entries(raw)) {
     if (typeof value !== 'object' || value === null) continue
     const v = value as Partial<BsAgentConfig> & Record<string, unknown>
     const legacyModel = typeof v.model === 'string' ? v.model : undefined
-    const isProviderRef = legacyModel !== undefined && !legacyModel.includes('/')
+    const isProviderRef = typeof v.provider !== 'string' && legacyModel !== undefined && !legacyModel.includes('/')
     out[name] = {
       provider: typeof v.provider === 'string' ? v.provider : (isProviderRef ? legacyModel : undefined),
       model: typeof v.model === 'string' && !isProviderRef ? v.model : undefined,
@@ -175,7 +178,7 @@ function normalizeAgents(raw: Record<string, unknown> | undefined): Record<strin
       systemPrompt: typeof v.systemPrompt === 'string' ? v.systemPrompt : (base[name]?.systemPrompt ?? base.bs.systemPrompt)
     }
   }
-  return { ...base, ...out }
+  return { ...defaults, ...out }
 }
 
 function normalizeCompaction(raw: Partial<BsCompactionConfig> | undefined): BsCompactionConfig {
@@ -324,12 +327,11 @@ export function resolveAgentConfig(
       providerName = agent.model
     }
   }
-  if (providerName === 'openai' && modelName) modelName = normalizeOpenAiCodexModel(modelName)
   const provider = cfg.provider[providerName]
   if (!provider) {
     return { provider: '', model: '', accountId: agent.accountId, fallback: agent.fallback, apiKey: null, systemPrompt: agent.systemPrompt }
   }
-  const model = modelName && provider.models.includes(modelName) ? modelName : (provider.models[0] ?? '')
+  const model = modelName ? (provider.models.includes(modelName) ? modelName : '') : (provider.models[0] ?? '')
   return {
     provider: providerName,
     model,

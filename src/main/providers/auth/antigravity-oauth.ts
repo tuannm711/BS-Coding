@@ -14,13 +14,13 @@ export interface AntigravityTokens extends ProviderSecrets {
   expiresAt: number
 }
 
-export function antigravityAuthorizeUrl(state: string): string {
-  const params = new URLSearchParams({ client_id: ANTIGRAVITY_CLIENT_ID, redirect_uri: ANTIGRAVITY_REDIRECT_URI, response_type: 'code', scope: SCOPES.join(' '), access_type: 'offline', prompt: 'consent', state })
+export function antigravityAuthorizeUrl(pkce: { state: string; challenge: string }): string {
+  const params = new URLSearchParams({ client_id: ANTIGRAVITY_CLIENT_ID, redirect_uri: ANTIGRAVITY_REDIRECT_URI, response_type: 'code', scope: SCOPES.join(' '), access_type: 'offline', prompt: 'consent', state: pkce.state, code_challenge: pkce.challenge, code_challenge_method: 'S256' })
   return `${AUTH_URL}?${params.toString()}`
 }
 
-export async function exchangeAntigravityCode(code: string, fetchImpl: typeof fetch = fetch): Promise<AntigravityTokens> {
-  const response = await fetchImpl(TOKEN_URL, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ client_id: ANTIGRAVITY_CLIENT_ID, client_secret: ANTIGRAVITY_CLIENT_SECRET, code, redirect_uri: ANTIGRAVITY_REDIRECT_URI, grant_type: 'authorization_code' }).toString() })
+export async function exchangeAntigravityCode(code: string, verifier: string, fetchImpl: typeof fetch = fetch): Promise<AntigravityTokens> {
+  const response = await fetchImpl(TOKEN_URL, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ client_id: ANTIGRAVITY_CLIENT_ID, client_secret: ANTIGRAVITY_CLIENT_SECRET, code, redirect_uri: ANTIGRAVITY_REDIRECT_URI, grant_type: 'authorization_code', code_verifier: verifier }).toString() })
   if (!response.ok) throw new Error(`[bs] Antigravity OAuth token exchange failed (${response.status})`)
   const body = await response.json() as { access_token?: string; refresh_token?: string; id_token?: string; expires_in?: number }
   if (!body.access_token || !body.refresh_token) throw new Error('[bs] Antigravity OAuth không trả về refresh token; hãy thu hồi quyền và đăng nhập lại')

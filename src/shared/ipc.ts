@@ -8,13 +8,20 @@ import type { BrowserStatusInfo, PairingInfo } from './browser-types'
 import type { AgentAssignmentSetRequest, AgentAssignmentSnapshot } from './provider-state'
 import type { ProviderSnapshot } from './provider-state'
 import type { RemoteStatus } from './remote-types'
-import type { ProviderCapability, ProviderConnectRequest, ProviderConnectResult } from './providers'
+import type {
+  ProviderAuthorizationRequest,
+  ProviderAuthorizationSession,
+  ProviderCapability,
+  ProviderConnectRequest,
+  ProviderConnectResult
+} from './providers'
 
 export const Channels = {
   WorkspaceList: 'workspace:list',
   WorkspaceAdd: 'workspace:add',
   WorkspaceRemove: 'workspace:remove',
   WorkspaceOpen: 'workspace:open',
+  EventWorkspaceRuntimeChanged: 'workspace:runtime-changed',
   ProjectOpenFolder: 'project:open-folder',
   ProjectOpenInEditor: 'project:open-in-editor',
   FileOpen: 'file:open',
@@ -39,8 +46,10 @@ export const Channels = {
   ProviderConnect: 'provider:connect',
   ProviderDisconnect: 'provider:disconnect',
   ProviderAccounts: 'provider:accounts',
-  ProviderLoginStart: 'provider:login-start',
-  ProviderLoginCancel: 'provider:login-cancel',
+  ProviderAuthorizationCreate: 'provider:authorization-create',
+  ProviderAuthorizationGet: 'provider:authorization-get',
+  ProviderAuthorizationOpen: 'provider:authorization-open',
+  ProviderAuthorizationCancel: 'provider:authorization-cancel',
   ProviderAccountEnable: 'provider:account-enable',
   ProviderAccountDisable: 'provider:account-disable',
   ProviderAccountSwitch: 'provider:account-switch',
@@ -153,7 +162,8 @@ export const Channels = {
   EventProviderSnapshotChanged: 'provider:snapshot-changed',
   AgentAssignmentGetSnapshot: 'agent:assignment-get-snapshot',
   AgentAssignmentSetSnapshot: 'agent:assignment-set-snapshot',
-  EventAgentAssignmentChanged: 'agent:assignment-changed'
+  EventAgentAssignmentChanged: 'agent:assignment-changed',
+  EventProviderAuthorizationChanged: 'provider:authorization-changed'
 } as const
 
 export interface PtyDataEvent { agentId: string; data: string }
@@ -178,6 +188,7 @@ export interface AgentApi {
   addWorkspace(projectPath: string, name: string): Promise<WorkspaceRuntime | null>
   removeWorkspace(projectPath: string): Promise<void>
   openWorkspace(projectPath: string): Promise<WorkspaceRuntime>
+  onWorkspaceRuntimeChanged(cb: (runtime: WorkspaceRuntime) => void): () => void
   openInEditor(projectPath: string): Promise<void>
   openFolder(projectPath: string): Promise<void>
   openFile(payload: FileViewerPayload): Promise<void>
@@ -207,11 +218,13 @@ export interface AgentApi {
   listProviderCatalog(): Promise<CatalogProviderSummary[]>
   listProviderCapabilities(): Promise<ProviderCapability[]>
   connectProviderMethod(request: ProviderConnectRequest): Promise<ProviderConnectResult>
+  createProviderAuthorization(request: ProviderAuthorizationRequest): Promise<ProviderAuthorizationSession>
+  getProviderAuthorization(loginId: string): Promise<ProviderAuthorizationSession | undefined>
+  openProviderAuthorization(loginId: string): Promise<void>
+  cancelProviderAuthorization(loginId: string): Promise<ProviderAuthorizationSession | undefined>
   connectProvider(providerId: string, apiKey: string, baseUrl?: string): Promise<BsSettings>
   disconnectProvider(providerId: string): Promise<BsSettings>
   listProviderAccounts(providerId?: string): Promise<ProviderConnection[]>
-  startProviderLogin(providerId: string): Promise<{ loginId: string; authUrl: string; expiresIn: number }>
-  cancelProviderLogin(loginId: string): Promise<void>
   setProviderAccountEnabled(accountId: string, enabled: boolean): Promise<void>
   switchProviderAccount(providerId: string, accountId: string): Promise<void>
   removeProviderAccount(accountId: string): Promise<void>
@@ -221,6 +234,7 @@ export interface AgentApi {
   onAgentAssignmentChanged(cb: (e: AgentAssignmentSnapshot) => void): () => void
   getProviderSnapshot(): Promise<ProviderSnapshot>
   onProviderSnapshotChanged(cb: (e: ProviderSnapshot) => void): () => void
+  onProviderAuthorizationChanged(cb: (e: ProviderAuthorizationSession) => void): () => void
   refreshProviderAccount(providerId: string, accountId: string): Promise<ProviderSnapshot>
   getAgentAssignmentSnapshot(agentId: string): Promise<AgentAssignmentSnapshot | null>
   setAgentAssignmentSnapshot(request: AgentAssignmentSetRequest): Promise<AgentAssignmentSnapshot>

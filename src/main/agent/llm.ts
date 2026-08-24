@@ -15,6 +15,7 @@ export interface LlmStreamPart {
   toolName?: string
   toolCallId?: string
   toolInput?: Record<string, unknown>
+  thoughtSignature?: string
   finishReason?: string
   error?: string
   tokens?: MessageTokens

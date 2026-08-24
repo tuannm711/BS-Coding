@@ -22,4 +22,24 @@ describe('assignment store', () => {
     expect(store.get('r1')).toMatchObject({ providerId: 'openai', modelId: 'gpt-5.6-sol', accountId: 'a1', speed: 'fast', status: 'ready' })
     expect(store.get('r2')).toMatchObject({ status: 'needs-review' })
   })
+
+  it('marks non-empty legacy references for review when the account or model is invalid', () => {
+    const data: Record<string, unknown> = {}
+    const store = new AssignmentStore({ load: () => data.value, save: value => { data.value = value } })
+
+    const result = store.migrate({ agents: {
+      removedAccount: { provider: 'antigravity', model: 'gemini-code', accountId: 'removed' },
+      removedModel: { provider: 'antigravity', model: 'removed-model', accountId: 'active' },
+      valid: { provider: 'antigravity', model: 'gemini-code', accountId: 'active' }
+    } }, [
+      { id: 'a1', name: 'removedAccount' },
+      { id: 'a2', name: 'removedModel' },
+      { id: 'a3', name: 'valid' }
+    ], assignment => assignment.providerId === 'antigravity' && assignment.accountId === 'active' && assignment.modelId === 'gemini-code')
+
+    expect(result.needsReview).toEqual(['a1', 'a2'])
+    expect(store.get('a1')).toMatchObject({ accountId: 'removed', modelId: 'gemini-code', status: 'needs-review' })
+    expect(store.get('a2')).toMatchObject({ accountId: 'active', modelId: 'removed-model', status: 'needs-review' })
+    expect(store.get('a3')).toMatchObject({ accountId: 'active', modelId: 'gemini-code', status: 'ready' })
+  })
 })

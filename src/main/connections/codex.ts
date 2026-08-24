@@ -44,6 +44,18 @@ export async function exchangeCodexCode(code: string, verifier: string, fetchImp
   return { accessToken: body.access_token, refreshToken: body.refresh_token, idToken: body.id_token, expiresAt: Date.now() + (body.expires_in ?? 3600) * 1000 }
 }
 
+export async function refreshCodexToken(refreshToken: string, fetchImpl: typeof fetch = fetch): Promise<CodexTokens> {
+  const response = await fetchImpl(CODEX_TOKEN_URL, {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded', originator: CODEX_ORIGINATOR, 'user-agent': `${CODEX_ORIGINATOR}/0.146.0` },
+    body: new URLSearchParams({ grant_type: 'refresh_token', client_id: CODEX_CLIENT_ID, refresh_token: refreshToken }).toString()
+  })
+  if (!response.ok) throw new Error(`[bs] ChatGPT OAuth token refresh failed (${response.status})`)
+  const body = await response.json() as { access_token?: string; refresh_token?: string; id_token?: string; expires_in?: number }
+  if (!body.access_token) throw new Error('[bs] ChatGPT OAuth token refresh không trả về access token')
+  return { accessToken: body.access_token, refreshToken: body.refresh_token ?? refreshToken, idToken: body.id_token, expiresAt: Date.now() + (body.expires_in ?? 3600) * 1000 }
+}
+
 export function decodeJwtProfile(idToken?: string): { email?: string; name?: string; accountId?: string } {
   if (!idToken) return {}
   try {

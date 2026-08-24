@@ -26,7 +26,7 @@ describe('Antigravity runtime transport', () => {
     const parts = []
     for await (const part of stream) parts.push(part)
     expect(parts[0]).toMatchObject({ kind: 'text', text: 'ok' })
-    expect(calls[0].url).toBe('https://cloudcode-pa.googleapis.com/v1internal:streamGenerateContent?alt=sse')
+    expect(calls[0].url).toBe('https://daily-cloudcode-pa.googleapis.com/v1internal:streamGenerateContent?alt=sse')
     expect((calls[0].init?.headers as Record<string, string>).authorization).toBe('Bearer ya29.test-token')
     const payload = JSON.parse(String(calls[0].init?.body)) as { request: { tools: Array<{ functionDeclarations: Array<{ parameters: Record<string, unknown> }> }> } }
     expect(payload.request.tools[0].functionDeclarations[0].parameters).not.toHaveProperty('$schema')

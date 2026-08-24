@@ -7,7 +7,11 @@ export interface AssignmentPersistence {
   save(value: unknown): void
 }
 
-export function fileAssignmentPersistence(file: string): AssignmentPersistence {
+export function assignmentMigrationBackupPath(file: string): string {
+  return `${file}.migration-v1.backup.json`
+}
+
+export function fileAssignmentPersistence(file: string, legacySettingsFile?: string): AssignmentPersistence {
   return {
     load() {
       if (!existsSync(file)) return null
@@ -15,6 +19,12 @@ export function fileAssignmentPersistence(file: string): AssignmentPersistence {
     },
     save(value) {
       mkdirSync(path.dirname(file), { recursive: true })
+      const backup = assignmentMigrationBackupPath(file)
+      if (!existsSync(file) && legacySettingsFile && existsSync(legacySettingsFile) && !existsSync(backup)) {
+        const backupTemp = `${backup}.${process.pid}.${Date.now()}.tmp`
+        writeFileSync(backupTemp, readFileSync(legacySettingsFile))
+        renameSync(backupTemp, backup)
+      }
       const temp = `${file}.${process.pid}.${Date.now()}.tmp`
       writeFileSync(temp, JSON.stringify(value, null, 2))
       renameSync(temp, file)
@@ -58,7 +68,11 @@ export class AssignmentStore {
     this.persistence.save(this.state)
   }
 
-  migrate(settings: { agents?: Record<string, { provider?: string; model?: string; accountId?: string; speed?: 'standard' | 'fast' }> }, workspaceAgents: Array<{ id: string; name: string; model?: string; accountId?: string; speed?: 'standard' | 'fast' }>): { migrated: number; needsReview: string[] } {
+  migrate(
+    settings: { agents?: Record<string, { provider?: string; model?: string; accountId?: string; speed?: 'standard' | 'fast' }> },
+    workspaceAgents: Array<{ id: string; name: string; model?: string; accountId?: string; speed?: 'standard' | 'fast' }>,
+    isCompatible?: (assignment: Pick<AgentAssignmentSnapshot, 'providerId' | 'accountId' | 'modelId'>) => boolean
+  ): { migrated: number; needsReview: string[] } {
     let migrated = 0
     const needsReview: string[] = []
     for (const agent of workspaceAgents) {
@@ -68,8 +82,11 @@ export class AssignmentStore {
       const slash = encoded.indexOf('/')
       const providerId = profile?.provider ?? (slash > 0 ? encoded.slice(0, slash) : '')
       const modelId = slash > 0 ? encoded.slice(slash + 1) : encoded
-      const status = providerId && modelId ? 'ready' as const : 'needs-review' as const
-      this.state.assignments[agent.id] = { agentId: agent.id, providerId, modelId, accountId: profile?.accountId ?? agent.accountId, speed: profile?.speed ?? agent.speed ?? 'standard', revision: 1, status }
+      const complete = Boolean(providerId && modelId)
+      const status = complete && (!isCompatible || isCompatible({ providerId, modelId, accountId: profile?.accountId ?? agent.accountId }))
+        ? 'ready' as const
+        : 'needs-review' as const
+      this.state.assignments[agent.id] = { agentId: agent.id, profileName: agent.name, providerId, modelId, accountId: profile?.accountId ?? agent.accountId, speed: profile?.speed ?? agent.speed ?? 'standard', revision: 1, status }
       migrated++
       if (status === 'needs-review') needsReview.push(agent.id)
     }

@@ -37,7 +37,6 @@ import type { NotificationService } from './notification-service'
 import type { Vault } from './vault'
 import { TraceStore } from './agent/trace-store'
 import type { TraceEventInput } from './agent/trace-store'
-import { OPENAI_OAUTH_MODELS, isActiveOpenAiOAuthAccount, isOpenAiGenericModel, normalizeOpenAiCodexModel } from '../shared/openai-oauth'
 import type { AgentAssignmentSetRequest, AgentAssignmentSnapshot } from '../shared/provider-state'
 import { AssignmentStore, fileAssignmentPersistence } from './agent/assignments'
 import { SharedSessionCoordinator } from './agent/shared-session-coordinator'
@@ -73,6 +72,14 @@ export interface BsAgentManagerDeps {
   onAssignmentChanged?: (assignment: AgentAssignmentSnapshot) => void
   assignmentPath?: string
   providerRuntime?: (providerId: string, accountId: string, modelId: string) => LlmClient
+}
+
+function unavailableProviderRuntime(providerId: string): LlmClient {
+  return {
+    async *stream() {
+      yield { kind: 'error', error: `[bs] Provider runtime adapter không khả dụng cho ${providerId}` }
+    }
+  }
 }
 
 export class BsAgentManager {
@@ -114,7 +121,7 @@ export class BsAgentManager {
     this.tools = new Map(deps.tools)
     const cfg = loadBsConfig(deps.configPath)
     this.deps = { ...deps, notifications: cfg.notifications }
-    this.assignments = new AssignmentStore(fileAssignmentPersistence(deps.assignmentPath ?? `${deps.configPath}.assignments.json`))
+    this.assignments = new AssignmentStore(fileAssignmentPersistence(deps.assignmentPath ?? `${deps.configPath}.assignments.json`, deps.configPath))
     this.traceEnabled = cfg.trace?.enabled ?? false
     // Auto-compact when a session sits over its context limit while idle
     // (compaction otherwise only runs at the start of a turn step).
@@ -180,7 +187,20 @@ export class BsAgentManager {
 
   async init(agents: AgentConfig[]): Promise<void> {
     const cfg = loadBsConfig(this.deps.configPath)
-    this.assignments.migrate(cfg, agents)
+    const migrationCandidates = agents.filter(agent => {
+      const profile = cfg.agents[agent.name]
+      return Boolean(agent.model || agent.accountId || profile?.provider || profile?.model || profile?.accountId)
+    })
+    this.assignments.migrate(cfg, migrationCandidates, assignment => {
+      const connection = this.deps.providerAccounts?.().find(item => item.providerId === assignment.providerId)
+      if (connection) {
+        const accounts = assignment.accountId
+          ? connection.accounts.filter(account => account.id === assignment.accountId)
+          : connection.accounts
+        return accounts.some(account => account.status === 'active' && account.models?.includes(assignment.modelId))
+      }
+      return cfg.provider[assignment.providerId]?.models.includes(assignment.modelId) ?? false
+    })
     await this.syncTools()
     await this.refreshModelLimits()
     for (const agent of agents) {
@@ -456,7 +476,12 @@ export class BsAgentManager {
     this.deps.store.appendMessage(this.activeSessionId(agentId), message)
     this.emit({ type: 'user-message', agentId, message })
     const config = this.resolved.get(agentId)
-    if (!config?.apiKey) {
+    const storedAssignment = this.assignments.get(agentId)
+    if (storedAssignment && storedAssignment.status !== 'ready') {
+      this.emit({ type: 'error', agentId, message: '[bs] Agent assignment cần được review trong Settings trước khi chat.' })
+      return
+    }
+    if (!config?.apiKey && !config?.accountId) {
       this.emit({
         type: 'error',
         agentId,
@@ -666,7 +691,11 @@ export class BsAgentManager {
   setModel(agentId: string, provider: string, model: string): void {
     const agent = this.agents.get(agentId)
     if (!agent) return
-    if (provider === 'openai') model = normalizeOpenAiCodexModel(model)
+    const connection = this.deps.providerAccounts?.().find(item => item.providerId === provider)
+    if (connection) {
+      this.setAgentAssignmentSnapshot({ agentId, providerId: provider, accountId: agent.accountId ?? connection.activeAccountId ?? undefined, modelId: model, speed: agent.speed ?? 'standard' })
+      return
+    }
     agent.model = `${provider}/${model}`
     this.persistAssignment(agentId, provider, model, agent.accountId, agent.speed)
     this.agents.set(agentId, agent)
@@ -769,7 +798,11 @@ export class BsAgentManager {
     if (!agent) return
     agent.speed = speed
     const current = this.assignments.get(agentId)
-    if (current) this.assignments.set({ ...current, speed })
+    if (current) {
+      const assignment = this.assignments.set({ ...current, speed })
+      this.syncProfileAssignment(assignment)
+      this.deps.onAssignmentChanged?.(assignment)
+    }
     this.agents.set(agentId, agent)
     this.runners.delete(agentId)
     this.resolved.delete(agentId)
@@ -783,11 +816,22 @@ export class BsAgentManager {
     const profile = cfg.agents[profileName]
     if (!profile) return
     agent.name = profileName
-    agent.model = profile.model ?? (profile.provider ? `${profile.provider}/${cfg.provider[profile.provider]?.models[0] ?? ''}` : undefined)
+    agent.model = profile.provider && profile.model ? `${profile.provider}/${profile.model}` : undefined
     agent.accountId = profile.accountId
     agent.speed = profile.speed ?? 'standard'
-    if (profile.provider && profile.model) this.persistAssignment(agentId, profile.provider, profile.model, profile.accountId, agent.speed)
     this.agents.set(agentId, agent)
+    if (profile.provider && profile.model) {
+      const connection = this.deps.providerAccounts?.().find(item => item.providerId === profile.provider)
+      if (connection) {
+        this.setAgentAssignmentSnapshot({ agentId, providerId: profile.provider, accountId: profile.accountId, modelId: profile.model, speed: agent.speed })
+        return
+      }
+      this.persistAssignment(agentId, profile.provider, profile.model, profile.accountId, agent.speed)
+    } else if (profile.provider) {
+      const assignment = this.assignments.set({ agentId, profileName, providerId: profile.provider, accountId: profile.accountId, modelId: '', speed: agent.speed, status: 'needs-review' })
+      this.syncProfileAssignment(assignment)
+      this.deps.onAssignmentChanged?.(assignment)
+    }
     this.runners.delete(agentId)
     this.resolved.delete(agentId)
     this.register(agent)
@@ -822,18 +866,43 @@ export class BsAgentManager {
     return Object.values(this.assignments.load())
   }
 
+  revalidateAssignments(): void {
+    for (const assignment of Object.values(this.assignments.load())) {
+      if (assignment.status !== 'ready') continue
+      const connection = this.deps.providerAccounts?.().find(item => item.providerId === assignment.providerId)
+      const account = assignment.accountId
+        ? connection?.accounts.find(item => item.id === assignment.accountId && item.status === 'active')
+        : connection?.accounts.find(item => item.status === 'active' && item.models?.includes(assignment.modelId))
+      if (account?.models?.includes(assignment.modelId)) continue
+      const next = this.assignments.set({ ...assignment, status: 'error' })
+      this.deps.onAssignmentChanged?.(next)
+      const agent = this.agents.get(assignment.agentId)
+      if (agent) {
+        this.runners.delete(agent.id)
+        this.resolved.delete(agent.id)
+        this.register(agent)
+      }
+    }
+  }
+
   setAgentAssignmentSnapshot(request: AgentAssignmentSetRequest): AgentAssignmentSnapshot {
     const agent = this.agents.get(request.agentId)
     if (!agent) throw new Error('[bs] Agent không tồn tại')
     const connection = this.deps.providerAccounts?.().find(item => item.providerId === request.providerId)
     const account = request.accountId ? connection?.accounts.find(item => item.id === request.accountId && item.status === 'active') : connection?.accounts.find(item => item.status === 'active')
     const models = account?.models ?? connection?.accounts.filter(item => item.status === 'active').flatMap(item => item.models ?? [])
-    if (!connection || (request.accountId && !account) || !models?.includes(request.modelId)) throw new Error('[bs] Agent assignment provider/account/model không hợp lệ')
+    if (!connection || (request.accountId && !account) || !models?.includes(request.modelId)) {
+      const assignment = this.assignments.set({ ...request, profileName: agent.name, status: 'needs-review' })
+      this.syncProfileAssignment(assignment)
+      this.deps.onAssignmentChanged?.(assignment)
+      return assignment
+    }
     agent.model = `${request.providerId}/${request.modelId}`
     agent.accountId = account?.id
     agent.speed = request.speed
     this.agents.set(agent.id, agent)
-    const assignment = this.assignments.set({ ...request, accountId: account?.id, status: 'ready' })
+    const assignment = this.assignments.set({ ...request, profileName: agent.name, accountId: account?.id, status: 'ready' })
+    this.syncProfileAssignment(assignment)
     this.runners.delete(agent.id)
     this.resolved.delete(agent.id)
     this.register(agent)
@@ -870,24 +939,17 @@ export class BsAgentManager {
   getProviderModels(): ModelRef[] {
     const cfg = loadBsConfig(this.deps.configPath)
     const refs: ModelRef[] = []
+    const connected = new Set((this.deps.providerAccounts?.() ?? []).map(connection => connection.providerId))
     for (const [provider, p] of Object.entries(cfg.provider)) {
+      if (connected.has(provider)) continue
       for (const model of p.models) {
-        if (provider === 'openai' && isOpenAiGenericModel(model)) continue
         refs.push({ provider, model })
-      }
-    }
-    const hasOAuth = this.deps.providerAccounts?.().some(connection =>
-      connection.accounts.some(account => isActiveOpenAiOAuthAccount(connection.providerId, account.authMode, account.status)))
-    if (hasOAuth) {
-      for (const model of OPENAI_OAUTH_MODELS) {
-        if (!refs.some(ref => ref.provider === 'openai' && ref.model === model)) refs.push({ provider: 'openai', model })
       }
     }
     for (const connection of this.deps.providerAccounts?.() ?? []) {
       for (const account of connection.accounts) {
         if (account.status !== 'active') continue
         for (const model of account.models ?? []) {
-          if (connection.providerId === 'openai' && isOpenAiGenericModel(model)) continue
           if (!refs.some(ref => ref.provider === connection.providerId && ref.model === model)) refs.push({ provider: connection.providerId, model })
         }
       }
@@ -1040,13 +1102,9 @@ export class BsAgentManager {
     this.deps = { ...this.deps, notifications: cfg.notifications }
     for (const agent of this.agents.values()) {
       const profile = cfg.agents[agent.name]
-      if (profile?.provider && profile.model) this.persistAssignment(agent.id, profile.provider, profile.model, profile.accountId, profile.speed ?? 'standard')
+      if (profile?.provider && profile.model) this.setAgentAssignmentSnapshot({ agentId: agent.id, providerId: profile.provider, accountId: profile.accountId, modelId: profile.model, speed: profile.speed ?? 'standard' })
     }
     await this.reload()
-    for (const agent of this.agents.values()) {
-      const assignment = this.getAgentAssignment(agent.id)
-      if (assignment) this.deps.onAssignmentChanged?.({ agentId: agent.id, providerId: assignment.provider, accountId: assignment.accountId, modelId: assignment.model, speed: assignment.speed ?? 'standard', revision: Date.now(), status: 'ready' })
-    }
     return configToSettings(cfg)
   }
 
@@ -1162,15 +1220,18 @@ export class BsAgentManager {
     // prompt (opencode-style); module-level ones attach on read via loop.ts.
     const instructionFiles = loadInstructions(agent.cwd)
     const instructions = instructionsText(instructionFiles)
-    const llmClient = resolved.accountId && this.deps.providerRuntime
-      ? this.deps.providerRuntime(resolved.provider, resolved.accountId, resolved.model)
-      : (this.deps.createLlm ?? createLlm)(resolved.provider, resolved.apiKey ?? '', resolved.baseUrl, this.oauthHeaders(resolved))
+    const llmClient = resolved.accountId && resolved.provider && resolved.model
+      ? this.deps.providerRuntime?.(resolved.provider, resolved.accountId, resolved.model) ?? unavailableProviderRuntime(resolved.provider)
+      : (this.deps.createLlm ?? createLlm)(resolved.provider, resolved.apiKey ?? '', resolved.baseUrl)
     const resolveSubagent = (type: SubagentType): ResolvedSubagentModel | undefined => {
       const ref = cfg.subagentModels?.[type]
       if (!ref) return undefined
       const subResolved = this.resolveAgentConfig(cfg, agent.name, `${ref.provider}/${ref.model}`)
-      if (!subResolved.provider || !subResolved.model || !subResolved.apiKey) return undefined // fallback main
-      const subLlm = (this.deps.createLlm ?? createLlm)(subResolved.provider, subResolved.apiKey, subResolved.baseUrl)
+      if (!subResolved.provider || !subResolved.model) return undefined
+      const subLlm = subResolved.accountId
+        ? this.deps.providerRuntime?.(subResolved.provider, subResolved.accountId, subResolved.model)
+        : subResolved.apiKey ? (this.deps.createLlm ?? createLlm)(subResolved.provider, subResolved.apiKey, subResolved.baseUrl) : undefined
+      if (!subLlm) return undefined
       return { provider: subResolved.provider, model: subResolved.model, llm: subLlm }
     }
     const taskTool = createTaskTool({
@@ -1281,7 +1342,7 @@ export class BsAgentManager {
         this.emit({ type: 'todo-updated', agentId: agent.id, todos })
       },
       variantOptions,
-      serviceTier: agent.speed === 'fast' && resolved.provider === 'openai' ? 'priority' : undefined,
+      serviceTier: agent.speed === 'fast' ? 'priority' : undefined,
       diagnostics: cfg.lsp.enabled && this.deps.lsp
         ? (filePath, text) => this.deps.lsp!.diagnosticsText(filePath, text)
         : undefined,
@@ -1352,83 +1413,48 @@ export class BsAgentManager {
       requestedModel,
       this.deps.vault ? (ref: string) => this.deps.vault!.getSecret(ref) : undefined
     )
+    if (storedAssignment && storedAssignment.status !== 'ready') {
+      return { ...resolved, provider: storedAssignment.providerId, model: '', accountId: undefined, apiKey: null }
+    }
     const agent = registeredAgent
     if (storedAssignment?.status === 'ready') resolved.accountId = storedAssignment.accountId
     if (agent?.accountId) resolved.accountId = agent.accountId
     if (resolved.provider) {
       const connection = this.deps.providerAccounts?.().find(c => c.providerId === resolved.provider)
-      const selected = resolved.accountId ? connection?.accounts.find(account => account.id === resolved.accountId && account.status === 'active') : undefined
-      const active = selected ?? connection?.accounts.find(account => account.status === 'active')
-      if (active) resolved.accountId = active.id
+      if (resolved.accountId) {
+        const selected = connection?.accounts.find(account => account.id === resolved.accountId && account.status === 'active' && account.models?.includes(resolved.model))
+        if (!selected) {
+          resolved.model = ''
+          resolved.accountId = undefined
+        }
+      } else {
+        const active = connection?.accounts.find(account => account.status === 'active' && account.models?.includes(resolved.model))
+        if (active) resolved.accountId = active.id
+      }
     }
-    this.applyAccountCredentials(resolved)
     return resolved
   }
 
   private persistAssignment(agentId: string, providerId: string, modelId: string, accountId?: string, speed: 'standard' | 'fast' = 'standard'): void {
-    const assignment = this.assignments.set({ agentId, providerId, modelId, accountId, speed, status: 'ready' })
+    const assignment = this.assignments.set({ agentId, profileName: this.agents.get(agentId)?.name, providerId, modelId, accountId, speed, status: 'ready' })
+    this.syncProfileAssignment(assignment)
     this.deps.onAssignmentChanged?.(assignment)
   }
 
-  private applyAccountCredentials(resolved: ResolvedAgentConfig): void {
-    if (!resolved.provider || !resolved.accountId || !this.deps.vault) return
-    const account = this.deps.providerAccounts?.().flatMap(connection => connection.accounts).find(item => item.id === resolved.accountId)
-    if (!account?.keyRef) return
-    const raw = this.deps.vault.getSecret(account.keyRef)
-    if (!raw) return
-    try {
-      const secret = JSON.parse(raw) as { apiKey?: string; accessToken?: string; baseUrl?: string }
-      if (secret.accessToken && account.providerId === 'openai') {
-        resolved.apiKey = secret.accessToken
-        resolved.baseUrl = 'https://chatgpt.com/backend-api/codex'
-      } else if (secret.accessToken) {
-        // OAuth-backed providers expose their bearer token through the same
-        // client credential slot as API-key providers. Provider adapters can
-        // then apply provider-specific transport/authentication.
-        resolved.apiKey = secret.accessToken
-        resolved.baseUrl = secret.baseUrl ?? resolved.baseUrl
-      } else if (secret.apiKey) {
-        resolved.apiKey = secret.apiKey
-        resolved.baseUrl = secret.baseUrl ?? resolved.baseUrl
-      }
-    } catch { /* legacy non-JSON secrets are API keys, not OAuth tokens */ }
-  }
-
-  private oauthHeaders(resolved: ResolvedAgentConfig): Record<string, string> | undefined {
-    if (resolved.provider !== 'openai' || resolved.baseUrl !== 'https://chatgpt.com/backend-api/codex' || !resolved.accountId) return undefined
-    const account = this.deps.providerAccounts?.().flatMap(connection => connection.accounts).find(item => item.id === resolved.accountId)
-    if (!account?.keyRef || !this.deps.vault) return undefined
-    const raw = this.deps.vault.getSecret(account.keyRef)
-    if (!raw) return undefined
-    try {
-      const secret = JSON.parse(raw) as { accountId?: string }
-      return {
-        ...(secret.accountId ? { 'ChatGPT-Account-ID': secret.accountId } : {}),
-        originator: 'codex_vscode',
-        'OpenAI-Beta': 'responses_websockets=2026-02-06',
-        'x-openai-internal-codex-residency': 'us',
-        accept: 'text/event-stream'
-      }
-    } catch {
-      return { originator: 'codex_vscode', 'OpenAI-Beta': 'responses_websockets=2026-02-06', 'x-openai-internal-codex-residency': 'us', accept: 'text/event-stream' }
+  private syncProfileAssignment(assignment: AgentAssignmentSnapshot): void {
+    const profileName = assignment.profileName ?? this.agents.get(assignment.agentId)?.name
+    if (!profileName) return
+    const cfg = loadBsConfig(this.deps.configPath)
+    const profile = cfg.agents[profileName]
+    if (!profile) return
+    cfg.agents[profileName] = {
+      ...profile,
+      provider: assignment.providerId || undefined,
+      model: assignment.modelId || undefined,
+      accountId: assignment.accountId,
+      speed: assignment.speed
     }
-  }
-
-  private materializeOAuthProviders(cfg: BsConfig): BsConfig {
-    const account = this.deps.providerAccounts?.().find(connection =>
-      connection.accounts.some(item => isActiveOpenAiOAuthAccount(connection.providerId, item.authMode, item.status)))
-    if (!account) return cfg
-    const current = cfg.provider.openai
-    return {
-      ...cfg,
-      provider: {
-        ...cfg.provider,
-        openai: {
-          ...(current ?? {}),
-          models: [...new Set([...(current?.models ?? []).filter(model => !isOpenAiGenericModel(model)), ...OPENAI_OAUTH_MODELS])]
-        }
-      }
-    }
+    writeBsConfig(this.deps.configPath, cfg)
   }
 
   private materializeConnectedProviders(cfg: BsConfig): BsConfig {
@@ -1439,8 +1465,7 @@ export class BsAgentManager {
       const current = nextProviders[connection.providerId]
       nextProviders[connection.providerId] = { ...(current ?? {}), models: [...new Set([...(current?.models ?? []), ...activeModels])] }
     }
-    const next = { ...cfg, provider: nextProviders }
-    return this.materializeOAuthProviders(next)
+    return { ...cfg, provider: nextProviders }
   }
 
   private priceFor(provider: string, model: string): ModelPrice | undefined {
