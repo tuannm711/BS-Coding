@@ -9,6 +9,7 @@ import {
   type WheelEvent as ReactWheelEvent
 } from 'react'
 import {
+  CHAT_TURN_TOP_INSET,
   anchorScrollTop,
   followScrollDelta,
   isInBottomFollowZone,
@@ -53,6 +54,7 @@ export function useChatScroll(): ChatScrollController {
   const trustedInteractionRef = useRef(false)
   const reconcileRafRef = useRef<number | null>(null)
   const pinRafRef = useRef<number | null>(null)
+  const anchorRafRef = useRef<number | null>(null)
   const programmaticReleaseRafRef = useRef<number | null>(null)
   const [showJumpToEnd, setShowJumpToEnd] = useState(false)
 
@@ -68,6 +70,11 @@ export function useChatScroll(): ChatScrollController {
   const cancelPin = useCallback(() => {
     if (pinRafRef.current !== null) cancelAnimationFrame(pinRafRef.current)
     pinRafRef.current = null
+  }, [])
+
+  const cancelAnchorSettle = useCallback(() => {
+    if (anchorRafRef.current !== null) cancelAnimationFrame(anchorRafRef.current)
+    anchorRafRef.current = null
   }, [])
 
   const writeScrollTop = useCallback((top: number) => {
@@ -93,12 +100,13 @@ export function useChatScroll(): ChatScrollController {
 
   const enterManual = useCallback(() => {
     cancelPin()
+    cancelAnchorSettle()
     if (reconcileRafRef.current !== null) cancelAnimationFrame(reconcileRafRef.current)
     reconcileRafRef.current = null
     pendingAnchorIdRef.current = null
     modeRef.current = nextChatScrollMode(modeRef.current, 'user-away')
     setShowJumpToEnd(true)
-  }, [cancelPin])
+  }, [cancelAnchorSettle, cancelPin])
 
   const reconcile = useCallback(() => {
     if (reconcileRafRef.current !== null) return
@@ -136,6 +144,43 @@ export function useChatScroll(): ChatScrollController {
         }))
         pendingAnchorIdRef.current = null
         modeRef.current = nextChatScrollMode(modeRef.current, 'anchor-applied')
+        let frames = 0
+        let stableFrames = 0
+        const settle = () => {
+          if (modeRef.current === 'manual') {
+            anchorRafRef.current = null
+            return
+          }
+          const currentFeed = feedRef.current
+          const currentAnchor = findAnchor()
+          if (!currentFeed || !currentAnchor) {
+            anchorRafRef.current = null
+            return
+          }
+          const feedRect = currentFeed.getBoundingClientRect()
+          const rowRect = currentAnchor.getBoundingClientRect()
+          const offset = rowRect.top - feedRect.top
+          if (Math.abs(offset - CHAT_TURN_TOP_INSET) > 0.5) {
+            stableFrames = 0
+            writeScrollTop(anchorScrollTop({
+              currentScrollTop: currentFeed.scrollTop,
+              feedTop: feedRect.top,
+              rowTop: rowRect.top,
+              scrollHeight: currentFeed.scrollHeight,
+              clientHeight: currentFeed.clientHeight
+            }))
+          } else {
+            stableFrames += 1
+          }
+          frames += 1
+          if (stableFrames >= 2 || frames >= 60) {
+            anchorRafRef.current = null
+            return
+          }
+          anchorRafRef.current = requestAnimationFrame(settle)
+        }
+        cancelAnchorSettle()
+        anchorRafRef.current = requestAnimationFrame(settle)
         return
       }
 
@@ -144,17 +189,18 @@ export function useChatScroll(): ChatScrollController {
       const delta = followScrollDelta({ feedBottom: feedRect.bottom, latestBottom: latestRect.bottom })
       if (delta > 0) writeScrollTop(feed.scrollTop + delta)
     })
-  }, [findAnchor, writeScrollTop])
+  }, [cancelAnchorSettle, findAnchor, writeScrollTop])
 
   const startTurnAnchor = useCallback((messageId: string) => {
     cancelPin()
+    cancelAnchorSettle()
     activeAnchorIdRef.current = messageId
     pendingAnchorIdRef.current = messageId
     modeRef.current = nextChatScrollMode(modeRef.current, 'start-turn')
     if (tailRef.current) tailRef.current.style.height = '0px'
     setShowJumpToEnd(false)
     reconcile()
-  }, [cancelPin, reconcile])
+  }, [cancelAnchorSettle, cancelPin, reconcile])
 
   const replaceActiveAnchorId = useCallback((messageId: string) => {
     if (!activeAnchorIdRef.current) return
@@ -164,6 +210,7 @@ export function useChatScroll(): ChatScrollController {
 
   const pinSessionToEnd = useCallback(() => {
     cancelPin()
+    cancelAnchorSettle()
     activeAnchorIdRef.current = null
     pendingAnchorIdRef.current = null
     modeRef.current = nextChatScrollMode(modeRef.current, 'session-load')
@@ -184,16 +231,17 @@ export function useChatScroll(): ChatScrollController {
       else pinRafRef.current = null
     }
     pinRafRef.current = requestAnimationFrame(pin)
-  }, [cancelPin, writeScrollTop])
+  }, [cancelAnchorSettle, cancelPin, writeScrollTop])
 
   const jumpToEnd = useCallback(() => {
     cancelPin()
+    cancelAnchorSettle()
     modeRef.current = nextChatScrollMode(modeRef.current, 'jump-end')
     trustedInteractionRef.current = false
     const feed = feedRef.current
     if (feed) writeScrollTop(feed.scrollHeight)
     setShowJumpToEnd(false)
-  }, [cancelPin, writeScrollTop])
+  }, [cancelAnchorSettle, cancelPin, writeScrollTop])
 
   const onScroll = useCallback(() => {
     if (programmaticRef.current) return
@@ -250,12 +298,13 @@ export function useChatScroll(): ChatScrollController {
 
   useEffect(() => () => {
     cancelPin()
+    cancelAnchorSettle()
     if (reconcileRafRef.current !== null) cancelAnimationFrame(reconcileRafRef.current)
     if (programmaticReleaseRafRef.current !== null) cancelAnimationFrame(programmaticReleaseRafRef.current)
     reconcileRafRef.current = null
     programmaticReleaseRafRef.current = null
     programmaticRef.current = false
-  }, [cancelPin])
+  }, [cancelAnchorSettle, cancelPin])
 
   return {
     feedRef,
