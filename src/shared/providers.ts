@@ -22,6 +22,8 @@ export interface ProviderModelCapabilities {
 export interface ProviderModel {
   id: string
   name: string
+  /** Provider transport identifier when it differs from the persisted assignment id. */
+  runtimeId?: string
   capabilities?: ProviderModelCapabilities
 }
 
@@ -37,6 +39,7 @@ export interface ProviderCapability {
 export interface ProviderConnectRequest {
   providerId: string
   methodId: string
+  reconnectAccountId?: string
   fields: Record<string, string>
 }
 
@@ -46,6 +49,58 @@ export interface ProviderConnectResult {
   authUrl?: string
   expiresIn?: number
   requiresBrowser?: boolean
+}
+
+export type ProviderAuthorizationStatus = 'waiting' | 'connected' | 'expired' | 'cancelled' | 'error'
+
+export type ProviderAuthorizationErrorKind =
+  | 'callback-port-unavailable'
+  | 'authorization-expired'
+  | 'authorization-cancelled'
+  | 'authorization-denied'
+  | 'oauth-state-mismatch'
+  | 'token-exchange-failed'
+  | 'profile-fetch-failed'
+  | 'entitlement-missing'
+  | 'provider-oauth-unavailable'
+  | 'browser-open-failed'
+
+export interface ProviderAuthorizationError {
+  kind: ProviderAuthorizationErrorKind
+  message: string
+}
+
+export interface ProviderAuthorizationRequest {
+  providerId: string
+  methodId: string
+  reconnectAccountId?: string
+}
+
+export interface ProviderAuthorizationSession {
+  loginId: string
+  providerId: string
+  methodId: string
+  authUrl: string
+  expiresAt: number
+  status: ProviderAuthorizationStatus
+  accountId?: string
+  error?: ProviderAuthorizationError
+}
+
+export function sanitizeProviderAuthorizationSession(
+  session: ProviderAuthorizationSession & Record<string, unknown>
+): ProviderAuthorizationSession {
+  const { loginId, providerId, methodId, authUrl, expiresAt, status, accountId, error } = session
+  return {
+    loginId,
+    providerId,
+    methodId,
+    authUrl,
+    expiresAt,
+    status,
+    ...(accountId ? { accountId } : {}),
+    ...(error ? { error } : {})
+  }
 }
 
 export function providerCanUseMethod(capability: ProviderCapability, methodId: string): boolean {

@@ -105,24 +105,38 @@ export class ProviderManager {
           const currentAccount = manager.store.get(accountId)
           const currentSecret = manager.store.getSecret(accountId)
           if (!currentAccount || !currentSecret) throw new Error(`[bs] Provider runtime unavailable for ${providerId}/${modelId}`)
+          const currentModel = currentAccount.modelCatalog?.find(item => item.id === modelId)
+            ?? (currentAccount.models?.includes(modelId) ? { id: modelId, name: modelId, capabilities: { isCodeModel: true, supportsStreaming: true, supportsTools: true } } : undefined)
+          if (!currentModel) throw new Error(`[bs] Exact provider model unavailable for ${providerId}/${modelId}; refresh the account model catalog`)
           const readySecret = adapter.refreshCredentials
             ? await adapter.refreshCredentials(currentAccount, currentSecret, { force: forceRefresh })
             : currentSecret
           if (readySecret !== currentSecret) manager.store.upsert({ ...currentAccount, oauthExpiresAt: readySecret.expiresAt ?? currentAccount.oauthExpiresAt }, readySecret)
-          let retryAuth = false
+          let retry: 'auth' | 'runtime-context' | undefined
           let hadError = false
           let completed = false
           let completedTokens = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }
           try {
-            for await (const part of adapter.createRuntime(currentAccount, readySecret, model).stream(request)) {
+            for await (const part of adapter.createRuntime(currentAccount, readySecret, currentModel).stream(request)) {
               if (part.kind === 'error') {
                 hadError = true
                 const error = runtimeProviderError(part.error ?? 'Provider runtime error')
                 if (error.kind === 'auth' && attempt === 0 && adapter.refreshCredentials && readySecret.refreshToken) {
-                  retryAuth = true
+                  retry = 'auth'
+                  break
+                }
+                if (error.kind === 'runtime-entity-not-found' && attempt === 0 && adapter.recoverRuntimeContext) {
+                  retry = 'runtime-context'
                   break
                 }
                 manager.recordRuntimeError(accountId, error)
+                if (error.kind === 'runtime-entity-not-found') {
+                  yield {
+                    ...part,
+                    error: `${part.error}; provider=${providerId}; account=${currentAccount.label}; model=${modelId}. Refresh or reconnect this account, then retry.`
+                  }
+                  continue
+                }
               }
               if (part.kind === 'finish') {
                 completed = true
@@ -139,14 +153,34 @@ export class ProviderManager {
             manager.recordRuntimeError(accountId, runtimeProviderError(String(error)))
             throw error
           }
-          if (!retryAuth) {
+          if (!retry) {
             if (!hadError) {
               manager.clearRuntimeError(accountId)
               if (completed) manager.recordRuntimeUsage(providerId, accountId, modelId, completedTokens)
             }
             return
           }
-          forceRefresh = true
+          if (retry === 'auth') {
+            forceRefresh = true
+            continue
+          }
+          try {
+            const recovered = await adapter.recoverRuntimeContext!(currentAccount, readySecret, { code: 'runtime-entity-not-found', modelId })
+            const exactModel = recovered.models.find(candidate => candidate.id === modelId)
+            if (!exactModel) throw new Error(`selected model ${modelId} was not returned after refresh`)
+            manager.store.upsert({
+              ...currentAccount,
+              oauthExpiresAt: recovered.secret.expiresAt ?? currentAccount.oauthExpiresAt,
+              models: recovered.models.map(candidate => candidate.id),
+              modelCatalog: recovered.models
+            }, recovered.secret)
+            manager.emitAccountsChanged()
+          } catch (error) {
+            const message = `[bs] [runtime-entity-not-found] Unable to recover provider=${providerId}; account=${currentAccount.label}; model=${modelId}. Refresh or reconnect this account, then retry. ${String(error)}`
+            manager.recordRuntimeError(accountId, runtimeProviderError(message))
+            yield { kind: 'error', error: message }
+            return
+          }
         }
       }
     }

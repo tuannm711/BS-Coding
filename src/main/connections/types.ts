@@ -7,9 +7,14 @@ export interface ProviderSecrets {
   baseUrl?: string
   models?: string[]
   accessToken?: string
+  githubAccessToken?: string
   refreshToken?: string
   idToken?: string
   accountId?: string
+  expiresAt?: number
+  projectId?: string
+  planName?: string
+  cloudCodeBaseUrl?: string
 }
 
 export interface StoredProviderAccounts {

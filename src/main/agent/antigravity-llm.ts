@@ -1,22 +1,43 @@
 import { randomUUID } from 'node:crypto'
 import type { ModelMessage } from 'ai'
 import type { LlmClient, LlmStreamOptions, LlmStreamPart } from './llm'
+import { decodeProviderResponse } from './provider-stream'
 
-const CLOUD_CODE_URL = 'https://cloudcode-pa.googleapis.com'
+const CLOUD_CODE_URL = 'https://daily-cloudcode-pa.googleapis.com'
 
-function textParts(message: ModelMessage): Array<{ text: string }> {
-  if (typeof message.content === 'string') return [{ text: message.content }]
-  return message.content.flatMap(part => {
-    if (part.type === 'text') return [{ text: part.text }]
-    return []
-  })
+interface AntigravityRuntimeContext {
+  baseUrl?: string
+  projectId?: string
+  modelId?: string
+  isGemini3?: boolean
 }
 
-function toContents(messages: ModelMessage[]) {
-  return messages.map(message => ({
-    role: message.role === 'assistant' ? 'model' : 'user',
-    parts: textParts(message)
-  })).filter(message => message.parts.length > 0)
+function toContents(messages: ModelMessage[], useGemini3SignatureFallback = false) {
+  return messages.map(message => {
+    if (typeof message.content === 'string') return { role: message.role === 'assistant' ? 'model' : 'user', parts: [{ text: message.content }] }
+    const parts: Array<{ text: string } | { functionCall: { id: string; name: string; args: object }; thoughtSignature?: string } | { functionResponse: { id: string; name: string; response: object } }> = []
+    for (const part of message.content) {
+      if (part.type === 'text') parts.push({ text: part.text })
+      if (part.type === 'tool-call') {
+        const signature = part.providerOptions?.google?.thoughtSignature
+        const effectiveSignature = typeof signature === 'string' && signature
+          ? signature
+          : useGemini3SignatureFallback
+            ? 'skip_thought_signature_validator'
+            : undefined
+        parts.push({
+          functionCall: { id: part.toolCallId, name: part.toolName, args: part.input && typeof part.input === 'object' ? part.input : {} },
+          ...(effectiveSignature ? { thoughtSignature: effectiveSignature } : {})
+        })
+      }
+      if (part.type === 'tool-result') {
+        const output = part.output
+        const response = output.type === 'error-text' ? { error: output.value } : output.type === 'text' ? { output: output.value } : { output }
+        parts.push({ functionResponse: { id: part.toolCallId, name: part.toolName, response } })
+      }
+    }
+    return { role: message.role === 'assistant' ? 'model' : 'user', parts }
+  }).filter(message => message.parts.length > 0)
 }
 
 function toCloudSchema(value: unknown): unknown {
@@ -34,14 +55,14 @@ function toCloudSchema(value: unknown): unknown {
 }
 
 function parseChunk(value: unknown): LlmStreamPart[] {
-  const envelope = value as { response?: { candidates?: Array<{ content?: { parts?: Array<{ text?: string; functionCall?: { name?: string; args?: Record<string, unknown> } }> }; finishReason?: string; usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number; totalTokenCount?: number } }> } }
-  const response = (envelope.response ?? envelope) as { candidates?: Array<{ content?: { parts?: Array<{ text?: string; functionCall?: { name?: string; args?: Record<string, unknown> } }> }; finishReason?: string; usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number; totalTokenCount?: number } }> }
+  const envelope = value as { response?: { candidates?: Array<{ content?: { parts?: Array<{ text?: string; thoughtSignature?: string; functionCall?: { id?: string; name?: string; args?: Record<string, unknown> } }> }; finishReason?: string; usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number; totalTokenCount?: number } }> } }
+  const response = (envelope.response ?? envelope) as { candidates?: Array<{ content?: { parts?: Array<{ text?: string; thoughtSignature?: string; functionCall?: { id?: string; name?: string; args?: Record<string, unknown> } }> }; finishReason?: string; usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number; totalTokenCount?: number } }> }
   const candidate = response.candidates?.[0]
   if (!candidate) return []
   const parts: LlmStreamPart[] = []
   for (const part of candidate.content?.parts ?? []) {
     if (part.text) parts.push({ kind: 'text', text: part.text })
-    if (part.functionCall?.name) parts.push({ kind: 'tool-call', toolName: part.functionCall.name, toolCallId: randomUUID(), toolInput: part.functionCall.args ?? {} })
+    if (part.functionCall?.name) parts.push({ kind: 'tool-call', toolName: part.functionCall.name, toolCallId: part.functionCall.id ?? randomUUID(), toolInput: part.functionCall.args ?? {}, thoughtSignature: part.thoughtSignature })
   }
   if (candidate.finishReason) {
     const usage = candidate.usageMetadata
@@ -50,16 +71,18 @@ function parseChunk(value: unknown): LlmStreamPart[] {
   return parts
 }
 
-export function createAntigravityLlm(apiKey: string, baseUrl = CLOUD_CODE_URL): LlmClient {
+export function createAntigravityLlm(apiKey: string, context: string | AntigravityRuntimeContext = {}): LlmClient {
+  const resolved = typeof context === 'string' ? { baseUrl: context } : context
+  const baseUrl = resolved.baseUrl ?? CLOUD_CODE_URL
   return {
     async *stream(opts: LlmStreamOptions): AsyncGenerator<LlmStreamPart> {
       const body = {
-        project: 'antigravity-internal-project',
-        model: opts.model,
+        project: resolved.projectId,
+        model: resolved.modelId ?? opts.model,
         requestId: randomUUID(),
-        userAgent: 'bs-coding',
+        userAgent: 'antigravity',
         request: {
-          contents: toContents(opts.messages),
+          contents: toContents(opts.messages, resolved.isGemini3 ?? /^gemini-3(?:\.|-|$)/i.test(opts.model)),
           systemInstruction: opts.system ? { parts: [{ text: opts.system }] } : undefined,
           generationConfig: { maxOutputTokens: 8192 },
           tools: opts.tools.length > 0 ? [{ functionDeclarations: opts.tools.map(tool => {
@@ -76,7 +99,7 @@ export function createAntigravityLlm(apiKey: string, baseUrl = CLOUD_CODE_URL): 
           authorization: `Bearer ${apiKey}`,
           'content-type': 'application/json',
           accept: 'text/event-stream',
-          'user-agent': 'antigravity/1.15.8 windows/amd64',
+          'user-agent': 'antigravity/1.20.5 windows/amd64',
           'x-goog-api-client': 'google-cloud-sdk vscode_cloudshelleditor/0.1',
           'client-metadata': JSON.stringify({ ideType: 'IDE_UNSPECIFIED', platform: 'PLATFORM_UNSPECIFIED', pluginType: 'GEMINI' })
         },
@@ -85,25 +108,18 @@ export function createAntigravityLlm(apiKey: string, baseUrl = CLOUD_CODE_URL): 
       })
       if (!response.ok) {
         const detail = await response.text()
-        yield { kind: 'error', error: `[bs] Antigravity request failed (${response.status}): ${detail.slice(0, 500)}` }
+        const retryAfter = response.headers.get('retry-after')
+        const code = response.status === 404 && /NOT_FOUND|not found/i.test(detail) ? 'runtime-entity-not-found' : 'request-failed'
+        yield { kind: 'error', error: `[bs] [${code}] Antigravity request failed (${response.status}): ${detail.slice(0, 500)}${retryAfter ? `; retry-after=${retryAfter}` : ''}` }
         return
       }
-      if (!response.body) return
-      const reader = response.body.getReader()
-      const decoder = new TextDecoder()
-      let buffer = ''
-      while (true) {
-        const next = await reader.read()
-        buffer += decoder.decode(next.value ?? new Uint8Array(), { stream: !next.done })
-        const lines = buffer.split(/\r?\n/)
-        buffer = lines.pop() ?? ''
-        for (const line of lines) {
-          if (!line.startsWith('data:')) continue
-          try {
-            for (const part of parseChunk(JSON.parse(line.slice(5).trim()))) yield part
-          } catch { /* ignore keep-alive or partial SSE frames */ }
+      for await (const decoded of decodeProviderResponse(response, { maxBytes: 16 * 1024 * 1024 })) {
+        if (decoded.kind === 'parse-error') {
+          yield { kind: 'error', error: `[bs] [stream-invalid] ${decoded.message}` }
+          continue
         }
-        if (next.done) break
+        const value = decoded.kind === 'event' ? decoded.event : decoded.value
+        for (const part of parseChunk(value)) yield part
       }
     }
   }

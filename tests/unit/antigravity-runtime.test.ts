@@ -1,7 +1,33 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
 import type { ModelMessage } from 'ai'
 import { createAntigravityLlm } from '../../src/main/agent/antigravity-llm'
-import { ANTIGRAVITY_ENTITY_404 } from '../fixtures/provider-chat-fixtures'
+import { ProviderManager } from '../../src/main/connections/manager'
+import { ProviderRegistry } from '../../src/main/providers/registry'
+import { createAntigravityAdapter } from '../../src/main/providers/adapters/antigravity'
+import {
+  ANTIGRAVITY_ENTITY_404
+} from '../fixtures/provider-chat-fixtures'
+
+function runtimeManager(dir: string) {
+  const secrets = new Map<string, any>()
+  const vault = {
+    saveSecret: (ref: string, value: any) => secrets.set(ref, value),
+    getSecret: (ref: string) => secrets.get(ref) ?? null,
+    deleteSecret: (ref: string) => secrets.delete(ref)
+  }
+  const registry = new ProviderRegistry()
+  registry.register(createAntigravityAdapter())
+  const manager = new ProviderManager({ accountsFile: path.join(dir, 'accounts.json'), registry, vault: vault as never })
+  manager.store.upsert({
+    id: 'account-1', providerId: 'antigravity', label: 'Pro fixture', authMode: 'oauth', status: 'active', createdAt: 1, lastUsedAt: 1,
+    models: ['claude-sonnet-4-6'],
+    modelCatalog: [{ id: 'claude-sonnet-4-6', name: 'Claude Sonnet 4.6', runtimeId: 'MODEL_OLD' }]
+  }, { accessToken: 'old-token', refreshToken: 'refresh-token', expiresAt: Date.now() + 3_600_000, projectId: 'stale-project' })
+  return manager
+}
 
 describe('Antigravity Cloud Code runtime', () => {
   afterEach(() => vi.unstubAllGlobals())
@@ -95,5 +121,69 @@ describe('Antigravity Cloud Code runtime', () => {
       kind: 'error',
       error: expect.stringContaining('runtime-entity-not-found')
     }))
+  })
+
+  it('refreshes project and the exact persisted model runtime id once after NOT_FOUND', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'bs-antigravity-recovery-'))
+    try {
+      const requests: any[] = []
+      const calls: string[] = []
+      vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+        calls.push(url)
+        if (url.includes('oauth2.googleapis.com/token')) return new Response(JSON.stringify({ access_token: 'fresh-token', expires_in: 3600 }), { status: 200 })
+        if (url.includes('loadCodeAssist')) return new Response(JSON.stringify({ cloudaicompanionProject: 'fresh-project', paidTier: { id: 'PRO' } }), { status: 200 })
+        if (url.includes('fetchAvailableModels')) return new Response(JSON.stringify({ models: { MODEL_FRESH: { model: 'claude-sonnet-4-6', displayName: 'Claude Sonnet 4.6' } } }), { status: 200 })
+        requests.push(JSON.parse(String(init?.body)))
+        if (requests.length === 1) return new Response(JSON.stringify(ANTIGRAVITY_ENTITY_404), { status: 404 })
+        return new Response('data: {"response":{"candidates":[{"content":{"parts":[{"text":"recovered"}]},"finishReason":"STOP"}]}}\n\n', { status: 200, headers: { 'content-type': 'text/event-stream' } })
+      }))
+      const manager = runtimeManager(dir)
+      const parts = []
+      for await (const part of manager.createRuntime('antigravity', 'account-1', 'claude-sonnet-4-6').stream({ model: 'claude-sonnet-4-6', system: '', messages: [{ role: 'user', content: 'hello' }], tools: [] })) parts.push(part)
+
+      expect(requests).toHaveLength(2)
+      expect(requests[0]).toMatchObject({ project: 'stale-project', model: 'MODEL_OLD' })
+      expect(requests[1]).toMatchObject({ project: 'fresh-project', model: 'MODEL_FRESH' })
+      expect(calls.filter(url => url.includes('loadCodeAssist'))).toHaveLength(1)
+      expect(calls.filter(url => url.includes('fetchAvailableModels'))).toHaveLength(1)
+      expect(parts).toContainEqual({ kind: 'text', text: 'recovered' })
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('stops after one runtime context recovery when NOT_FOUND repeats', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'bs-antigravity-retry-bound-'))
+    try {
+      const calls: string[] = []
+      vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+        calls.push(url)
+        if (url.includes('oauth2.googleapis.com/token')) return new Response(JSON.stringify({ access_token: 'fresh-token', expires_in: 3600 }), { status: 200 })
+        if (url.includes('loadCodeAssist')) return new Response(JSON.stringify({ cloudaicompanionProject: 'fresh-project' }), { status: 200 })
+        if (url.includes('fetchAvailableModels')) return new Response(JSON.stringify({ models: { MODEL_FRESH: { model: 'claude-sonnet-4-6', displayName: 'Claude Sonnet 4.6' } } }), { status: 200 })
+        return new Response(JSON.stringify(ANTIGRAVITY_ENTITY_404), { status: 404 })
+      }))
+      const manager = runtimeManager(dir)
+      const parts = []
+      for await (const part of manager.createRuntime('antigravity', 'account-1', 'claude-sonnet-4-6').stream({ model: 'claude-sonnet-4-6', system: '', messages: [], tools: [] })) parts.push(part)
+
+      expect(calls.filter(url => url.includes('streamGenerateContent'))).toHaveLength(2)
+      expect(calls.filter(url => url.includes('loadCodeAssist'))).toHaveLength(1)
+      expect(parts.filter(part => part.kind === 'error')).toHaveLength(1)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('reports malformed Cloud Code frames and continues parsing later valid frames', async () => {
+    const stream = [
+      'event: result\ndata: {broken\n\n',
+      'event: result\ndata: {"response":{"candidates":[{"content":{"parts":[{"text":"valid-after-error"}]},"finishReason":"STOP"}]}}\n\n'
+    ].join('')
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(stream, { status: 200, headers: { 'content-type': 'text/event-stream' } })))
+    const parts = []
+    for await (const part of createAntigravityLlm('token').stream({ model: 'gemini-3.1-pro-high', system: '', messages: [], tools: [] })) parts.push(part)
+    expect(parts).toContainEqual(expect.objectContaining({ kind: 'error', error: expect.stringContaining('stream-invalid') }))
+    expect(parts).toContainEqual({ kind: 'text', text: 'valid-after-error' })
   })
 })

@@ -83,6 +83,8 @@ export function classifyProviderError(statusCode: number | undefined, message: s
   const capacity = normalized.includes('capacity') || normalized.includes('model_out_of_compute') || normalized.includes('out_of_compute')
   const kind: ProviderErrorKind = statusCode === 401 || statusCode === 403
     ? 'auth'
+    : statusCode === 404 && (normalized.includes('not_found') || normalized.includes('not found'))
+      ? 'runtime-entity-not-found'
     : (statusCode === 429 || statusCode === 503) && capacity
       ? 'capacity-exhausted'
       : statusCode === 429 && (normalized.includes('resource_exhausted') || normalized.includes('quota'))

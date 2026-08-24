@@ -66,6 +66,21 @@ async function fetchAvailableModels(secret: Parameters<NonNullable<ProviderAdapt
   })
 }
 
+async function refreshCredentials(
+  account: Parameters<ProviderAdapter['refreshAccount']>[0],
+  secret: Parameters<NonNullable<ProviderAdapter['refreshCredentials']>>[1],
+  options?: { force?: boolean }
+) {
+  const expiresAt = secret.expiresAt ?? account.oauthExpiresAt
+  if (!options?.force && (!expiresAt || expiresAt > Date.now() + 60_000)) return secret
+  if (!secret.refreshToken) {
+    if (secret.accessToken) return secret
+    throw new Error('[bs] Antigravity OAuth refresh token unavailable')
+  }
+  const refreshed = await refreshAntigravityToken(secret.refreshToken)
+  return { ...secret, ...refreshed }
+}
+
 async function fetchQuotaPayload(secret: Parameters<NonNullable<ProviderAdapter['refreshCredentials']>>[1]): Promise<{ response: Response; raw: string; payload: unknown }> {
   const context = await resolveCloudCodeContext(secret)
   let last: { response: Response; raw: string; payload: unknown } | undefined
@@ -123,11 +138,7 @@ export function createAntigravityAdapter(): ProviderAdapter {
     async connect() { throw new Error('[bs] Antigravity OAuth phải được bắt đầu qua login session') },
     async refreshAccount(account) { return account },
     async refreshCredentials(account, secret, options) {
-      const expiresAt = secret.expiresAt ?? account.oauthExpiresAt
-      if (!options?.force && (!expiresAt || expiresAt > Date.now() + 60_000)) return secret
-      if (!secret.refreshToken) throw new Error('[bs] Antigravity OAuth refresh token unavailable')
-      const refreshed = await refreshAntigravityToken(secret.refreshToken)
-      return { ...secret, ...refreshed }
+      return refreshCredentials(account, secret, options)
     },
     async listModels(_account, secret) {
       if (secret.accessToken) {
@@ -148,6 +159,18 @@ export function createAntigravityAdapter(): ProviderAdapter {
         modelId: model.runtimeId ?? model.id,
         isGemini3: /gemini\s*3/i.test(model.name) || /^gemini-3(?:\.|-|$)/i.test(model.runtimeId ?? '')
       })
+    },
+    async recoverRuntimeContext(account, secret) {
+      const staleContextCleared = { ...secret }
+      delete staleContextCleared.projectId
+      const readySecret = await refreshCredentials(account, staleContextCleared, { force: true })
+      delete readySecret.projectId
+      await resolveCloudCodeContext(readySecret)
+      const response = await fetchAvailableModels(readySecret)
+      if (!response.ok) throw new Error(`[bs] Antigravity model discovery failed (${response.status})`)
+      const models = parseAntigravityModels(await response.json())
+      if (models.length === 0) throw new Error('[bs] Antigravity model discovery returned no code models')
+      return { secret: readySecret, models }
     },
     async fetchUsage(account, secret) {
       if (!secret.accessToken) return { accountId: account.id, refreshedAt: Date.now(), source: 'unavailable', status: 'unavailable', unavailableReason: 'OAuth access token unavailable' }
