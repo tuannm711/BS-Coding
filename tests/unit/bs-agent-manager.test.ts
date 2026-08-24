@@ -944,7 +944,7 @@ describe('BsAgentManager', () => {
         configPath,
         partsQueue: [
           [
-            { kind: 'tool-call', toolCallId: 'tc1', toolName: 'task', toolInput: { prompt: 'research x', subagent_type: 'research' } },
+            { kind: 'tool-call', toolCallId: 'tc1', toolName: 'task', toolInput: { description: 'research x', prompt: 'research x', subagent_type: 'research' } },
             { kind: 'finish' }
           ],
           [{ kind: 'text', text: 'sub result' }, { kind: 'finish' }],
@@ -977,7 +977,7 @@ describe('BsAgentManager', () => {
         configPath,
         partsQueue: [
           [
-            { kind: 'tool-call', toolCallId: 'tc1', toolName: 'task', toolInput: { prompt: 'research x', subagent_type: 'research' } },
+            { kind: 'tool-call', toolCallId: 'tc1', toolName: 'task', toolInput: { description: 'research x', prompt: 'research x', subagent_type: 'research' } },
             { kind: 'finish' }
           ],
           [{ kind: 'text', text: 'sub result' }, { kind: 'finish' }],

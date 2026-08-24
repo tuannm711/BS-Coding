@@ -2,6 +2,9 @@ import { describe, expect, it, vi } from 'vitest'
 import type { ModelMessage } from 'ai'
 import { OpenAIResponsesClient, toResponsesInput } from '../../src/main/agent/openai-responses'
 import { decodeProviderResponse } from '../../src/main/agent/provider-stream'
+import { bashTool } from '../../src/main/agent/tools/bash'
+import { readTool } from '../../src/main/agent/tools/read'
+import { createSkillTool } from '../../src/main/agent/tools/skill'
 import {
   MALFORMED_THEN_VALID_SSE,
   MISLABELED_SSE,
@@ -50,6 +53,57 @@ describe('OpenAIResponsesClient', () => {
     const client = new OpenAIResponsesClient({ apiKey: 'oauth-token', fetchImpl })
     for await (const _part of client.stream({ model: 'gpt-5.6-sol', system: 'sys', messages: [], tools: [], serviceTier: 'priority' })) { /* consume */ }
     expect(JSON.parse(String(fetchImpl.mock.calls[0]?.[1] && (fetchImpl.mock.calls[0]?.[1] as RequestInit).body))).toMatchObject({ service_tier: 'priority' })
+  })
+
+  it('sends required JSON Schema parameters for native tools', async () => {
+    let requestBody: any
+    const fetchImpl = vi.fn(async (_url: string, init?: RequestInit) => {
+      requestBody = JSON.parse(String(init?.body))
+      return new Response(JSON.stringify(OPENAI_COMPLETED), {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      })
+    }) as unknown as typeof fetch
+    const client = new OpenAIResponsesClient({ apiKey: 'fixture-token', fetchImpl })
+
+    for await (const _part of client.stream({
+      model: 'gpt-5.6-sol',
+      system: 'Use tools.',
+      messages: [{ role: 'user', content: 'inspect the project' }],
+      tools: [readTool, bashTool, createSkillTool(() => undefined)]
+    })) { /* consume */ }
+
+    const byName = Object.fromEntries(requestBody.tools.map((item: any) => [item.name, item]))
+    expect(byName.read.parameters.required).toContain('file_path')
+    expect(byName.bash.parameters.required).toContain('command')
+    expect(byName.skill.parameters.required).toContain('name')
+    expect(JSON.stringify(requestBody.tools)).not.toContain('"$schema"')
+  })
+
+  it('preserves valid streamed function-call arguments', async () => {
+    const events = [
+      `data: ${JSON.stringify({
+        type: 'response.output_item.done',
+        item: {
+          type: 'function_call',
+          call_id: 'call-read',
+          name: 'read',
+          arguments: JSON.stringify({ file_path: 'package.json' })
+        }
+      })}\n\n`,
+      `data: ${JSON.stringify({ type: 'response.completed', response: { id: 'response-tools' } })}\n\n`
+    ]
+    const fetchImpl = vi.fn(async () => chunkedResponse(events)) as unknown as typeof fetch
+    const client = new OpenAIResponsesClient({ apiKey: 'fixture-token', fetchImpl })
+    const parts = []
+
+    for await (const part of client.stream({
+      model: 'gpt-5.6-sol', system: 'Use tools.', messages: [], tools: [readTool]
+    })) parts.push(part)
+
+    expect(parts).toContainEqual(expect.objectContaining({
+      kind: 'tool-call', toolName: 'read', toolInput: { file_path: 'package.json' }
+    }))
   })
 
   it('does not send AI SDK tool-call and tool-result content types to Responses', async () => {
