@@ -34,6 +34,7 @@ export default function App() {
   const [showModelRouter, setShowModelRouter] = useState(false)
   const [runtime, setRuntime] = useState<WorkspaceRuntime | null>(null)
   const [selectedNativeAgentId, setSelectedNativeAgentId] = useState<string | null>(null)
+  const [activeProjectSessionId, setActiveProjectSessionId] = useState<string | null>(null)
   const [backgrounds, setBackgrounds] = useState<Record<string, boolean>>({})
   const [browser, setBrowser] = useState<BrowserStatusInfo | null>(null)
   const [browserDialogOpen, setBrowserDialogOpen] = useState(false)
@@ -179,8 +180,15 @@ export default function App() {
       buffersRef.current.delete(t.id)
     }
     const rt = await window.api.openWorkspace(path)
+    const native = rt.workspace.agents.filter(agent => agent.kind === 'native')
+    const fallbackAgentId = resolveSelectedNativeAgent(native, null) ?? undefined
+    const projectSessions = fallbackAgentId ? await window.api.listProjectSessions(path) : []
+    const projectSession = projectSessions[0]
+      ?? (fallbackAgentId ? await window.api.createProjectSession(path, fallbackAgentId) : null)
     const list = await window.api.listArtifacts(path)
     setRuntime(rt)
+    setActiveProjectSessionId(projectSession?.id ?? null)
+    setSelectedNativeAgentId(resolveSelectedNativeAgent(native, projectSession?.lastAgentId ?? fallbackAgentId ?? null))
     setTerminals([])
     setArtifacts(prev => ({ ...prev, [path]: list }))
     setBackgrounds(Object.fromEntries(rt.workspace.agents.map(a => [a.id, a.background ?? false])))
@@ -188,6 +196,11 @@ export default function App() {
       if (!rt.workspace.agents.some(a => a.id === id)) buffersRef.current.delete(id)
     }
   }, [terminals])
+
+  const handleProjectSessionChange = useCallback((sessionId: string, agentId?: string) => {
+    setActiveProjectSessionId(sessionId)
+    if (agentId) setSelectedNativeAgentId(agentId)
+  }, [])
 
   const removeWorkspace = useCallback(async (path: string) => {
     if (runtime?.workspace.projectPath === path) {
@@ -300,6 +313,9 @@ export default function App() {
                 panes={panes}
                 nativeAgents={nativeAgents}
                 onSelectNativeAgent={setSelectedNativeAgentId}
+                projectPath={runtime?.workspace.projectPath ?? null}
+                sessionId={activeProjectSessionId}
+                onSessionChange={handleProjectSessionChange}
                 backgrounds={backgrounds}
                 isTerminal={id => terminals.some(t => t.id === id)}
                 onRemove={handleRemovePane}
@@ -312,7 +328,9 @@ export default function App() {
                 onOpen={agentId => void window.api.setAgentBackground(agentId, false)}
                 onStop={agentId => {
                   const pane = allPanes.find(p => p.agent.id === agentId)
-                  if (pane?.agent.kind === 'native') void window.api.stopChat(agentId)
+                  if (pane?.agent.kind === 'native' && runtime && activeProjectSessionId) {
+                    void window.api.stopSessionChat(runtime.workspace.projectPath, activeProjectSessionId)
+                  }
                   else void window.api.stopAgent(agentId)
                 }}
               />

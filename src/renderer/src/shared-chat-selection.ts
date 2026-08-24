@@ -12,3 +12,7 @@ export function projectVisiblePanes(panes: PaneModel[], selectedNativeId: string
   const nonNative = panes.filter(pane => pane.agent.kind !== 'native')
   return selected ? [selected, ...nonNative] : nonNative
 }
+
+export function nativeChatPaneKey(projectPath: string, sessionId: string): string {
+  return `native-chat:${projectPath}:${sessionId}`
+}

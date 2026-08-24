@@ -12,6 +12,8 @@ interface Props {
   agents: AgentPickerOption[]
   value: string
   onChange: (agentId: string) => void
+  disabled?: boolean
+  disabledReason?: string
 }
 
 const MENU_WIDTH = 270
@@ -19,7 +21,7 @@ const MENU_HEIGHT = 300
 const MENU_GAP = 4
 const VIEWPORT_MARGIN = 8
 
-export default function AgentPicker({ agents, value, onChange }: Props) {
+export default function AgentPicker({ agents, value, onChange, disabled = false, disabledReason }: Props) {
   const [open, setOpen] = useState(false)
   const [activeIndex, setActiveIndex] = useState(0)
   const [position, setPosition] = useState<AgentPickerPosition | null>(null)
@@ -57,9 +59,10 @@ export default function AgentPicker({ agents, value, onChange }: Props) {
   }, [])
 
   const show = useCallback(() => {
+    if (disabled) return
     setActiveIndex(currentIndex)
     setOpen(true)
-  }, [currentIndex])
+  }, [currentIndex, disabled])
 
   useLayoutEffect(() => {
     if (!open) return
@@ -144,13 +147,14 @@ export default function AgentPicker({ agents, value, onChange }: Props) {
     {agents.length === 0 ? <span className="model-empty">No agents configured</span> : null}
   </div> : null
 
+  const reasonId = disabled && disabledReason ? 'agent-picker-disabled-reason' : undefined
   return (
     <div className="agent-picker">
       <button
         ref={triggerRef}
         className="agent-picker-trigger"
         type="button"
-        onClick={() => open ? close(false) : show()}
+        onClick={() => disabled ? undefined : (open ? close(false) : show())}
         onKeyDown={event => {
           if (!open && ['ArrowDown', 'ArrowUp', 'Enter', ' '].includes(event.key)) {
             event.preventDefault()
@@ -159,11 +163,15 @@ export default function AgentPicker({ agents, value, onChange }: Props) {
         }}
         aria-haspopup="listbox"
         aria-expanded={open}
+        aria-disabled={disabled}
+        aria-describedby={reasonId}
+        title={disabledReason}
       >
         <span className="agent-picker-label">Agent</span>
         <strong>{current?.name ?? 'Select Agent'}</strong>
         <span className="model-caret" aria-hidden="true">▾</span>
       </button>
+      {reasonId ? <span id={reasonId} className="sr-only">{disabledReason}</span> : null}
       {menu ? createPortal(menu, document.body) : null}
     </div>
   )

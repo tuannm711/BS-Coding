@@ -57,6 +57,23 @@ export class SharedSessionCoordinator {
     return this.executions.get(sessionId)?.queue.shift()
   }
 
+  removeQueued(sessionId: string, messageId: string): boolean {
+    const state = this.requireState(sessionId)
+    const next = state.queue.filter(message => message.id !== messageId)
+    if (next.length === state.queue.length) return false
+    state.queue = next
+    return true
+  }
+
+  editQueued(sessionId: string, messageId: string, text: string): boolean {
+    const state = this.requireState(sessionId)
+    const message = state.queue.find(item => item.id === messageId)
+    if (!message || !text.trim()) return false
+    message.text = text
+    message.displayText = undefined
+    return true
+  }
+
   setPrompt(turnId: string, promptId?: string): void {
     const state = [...this.executions.values()].find(item => item.turnId === turnId)
     if (!state) throw new Error(`[bs] Turn ${turnId} is not running`)

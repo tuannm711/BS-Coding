@@ -62,6 +62,13 @@ describe('shared session execution lock', () => {
       expect.objectContaining({ agentId: agent.id, text: 'queued' })
     ])
 
+    const queuedId = manager.listSessionQueued(session.id)[0].id
+    manager.editSessionQueued(dir, session.id, queuedId, 'edited')
+    expect(manager.listSessionQueued(session.id)[0].text).toBe('edited')
+    manager.removeSessionQueued(dir, session.id, queuedId)
+    expect(manager.listSessionQueued(session.id)).toEqual([])
+    await manager.sendInSession(dir, session.id, agent.id, 'queued again')
+
     manager.stopSessionChat(dir, session.id)
     await running
     expect(manager.listSessionQueued(session.id)).toEqual([])

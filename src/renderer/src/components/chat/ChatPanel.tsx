@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import { ChevronDown } from 'lucide-react'
-import type { AgentConfig, AgentMode, ChatEvent, ChatMessage, Command, ImageAttachment, QuestionOption, QueuedMessage, SessionSummary, TodoItem, TodoStatus, ToolCallData } from '@shared/types'
+import type { AgentConfig, AgentMode, ChatEvent, ChatMessage, Command, ImageAttachment, ProjectSessionSummary, QuestionOption, QueuedMessage, TodoItem, TodoStatus, ToolCallData } from '@shared/types'
 import { appendStreamDelta } from '@shared/text'
 import { contextTokens } from '@shared/usage'
 import ChatInput from './ChatInput'
@@ -12,6 +12,7 @@ import ModelPicker from './ModelPicker'
 import AgentPicker from './AgentPicker'
 import VariantPicker from './VariantPicker'
 import ContextFooter from './ContextFooter'
+import { acceptChatEvent } from './chat-event-scope'
 
 type FeedItem =
   | { kind: 'message'; id: string; role: ChatMessage['role']; text: string; reasoning?: string; images?: ImageAttachment[] }
@@ -103,6 +104,9 @@ interface Props {
   agentId: string
   agents: AgentConfig[]
   onAgentChange: (agentId: string) => void
+  projectPath: string
+  sessionId: string
+  onSessionChange: (sessionId: string, agentId?: string) => void
   cwd: string
   mode?: AgentMode
   variant?: string
@@ -110,7 +114,7 @@ interface Props {
   onVariantChange?: (variant: string | undefined) => void
 }
 
-function ChatPanel({ agentId, agents, onAgentChange, cwd, mode = 'build', variant, onModeChange, onVariantChange }: Props) {
+function ChatPanel({ agentId, agents, onAgentChange, projectPath, sessionId, onSessionChange, cwd, mode = 'build', variant, onModeChange, onVariantChange }: Props) {
   const [items, setItems] = useState<FeedItem[]>([])
   const [running, setRunning] = useState(false)
   const [currentMode, setCurrentMode] = useState<AgentMode>(mode)
@@ -132,8 +136,7 @@ function ChatPanel({ agentId, agents, onAgentChange, cwd, mode = 'build', varian
   const [contextLimit, setContextLimit] = useState<number | null>(null)
   const [compactThreshold, setCompactThreshold] = useState<number | null>(null)
   const [commands, setCommands] = useState<Command[]>([])
-  const [sessions, setSessions] = useState<SessionSummary[]>([])
-  const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
+  const [sessions, setSessions] = useState<ProjectSessionSummary[]>([])
   const [todos, setTodos] = useState<TodoItem[]>([])
   const [todosCollapsed, setTodosCollapsed] = useState(false)
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
@@ -155,6 +158,7 @@ function ChatPanel({ agentId, agents, onAgentChange, cwd, mode = 'build', varian
   const prevLastIdRef = useRef<string | null>(null)
   const stuckRef = useRef(true)
   const [showJumpToEnd, setShowJumpToEnd] = useState(false)
+  const activeTurnIdRef = useRef<string | undefined>(undefined)
 
   const refreshVariants = useCallback(() => {
     void window.api.getAgentVariants(agentId).then(list => {
@@ -195,7 +199,7 @@ function ChatPanel({ agentId, agents, onAgentChange, cwd, mode = 'build', varian
   }, [pendingPrompt])
 
   const loadTranscript = useCallback(() => {
-    void window.api.listChatTranscript(agentId).then(items => {
+    void window.api.listSessionTranscript(projectPath, sessionId).then(items => {
       setItems(items.map(it => it.kind === 'message'
         ? {
             kind: 'message', id: it.message.id, role: it.message.role,
@@ -216,18 +220,15 @@ function ChatPanel({ agentId, agents, onAgentChange, cwd, mode = 'build', varian
       setContextUsed(used)
       shouldJumpToEnd.current = true
     })
-  }, [agentId])
+  }, [projectPath, sessionId])
 
   const reloadSessions = useCallback(() => {
-    void window.api.listSessions(agentId).then(list => {
-      setSessions(list)
-      setActiveSessionId(list[0]?.id ?? null)
-    })
-  }, [agentId])
+    void window.api.listProjectSessions(projectPath).then(setSessions)
+  }, [projectPath])
 
   const loadTodos = useCallback(() => {
-    void window.api.getChatTodos(agentId).then(setTodos)
-  }, [agentId])
+    void window.api.getSessionTodos(projectPath, sessionId).then(setTodos)
+  }, [projectPath, sessionId])
 
   const resetView = useCallback(() => {
     setItems([])
@@ -257,11 +258,11 @@ function ChatPanel({ agentId, agents, onAgentChange, cwd, mode = 'build', varian
     void window.api.listCommands(cwd).then(setCommands)
     // The agent may already be mid-turn from before a project switch/remount;
     // restore the running state so the Stop button and indicator come back.
-    void window.api.isChatRunning(agentId).then(setRunning)
+    void window.api.isSessionChatRunning(projectPath, sessionId).then(setRunning)
     const off = window.api.onChatEvent(e => applyEvent(e))
     return off
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [agentId, cwd])
+  }, [projectPath, sessionId, cwd])
 
   const openFile = useCallback((p: string) => {
     void window.api.openFile({ path: p, root: cwd })
@@ -377,7 +378,7 @@ function ChatPanel({ agentId, agents, onAgentChange, cwd, mode = 'build', varian
   }, [liveTaskId])
 
   const applyEvent = useCallback((e: ChatEvent) => {
-    if (e.agentId !== agentId) return
+    if (!acceptChatEvent({ projectPath, sessionId, turnId: activeTurnIdRef.current }, e)) return
     if (e.type === 'subagent-event') {
       setItems(prev => {
         const idx = prev.findIndex(i => i.kind === 'subagent' && i.taskId === e.taskId)
@@ -470,6 +471,7 @@ if (e.type === 'usage') {
       flushDeltas()
       setRunning(false)
       setPendingPrompt(null)
+      activeTurnIdRef.current = undefined
       if (e.type === 'error') {
         setItems(prev => [...prev, { kind: 'error', id: 'err-' + Date.now(), text: e.message }])
       }
@@ -481,6 +483,7 @@ if (e.type === 'usage') {
       return
     }
     if (e.type === 'turn-started') {
+      activeTurnIdRef.current = (e as ChatEvent & { turnId?: string }).turnId
       setRunning(true)
       return
     }
@@ -523,7 +526,7 @@ if (e.type === 'usage') {
       }
       return next
     })
-  }, [agentId, flushDeltas, resetView, reloadSessions])
+  }, [projectPath, sessionId, flushDeltas, resetView, reloadSessions])
 
   const send = useCallback((text: string, images?: ImageAttachment[]) => {
     const trimmed = text.trim()
@@ -536,64 +539,71 @@ if (e.type === 'usage') {
       }])
       setRunning(true)
     }
-    const m = /^\/(\S+)(?:\s+([\s\S]*))?$/.exec(trimmed)
-    if (m && commands.some(c => c.name === m[1])) {
-      void window.api.runCommand(agentId, m[1], m[2] ?? '')
-    } else {
-      void window.api.sendChat(agentId, trimmed, images)
-    }
+    void window.api.sendSessionChat(projectPath, sessionId, agentId, trimmed, images)
     reloadSessions()
-  }, [agentId, commands, running, reloadSessions])
+  }, [projectPath, sessionId, agentId, running, reloadSessions])
 
   const handleStop = useCallback(() => {
-    void window.api.stopChat(agentId)
-  }, [agentId])
+    void window.api.stopSessionChat(projectPath, sessionId)
+  }, [projectPath, sessionId])
 
   const handleCreateSession = useCallback(() => {
-    void window.api.createSession(agentId).then(() => {
+    void window.api.createProjectSession(projectPath, agentId).then(next => {
       resetView()
       reloadSessions()
+      onSessionChange(next.id, next.lastAgentId)
     })
-  }, [agentId, resetView, reloadSessions])
+  }, [projectPath, agentId, resetView, reloadSessions, onSessionChange])
 
-  const handleSelectSession = useCallback((sessionId: string) => {
-    if (sessionId === activeSessionId) return
-    void window.api.switchSession(agentId, sessionId).then(() => {
+  const handleSelectSession = useCallback((nextSessionId: string) => {
+    if (nextSessionId === sessionId) return
+    void window.api.switchProjectSession(projectPath, nextSessionId).then(next => {
+      if (!next) return
       resetView()
       reloadSessions()
+      onSessionChange(next.id, next.lastAgentId)
     })
-  }, [agentId, activeSessionId, resetView, reloadSessions])
+  }, [projectPath, sessionId, resetView, reloadSessions, onSessionChange])
 
-  const handleDeleteSession = useCallback((sessionId: string) => {
-    void window.api.deleteSession(agentId, sessionId).then(() => {
+  const handleDeleteSession = useCallback((deleteSessionId: string) => {
+    void window.api.deleteProjectSession(projectPath, deleteSessionId).then(next => {
       resetView()
       reloadSessions()
+      onSessionChange(next.id, next.lastAgentId)
     })
-  }, [agentId, resetView, reloadSessions])
+  }, [projectPath, resetView, reloadSessions, onSessionChange])
 
-  const handleRenameSession = useCallback((sessionId: string, title: string) => {
-    void window.api.renameSession(agentId, sessionId, title).then(() => {
+  const handleRenameSession = useCallback((renameSessionId: string, title: string) => {
+    void window.api.renameProjectSession(projectPath, renameSessionId, title).then(() => {
       reloadSessions()
     })
-  }, [agentId, reloadSessions])
+  }, [projectPath, reloadSessions])
+
+  const pickerLocked = running || pendingPrompt !== null || queue.length > 0
+  const handleAgentChange = useCallback((nextAgentId: string) => {
+    if (pickerLocked || nextAgentId === agentId) return
+    void window.api.selectProjectSessionAgent(projectPath, sessionId, nextAgentId).then(() => {
+      onAgentChange(nextAgentId)
+    })
+  }, [pickerLocked, agentId, projectPath, sessionId, onAgentChange])
 
   const handleUndo = useCallback(() => {
-    void window.api.undoChat(agentId).then(ok => {
-      if (ok) {
+    void window.api.undoSessionChat(projectPath, sessionId).then(result => {
+      if (result) {
         loadTranscript()
         loadTodos()
       }
     })
-  }, [agentId, loadTranscript, loadTodos])
+  }, [projectPath, sessionId, loadTranscript, loadTodos])
 
   const handleRedo = useCallback(() => {
-    void window.api.redoChat(agentId).then(ok => {
-      if (ok) {
+    void window.api.redoSessionChat(projectPath, sessionId).then(result => {
+      if (result) {
         loadTranscript()
         loadTodos()
       }
     })
-  }, [agentId, loadTranscript, loadTodos])
+  }, [projectPath, sessionId, loadTranscript, loadTodos])
 
   const respond = useCallback((promptId: string, allow: boolean, text?: string, always = false) => {
     void window.api.respondPrompt(agentId, promptId, { allow, text, always })
@@ -720,7 +730,7 @@ if (e.type === 'usage') {
   const doneCount = todos.filter(t => t.status === 'completed' || t.status === 'cancelled').length
 
   return (
-    <div className="chat-panel" onKeyDown={onPanelKeyDown}>
+    <div className="chat-panel" data-testid="chat-panel" onKeyDown={onPanelKeyDown}>
       {lightboxUrl && (
         <div className="chat-lightbox" onClick={() => setLightboxUrl(null)}>
           <img src={lightboxUrl} alt="preview" />
@@ -747,7 +757,7 @@ if (e.type === 'usage') {
       })()}
       <SessionBar
         sessions={sessions}
-        activeSessionId={activeSessionId}
+        activeSessionId={sessionId}
         onSelect={handleSelectSession}
         onCreate={handleCreateSession}
         onDelete={handleDeleteSession}
@@ -846,7 +856,7 @@ if (e.type === 'usage') {
                 <button
                   className="chat-queue-remove"
                   aria-label={`remove queued ${q.displayText ?? q.text}`}
-                  onClick={() => void window.api.removeQueued(agentId, q.id)}
+                  onClick={() => void window.api.removeSessionQueued(projectPath, sessionId, q.id)}
                 >
                   ×
                 </button>
@@ -985,7 +995,13 @@ if (e.type === 'usage') {
           </button>
           {currentMode === 'plan' && <span className="chat-mode-hint">read-only — edits denied</span>}
           <div className="chat-mode-tools">
-            <AgentPicker agents={agents} value={agentId} onChange={onAgentChange} />
+            <AgentPicker
+              agents={agents}
+              value={agentId}
+              onChange={handleAgentChange}
+              disabled={pickerLocked}
+              disabledReason={pickerLocked ? 'Agent locked while running' : undefined}
+            />
             {availableVariants.length > 0 && (
               <VariantPicker
                 variants={availableVariants}
@@ -1006,7 +1022,7 @@ if (e.type === 'usage') {
           editTarget={editTarget}
           onSubmit={send}
           onEditSubmit={(id, text) => {
-            void window.api.editQueued(agentId, id, text)
+            void window.api.editSessionQueued(projectPath, sessionId, id, text)
             setEditTarget(null)
           }}
           onEditCancel={() => setEditTarget(null)}

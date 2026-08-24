@@ -92,6 +92,12 @@ export const Channels = {
   ProjectSessionRename: 'project-session:rename',
   SessionSelectAgent: 'session:select-agent',
   SessionTranscript: 'session:transcript',
+  SessionTodos: 'session:todos',
+  SessionIsRunning: 'session:is-running',
+  SessionUndo: 'session:undo',
+  SessionRedo: 'session:redo',
+  SessionQueueRemove: 'session:queue-remove',
+  SessionQueueEdit: 'session:queue-edit',
   SettingsGet: 'settings:get',
   SettingsSave: 'settings:save',
   CommandList: 'commands:list',
@@ -244,6 +250,12 @@ export interface AgentApi {
   sendSessionChat(projectPath: string, sessionId: string, agentId: string, text: string, images?: ImageAttachment[]): Promise<void>
   stopSessionChat(projectPath: string, sessionId: string): Promise<void>
   listSessionTranscript(projectPath: string, sessionId: string): Promise<ChatTranscriptItem[]>
+  getSessionTodos(projectPath: string, sessionId: string): Promise<TodoItem[]>
+  isSessionChatRunning(projectPath: string, sessionId: string): Promise<boolean>
+  undoSessionChat(projectPath: string, sessionId: string): Promise<{ agentId: string; turnId: string } | null>
+  redoSessionChat(projectPath: string, sessionId: string): Promise<{ agentId: string; turnId: string } | null>
+  removeSessionQueued(projectPath: string, sessionId: string, messageId: string): Promise<void>
+  editSessionQueued(projectPath: string, sessionId: string, messageId: string, text: string): Promise<void>
   suggestFiles(agentId: string, prefix: string): Promise<FileSuggestion[]>
   setAgentBackground(agentId: string, background: boolean): Promise<void>
   onAgentBackground(cb: (e: { agentId: string; background: boolean }) => void): () => void

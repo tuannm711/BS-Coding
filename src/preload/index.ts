@@ -118,6 +118,12 @@ const api: AgentApi = {
     ipcRenderer.invoke(Channels.ChatSend, projectPath, sessionId, agentId, text, images),
   stopSessionChat: (projectPath: string, sessionId: string) => ipcRenderer.invoke(Channels.ChatStop, projectPath, sessionId),
   listSessionTranscript: (projectPath: string, sessionId: string) => ipcRenderer.invoke(Channels.SessionTranscript, projectPath, sessionId),
+  getSessionTodos: (projectPath: string, sessionId: string) => ipcRenderer.invoke(Channels.SessionTodos, projectPath, sessionId),
+  isSessionChatRunning: (projectPath: string, sessionId: string) => ipcRenderer.invoke(Channels.SessionIsRunning, projectPath, sessionId),
+  undoSessionChat: (projectPath: string, sessionId: string) => ipcRenderer.invoke(Channels.SessionUndo, projectPath, sessionId),
+  redoSessionChat: (projectPath: string, sessionId: string) => ipcRenderer.invoke(Channels.SessionRedo, projectPath, sessionId),
+  removeSessionQueued: (projectPath: string, sessionId: string, messageId: string) => ipcRenderer.invoke(Channels.SessionQueueRemove, projectPath, sessionId, messageId),
+  editSessionQueued: (projectPath: string, sessionId: string, messageId: string, text: string) => ipcRenderer.invoke(Channels.SessionQueueEdit, projectPath, sessionId, messageId, text),
   runCommand: (agentId: string, name: string, args: string) =>
     ipcRenderer.invoke(Channels.ChatRunCommand, agentId, name, args),
   undoChat: (agentId: string) => ipcRenderer.invoke(Channels.ChatUndo, agentId),

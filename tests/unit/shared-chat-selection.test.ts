@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { projectVisiblePanes, resolveSelectedNativeAgent } from '../../src/renderer/src/shared-chat-selection'
+import { nativeChatPaneKey, projectVisiblePanes, resolveSelectedNativeAgent } from '../../src/renderer/src/shared-chat-selection'
 import type { AgentConfig } from '../../src/shared/types'
 import type { PaneModel } from '../../src/renderer/src/App'
 
@@ -28,5 +28,10 @@ describe('shared native chat selection', () => {
     const visible = projectVisiblePanes(agents.map(pane), 'reviewer-id')
     expect(visible.filter(item => item.agent.kind === 'native').map(item => item.agent.id)).toEqual(['reviewer-id'])
     expect(visible.filter(item => item.agent.kind !== 'native').map(item => item.agent.id)).toEqual(['pty-id'])
+  })
+
+  it('keeps one stable native pane key while Agents switch inside a session', () => {
+    expect(nativeChatPaneKey('C:/project', 'session-1')).toBe('native-chat:C:/project:session-1')
+    expect(nativeChatPaneKey('C:/project', 'session-1')).not.toContain('reviewer-id')
   })
 })

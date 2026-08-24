@@ -697,12 +697,15 @@ export class BsAgentManager {
     const session = this.deps.store.get(sessionId)
     if (!session || !this.deps.store.listProject(projectPath).some(item => item.id === sessionId)) return null
     this.activeProjectSessions.set(projectPath, sessionId)
+    if (session.lastAgentId) this.activeSessions.set(session.lastAgentId, sessionId)
     this.deps.store.touch(sessionId)
     return this.projectSummary(this.deps.store.get(sessionId)!)
   }
 
   selectProjectSessionAgent(projectPath: string, sessionId: string, agentId: string): ProjectSessionSummary {
-    return this.coordinator.selectAgent(projectPath, sessionId, agentId, [...this.agents.values()])
+    const selected = this.coordinator.selectAgent(projectPath, sessionId, agentId, [...this.agents.values()])
+    this.activeSessions.set(agentId, sessionId)
+    return selected
   }
 
   deleteProjectSession(projectPath: string, sessionId: string): ProjectSessionSummary {
@@ -730,6 +733,26 @@ export class BsAgentManager {
   listSessionTranscript(projectPath: string, sessionId: string): ChatTranscriptItem[] {
     if (!this.deps.store.listProject(projectPath).some(item => item.id === sessionId)) return []
     return this.deps.store.transcript(sessionId)
+  }
+
+  listSessionTodos(projectPath: string, sessionId: string): TodoItem[] {
+    if (!this.deps.store.listProject(projectPath).some(item => item.id === sessionId)) return []
+    return this.deps.store.todos(sessionId)
+  }
+
+  isSessionChatRunning(projectPath: string, sessionId: string): boolean {
+    return this.deps.store.listProject(projectPath).some(item => item.id === sessionId)
+      && this.coordinator.state(sessionId) !== null
+  }
+
+  removeSessionQueued(projectPath: string, sessionId: string, messageId: string): void {
+    if (!this.deps.store.listProject(projectPath).some(item => item.id === sessionId)) return
+    if (this.coordinator.removeQueued(sessionId, messageId)) this.emitSessionQueue(sessionId)
+  }
+
+  editSessionQueued(projectPath: string, sessionId: string, messageId: string, text: string): void {
+    if (!this.deps.store.listProject(projectPath).some(item => item.id === sessionId)) return
+    if (this.coordinator.editQueued(sessionId, messageId, text)) this.emitSessionQueue(sessionId)
   }
 
   setSpeed(agentId: string, speed: 'standard' | 'fast'): void {

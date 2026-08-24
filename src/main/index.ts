@@ -863,6 +863,12 @@ function registerIpcHandlers(): void {
   ipcMain.handle(Channels.ProjectSessionRename, (_e, projectPath: string, sessionId: string, title: string) => mainApp.bsAgent.renameProjectSession(projectPath, sessionId, title))
   ipcMain.handle(Channels.SessionSelectAgent, (_e, projectPath: string, sessionId: string, agentId: string) => mainApp.bsAgent.selectProjectSessionAgent(projectPath, sessionId, agentId))
   ipcMain.handle(Channels.SessionTranscript, (_e, projectPath: string, sessionId: string) => mainApp.bsAgent.listSessionTranscript(projectPath, sessionId))
+  ipcMain.handle(Channels.SessionTodos, (_e, projectPath: string, sessionId: string) => mainApp.bsAgent.listSessionTodos(projectPath, sessionId))
+  ipcMain.handle(Channels.SessionIsRunning, (_e, projectPath: string, sessionId: string) => mainApp.bsAgent.isSessionChatRunning(projectPath, sessionId))
+  ipcMain.handle(Channels.SessionUndo, (_e, projectPath: string, sessionId: string) => mainApp.bsAgent.undoSession(projectPath, sessionId))
+  ipcMain.handle(Channels.SessionRedo, (_e, projectPath: string, sessionId: string) => mainApp.bsAgent.redoSession(projectPath, sessionId))
+  ipcMain.handle(Channels.SessionQueueRemove, (_e, projectPath: string, sessionId: string, messageId: string) => mainApp.bsAgent.removeSessionQueued(projectPath, sessionId, messageId))
+  ipcMain.handle(Channels.SessionQueueEdit, (_e, projectPath: string, sessionId: string, messageId: string, text: string) => mainApp.bsAgent.editSessionQueued(projectPath, sessionId, messageId, text))
   ipcMain.handle(Channels.ChatRunCommand, (_e, agentId: string, name: string, args: string) =>
     mainApp.bsAgent.runCommand(agentId, name, args))
   ipcMain.handle(Channels.ChatUndo, (_e, agentId: string) => mainApp.bsAgent.undo(agentId))
