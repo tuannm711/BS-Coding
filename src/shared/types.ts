@@ -8,6 +8,27 @@ export type ModelVariant = string
 export type AgentSpeed = 'standard' | 'fast'
 export type ChatRole = 'user' | 'assistant'
 
+export const CHAT_SESSION_SCHEMA_VERSION = 2 as const
+export type TurnExecutionStatus = 'running' | 'completed' | 'stopped' | 'failed'
+
+export interface TurnExecutionSnapshot {
+  turnId: string
+  agentId: string
+  agentName: string
+  providerId?: string
+  accountId?: string
+  accountLabel?: string
+  modelId?: string
+  modelLabel?: string
+  speed: AgentSpeed
+  startedAt: number
+  completedAt?: number
+  status: TurnExecutionStatus
+}
+
+export type ResolvedTurnExecutionSnapshot = TurnExecutionSnapshot &
+  Required<Pick<TurnExecutionSnapshot, 'providerId' | 'modelId'>>
+
 export interface Template {
   id: string
   name: string
@@ -106,6 +127,8 @@ export interface ChatMessage {
   reasoning?: string
   tokens?: MessageTokens
   images?: ImageAttachment[]
+  turnId?: string
+  execution?: TurnExecutionSnapshot
   createdAt: number
 }
 
@@ -114,6 +137,8 @@ export interface ToolCallData {
   tool: string
   input: Record<string, unknown>
   thoughtSignature?: string
+  turnId?: string
+  execution?: TurnExecutionSnapshot
   output?: string
   error?: string
   permission: 'pending' | 'allowed' | 'denied'
@@ -130,6 +155,11 @@ export interface SessionSummary {
   messageCount: number
   createdAt: number
   updatedAt: number
+}
+
+export type ProjectSessionSummary = Omit<SessionSummary, 'agentId'> & {
+  projectPath: string
+  lastAgentId?: string
 }
 
 export type ChatEvent =
@@ -158,12 +188,23 @@ export type ChatEvent =
   | { type: 'message-removed'; agentId: string; messageId: string }
   | { type: 'session-created'; agentId: string }
 
+export interface ChatEventScope {
+  projectPath: string
+  sessionId: string
+  agentId: string
+  turnId?: string
+}
+
+export type ScopedChatEvent = ChatEvent & ChatEventScope
+
 export interface QueuedMessage {
   id: string
   text: string
   displayText?: string
   images?: ImageAttachment[]
 }
+
+export type SessionQueuedMessage = QueuedMessage & { agentId: string }
 
 export interface TokenUsage {
   input: number
