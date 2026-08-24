@@ -14,6 +14,7 @@ import {
   followScrollDelta,
   isInBottomFollowZone,
   nextChatScrollMode,
+  shouldEnterManualForKey,
   tailSpacerHeight,
   type ChatScrollMode
 } from './chat-scroll-geometry'
@@ -285,8 +286,8 @@ export function useChatScroll(): ChatScrollController {
   const onKeyDown = useCallback((event: ReactKeyboardEvent<HTMLDivElement>) => {
     if (!SCROLL_KEYS.has(event.key)) return
     trustedInteractionRef.current = true
-    enterManual()
-  }, [enterManual])
+    if (shouldEnterManualForKey(event.key, isAtBottom())) enterManual()
+  }, [enterManual, isAtBottom])
 
   useEffect(() => {
     const content = contentRef.current

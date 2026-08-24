@@ -6,6 +6,7 @@ import {
   followScrollDelta,
   isInBottomFollowZone,
   nextChatScrollMode,
+  shouldEnterManualForKey,
   tailSpacerHeight
 } from '../../src/renderer/src/components/chat/chat-scroll-geometry'
 
@@ -62,5 +63,16 @@ describe('chat scroll geometry', () => {
     expect(nextChatScrollMode('manual', 'user-bottom')).toBe('following')
     expect(nextChatScrollMode('manual', 'jump-end')).toBe('following')
     expect(nextChatScrollMode('manual', 'session-load')).toBe('following')
+  })
+
+  it('does not claim manual ownership for downward keys already at the bottom', () => {
+    expect(shouldEnterManualForKey('ArrowUp', true)).toBe(true)
+    expect(shouldEnterManualForKey('PageUp', true)).toBe(true)
+    expect(shouldEnterManualForKey('Home', true)).toBe(true)
+    expect(shouldEnterManualForKey('ArrowDown', true)).toBe(false)
+    expect(shouldEnterManualForKey('PageDown', true)).toBe(false)
+    expect(shouldEnterManualForKey(' ', true)).toBe(false)
+    expect(shouldEnterManualForKey('End', false)).toBe(false)
+    expect(shouldEnterManualForKey('ArrowDown', false)).toBe(true)
   })
 })
