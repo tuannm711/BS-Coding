@@ -33,8 +33,11 @@ export interface ProviderCapability {
   description?: string
   methods: AuthMethodDescriptor[]
   status: 'ready' | 'experimental' | 'unavailable'
+  chatTransport: ProviderChatTransport
   logo?: string
 }
+
+export type ProviderChatTransport = 'openai-responses' | 'openai-compatible' | 'cloud-code'
 
 export interface ProviderConnectRequest {
   providerId: string

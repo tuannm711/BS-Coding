@@ -7,7 +7,8 @@ describe('provider contracts', () => {
       id: 'fixture',
       displayName: 'Fixture',
       methods: [{ id: 'api-key', label: 'API key', description: 'Key', kind: 'api-key', fields: ['apiKey'] }],
-      status: 'ready'
+      status: 'ready',
+      chatTransport: 'openai-compatible'
     }
     expect(providerCanUseMethod(capability, 'api-key')).toBe(true)
     expect(providerCanUseMethod(capability, 'oauth')).toBe(false)

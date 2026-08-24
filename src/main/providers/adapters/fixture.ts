@@ -15,7 +15,8 @@ export function createFixtureAdapter(): ProviderAdapter {
         { id: 'api-key', label: 'API key', description: 'Use a test API key', kind: 'api-key', fields: ['apiKey'] },
         { id: 'imported', label: 'Import JSON', description: 'Import a test credential JSON', kind: 'imported', fields: ['credentialJson'] }
       ],
-      status: 'ready'
+      status: 'ready',
+      chatTransport: 'openai-compatible'
     },
     definition() { return this.capability },
     async connect(request, context) {

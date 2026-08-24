@@ -20,7 +20,7 @@ describe('ProviderManager adapter flow', () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'bs-runtime-ledger-'))
     const ledger = new ProviderUsageLedger(path.join(dir, 'usage-ledger.json'))
     const adapter: ProviderAdapter = {
-      capability: { id: 'tracked-runtime', displayName: 'Tracked runtime', status: 'ready', methods: [] },
+      capability: { id: 'tracked-runtime', displayName: 'Tracked runtime', status: 'ready', chatTransport: 'openai-compatible', methods: [] },
       definition() { return this.capability },
       async connect() { throw new Error('not used') },
       async refreshAccount(account) { return account },
@@ -59,7 +59,7 @@ describe('ProviderManager adapter flow', () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'bs-runtime-ledger-error-'))
     const ledger = new ProviderUsageLedger(path.join(dir, 'usage-ledger.json'))
     const adapter: ProviderAdapter = {
-      capability: { id: 'failed-runtime', displayName: 'Failed runtime', status: 'ready', methods: [] },
+      capability: { id: 'failed-runtime', displayName: 'Failed runtime', status: 'ready', chatTransport: 'openai-compatible', methods: [] },
       definition() { return this.capability },
       async connect() { throw new Error('not used') },
       async refreshAccount(account) { return account },
@@ -78,7 +78,7 @@ describe('ProviderManager adapter flow', () => {
 
   it('preserves last-known-good quota when an account refresh fails', async () => {
     const adapter: ProviderAdapter = {
-      capability: { id: 'stale-usage', displayName: 'Stale usage', status: 'ready', methods: [] },
+      capability: { id: 'stale-usage', displayName: 'Stale usage', status: 'ready', chatTransport: 'openai-compatible', methods: [] },
       definition() { return this.capability },
       async connect() { throw new Error('not used') },
       async refreshAccount(account) { return account },
@@ -120,7 +120,7 @@ describe('ProviderManager adapter flow', () => {
     ledger.record({ providerId: 'merged-usage', accountId: 'account-id', modelId: 'model-a', timestamp: 1, tokens: { input: 10, output: 2 }, estimatedCost: 0.01 }, trackedPeriod)
     ledger.record({ providerId: 'merged-usage', accountId: 'account-id', modelId: 'model-b', timestamp: 2, tokens: { input: 20, output: 3, cacheRead: 4 }, estimatedCost: 0.02 }, trackedPeriod)
     const adapter: ProviderAdapter = {
-      capability: { id: 'merged-usage', displayName: 'Merged usage', status: 'ready', methods: [] },
+      capability: { id: 'merged-usage', displayName: 'Merged usage', status: 'ready', chatTransport: 'openai-compatible', methods: [] },
       definition() { return this.capability },
       async connect() { throw new Error('not used') },
       async refreshAccount(account) { return account },
@@ -152,6 +152,7 @@ describe('ProviderManager adapter flow', () => {
         id: 'oauth-fixture',
         displayName: 'OAuth fixture',
         status: 'ready',
+        chatTransport: 'openai-compatible',
         methods: [{ id: 'oauth', label: 'OAuth', description: '', kind: 'oauth', fields: [] }]
       },
       authorization: {
@@ -207,7 +208,7 @@ describe('ProviderManager adapter flow', () => {
   it('rolls back a new OAuth account when model hydration fails', async () => {
     const adapter: ProviderAdapter = {
       capability: {
-        id: 'oauth-model-failure', displayName: 'OAuth model failure', status: 'ready',
+        id: 'oauth-model-failure', displayName: 'OAuth model failure', status: 'ready', chatTransport: 'openai-compatible',
         methods: [{ id: 'oauth', label: 'OAuth', description: '', kind: 'oauth', fields: [] }]
       },
       authorization: {
@@ -251,7 +252,7 @@ describe('ProviderManager adapter flow', () => {
   it('restores the previous OAuth account and secret when reconnect hydration fails', async () => {
     const adapter: ProviderAdapter = {
       capability: {
-        id: 'oauth-reconnect-failure', displayName: 'OAuth reconnect failure', status: 'ready',
+        id: 'oauth-reconnect-failure', displayName: 'OAuth reconnect failure', status: 'ready', chatTransport: 'openai-compatible',
         methods: [{ id: 'oauth', label: 'OAuth', description: '', kind: 'oauth', fields: [] }]
       },
       authorization: {
@@ -313,7 +314,7 @@ describe('ProviderManager adapter flow', () => {
 
     const adapter: ProviderAdapter = {
       capability: {
-        id: 'oauth-build-failure', displayName: 'OAuth build failure', status: 'ready',
+        id: 'oauth-build-failure', displayName: 'OAuth build failure', status: 'ready', chatTransport: 'openai-compatible',
         methods: [{ id: 'oauth', label: 'OAuth', description: '', kind: 'oauth', fields: [] }]
       },
       authorization: {
@@ -384,7 +385,7 @@ describe('ProviderManager adapter flow', () => {
   it('persists rotated credentials before creating an OAuth runtime', async () => {
     const seenTokens: string[] = []
     const adapter: ProviderAdapter = {
-      capability: { id: 'oauth-runtime', displayName: 'OAuth runtime', status: 'ready', methods: [] },
+      capability: { id: 'oauth-runtime', displayName: 'OAuth runtime', status: 'ready', chatTransport: 'openai-compatible', methods: [] },
       definition() { return this.capability },
       async connect() { throw new Error('not used') },
       async refreshAccount(account) { return account },
@@ -410,7 +411,7 @@ describe('ProviderManager adapter flow', () => {
   it('refreshes once after a runtime auth failure and persists the rotated token', async () => {
     const runtimeTokens: string[] = []
     const adapter: ProviderAdapter = {
-      capability: { id: 'oauth-retry', displayName: 'OAuth retry', status: 'ready', methods: [] },
+      capability: { id: 'oauth-retry', displayName: 'OAuth retry', status: 'ready', chatTransport: 'openai-compatible', methods: [] },
       definition() { return this.capability },
       async connect() { throw new Error('not used') },
       async refreshAccount(account) { return account },
@@ -437,7 +438,7 @@ describe('ProviderManager adapter flow', () => {
   it('persists structured runtime capacity errors and retry windows in the snapshot', async () => {
     let fail = true
     const adapter: ProviderAdapter = {
-      capability: { id: 'runtime-error', displayName: 'Runtime error', status: 'ready', methods: [] },
+      capability: { id: 'runtime-error', displayName: 'Runtime error', status: 'ready', chatTransport: 'openai-compatible', methods: [] },
       definition() { return this.capability },
       async connect() { throw new Error('not used') },
       async refreshAccount(account) { return account },
@@ -463,7 +464,7 @@ describe('ProviderManager adapter flow', () => {
 
   it('persists credentials rotated by a usage adapter', async () => {
     const adapter: ProviderAdapter = {
-      capability: { id: 'usage-refresh', displayName: 'Usage refresh', status: 'ready', methods: [] },
+      capability: { id: 'usage-refresh', displayName: 'Usage refresh', status: 'ready', chatTransport: 'openai-compatible', methods: [] },
       definition() { return this.capability },
       async connect() { throw new Error('not used') },
       async refreshAccount(account) { return account },

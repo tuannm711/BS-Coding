@@ -110,7 +110,8 @@ export function createAntigravityAdapter(): ProviderAdapter {
       methods: [
         { id: 'oauth', label: 'OAuth authorization', description: 'Authorize with Google and store an offline refresh token', kind: 'oauth', fields: [], opensBrowser: true, supportsMultipleAccounts: true }
       ],
-      status: 'experimental'
+      status: 'experimental',
+      chatTransport: 'cloud-code'
     },
     authorization: {
       methodId: 'oauth',

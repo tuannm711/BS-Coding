@@ -67,6 +67,10 @@ describe('provider chat transport matrix', () => {
     expect(continuationParts.some(part => part.kind === 'text')).toBe(true)
     expect(bodies).toHaveLength(2)
     expect(bodies.every(body => body.model === model)).toBe(true)
+    if (transport === 'openai-compatible') {
+      expect(JSON.stringify(bodies)).not.toContain('function_call_output')
+      expect(JSON.stringify(bodies)).not.toContain('MODEL_PLACEHOLDER')
+    }
   })
 
   it('covers every provider adapter registered by the desktop app', () => {

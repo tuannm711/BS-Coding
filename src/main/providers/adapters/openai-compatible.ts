@@ -21,7 +21,7 @@ const DEFAULT_MODELS: Record<string, string[]> = {
 export function createOpenAiCompatibleAdapter(providerId: string, displayName: string, apiKey = false): ProviderAdapter {
   const methods: AuthMethodDescriptor[] = [{ id: 'imported', label: 'Import credentials', description: 'Paste a provider credential JSON with apiKey/accessToken and baseUrl', kind: 'imported', fields: ['credentialJson'], supportsMultipleAccounts: true }]
   if (apiKey) methods.unshift({ id: 'api-key', label: 'API key', description: 'Use an API key and optional OpenAI-compatible base URL', kind: 'api-key' as const, fields: ['apiKey', 'baseUrl'], supportsMultipleAccounts: true })
-  const capability: ProviderCapability = { id: providerId, displayName, description: 'Experimental in-app adapter using provider credentials and an OpenAI-compatible endpoint', methods, status: 'experimental' }
+  const capability: ProviderCapability = { id: providerId, displayName, description: 'Experimental in-app adapter using provider credentials and an OpenAI-compatible endpoint', methods, status: 'experimental', chatTransport: 'openai-compatible' }
   return {
     capability,
     definition() { return capability },
