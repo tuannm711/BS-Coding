@@ -303,3 +303,39 @@ test('settings agent list immediately reconciles the active workspace', async ()
     rmSync(project, { recursive: true, force: true })
   }
 })
+
+test('opening a legacy workspace removes duplicate native Agent rows', async () => {
+  const userData = mkdtempSync(path.join(tmpdir(), 'bs-duplicate-agent-'))
+  const project = mkdtempSync(path.join(tmpdir(), 'bs-duplicate-project-'))
+  try {
+    writeFileSync(path.join(userData, 'bs.json'), JSON.stringify({
+      provider: {}, model: '', agents: {
+        bs: { systemPrompt: 'Default' },
+        reviewer: { systemPrompt: 'Review' }
+      }
+    }))
+    writeFileSync(path.join(userData, 'workspaces.json'), JSON.stringify([{
+      projectPath: project,
+      name: 'Duplicate Agent Project',
+      agents: [
+        { id: 'duplicate-bs', name: 'bs', templateId: 'bs', cwd: project, kind: 'native' },
+        { id: 'reviewer-first', name: 'reviewer', templateId: 'bs', cwd: project, kind: 'native' },
+        { id: 'reviewer-duplicate', name: 'reviewer', templateId: 'bs', cwd: project, kind: 'native' }
+      ]
+    }]))
+    const app = await electron.launch({ args: ['.'], env: { ...process.env as Record<string, string>, BS_USER_DATA: userData } })
+    const window = await app.firstWindow()
+    try {
+      await window.locator('.project-row').click()
+      await window.locator('.agent-picker-trigger').click()
+      await expect(window.locator('.agent-picker-item').filter({ hasText: 'reviewer' })).toHaveCount(1)
+      const stored = JSON.parse(readFileSync(path.join(userData, 'workspaces.json'), 'utf8'))
+      expect(stored[0].agents.filter((agent: { name: string }) => agent.name === 'reviewer')).toHaveLength(1)
+    } finally {
+      await app.close()
+    }
+  } finally {
+    rmSync(userData, { recursive: true, force: true })
+    rmSync(project, { recursive: true, force: true })
+  }
+})

@@ -357,23 +357,22 @@ class MainApp {
     const projectPath = this.activeProject
     const workspace = projectPath ? this.workspaces.get(projectPath) : undefined
     if (!projectPath || !workspace) return saved
+    const fresh = await this.reconcileWorkspaceAgents(projectPath, saved.agents.map(agent => agent.name))
+    if (fresh) win?.webContents.send(Channels.EventWorkspaceRuntimeChanged, this.runtimeFor(fresh))
+    return saved
+  }
 
-    const reconciliation = planNativeAgentReconciliation(workspace.agents, saved.agents.map(agent => agent.name))
+  private async reconcileWorkspaceAgents(projectPath: string, desiredNames: string[]): Promise<Workspace | undefined> {
+    const workspace = this.workspaces.get(projectPath)
+    if (!workspace) return undefined
+    const reconciliation = planNativeAgentReconciliation(workspace.agents, desiredNames)
     for (const agentId of reconciliation.remove) await this.removeWorkspaceAgent(projectPath, agentId)
     for (const name of reconciliation.add) {
-      const next = this.workspaces.addAgent(projectPath, {
-        name,
-        templateId: 'bs',
-        cwd: projectPath,
-        kind: 'native'
-      })
+      const next = this.workspaces.addAgent(projectPath, { name, templateId: 'bs', cwd: projectPath, kind: 'native' })
       const added = next.agents.find(agent => agent.name === name && agent.kind === 'native')
       if (added) this.bsAgent.addAgent(added)
     }
-
-    const fresh = this.workspaces.get(projectPath)
-    if (fresh) win?.webContents.send(Channels.EventWorkspaceRuntimeChanged, this.runtimeFor(fresh))
-    return saved
+    return this.workspaces.get(projectPath)
   }
 
   async removeWorkspaceAgent(projectPath: string, agentId: string): Promise<void> {
@@ -445,8 +444,10 @@ class MainApp {
 
   async openWorkspace(projectPath: string): Promise<WorkspaceRuntime> {
     this.closeAllTerminals()
-    const ws = this.workspaces.get(projectPath)
+    let ws = this.workspaces.get(projectPath)
     if (!ws) throw new Error(`Workspace not found: ${projectPath}`)
+    ws = await this.reconcileWorkspaceAgents(projectPath, this.bsAgent.getSettings().agents.map(agent => agent.name))
+    if (!ws) throw new Error(`Workspace not found after Agent reconciliation: ${projectPath}`)
     this.activeProject = projectPath
     this.bsAgent.setProjectPath(projectPath)
     // Register native agents synchronously (cheap) so the chat panel mounts

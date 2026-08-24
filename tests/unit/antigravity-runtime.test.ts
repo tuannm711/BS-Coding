@@ -123,7 +123,7 @@ describe('Antigravity Cloud Code runtime', () => {
     }))
   })
 
-  it('refreshes project and the exact persisted model runtime id once after NOT_FOUND', async () => {
+  it('refreshes the project once while preserving the exact friendly model id after NOT_FOUND', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'bs-antigravity-recovery-'))
     try {
       const requests: any[] = []
@@ -142,8 +142,8 @@ describe('Antigravity Cloud Code runtime', () => {
       for await (const part of manager.createRuntime('antigravity', 'account-1', 'claude-sonnet-4-6').stream({ model: 'claude-sonnet-4-6', system: '', messages: [{ role: 'user', content: 'hello' }], tools: [] })) parts.push(part)
 
       expect(requests).toHaveLength(2)
-      expect(requests[0]).toMatchObject({ project: 'stale-project', model: 'MODEL_OLD' })
-      expect(requests[1]).toMatchObject({ project: 'fresh-project', model: 'MODEL_FRESH' })
+      expect(requests[0]).toMatchObject({ project: 'stale-project', model: 'claude-sonnet-4-6' })
+      expect(requests[1]).toMatchObject({ project: 'fresh-project', model: 'claude-sonnet-4-6' })
       expect(calls.filter(url => url.includes('loadCodeAssist'))).toHaveLength(1)
       expect(calls.filter(url => url.includes('fetchAvailableModels'))).toHaveLength(1)
       expect(parts).toContainEqual({ kind: 'text', text: 'recovered' })

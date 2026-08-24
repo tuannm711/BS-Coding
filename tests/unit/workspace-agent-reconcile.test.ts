@@ -24,6 +24,18 @@ describe('workspace Agent reconciliation', () => {
     expect(() => planNativeAgentReconciliation(current, ['bs', 'reviewer', 'reviewer'])).toThrow('Duplicate Agent profile name: reviewer')
   })
 
+  it('removes duplicate native runtime Agents while retaining the first matching profile', () => {
+    const duplicated = [
+      current[0],
+      { id: 'reviewer-first', name: 'reviewer', templateId: 'bs', cwd: 'C:/repo', kind: 'native' as const },
+      { id: 'reviewer-duplicate', name: 'reviewer', templateId: 'bs', cwd: 'C:/repo', kind: 'native' as const }
+    ]
+    expect(planNativeAgentReconciliation(duplicated, ['bs', 'reviewer'])).toEqual({
+      add: [],
+      remove: ['reviewer-duplicate']
+    })
+  })
+
   it('falls back to bs when the focused Agent is removed', () => {
     const agents = [{ id: 'bs-id', name: 'bs' }, { id: 'review-id', name: 'reviewer' }]
     expect(resolveActiveAgentId(agents, 'review-id')).toBe('review-id')

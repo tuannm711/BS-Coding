@@ -157,7 +157,7 @@ export function createAntigravityAdapter(): ProviderAdapter {
       return createAntigravityLlm(secret.accessToken, {
         baseUrl: secret.cloudCodeBaseUrl ?? CLOUD_CODE_DAILY_URL,
         projectId: secret.projectId,
-        modelId: model.runtimeId ?? model.id,
+        modelId: model.id,
         isGemini3: /gemini\s*3/i.test(model.name) || /^gemini-3(?:\.|-|$)/i.test(model.runtimeId ?? '')
       })
     },
