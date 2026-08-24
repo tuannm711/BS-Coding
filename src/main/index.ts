@@ -38,6 +38,7 @@ import { getWindowChromeOptions } from './window-chrome'
 import { Vault } from './vault'
 import { ProviderManager } from './connections/manager'
 import { ProviderUsageLedger } from './connections/usage-ledger'
+import { UsageScheduler } from './connections/usage'
 import { ProviderRegistry } from './providers/registry'
 import { createOpenAiAdapter } from './providers/adapters/openai'
 import { createOpenAiCompatibleAdapter } from './providers/adapters/openai-compatible'
@@ -200,6 +201,8 @@ class MainApp {
 
   private states = new Map<string, AgentState>()
   private gitTimer: ReturnType<typeof setInterval> | null = null
+  private usageScheduler = new UsageScheduler()
+  private usageRefreshTimer: ReturnType<typeof setTimeout> | null = null
   private activeProject: string | null = null
   private watcher: FileWatcher | null = null
   artifacts = new ArtifactStore((projectPath, artifacts) => {
@@ -275,6 +278,7 @@ class MainApp {
         this.setState(event.agentId, { status: 'running', lastOutputAt: Date.now(), alert: 'normal' })
       } else if (event.type === 'done' || event.type === 'error') {
         this.setState(event.agentId, { status: 'idle', alert: 'normal' })
+        this.debouncedUsageRefresh()
       }
       mainApp.remote?.handleAgentEvent(event)
       win?.webContents.send(Channels.EventChat, event)
@@ -535,6 +539,22 @@ class MainApp {
       clearInterval(this.gitTimer)
       this.gitTimer = null
     }
+  }
+
+  startUsagePoll(): void {
+    this.usageScheduler.start(() => void this.providerManager.refreshUsage(), 5 * 60 * 1000)
+  }
+
+  stopUsagePoll(): void {
+    this.usageScheduler.stop()
+  }
+
+  private debouncedUsageRefresh(): void {
+    if (this.usageRefreshTimer) clearTimeout(this.usageRefreshTimer)
+    this.usageRefreshTimer = setTimeout(() => {
+      this.usageRefreshTimer = null
+      void this.providerManager.refreshUsage().catch(() => {})
+    }, 3000)
   }
 
   isActiveProject(projectPath: string): boolean {
@@ -959,6 +979,7 @@ app.whenReady().then(async () => {
   }
   registerIpcHandlers()
   createWindow()
+  mainApp.startUsagePoll()
   tray = TrayManager.create({
     userDataDir: app.getPath('userData'),
     getWindow: () => win,
@@ -990,6 +1011,7 @@ app.on('before-quit', (event) => {
   cleaningUp = true
   isQuitting = true
   mainApp.stopGitPoll()
+  mainApp.stopUsagePoll()
   void mainApp.bsAgent.dispose().then(() => {
     return mainApp.traces.flushAll()
   }).then(() => {
