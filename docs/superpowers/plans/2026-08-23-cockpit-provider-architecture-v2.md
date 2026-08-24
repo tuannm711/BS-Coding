@@ -8,6 +8,13 @@
 
 **Audit:** `docs/superpowers/audits/2026-08-23-cockpit-provider-implementation-audit.md`
 
+## Execution status — completed 2026-08-24
+
+- Tasks 1–9 and their automated acceptance suites are complete.
+- The user verified three ChatGPT OAuth accounts and the connected Antigravity account in the running Electron app after the final routing and Agent-list fixes.
+- Evidence: `docs/evidence/2026-08-23-provider-architecture-manual-verification.md` and `docs/evidence/2026-08-24-shared-session-provider-chat-verification.md`.
+- Release baseline: BS Coding `1.0.0`.
+
 ## Non-negotiable execution rules
 
 1. A task is `in_progress` until its tests, typecheck, diff review and required UI evidence are complete.
@@ -193,4 +200,3 @@ Definition of Done:
 - `npm test`, `npm run typecheck`, `npm run build`, and required integration tests pass.
 - Evidence note confirms Settings reopen, quota update, provider add flow and 429 state.
 - Only then may the plan be marked complete.
-

@@ -44,7 +44,7 @@ async function resolveCloudCodeContext(secret: Parameters<NonNullable<ProviderAd
       'x-goog-api-client': 'gl-node/22.21.1'
     },
     body: JSON.stringify({
-      metadata: { ideName: 'antigravity', ideType: 'ANTIGRAVITY', ideVersion: '1.20.5', pluginVersion: '0.25.7', platform: 'WINDOWS_AMD64', updateChannel: 'stable', pluginType: 'GEMINI' },
+      metadata: { ideName: 'antigravity', ideType: 'ANTIGRAVITY', ideVersion: '1.20.5', pluginVersion: '1.0.0', platform: 'WINDOWS_AMD64', updateChannel: 'stable', pluginType: 'GEMINI' },
       mode: 'FULL_ELIGIBILITY_CHECK'
     })
   })

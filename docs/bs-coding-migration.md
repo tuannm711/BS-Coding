@@ -9,3 +9,11 @@ The migration is idempotent and writes `bs-migration.json` only after successful
 Use `BS_USER_DATA` to select a custom BS profile location. `MEOW_USER_DATA` is accepted only as a temporary compatibility fallback during the migration window; new deployments should use `BS_USER_DATA`.
 
 Because the Electron app ID changed, an existing installation may require one manual installation of BS Coding before future updates are delivered through the BS release channel.
+
+## Provider assignment migration
+
+The first provider-architecture launch creates `assignments.json` in the BS Coding user-data directory. Existing agent provider, account, model, and speed fields are copied from `bs.json` and workspace agents. The assignment file has a schema `version` and is written through a temporary file plus atomic rename.
+
+Before the first assignment write, BS Coding copies the current settings to `assignments.json.migration-v1.backup.json`. The backup is created once and is not overwritten on later launches. An assignment that cannot identify both a provider and a model is retained with `needs-review`; BS Coding does not substitute the first available model.
+
+See [Provider assignment migration and recovery](provider-assignment-recovery.md) for verification and recovery steps.
