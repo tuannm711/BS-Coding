@@ -228,6 +228,24 @@ export class SessionStore {
     if (changed) this.saveSessions(all)
   }
 
+  finishExecution(turnId: string, status: TurnExecutionSnapshot['status'], completedAt: number): void {
+    const all = this.loadSessions()
+    let changed = false
+    for (const session of all) {
+      let sessionChanged = false
+      for (const item of session.items) {
+        const execution = item.kind === 'message' ? item.message.execution : item.tool.execution
+        if (!execution || execution.turnId !== turnId) continue
+        execution.status = status
+        execution.completedAt = completedAt
+        changed = true
+        sessionChanged = true
+      }
+      if (sessionChanged) session.updatedAt = this.nextUpdatedAt()
+    }
+    if (changed) this.saveSessions(all)
+  }
+
   transcript(id: string): ChatTranscriptItem[] {
     return this.get(id)?.items ?? []
   }

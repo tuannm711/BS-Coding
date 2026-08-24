@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { writeFileSync } from 'node:fs'
-import type { ChatEvent, ChatMessage, ChatTranscriptItem, ContextInfo, FileSuggestion, ImageAttachment, McpServerStatus, BsSettings, MessageTokens, ModelUsage, NotificationsSettings, PromptResponse, QueuedMessage, StatsSummary, TodoItem, TraceEvent, UsageSummary, ProviderConnection } from '../shared/types'
+import type { ChatEvent, ChatMessage, ChatTranscriptItem, ContextInfo, FileSuggestion, ImageAttachment, McpServerStatus, BsSettings, MessageTokens, ModelUsage, NotificationsSettings, ProjectSessionSummary, PromptResponse, QueuedMessage, ResolvedTurnExecutionSnapshot, StatsSummary, TodoItem, TraceEvent, UsageSummary, ProviderConnection } from '../shared/types'
 import type { AgentConfig, AgentMode, ArtifactEntry, CatalogProviderSummary, Command, ModelRef, SubagentType } from '../shared/types'
 import {
   configToSettings, loadBsConfig, resolveAgentConfig, settingsToConfig, writeBsConfig,
@@ -40,6 +40,9 @@ import type { TraceEventInput } from './agent/trace-store'
 import { OPENAI_OAUTH_MODELS, isActiveOpenAiOAuthAccount, isOpenAiGenericModel, normalizeOpenAiCodexModel } from '../shared/openai-oauth'
 import type { AgentAssignmentSetRequest, AgentAssignmentSnapshot } from '../shared/provider-state'
 import { AssignmentStore, fileAssignmentPersistence } from './agent/assignments'
+import { SharedSessionCoordinator } from './agent/shared-session-coordinator'
+import { compileNeutralContext } from './agent/neutral-context'
+import { toLlmMessages } from './agent/message'
 
 export interface BsAgentManagerDeps {
   configPath: string
@@ -98,6 +101,9 @@ export class BsAgentManager {
   private lastCompactionAt = new Map<string, number>()
   private idleCompactTimer: ReturnType<typeof setInterval> | null = null
   private assignments: AssignmentStore
+  private coordinator = new SharedSessionCoordinator(this.deps.store)
+  private activeProjectSessions = new Map<string, string>()
+  private sessionExecutions = new Map<string, { projectPath: string; sessionId: string; execution: ResolvedTurnExecutionSnapshot }>()
 
   constructor(private deps: BsAgentManagerDeps) {
     this.tools = new Map(deps.tools)
@@ -174,6 +180,20 @@ export class BsAgentManager {
     for (const agent of agents) {
       if (agent.kind === 'native') this.register(agent, true)
     }
+    this.deps.store.backfillLegacyExecution(agentId => {
+      const agent = this.agents.get(agentId)
+      const resolved = this.resolved.get(agentId)
+      if (!agent || !resolved) return null
+      return {
+        agentId,
+        agentName: agent.name,
+        providerId: resolved.provider || undefined,
+        accountId: resolved.accountId,
+        modelId: resolved.model || undefined,
+        speed: agent.speed ?? 'standard'
+      }
+    })
+    this.coordinator.reconcileAgents([...this.agents.values()])
   }
 
   addAgent(agent: AgentConfig): void {
@@ -287,6 +307,55 @@ export class BsAgentManager {
     this.emitQueue(agentId)
   }
 
+  async sendInSession(
+    projectPath: string,
+    sessionId: string,
+    agentId: string,
+    text: string,
+    images?: ImageAttachment[],
+    displayText?: string
+  ): Promise<void> {
+    const agent = this.agents.get(agentId)
+    if (!agent || !this.deps.store.listProject(projectPath).some(session => session.id === sessionId)) return
+    const state = this.coordinator.acquire(projectPath, sessionId, agentId)
+    const resolved = this.resolved.get(agentId)
+    const assignment = this.assignments.get(agentId)
+    const providerId = assignment?.providerId || resolved?.provider
+    const modelId = assignment?.modelId || resolved?.model
+    if (!providerId || !modelId) {
+      this.coordinator.fail(sessionId)
+      this.emit({ type: 'error', agentId, message: '[bs] Agent assignment cần được review trong Settings trước khi chat.' })
+      return
+    }
+    const connection = this.deps.providerAccounts?.().find(item => item.providerId === providerId)
+    const accountId = assignment?.accountId ?? resolved?.accountId
+    const account = connection?.accounts.find(item => item.id === accountId)
+    const execution: ResolvedTurnExecutionSnapshot = {
+      turnId: state.turnId,
+      agentId,
+      agentName: agent.name,
+      providerId,
+      accountId,
+      accountLabel: account?.label,
+      modelId,
+      modelLabel: modelId,
+      speed: agent.speed ?? assignment?.speed ?? 'standard',
+      startedAt: Date.now(),
+      status: 'running'
+    }
+    this.activeSessions.set(agentId, sessionId)
+    this.activeProjectSessions.set(projectPath, sessionId)
+    this.sessionExecutions.set(agentId, { projectPath, sessionId, execution })
+    try {
+      await this.runTurn(agentId, text, images, displayText)
+    } finally {
+      const finalStatus = execution.status === 'running' ? 'completed' : execution.status
+      this.deps.store.finishExecution(execution.turnId, finalStatus, Date.now())
+      this.coordinator.complete(sessionId)
+      this.sessionExecutions.delete(agentId)
+    }
+  }
+
   async send(agentId: string, text: string, images?: ImageAttachment[], displayText?: string): Promise<void> {
     const agent = this.agents.get(agentId)
     if (!agent) return
@@ -326,6 +395,8 @@ export class BsAgentManager {
       text: referenceHints(agent.cwd, text),
       displayText: displayText ?? text,
       images,
+      turnId: this.sessionExecutions.get(agentId)?.execution.turnId,
+      execution: this.sessionExecutions.get(agentId)?.execution,
       createdAt: Date.now()
     }
     this.deps.store.appendMessage(this.activeSessionId(agentId), message)
@@ -496,6 +567,45 @@ export class BsAgentManager {
     this.runners.delete(agentId)
     this.resolved.delete(agentId)
     this.register(agent)
+  }
+
+  private projectSummary(session: StoredSession): ProjectSessionSummary {
+    return {
+      id: session.id,
+      projectPath: session.projectPath,
+      lastAgentId: session.lastAgentId,
+      title: session.title,
+      messageCount: session.items.length,
+      createdAt: session.createdAt,
+      updatedAt: session.updatedAt
+    }
+  }
+
+  listProjectSessions(projectPath: string): ProjectSessionSummary[] {
+    return this.deps.store.listProject(projectPath)
+  }
+
+  createProjectSession(projectPath: string, agentId?: string): ProjectSessionSummary {
+    const session = this.deps.store.createProject(projectPath, agentId)
+    this.activeProjectSessions.set(projectPath, session.id)
+    return this.projectSummary(session)
+  }
+
+  switchProjectSession(projectPath: string, sessionId: string): ProjectSessionSummary | null {
+    const session = this.deps.store.get(sessionId)
+    if (!session || !this.deps.store.listProject(projectPath).some(item => item.id === sessionId)) return null
+    this.activeProjectSessions.set(projectPath, sessionId)
+    this.deps.store.touch(sessionId)
+    return this.projectSummary(this.deps.store.get(sessionId)!)
+  }
+
+  selectProjectSessionAgent(projectPath: string, sessionId: string, agentId: string): ProjectSessionSummary {
+    return this.coordinator.selectAgent(projectPath, sessionId, agentId, [...this.agents.values()])
+  }
+
+  listSessionTranscript(projectPath: string, sessionId: string): ChatTranscriptItem[] {
+    if (!this.deps.store.listProject(projectPath).some(item => item.id === sessionId)) return []
+    return this.deps.store.transcript(sessionId)
   }
 
   setSpeed(agentId: string, speed: 'standard' | 'fast'): void {
@@ -979,8 +1089,29 @@ export class BsAgentManager {
       onEvent: (e) => this.emit(e),
       onArtifact: (entry) => this.deps.onArtifact?.(entry),
       getItems: () => this.deps.store.get(this.activeSessionId(agent.id))?.items ?? [],
-      appendMessage: (msg) => this.deps.store.appendMessage(this.activeSessionId(agent.id), msg),
-      appendTool: (tool) => this.deps.store.appendTool(this.activeSessionId(agent.id), tool),
+      buildMessages: (items) => {
+        const current = this.sessionExecutions.get(agent.id)?.execution
+        if (!current) return toLlmMessages(items, { toolOutputMaxChars: cfg.compaction.toolOutputMaxChars })
+        const turnId = current.turnId
+        const prior = items.filter(item => (item.kind === 'message' ? item.message.turnId : item.tool.turnId) !== turnId)
+        const active = items.filter(item => (item.kind === 'message' ? item.message.turnId : item.tool.turnId) === turnId)
+        return [
+          ...compileNeutralContext(prior, { toolOutputMaxChars: cfg.compaction.toolOutputMaxChars }),
+          ...toLlmMessages(active, { toolOutputMaxChars: cfg.compaction.toolOutputMaxChars })
+        ]
+      },
+      appendMessage: (msg) => {
+        const execution = this.sessionExecutions.get(agent.id)?.execution
+        this.deps.store.appendMessage(this.activeSessionId(agent.id), execution
+          ? { ...msg, turnId: execution.turnId, execution }
+          : msg)
+      },
+      appendTool: (tool) => {
+        const execution = this.sessionExecutions.get(agent.id)?.execution
+        this.deps.store.appendTool(this.activeSessionId(agent.id), execution
+          ? { ...tool, turnId: execution.turnId, execution }
+          : tool)
+      },
       takeSteers: () => {
         const q = this.queues.get(agent.id)
         if (!q || q.length === 0) return []
@@ -1270,6 +1401,19 @@ export class BsAgentManager {
   }
 
   private emit(e: ChatEvent): void {
-    this.onEvent(e)
+    const context = this.sessionExecutions.get(e.agentId)
+    if (!context) {
+      this.onEvent(e)
+      return
+    }
+    if (e.type === 'error') context.execution.status = 'failed'
+    if (e.type === 'done') context.execution.status = e.reason === 'stopped' ? 'stopped' : 'completed'
+    const scoped = {
+      ...e,
+      projectPath: context.projectPath,
+      sessionId: context.sessionId,
+      turnId: context.execution.turnId
+    } as unknown as ChatEvent
+    this.onEvent(scoped)
   }
 }

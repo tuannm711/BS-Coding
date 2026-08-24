@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import type { ModelMessage } from 'ai'
 import type { ArtifactEntry, ChatEvent, ChatMessage, MessageTokens, PromptResponse, QuestionPrompt, QueuedMessage, TodoItem, ToolCallData } from '../../shared/types'
 import { appendStreamDelta } from '../../shared/text'
 import type { LlmClient, LlmStreamPart } from './llm'
@@ -36,6 +37,7 @@ export interface LoopDeps {
   onEvent: (e: ChatEvent) => void
   onArtifact?: (entry: Omit<ArtifactEntry, 'id' | 'ts'>) => void
   getItems: () => TranscriptItem[]
+  buildMessages?: (items: TranscriptItem[]) => ModelMessage[]
   appendMessage: (msg: ChatMessage) => void
   appendTool: (tool: ToolCallData) => void
   // Returns and clears all pending steered messages (injected at the next step
@@ -393,7 +395,9 @@ export class SessionRunner {
   private buildMessages(isLastStep = false): ReturnType<typeof toLlmMessages> {
     const items = this.deps.getItems()
     const toolOutputMaxChars = this.deps.compaction?.toolOutputMaxChars
-    const messages = toLlmMessages(items, { toolOutputMaxChars, ...this.truncationOpts() })
+    const messages = this.deps.buildMessages
+      ? this.deps.buildMessages(items)
+      : toLlmMessages(items, { toolOutputMaxChars, ...this.truncationOpts() })
     return isLastStep ? [...messages, { role: 'user', content: MAX_STEPS_PROMPT }] : messages
   }
 }
