@@ -8,6 +8,8 @@ import { createOpenAiAdapter } from '../../src/main/providers/adapters/openai'
 import { createAntigravityAdapter } from '../../src/main/providers/adapters/antigravity'
 import { createGitHubCopilotAdapter } from '../../src/main/providers/adapters/github-copilot'
 import { createOpenAiCompatibleAdapter } from '../../src/main/providers/adapters/openai-compatible'
+import type { ToolDefinition } from '../../src/main/agent/tools/types'
+import { readTool } from '../../src/main/agent/tools/read'
 import {
   ANTIGRAVITY_ENTITY_404,
   CLOUD_CODE_TEXT_SSE,
@@ -28,9 +30,14 @@ const continuation: ModelMessage[] = [
   ] }
 ]
 
-async function consume(client: LlmClient, model: string, messages: ModelMessage[]): Promise<LlmStreamPart[]> {
+async function consume(
+  client: LlmClient,
+  model: string,
+  messages: ModelMessage[],
+  tools: ToolDefinition[] = []
+): Promise<LlmStreamPart[]> {
   const parts: LlmStreamPart[] = []
-  for await (const part of client.stream({ model, system: 'You code.', messages, tools: [] })) parts.push(part)
+  for await (const part of client.stream({ model, system: 'You code.', messages, tools })) parts.push(part)
   return parts
 }
 
@@ -86,6 +93,37 @@ describe('provider chat transport matrix', () => {
 
     const tested = new Set(['openai', 'github-copilot', 'antigravity', 'cursor', 'windsurf', 'kiro', 'grok', 'codebuddy', 'codebuddy-cn', 'qoder', 'trae', 'zed', 'zcode'])
     expect(registry.listReady().map(provider => provider.id).filter(id => !tested.has(id))).toEqual([])
+  })
+
+  it.each([
+    ['openai-responses', 'gpt-5.6-sol'],
+    ['openai-compatible', 'fixture-code'],
+    ['cloud-code', 'gemini-3.1-pro-high']
+  ] as const)('%s advertises required read arguments', async (transport, model) => {
+    let body: any
+    const fetchMock = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
+      body = JSON.parse(String(init?.body))
+      if (transport === 'openai-responses') return new Response(JSON.stringify(OPENAI_COMPLETED), {
+        status: 200, headers: { 'content-type': 'application/json' }
+      })
+      if (transport === 'cloud-code') return chunkedResponse([CLOUD_CODE_TEXT_SSE])
+      return chunkedResponse([OPENAI_COMPATIBLE_TEXT_SSE])
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const client = transport === 'openai-responses'
+      ? new OpenAIResponsesClient({ apiKey: 'fixture-token', fetchImpl: fetchMock as unknown as typeof fetch })
+      : transport === 'cloud-code'
+        ? createAntigravityLlm('fixture-token', { projectId: 'fixture', modelId: model })
+        : createLlm('openai-compatible', 'fixture-token', 'https://provider.invalid/v1')
+
+    await consume(client, model, [{ role: 'user', content: 'read package.json' }], [readTool])
+
+    const required = transport === 'openai-responses'
+      ? body.tools[0].parameters.required
+      : transport === 'cloud-code'
+        ? body.request.tools[0].functionDeclarations[0].parameters.required
+        : body.tools[0].function.parameters.required
+    expect(required).toContain('file_path')
   })
 
   it('rejects raw AI SDK tool content before an OpenAI Responses request is sent', async () => {
