@@ -1,6 +1,14 @@
 import { describe, expect, it, vi } from 'vitest'
-import { OpenAIResponsesClient } from '../../src/main/agent/openai-responses'
-import { MISLABELED_SSE, OPENAI_COMPLETED } from '../fixtures/provider-chat-fixtures'
+import type { ModelMessage } from 'ai'
+import { OpenAIResponsesClient, toResponsesInput } from '../../src/main/agent/openai-responses'
+import { decodeProviderResponse } from '../../src/main/agent/provider-stream'
+import {
+  MALFORMED_THEN_VALID_SSE,
+  MISLABELED_SSE,
+  OPENAI_COMPLETED,
+  SPLIT_SSE_CHUNKS,
+  chunkedResponse
+} from '../fixtures/provider-chat-fixtures'
 
 describe('OpenAIResponsesClient', () => {
   it('sends Responses payload and stores continuation id', async () => {
@@ -66,6 +74,20 @@ describe('OpenAIResponsesClient', () => {
     expect(JSON.stringify(requestBody.input)).not.toContain('"type":"tool-result"')
   })
 
+  it('serializes text and tool continuation as explicit Responses input items', () => {
+    const messages: ModelMessage[] = [
+      { role: 'user', content: [{ type: 'text', text: 'inspect' }] },
+      { role: 'assistant', content: [{ type: 'text', text: 'reading' }, { type: 'tool-call', toolCallId: 'call-1', toolName: 'read', input: { file_path: 'a.ts' } }] },
+      { role: 'tool', content: [{ type: 'tool-result', toolCallId: 'call-1', toolName: 'read', output: { type: 'text', value: 'contents' } }] }
+    ]
+    expect(toResponsesInput(messages)).toEqual([
+      { role: 'user', content: [{ type: 'input_text', text: 'inspect' }] },
+      { role: 'assistant', content: [{ type: 'output_text', text: 'reading' }] },
+      { type: 'function_call', call_id: 'call-1', name: 'read', arguments: '{"file_path":"a.ts"}' },
+      { type: 'function_call_output', call_id: 'call-1', output: 'contents' }
+    ])
+  })
+
   it('decodes a mislabeled SSE response without throwing a raw SyntaxError', async () => {
     const fetchImpl = vi.fn(async () => new Response(MISLABELED_SSE, { status: 200, headers: { 'content-type': 'text/plain' } })) as unknown as typeof fetch
     const client = new OpenAIResponsesClient({ apiKey: 'fixture-token', fetchImpl })
@@ -73,5 +95,20 @@ describe('OpenAIResponsesClient', () => {
     for await (const part of client.stream({ model: 'gpt-5.6-codex', system: 'sys', messages: [], tools: [] })) parts.push(part)
     expect(parts).toContainEqual({ kind: 'text', text: 'recovered' })
     expect(parts).toContainEqual(expect.objectContaining({ kind: 'finish' }))
+  })
+
+  it('decodes split CRLF SSE frames, comments, and DONE markers', async () => {
+    const decoded = []
+    for await (const item of decodeProviderResponse(chunkedResponse(SPLIT_SSE_CHUNKS), { maxBytes: 64 * 1024 })) decoded.push(item)
+    expect(decoded).toContainEqual({ kind: 'event', event: { type: 'response.output_text.delta', delta: 'split' } })
+    expect(decoded.some(item => item.kind === 'parse-error')).toBe(false)
+  })
+
+  it('reports one malformed SSE event and continues with later valid events', async () => {
+    const decoded = []
+    for await (const item of decodeProviderResponse(new Response(MALFORMED_THEN_VALID_SSE, { headers: { 'content-type': 'text/event-stream' } }), { maxBytes: 64 * 1024 })) decoded.push(item)
+    expect(decoded).toContainEqual(expect.objectContaining({ kind: 'parse-error' }))
+    expect(decoded).toContainEqual({ kind: 'event', event: { type: 'response.output_text.delta', delta: 'valid-after-error' } })
+    expect(decoded).toContainEqual({ kind: 'event', event: { type: 'response.completed', response: { id: 'r2' } } })
   })
 })
