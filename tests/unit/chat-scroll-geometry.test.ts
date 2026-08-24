@@ -7,6 +7,7 @@ import {
   isInBottomFollowZone,
   nextChatScrollMode,
   shouldEnterManualForKey,
+  shouldEnterManualForWheel,
   tailSpacerHeight
 } from '../../src/renderer/src/components/chat/chat-scroll-geometry'
 
@@ -63,6 +64,12 @@ describe('chat scroll geometry', () => {
     expect(nextChatScrollMode('manual', 'user-bottom')).toBe('following')
     expect(nextChatScrollMode('manual', 'jump-end')).toBe('following')
     expect(nextChatScrollMode('manual', 'session-load')).toBe('following')
+  })
+
+  it('treats wheel movement as manual intent unless it is downward at the exact bottom', () => {
+    expect(shouldEnterManualForWheel(-1, true)).toBe(true)
+    expect(shouldEnterManualForWheel(1, false)).toBe(true)
+    expect(shouldEnterManualForWheel(1, true)).toBe(false)
   })
 
   it('does not claim manual ownership for downward keys already at the bottom', () => {

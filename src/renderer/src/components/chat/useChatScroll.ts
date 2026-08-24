@@ -15,6 +15,7 @@ import {
   isInBottomFollowZone,
   nextChatScrollMode,
   shouldEnterManualForKey,
+  shouldEnterManualForWheel,
   tailSpacerHeight,
   type ChatScrollMode
 } from './chat-scroll-geometry'
@@ -257,8 +258,10 @@ export function useChatScroll(): ChatScrollController {
 
   const onWheel = useCallback((event: ReactWheelEvent<HTMLDivElement>) => {
     trustedInteractionRef.current = true
-    if (event.deltaY < 0 || !isAtBottom()) enterManual()
-  }, [enterManual, isAtBottom])
+    const feed = feedRef.current
+    const atScrollEnd = feed !== null && feed.scrollHeight - feed.scrollTop - feed.clientHeight <= 1
+    if (shouldEnterManualForWheel(event.deltaY, atScrollEnd)) enterManual()
+  }, [enterManual])
 
   const onTouchMove = useCallback(() => {
     trustedInteractionRef.current = true

@@ -48,6 +48,10 @@ export function followScrollDelta(input: { feedBottom: number; latestBottom: num
   return Math.max(0, input.latestBottom - (input.feedBottom - CHAT_FOLLOW_BOTTOM_INSET))
 }
 
+export function shouldEnterManualForWheel(deltaY: number, atScrollEnd: boolean): boolean {
+  return deltaY < 0 || !atScrollEnd
+}
+
 export function shouldEnterManualForKey(key: string, atBottom: boolean): boolean {
   if (key === 'ArrowUp' || key === 'PageUp' || key === 'Home') return true
   if (key === 'ArrowDown' || key === 'PageDown' || key === ' ') return !atBottom
