@@ -88,7 +88,7 @@ export class BsAgentManager {
   private mcp = new McpManager()
   private modelLimits = new Map<string, { context?: number; output?: number }>()
   private modelVariants = new Map<string, Record<string, VariantBody>>()
-  private redoStacks = new Map<string, Array<{ items: ChatTranscriptItem[]; turn: SnapshotTurn }>>()
+  private redoStacks = new Map<string, Array<{ items: ChatTranscriptItem[]; turn?: SnapshotTurn; agentId: string; turnId: string }>>()
   private backgrounds = new Map<string, boolean>()
   private queues = new Map<string, QueuedMessage[]>()
   private onEvent: (e: ChatEvent) => void = () => {}
@@ -101,9 +101,14 @@ export class BsAgentManager {
   private lastCompactionAt = new Map<string, number>()
   private idleCompactTimer: ReturnType<typeof setInterval> | null = null
   private assignments: AssignmentStore
-  private coordinator = new SharedSessionCoordinator(this.deps.store)
+  private coordinator: SharedSessionCoordinator
   private activeProjectSessions = new Map<string, string>()
-  private sessionExecutions = new Map<string, { projectPath: string; sessionId: string; execution: ResolvedTurnExecutionSnapshot }>()
+  private sessionExecutions = new Map<string, {
+    projectPath: string
+    sessionId: string
+    execution: ResolvedTurnExecutionSnapshot
+    usage: UsageSummary
+  }>()
 
   constructor(private deps: BsAgentManagerDeps) {
     this.tools = new Map(deps.tools)
@@ -115,11 +120,12 @@ export class BsAgentManager {
     // (compaction otherwise only runs at the start of a turn step).
     this.idleCompactTimer = setInterval(() => void this.maybeCompactIdle(), 20_000)
     this.idleCompactTimer.unref?.()
+    this.coordinator = new SharedSessionCoordinator(deps.store)
   }
 
   setOnEvent(cb: (e: ChatEvent) => void): void {
     this.onEvent = (e) => {
-      if (e.type === 'done' || e.type === 'error') this.running.delete(e.agentId)
+      if (e.type === 'done' || e.type === 'error') this.running.delete(this.lifecycleKey(e.agentId))
       cb(e)
       if (this.traceEnabled) this.writeTrace(e)
       if (e.type === 'done' && this.deps.notifications?.onDone !== false) {
@@ -154,7 +160,7 @@ export class BsAgentManager {
   }
 
   isRunning(agentId: string): boolean {
-    return this.running.has(agentId)
+    return this.running.has(this.lifecycleKey(agentId))
   }
 
   isBackground(agentId: string): boolean {
@@ -317,6 +323,16 @@ export class BsAgentManager {
   ): Promise<void> {
     const agent = this.agents.get(agentId)
     if (!agent || !this.deps.store.listProject(projectPath).some(session => session.id === sessionId)) return
+    const existing = this.coordinator.state(sessionId)
+    if (existing) {
+      if (existing.queue.length >= this.MAX_QUEUE) {
+        this.emit({ type: 'error', agentId: existing.agentId, message: '[bs] Hàng đợi đã đầy (tối đa 5 tin).' })
+        return
+      }
+      this.coordinator.enqueue(sessionId, { id: randomUUID(), agentId: existing.agentId, text, images, displayText })
+      this.emitSessionQueue(sessionId)
+      return
+    }
     const state = this.coordinator.acquire(projectPath, sessionId, agentId)
     const resolved = this.resolved.get(agentId)
     const assignment = this.assignments.get(agentId)
@@ -345,15 +361,49 @@ export class BsAgentManager {
     }
     this.activeSessions.set(agentId, sessionId)
     this.activeProjectSessions.set(projectPath, sessionId)
-    this.sessionExecutions.set(agentId, { projectPath, sessionId, execution })
+    this.sessionExecutions.set(sessionId, { projectPath, sessionId, execution, usage: { ...EMPTY_USAGE } })
     try {
       await this.runTurn(agentId, text, images, displayText)
     } finally {
       const finalStatus = execution.status === 'running' ? 'completed' : execution.status
       this.deps.store.finishExecution(execution.turnId, finalStatus, Date.now())
-      this.coordinator.complete(sessionId)
-      this.sessionExecutions.delete(agentId)
+      const context = this.sessionExecutions.get(sessionId)
+      if (finalStatus === 'completed' && context) this.deps.store.addUsage(sessionId, context.usage)
+      const next = finalStatus === 'completed' ? this.coordinator.dequeue(sessionId) : undefined
+      if (finalStatus === 'completed') this.coordinator.complete(sessionId)
+      else if (finalStatus === 'stopped') this.coordinator.stop(sessionId)
+      else this.coordinator.fail(sessionId)
+      this.sessionExecutions.delete(sessionId)
+      if (next) {
+        this.coordinator.stop(sessionId)
+        await this.sendInSession(projectPath, sessionId, next.agentId, next.text, next.images, next.displayText)
+      }
     }
+  }
+
+  getSessionState(sessionId: string) {
+    return this.coordinator.state(sessionId)
+  }
+
+  listSessionQueued(sessionId: string) {
+    return this.coordinator.state(sessionId)?.queue ?? []
+  }
+
+  stopSessionChat(_projectPath: string, sessionId: string): void {
+    const state = this.coordinator.state(sessionId)
+    if (!state) return
+    const execution = this.sessionExecutions.get(sessionId)?.execution
+    if (execution) execution.status = 'stopped'
+    this.controllers.get(sessionId)?.abort()
+    this.resolvePendingFor(state.agentId, null)
+    this.coordinator.stop(sessionId)
+    this.emit({ type: 'queue-updated', agentId: state.agentId, queue: [] })
+  }
+
+  private emitSessionQueue(sessionId: string): void {
+    const state = this.coordinator.state(sessionId)
+    if (!state) return
+    this.emit({ type: 'queue-updated', agentId: state.agentId, queue: state.queue })
   }
 
   async send(agentId: string, text: string, images?: ImageAttachment[], displayText?: string): Promise<void> {
@@ -395,8 +445,8 @@ export class BsAgentManager {
       text: referenceHints(agent.cwd, text),
       displayText: displayText ?? text,
       images,
-      turnId: this.sessionExecutions.get(agentId)?.execution.turnId,
-      execution: this.sessionExecutions.get(agentId)?.execution,
+      turnId: this.executionForAgent(agentId)?.execution.turnId,
+      execution: this.executionForAgent(agentId)?.execution,
       createdAt: Date.now()
     }
     this.deps.store.appendMessage(this.activeSessionId(agentId), message)
@@ -415,18 +465,25 @@ export class BsAgentManager {
     const runner = this.runners.get(agentId)
     if (!runner) return
     const controller = new AbortController()
-    this.controllers.set(agentId, controller)
-    this.running.add(agentId)
+    const lifecycleKey = this.lifecycleKey(agentId)
+    const executionContext = this.executionForAgent(agentId)
+    this.controllers.set(lifecycleKey, controller)
+    this.running.add(lifecycleKey)
     this.nextTurn(agentId)
     this.emit({ type: 'turn-started', agentId })
-    this.redoStacks.delete(agentId)
-    this.deps.snapshots.beginTurn(agentId)
+    this.redoStacks.delete(lifecycleKey)
+    this.deps.snapshots.beginTurn(lifecycleKey, executionContext ? {
+      projectPath: executionContext.projectPath,
+      sessionId: executionContext.sessionId,
+      turnId: executionContext.execution.turnId,
+      agentId
+    } : undefined)
     try {
       await runner.run(controller.signal)
     } finally {
-      this.deps.snapshots.commitTurn(agentId)
-      this.running.delete(agentId)
-      this.controllers.delete(agentId)
+      this.deps.snapshots.commitTurn(lifecycleKey)
+      this.running.delete(lifecycleKey)
+      this.controllers.delete(lifecycleKey)
       this.resolvePendingFor(agentId, null)
     }
   }
@@ -443,7 +500,7 @@ export class BsAgentManager {
     const removed = this.deps.store.truncateFromLastUser(sessionId)
     if (removed.length > 0) {
       const stack = this.redoStacks.get(agentId) ?? []
-      stack.push({ items: removed, turn })
+      stack.push({ items: removed, turn, agentId, turnId: turn.turnId ?? '' })
       this.redoStacks.set(agentId, stack)
     }
     return true
@@ -457,20 +514,59 @@ export class BsAgentManager {
     if (!entry) return false
     if (stack && stack.length === 0) this.redoStacks.delete(agentId)
     const { items, turn } = entry
-    for (const [filePath, content] of Object.entries(turn.after)) {
+    for (const [filePath, content] of Object.entries(turn?.after ?? {})) {
       try {
         writeFileSync(filePath, content)
       } catch {
         /* file may be missing */
       }
     }
-    this.deps.snapshots.pushTurn(turn)
+    if (turn) this.deps.snapshots.pushTurn(turn)
     const sessionId = this.activeSessionId(agentId)
     for (const item of items) {
       if (item.kind === 'message') this.deps.store.appendMessage(sessionId, item.message)
       else this.deps.store.appendTool(sessionId, item.tool)
     }
     return true
+  }
+
+  undoSession(projectPath: string, sessionId: string): { agentId: string; turnId: string } | null {
+    if (!this.deps.store.listProject(projectPath).some(session => session.id === sessionId)) return null
+    this.stopSessionChat(projectPath, sessionId)
+    const items = this.deps.store.transcript(sessionId)
+    const latest = [...items].reverse().find(item => {
+      const execution = item.kind === 'message' ? item.message.execution : item.tool.execution
+      return execution?.status === 'completed'
+    })
+    const execution = latest && (latest.kind === 'message' ? latest.message.execution : latest.tool.execution)
+    if (!execution) return null
+    const turn = this.deps.snapshots.undoTurn(sessionId, execution.turnId) ?? undefined
+    const removed = this.deps.store.truncateTurn(sessionId, execution.turnId)
+    if (removed.length === 0) {
+      if (turn) this.deps.snapshots.pushTurn(turn)
+      return null
+    }
+    const stack = this.redoStacks.get(sessionId) ?? []
+    stack.push({ items: removed, turn, agentId: execution.agentId, turnId: execution.turnId })
+    this.redoStacks.set(sessionId, stack)
+    return { agentId: execution.agentId, turnId: execution.turnId }
+  }
+
+  redoSession(projectPath: string, sessionId: string): { agentId: string; turnId: string } | null {
+    if (!this.deps.store.listProject(projectPath).some(session => session.id === sessionId)) return null
+    const stack = this.redoStacks.get(sessionId)
+    const entry = stack?.pop()
+    if (!entry) return null
+    if (stack?.length === 0) this.redoStacks.delete(sessionId)
+    for (const [filePath, content] of Object.entries(entry.turn?.after ?? {})) {
+      try { writeFileSync(filePath, content) } catch { /* file may be missing */ }
+    }
+    if (entry.turn) this.deps.snapshots.pushTurn(entry.turn)
+    for (const item of entry.items) {
+      if (item.kind === 'message') this.deps.store.appendMessage(sessionId, item.message)
+      else this.deps.store.appendTool(sessionId, item.tool)
+    }
+    return { agentId: entry.agentId, turnId: entry.turnId }
   }
 
   renameSession(agentId: string, sessionId: string, title: string): SessionSummary | null {
@@ -481,9 +577,10 @@ export class BsAgentManager {
   }
 
   stop(agentId: string): void {
-    this.controllers.get(agentId)?.abort()
-    this.controllers.delete(agentId)
-    this.running.delete(agentId)
+    const key = this.lifecycleKey(agentId)
+    this.controllers.get(key)?.abort()
+    this.controllers.delete(key)
+    this.running.delete(key)
     this.resolvePendingFor(agentId, null)
   }
 
@@ -495,7 +592,10 @@ export class BsAgentManager {
   }
 
   stopAll(): void {
-    for (const id of [...this.controllers.keys()]) this.stop(id)
+    for (const controller of this.controllers.values()) controller.abort()
+    this.controllers.clear()
+    this.running.clear()
+    for (const agentId of this.agents.keys()) this.resolvePendingFor(agentId, null)
   }
 
   newSession(agentId: string): SessionSummary {
@@ -522,6 +622,8 @@ export class BsAgentManager {
     const entry = this.pendingPrompts.get(promptId)
     if (entry && entry.agentId === agentId) {
       this.pendingPrompts.delete(promptId)
+      const turnId = this.executionForAgent(agentId)?.execution.turnId
+      if (turnId) this.coordinator.setPrompt(turnId, undefined)
       if (resp.always && resp.allow && entry.tool) {
         const agent = this.agents.get(agentId)
         if (agent) this.deps.savedPermissions.save(agent.cwd, entry.tool)
@@ -919,7 +1021,7 @@ export class BsAgentManager {
   private async maybeCompactIdle(): Promise<void> {
     const cfg = loadBsConfig(this.deps.configPath)
     for (const agentId of this.runners.keys()) {
-      if (this.running.has(agentId) || this.compacting.has(agentId)) continue
+      if (this.isRunning(agentId) || this.compacting.has(agentId)) continue
       const now = Date.now()
       const lastAttempt = this.lastCompactionAt.get(agentId) ?? 0
       if (now - lastAttempt < 60_000) continue
@@ -1086,11 +1188,12 @@ export class BsAgentManager {
       truncation: this.deps.truncation,
       replaceItems: (items) => this.deps.store.replaceItems(this.activeSessionId(agent.id), items),
       snapshots: this.deps.snapshots,
+      snapshotScopeId: () => this.lifecycleKey(agent.id),
       onEvent: (e) => this.emit(e),
       onArtifact: (entry) => this.deps.onArtifact?.(entry),
       getItems: () => this.deps.store.get(this.activeSessionId(agent.id))?.items ?? [],
       buildMessages: (items) => {
-        const current = this.sessionExecutions.get(agent.id)?.execution
+        const current = this.executionForAgent(agent.id)?.execution
         if (!current) return toLlmMessages(items, { toolOutputMaxChars: cfg.compaction.toolOutputMaxChars })
         const turnId = current.turnId
         const prior = items.filter(item => (item.kind === 'message' ? item.message.turnId : item.tool.turnId) !== turnId)
@@ -1101,13 +1204,13 @@ export class BsAgentManager {
         ]
       },
       appendMessage: (msg) => {
-        const execution = this.sessionExecutions.get(agent.id)?.execution
+        const execution = this.executionForAgent(agent.id)?.execution
         this.deps.store.appendMessage(this.activeSessionId(agent.id), execution
           ? { ...msg, turnId: execution.turnId, execution }
           : msg)
       },
       appendTool: (tool) => {
-        const execution = this.sessionExecutions.get(agent.id)?.execution
+        const execution = this.executionForAgent(agent.id)?.execution
         this.deps.store.appendTool(this.activeSessionId(agent.id), execution
           ? { ...tool, turnId: execution.turnId, execution }
           : tool)
@@ -1150,16 +1253,31 @@ export class BsAgentManager {
           }, price)
         }
         this.lastUsageByAgent.set(agent.id, tokens)
-        this.deps.store.addUsage(sessionId, usage)
+        const executionContext = this.executionForAgent(agent.id)
+        if (executionContext) {
+          executionContext.usage = {
+            input: executionContext.usage.input + usage.input,
+            output: executionContext.usage.output + usage.output,
+            cacheRead: executionContext.usage.cacheRead + usage.cacheRead,
+            cacheWrite: executionContext.usage.cacheWrite + usage.cacheWrite,
+            cost: executionContext.usage.cost + usage.cost
+          }
+        } else {
+          this.deps.store.addUsage(sessionId, usage)
+        }
         const sessionUsage = this.deps.store.getUsage(sessionId)
+        const pendingUsage = executionContext?.usage ?? EMPTY_USAGE
         this.emit({
           type: 'usage',
           agentId: agent.id,
           tokens,
-          sessionCost: sessionUsage.cost,
+          sessionCost: sessionUsage.cost + pendingUsage.cost,
           // "in" counts cached tokens too, matching provider dashboards (e.g.
           // DeepSeek's prompt_tokens = cache hit + miss).
-          sessionTokens: { input: sessionUsage.input + sessionUsage.cacheRead + sessionUsage.cacheWrite, output: sessionUsage.output }
+          sessionTokens: {
+            input: sessionUsage.input + sessionUsage.cacheRead + sessionUsage.cacheWrite + pendingUsage.input + pendingUsage.cacheRead + pendingUsage.cacheWrite,
+            output: sessionUsage.output + pendingUsage.output
+          }
         })
       }
     })
@@ -1280,7 +1398,9 @@ export class BsAgentManager {
   private awaitPrompt(agentId: string, promptId: string, tool?: string): Promise<PromptResponse | null> {
     return new Promise(resolve => {
       this.pendingPrompts.set(promptId, { agentId, tool, resolve })
-      if (this.controllers.get(agentId)?.signal.aborted) {
+      const turnId = this.executionForAgent(agentId)?.execution.turnId
+      if (turnId) this.coordinator.setPrompt(turnId, promptId)
+      if (this.controllers.get(this.lifecycleKey(agentId))?.signal.aborted) {
         this.pendingPrompts.delete(promptId)
         resolve(null)
       }
@@ -1401,7 +1521,7 @@ export class BsAgentManager {
   }
 
   private emit(e: ChatEvent): void {
-    const context = this.sessionExecutions.get(e.agentId)
+    const context = this.executionForAgent(e.agentId)
     if (!context) {
       this.onEvent(e)
       return
@@ -1415,5 +1535,13 @@ export class BsAgentManager {
       turnId: context.execution.turnId
     } as unknown as ChatEvent
     this.onEvent(scoped)
+  }
+
+  private executionForAgent(agentId: string) {
+    return [...this.sessionExecutions.values()].find(context => context.execution.agentId === agentId)
+  }
+
+  private lifecycleKey(agentId: string): string {
+    return this.executionForAgent(agentId)?.sessionId ?? agentId
   }
 }

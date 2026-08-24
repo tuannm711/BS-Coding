@@ -23,6 +23,31 @@ function makeStore() {
 }
 
 describe('SnapshotStore', () => {
+  it('persists project, session, turn, and Agent ownership for shared-session undo', () => {
+    const entries: SnapshotEntry[] = []
+    const store = new SnapshotStore({
+      load: () => entries,
+      save: next => entries.splice(0, entries.length, ...next)
+    })
+
+    store.beginTurn('session-1', {
+      projectPath: 'C:/project',
+      sessionId: 'session-1',
+      turnId: 'turn-b',
+      agentId: 'agent-b'
+    })
+    store.snapshot('session-1', '/x/f.ts', 'before')
+    store.commitTurn('session-1')
+
+    expect(entries[0]).toMatchObject({
+      projectPath: 'C:/project',
+      sessionId: 'session-1',
+      turnId: 'turn-b',
+      agentId: 'agent-b'
+    })
+    expect(store.undo('session-1')).toMatchObject({ turnId: 'turn-b', agentId: 'agent-b' })
+  })
+
   it('records one turn per commit and restores on undo', () => {
     const { store, entries } = makeStore()
     store.beginTurn('a1')

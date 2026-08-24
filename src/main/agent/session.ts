@@ -309,6 +309,20 @@ export class SessionStore {
     return removed
   }
 
+  truncateTurn(id: string, turnId: string): ChatTranscriptItem[] {
+    const all = this.loadSessions()
+    const session = all.find(item => item.id === id)
+    if (!session) return []
+    const removed = session.items.filter(item =>
+      (item.kind === 'message' ? item.message.turnId : item.tool.turnId) === turnId)
+    if (removed.length === 0) return []
+    session.items = session.items.filter(item =>
+      (item.kind === 'message' ? item.message.turnId : item.tool.turnId) !== turnId)
+    session.updatedAt = this.nextUpdatedAt()
+    this.saveSessions(all)
+    return removed
+  }
+
   appendMessage(id: string, message: ChatMessage): void {
     const all = this.loadSessions()
     const idx = all.findIndex(s => s.id === id)
