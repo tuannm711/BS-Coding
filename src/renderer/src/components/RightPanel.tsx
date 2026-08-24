@@ -3,12 +3,14 @@ import { FileText, FolderTree } from 'lucide-react'
 import type { ArtifactEntry } from '@shared/types'
 import RightPanelTree from './RightPanelTree'
 import RightPanelArtifacts from './RightPanelArtifacts'
+import RightPanelQuota, { type QuotaAgent } from './RightPanelQuota'
 
 interface Props {
   root: string | null
   tab: 'tree' | 'artifacts'
   width: number
   artifacts: ArtifactEntry[]
+  agents: QuotaAgent[]
   onTabChange: (tab: 'tree' | 'artifacts') => void
   onWidthChange: (width: number) => void
   onClearArtifacts: () => void
@@ -23,7 +25,7 @@ function ArtifactIcon() {
 }
 
 export default function RightPanel({
-  root, tab, width, artifacts, onTabChange, onWidthChange, onClearArtifacts
+  root, tab, width, artifacts, agents, onTabChange, onWidthChange, onClearArtifacts
 }: Props) {
   const dragRef = useRef<{ startX: number; startWidth: number } | null>(null)
 
@@ -33,7 +35,7 @@ export default function RightPanel({
     const onMove = (ev: MouseEvent) => {
       if (!dragRef.current) return
       const delta = dragRef.current.startX - ev.clientX
-      const next = Math.min(600, Math.max(240, dragRef.current.startWidth + delta))
+      const next = Math.min(600, Math.max(300, dragRef.current.startWidth + delta))
       onWidthChange(next)
     }
     const onUp = () => {
@@ -48,7 +50,9 @@ export default function RightPanel({
   return (
     <div className="right-panel" style={{ width }}>
       <div className="right-panel-resizer" onMouseDown={startDrag} />
-      <div className="right-panel-content">
+      <RightPanelQuota agents={agents} />
+      <div className="right-panel-main">
+        <div className="right-panel-content">
         {/* Keep both views mounted so the tree keeps its expanded state (and
             scroll position) when the user switches tabs. */}
         <div className={`right-panel-view${tab === 'tree' ? '' : ' hidden'}`}>
@@ -57,8 +61,8 @@ export default function RightPanel({
         <div className={`right-panel-view${tab === 'artifacts' ? '' : ' hidden'}`}>
           <RightPanelArtifacts root={root} artifacts={artifacts} onClear={onClearArtifacts} />
         </div>
-      </div>
-      <div className="right-panel-tabs" role="tablist" aria-label="Right panel tabs">
+        </div>
+        <div className="right-panel-tabs" role="tablist" aria-label="Right panel tabs">
         <button
           className={`right-panel-tab${tab === 'tree' ? ' active' : ''}`}
           title="Directory Tree"
@@ -75,6 +79,7 @@ export default function RightPanel({
         >
           <ArtifactIcon />
         </button>
+        </div>
       </div>
     </div>
   )

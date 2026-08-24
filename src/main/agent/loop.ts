@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import type { ModelMessage } from 'ai'
 import type { ArtifactEntry, ChatEvent, ChatMessage, MessageTokens, PromptResponse, QuestionPrompt, QueuedMessage, TodoItem, ToolCallData } from '../../shared/types'
 import { appendStreamDelta } from '../../shared/text'
 import type { LlmClient, LlmStreamPart } from './llm'
@@ -33,9 +34,11 @@ export interface LoopDeps {
   truncation?: TruncationStore
   replaceItems?: (items: TranscriptItem[]) => void
   snapshots?: SnapshotStore
+  snapshotScopeId?: () => string
   onEvent: (e: ChatEvent) => void
   onArtifact?: (entry: Omit<ArtifactEntry, 'id' | 'ts'>) => void
   getItems: () => TranscriptItem[]
+  buildMessages?: (items: TranscriptItem[]) => ModelMessage[]
   appendMessage: (msg: ChatMessage) => void
   appendTool: (tool: ToolCallData) => void
   // Returns and clears all pending steered messages (injected at the next step
@@ -43,6 +46,7 @@ export interface LoopDeps {
   takeSteers?: () => QueuedMessage[]
   setTodos?: (todos: TodoItem[]) => void
   variantOptions?: Record<string, unknown>
+  serviceTier?: 'priority'
   onUsage?: (tokens: MessageTokens) => void
   computeCost?: (usage: { input: number; output: number; cacheRead?: number; cacheWrite?: number }) => number
   diagnostics?: (filePath: string, text: string) => Promise<string>
@@ -125,7 +129,8 @@ export class SessionRunner {
           messages: llmMessages,
           tools: isLastStep ? [] : this.visibleToolDefs(),
           signal,
-          variantOptions: this.deps.variantOptions
+          variantOptions: this.deps.variantOptions,
+          serviceTier: this.deps.serviceTier
         })
         for await (const part of stream) {
           if (signal?.aborted) {
@@ -149,6 +154,7 @@ export class SessionRunner {
               id: part.toolCallId ?? randomUUID(),
               tool: part.toolName ?? 'unknown',
               input: part.toolInput ?? {},
+              thoughtSignature: part.thoughtSignature,
               permission: 'pending'
             }
             calls.push(call)
@@ -249,6 +255,7 @@ export class SessionRunner {
           cwd: this.deps.cwd,
           signal,
           agentId: this.deps.agentId,
+          snapshotScopeId: this.deps.snapshotScopeId?.(),
           taskId: this.deps.taskId,
           turn: this.deps.turn,
           snapshots: this.deps.snapshots,
@@ -391,7 +398,9 @@ export class SessionRunner {
   private buildMessages(isLastStep = false): ReturnType<typeof toLlmMessages> {
     const items = this.deps.getItems()
     const toolOutputMaxChars = this.deps.compaction?.toolOutputMaxChars
-    const messages = toLlmMessages(items, { toolOutputMaxChars, ...this.truncationOpts() })
+    const messages = this.deps.buildMessages
+      ? this.deps.buildMessages(items)
+      : toLlmMessages(items, { toolOutputMaxChars, ...this.truncationOpts() })
     return isLastStep ? [...messages, { role: 'user', content: MAX_STEPS_PROMPT }] : messages
   }
 }

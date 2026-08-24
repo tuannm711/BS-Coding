@@ -8,15 +8,21 @@ describe('IPC contract', () => {
   it('defines all channels used by the preload api', () => {
     const required: (keyof AgentApi)[] = [
       'listWorkspaces', 'addWorkspace', 'removeWorkspace', 'openWorkspace', 'openInEditor',
+      'onWorkspaceRuntimeChanged',
       'openFolder', 'openTerminal', 'closeTerminal',
-      'addAgent', 'removeAgent', 'setAgentMode', 'setAgentVariant', 'getAgentVariants', 'setAgentModel', 'getAgentModel', 'getContextInfo', 'getProviderModels', 'fetchProviderModels',
+      'addAgent', 'removeAgent', 'setAgentMode', 'setAgentVariant', 'getAgentVariants', 'setAgentModel', 'setAgentSpeed', 'getAgentModel', 'getContextInfo', 'getProviderModels', 'fetchProviderModels',
       'listProviderCatalog', 'connectProvider', 'disconnectProvider',
+      'createProviderAuthorization', 'getProviderAuthorization', 'openProviderAuthorization',
+      'cancelProviderAuthorization', 'onProviderAuthorizationChanged',
       'listTemplates', 'saveTemplate', 'removeTemplate',
       'pickFolder', 'startAgent', 'stopAgent', 'restartAgent',
       'writeInput', 'injectPrompt', 'resizePty', 'openLog', 'getLogPath', 'quit', 'getAppVersion',
       'checkForUpdates', 'installUpdate', 'onUpdaterStatus',
       'onPtyData', 'onAgentState', 'onAgentConfig', 'onGitStatus', 'onTerminalExit',
       'sendChat', 'stopChat', 'runCommand', 'undoChat', 'redoChat', 'newChatSession', 'listChatMessages', 'listChatTranscript', 'respondPrompt', 'removeQueued', 'editQueued',
+      'listProjectSessions', 'createProjectSession', 'switchProjectSession', 'deleteProjectSession', 'renameProjectSession',
+      'selectProjectSessionAgent', 'sendSessionChat', 'stopSessionChat', 'listSessionTranscript',
+      'getSessionTodos', 'getSessionUsage', 'isSessionChatRunning', 'undoSessionChat', 'redoSessionChat', 'removeSessionQueued', 'editSessionQueued',
       'onChatEvent', 'getSettings', 'saveSettings', 'getMcpStatus', 'listCommands', 'saveCommand', 'removeCommand', 'getStats', 'onContextChanged',
       'suggestFiles', 'setAgentBackground', 'onAgentBackground',
       'listSessions', 'createSession', 'switchSession', 'deleteSession', 'renameSession',
@@ -33,6 +39,7 @@ describe('IPC contract', () => {
       addWorkspace: async () => null,
       removeWorkspace: async () => {},
       openWorkspace: async () => ({ workspace: { projectPath: '', name: '', agents: [] }, agents: [], git: null }),
+      onWorkspaceRuntimeChanged: () => () => {},
       openInEditor: async () => {},
       openFolder: async () => {},
       openTerminal: async () => ({ id: '', cwd: '', name: '', status: 'running' }),
@@ -43,11 +50,19 @@ describe('IPC contract', () => {
       setAgentVariant: async () => {},
       getAgentVariants: async () => [],
       setAgentModel: async () => {},
+      setAgentSpeed: async () => {},
       getAgentModel: async () => null,
       getContextInfo: async () => ({ limit: null, compactThreshold: null, sessionCost: 0 }),
       getProviderModels: async () => [],
       fetchProviderModels: async () => [],
       listProviderCatalog: async () => [],
+      listProviderCapabilities: async () => [],
+      connectProviderMethod: async () => ({}),
+      createProviderAuthorization: async () => ({ loginId: '', providerId: '', methodId: 'oauth', authUrl: '', expiresAt: 0, status: 'waiting' }),
+      getProviderAuthorization: async () => undefined,
+      openProviderAuthorization: async () => {},
+      cancelProviderAuthorization: async () => undefined,
+      onProviderAuthorizationChanged: () => () => {},
       connectProvider: async () => ({ providers: [], defaultProvider: '' }),
       disconnectProvider: async () => ({ providers: [], defaultProvider: '' }),
       listTemplates: async () => [],
@@ -74,6 +89,22 @@ describe('IPC contract', () => {
       onTerminalExit: () => () => {},
       sendChat: async () => {},
       stopChat: async () => {},
+      listProjectSessions: async () => [],
+      createProjectSession: async () => ({ id: '', projectPath: '', title: '', messageCount: 0, createdAt: 0, updatedAt: 0 }),
+      switchProjectSession: async () => null,
+      deleteProjectSession: async () => ({ id: '', projectPath: '', title: '', messageCount: 0, createdAt: 0, updatedAt: 0 }),
+      renameProjectSession: async () => null,
+      selectProjectSessionAgent: async () => ({ id: '', projectPath: '', title: '', messageCount: 0, createdAt: 0, updatedAt: 0 }),
+      sendSessionChat: async () => {},
+      stopSessionChat: async () => {},
+      listSessionTranscript: async () => [],
+      getSessionTodos: async () => [],
+      getSessionUsage: async () => ({ input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0 }),
+      isSessionChatRunning: async () => false,
+      undoSessionChat: async () => null,
+      redoSessionChat: async () => null,
+      removeSessionQueued: async () => {},
+      editSessionQueued: async () => {},
       runCommand: async () => {},
       undoChat: async () => true,
       redoChat: async () => true,
@@ -136,6 +167,7 @@ describe('IPC contract', () => {
   it('maps event channel names to the AgentApi method names', () => {
     expect(Channels.EventPtyData).toBe('pty:data')
     expect(Channels.EventAgentState).toBe('agent:state')
+    expect(Channels.EventWorkspaceRuntimeChanged).toBe('workspace:runtime-changed')
     expect(Channels.EventGitStatus).toBe('git:status')
     expect(Channels.PtyInput).toBe('pty:input')
     expect(Channels.ChatSend).toBe('chat:send')
@@ -168,6 +200,7 @@ describe('IPC contract', () => {
     expect(Channels.AgentSetVariant).toBe('agent:set-variant')
     expect(Channels.AgentGetVariants).toBe('agent:get-variants')
     expect(Channels.AgentSetModel).toBe('agent:set-model')
+    expect(Channels.AgentSetSpeed).toBe('agent:set-speed')
     expect(Channels.AgentGetModel).toBe('agent:get-model')
     expect(Channels.AgentGetContext).toBe('agent:get-context')
     expect(Channels.ProviderModels).toBe('provider:models')

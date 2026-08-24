@@ -18,6 +18,9 @@ export interface BsProviderConfig {
 export interface BsAgentConfig {
   provider?: string
   model?: string
+  accountId?: string
+  fallback?: Array<{ provider: string; accountId?: string; model: string }>
+  speed?: 'standard' | 'fast'
   systemPrompt: string
 }
 
@@ -58,6 +61,8 @@ export interface BsConfig {
 export interface ResolvedAgentConfig {
   provider: string
   model: string
+  accountId?: string
+  fallback?: Array<{ provider: string; accountId?: string; model: string }>
   apiKey: string | null
   baseUrl?: string
   systemPrompt: string
@@ -142,6 +147,7 @@ function normalizeProvider(raw: RawProvider): BsProviderConfig {
   return {
     apiKeyEnv: raw.apiKeyEnv,
     apiKey: raw.apiKey,
+    keyRef: raw.keyRef,
     baseUrl: raw.baseUrl,
     models
   }
@@ -149,20 +155,30 @@ function normalizeProvider(raw: RawProvider): BsProviderConfig {
 
 function normalizeAgents(raw: Record<string, unknown> | undefined): Record<string, BsAgentConfig> {
   const base = DEFAULT_BS_CONFIG.agents
-  if (!raw) return base
+  const defaults = Object.fromEntries(Object.entries(base).map(([name, agent]) => [name, {
+    ...agent,
+    fallback: agent.fallback?.map(item => ({ ...item }))
+  }]))
+  if (!raw) return defaults
   const out: Record<string, BsAgentConfig> = {}
   for (const [name, value] of Object.entries(raw)) {
     if (typeof value !== 'object' || value === null) continue
     const v = value as Partial<BsAgentConfig> & Record<string, unknown>
     const legacyModel = typeof v.model === 'string' ? v.model : undefined
-    const isProviderRef = legacyModel !== undefined && !legacyModel.includes('/')
+    const isProviderRef = typeof v.provider !== 'string' && legacyModel !== undefined && !legacyModel.includes('/')
     out[name] = {
       provider: typeof v.provider === 'string' ? v.provider : (isProviderRef ? legacyModel : undefined),
       model: typeof v.model === 'string' && !isProviderRef ? v.model : undefined,
+      accountId: typeof v.accountId === 'string' ? v.accountId : undefined,
+      speed: v.speed === 'fast' ? 'fast' : 'standard',
+      fallback: Array.isArray(v.fallback)
+        ? v.fallback.filter((f): f is { provider: string; accountId?: string; model: string } =>
+          typeof f === 'object' && f !== null && typeof (f as Record<string, unknown>).provider === 'string' && typeof (f as Record<string, unknown>).model === 'string')
+        : undefined,
       systemPrompt: typeof v.systemPrompt === 'string' ? v.systemPrompt : (base[name]?.systemPrompt ?? base.bs.systemPrompt)
     }
   }
-  return { ...base, ...out }
+  return { ...defaults, ...out }
 }
 
 function normalizeCompaction(raw: Partial<BsCompactionConfig> | undefined): BsCompactionConfig {
@@ -313,12 +329,14 @@ export function resolveAgentConfig(
   }
   const provider = cfg.provider[providerName]
   if (!provider) {
-    return { provider: '', model: '', apiKey: null, systemPrompt: agent.systemPrompt }
+    return { provider: '', model: '', accountId: agent.accountId, fallback: agent.fallback, apiKey: null, systemPrompt: agent.systemPrompt }
   }
-  const model = modelName && provider.models.includes(modelName) ? modelName : (provider.models[0] ?? '')
+  const model = modelName ? (provider.models.includes(modelName) ? modelName : '') : (provider.models[0] ?? '')
   return {
     provider: providerName,
     model,
+    accountId: agent.accountId,
+    fallback: agent.fallback,
     apiKey: resolveApiKey(provider, env, getSecret),
     baseUrl: provider.baseUrl,
     systemPrompt: agent.systemPrompt
@@ -339,7 +357,10 @@ export function configToSettings(cfg: BsConfig): BsSettings {
       name,
       systemPrompt: a.systemPrompt,
       provider: a.provider,
-      model: a.model
+      model: a.model,
+      accountId: a.accountId,
+      fallback: a.fallback,
+      speed: a.speed
     })),
     permission: cfg.permission,
     mcp: cfg.mcp,
@@ -374,6 +395,9 @@ export function settingsToConfig(settings: BsSettings, base: BsConfig = DEFAULT_
     agents[a.name.trim()] = {
       provider: a.provider,
       model: a.model,
+      accountId: a.accountId,
+      fallback: a.fallback,
+      speed: a.speed,
       systemPrompt: a.systemPrompt
     }
   }

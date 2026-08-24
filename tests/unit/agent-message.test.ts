@@ -82,6 +82,21 @@ describe('toLlmMessages', () => {
     ])
   })
 
+  it('replays a persisted Gemini thought signature as provider metadata', () => {
+    const items = [
+      { kind: 'message' as const, message: msg('user', 'read a file') },
+      { kind: 'message' as const, message: msg('assistant', '') },
+      { kind: 'tool' as const, tool: { ...toolCall('read', { file_path: 'a.ts' }), thoughtSignature: 'signature-1' } }
+    ]
+
+    const llm = toLlmMessages(items)
+    const assistant = llm[1] as { content: Array<{ type: string; providerOptions?: unknown }> }
+
+    expect(assistant.content.find(part => part.type === 'tool-call')).toMatchObject({
+      providerOptions: { google: { thoughtSignature: 'signature-1' } }
+    })
+  })
+
   it('uses tool output and falls back to error/ok', () => {
     const base = [
       { kind: 'message' as const, message: msg('user', 'x') },

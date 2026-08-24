@@ -7,10 +7,11 @@ interface Props {
   submitLabel?: string
   onSubmit?(): void
   submitDisabled?: boolean
+  showDefaultActions?: boolean
 }
 
 export default function Modal({
-  title, onClose, children, submitLabel = 'Save', onSubmit, submitDisabled = false
+  title, onClose, children, submitLabel = 'Save', onSubmit, submitDisabled = false, showDefaultActions = true
 }: Props) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -26,14 +27,16 @@ export default function Modal({
         <h3>{title}</h3>
         <button className="dialog-close" aria-label="Close" onClick={onClose}>✕</button>
         {children}
-        <div className="dialog-actions">
-          <button className="btn" onClick={onClose}>Cancel</button>
-          {onSubmit && (
-            <button className="btn primary submit" disabled={submitDisabled} onClick={onSubmit}>
-              {submitLabel}
-            </button>
-          )}
-        </div>
+        {showDefaultActions && (
+          <div className="dialog-actions">
+            <button className="btn" onClick={onClose}>Cancel</button>
+            {onSubmit && (
+              <button className="btn primary submit" disabled={submitDisabled} onClick={onSubmit}>
+                {submitLabel}
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </div>
   )

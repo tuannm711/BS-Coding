@@ -23,6 +23,22 @@ beforeEach(() => {
 afterEach(() => rmSync(dir, { recursive: true, force: true }))
 
 describe('loadBsConfig', () => {
+  it('returns an isolated default agent map for each load', () => {
+    const first = loadBsConfig(path.join(dir, 'first-missing.json'))
+    first.agents.bs = {
+      ...first.agents.bs,
+      provider: 'mutated-provider',
+      model: 'mutated-model'
+    }
+
+    const second = loadBsConfig(path.join(dir, 'second-missing.json'))
+
+    expect(second.agents.bs.provider).toBeUndefined()
+    expect(second.agents.bs.model).toBeUndefined()
+    expect(DEFAULT_BS_CONFIG.agents.bs.provider).toBeUndefined()
+    expect(DEFAULT_BS_CONFIG.agents.bs.model).toBeUndefined()
+  })
+
   it('uses empty providers when the file does not exist', () => {
     const cfg = loadBsConfig(path.join(dir, 'missing.json'))
     expect(cfg.model).toBe('')
@@ -111,6 +127,21 @@ describe('resolveAgentConfig', () => {
     const resolved = resolveAgentConfig(cfg, 'bs', {}, 'openai/qwen')
     expect(resolved.provider).toBe('openai')
     expect(resolved.model).toBe('qwen')
+  })
+
+  it('does not replace an unsupported saved model with the first provider model', () => {
+    const cfg = cfgWithProviders()
+    cfg.provider.openai.models = ['gpt-5.6-sol']
+    const resolved = resolveAgentConfig(cfg, 'bs', {}, 'openai/gpt-5.6')
+    expect(resolved.model).toBe('')
+  })
+
+  it('persists per-agent speed with settings conversion', () => {
+    const cfg = cfgWithProviders()
+    cfg.agents.bs.speed = 'fast'
+    const settings = configToSettings(cfg)
+    expect(settings.agents.find(agent => agent.name === 'bs')?.speed).toBe('fast')
+    expect(settingsToConfig(settings, cfg).agents.bs.speed).toBe('fast')
   })
 
   it('uses a legacy agent.model provider reference', () => {

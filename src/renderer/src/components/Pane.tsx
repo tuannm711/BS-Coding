@@ -5,9 +5,15 @@ import XtermHost from './XtermHost'
 import PaneHeader from './PaneHeader'
 import ChatPanel from './chat/ChatPanel'
 import TracePanel from './trace/TracePanel'
+import type { AgentConfig } from '@shared/types'
 
 interface Props {
   pane: PaneModel
+  nativeAgents: AgentConfig[]
+  onSelectNativeAgent: (agentId: string) => void
+  projectPath: string | null
+  sessionId: string | null
+  onSessionChange: (sessionId: string, agentId?: string) => void
   background: boolean
   isTerminal: boolean
   zoomed: boolean
@@ -20,7 +26,7 @@ interface Props {
 }
 
 export default function Pane({
-  pane, background, isTerminal, zoomed, active, onFocus, onZoom, onRemove, onRegisterTerminal, onUnregisterTerminal
+  pane, nativeAgents, onSelectNativeAgent, projectPath, sessionId, onSessionChange, background, isTerminal, zoomed, active, onFocus, onZoom, onRemove, onRegisterTerminal, onUnregisterTerminal
 }: Props) {
   const id = pane.agent.id
   const write = (data: string) => void window.api.writeInput(id, data)
@@ -36,9 +42,9 @@ export default function Pane({
   // cascade past the memoized ChatPanel into the chat feed.
   const handleStop = useCallback(() => {
     if (isTerminal) void window.api.closeTerminal(id)
-    else if (native) void window.api.stopChat(id)
+    else if (native && projectPath && sessionId) void window.api.stopSessionChat(projectPath, sessionId)
     else void window.api.stopAgent(id)
-  }, [id, native, isTerminal])
+  }, [id, native, isTerminal, projectPath, sessionId])
   const handleRestart = useCallback(() => {
     if (native) void window.api.newChatSession(id)
     else void window.api.restartAgent(id)
@@ -84,15 +90,22 @@ export default function Pane({
         {native ? (
           traceEnabled && tab === 'trace' ? (
             <TracePanel agentId={id} />
-          ) : (
+          ) : projectPath && sessionId ? (
             <ChatPanel
               agentId={id}
+              agents={nativeAgents}
+              onAgentChange={onSelectNativeAgent}
+              projectPath={projectPath}
+              sessionId={sessionId}
+              onSessionChange={onSessionChange}
               cwd={pane.agent.cwd}
               mode={pane.agent.mode ?? 'build'}
               variant={pane.agent.variant}
               onModeChange={handleModeChange}
               onVariantChange={handleVariantChange}
             />
+          ) : (
+            <div className="chat-panel" data-testid="chat-panel">Loading session…</div>
           )
         ) : (
           <XtermHost

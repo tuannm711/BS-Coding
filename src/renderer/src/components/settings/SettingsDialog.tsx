@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { CatalogProviderSummary, McpServerStatus, BsSettings, Template } from '@shared/types'
+import type { McpServerStatus, BsSettings, Template } from '@shared/types'
 import ProvidersTab from './ProvidersTab'
 import AgentsTab from './AgentsTab'
 import PermissionsTab from './PermissionsTab'
@@ -27,13 +27,13 @@ interface Props {
   projectPath?: string
   templates: Template[]
   onTemplatesChange: (templates: Template[]) => void
+  runtimeAgents: Array<{ id: string; name: string }>
 }
 
-export default function SettingsDialog({ onClose, projectPath, templates, onTemplatesChange }: Props) {
+export default function SettingsDialog({ onClose, projectPath, templates, onTemplatesChange, runtimeAgents }: Props) {
   const [tab, setTab] = useState<TabId>('providers')
   const [draft, setDraft] = useState<BsSettings | null>(null)
   const [saved, setSaved] = useState<BsSettings | null>(null)
-  const [catalog, setCatalog] = useState<CatalogProviderSummary[]>([])
   const [mcpStatus, setMcpStatus] = useState<McpServerStatus[]>([])
   const [status, setStatus] = useState('')
   const [error, setError] = useState('')
@@ -41,14 +41,12 @@ export default function SettingsDialog({ onClose, projectPath, templates, onTemp
 
   const refresh = useCallback(async () => {
     try {
-      const [settings, cat, mcps] = await Promise.all([
+      const [settings, mcps] = await Promise.all([
         window.api.getSettings(),
-        window.api.listProviderCatalog(),
         window.api.getMcpStatus()
       ])
       setDraft(settings)
       setSaved(settings)
-      setCatalog(cat)
       setMcpStatus(mcps)
     } catch (err) {
       setError(String(err))
@@ -118,12 +116,12 @@ export default function SettingsDialog({ onClose, projectPath, templates, onTemp
           </nav>
           <div className="settings-content">
             {draft && tab === 'providers' && (
-              <ProvidersTab settings={draft} catalog={catalog} onChange={patch} />
+              <ProvidersTab />
             )}
             {draft && tab === 'agents' && (
               <AgentsTab
                 agents={draft.agents}
-                providers={draft.providers}
+                runtimeAgents={runtimeAgents}
                 subagentModels={draft.subagentModels}
                 onChangeAgents={agents => patch({ agents })}
                 onChangeSubagentModels={subagentModels => patch({ subagentModels })}

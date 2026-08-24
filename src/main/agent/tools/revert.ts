@@ -8,8 +8,9 @@ export const revertTool: ToolDefinition = {
     'Revert files modified during this session back to their original content (undo tool changes).',
   schema: z.object({}),
   async run(_input, ctx): Promise<ToolRunResult> {
-    if (!ctx.snapshots || !ctx.agentId) return { error: 'revert: unavailable in this context' }
-    const files = ctx.snapshots.originals(ctx.agentId)
+    const scopeId = ctx.snapshotScopeId ?? ctx.agentId
+    if (!ctx.snapshots || !scopeId) return { error: 'revert: unavailable in this context' }
+    const files = ctx.snapshots.originals(scopeId)
     if (files.length === 0) return { output: '(no changes to revert)' }
     let reverted = 0
     let failed = 0

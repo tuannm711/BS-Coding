@@ -142,6 +142,7 @@ export class RemoteManager {
   }
 
   private mapEvent(e: ChatEvent): RemoteEvent {
+    if ('sessionId' in e && typeof e.sessionId === 'string') return { type: 'chat:event', event: e }
     if (e.type === 'turn-started') {
       return {
         type: 'agent:state',

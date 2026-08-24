@@ -16,7 +16,8 @@ import { CommandStore } from '../../src/main/agent/commands'
 import { SavedPermissions } from '../../src/main/agent/saved-permissions'
 import type { SavedPermission } from '../../src/main/agent/saved-permissions'
 import type { LlmClient, LlmStreamOptions, LlmStreamPart } from '../../src/main/agent/llm'
-import type { AgentConfig, ChatEvent, PromptResponse } from '../../src/shared/types'
+import type { AgentConfig, ChatEvent, PromptResponse, ProviderConnection } from '../../src/shared/types'
+import type { AgentAssignmentSnapshot } from '../../src/shared/provider-state'
 
 const BS_AGENT: AgentConfig = {
   id: 'a1', name: 'bs', templateId: 'bs', cwd: '/proj', kind: 'native'
@@ -33,6 +34,8 @@ interface StubLlmOptions {
 async function makeManager(opts: StubLlmOptions & {
   configPath?: string
   catalog?: ModelsCatalog
+  providerAccounts?: ProviderConnection[]
+  providerRuntime?: (providerId: string, accountId: string, modelId: string) => LlmClient
 } = {}) {
   const cfgDir = mkdtempSync(path.join(tmpdir(), 'bs-mgr-cfg-'))
   const defaultCfg = path.join(cfgDir, 'bs.json')
@@ -59,6 +62,7 @@ async function makeManager(opts: StubLlmOptions & {
     save: (next) => permEntries.splice(0, permEntries.length, ...next)
   })
   const events: ChatEvent[] = []
+  const assignmentEvents: AgentAssignmentSnapshot[] = []
   const llmCalls: string[][] = []
   const llmSystems: string[] = []
   const llmVariants: Array<Record<string, unknown> | undefined> = []
@@ -97,11 +101,14 @@ async function makeManager(opts: StubLlmOptions & {
     truncation: new TruncationStore(path.join(cfgDir, 'truncation')),
     commands: new CommandStore(path.join(cfgDir, 'commands.json')),
     prices: { 'test/test-model': { input: 1, output: 2 } },
-    env: { ANTHROPIC_API_KEY: 'sk-test' } as NodeJS.ProcessEnv
+    env: { ANTHROPIC_API_KEY: 'sk-test' } as NodeJS.ProcessEnv,
+    providerAccounts: opts.providerAccounts ? () => opts.providerAccounts! : undefined,
+    providerRuntime: opts.providerRuntime,
+    onAssignmentChanged: assignment => assignmentEvents.push(assignment)
   })
   manager.setOnEvent(e => events.push(e))
   await manager.init([{ ...BS_AGENT }, { ...PTY_AGENT }])
-  return { manager, store, events, createLlm, savedPermissions, llmCalls, llmSystems, llmVariants, llmModels }
+  return { manager, store, events, assignmentEvents, createLlm, savedPermissions, llmCalls, llmSystems, llmVariants, llmModels }
 }
 
 describe('BsAgentManager', () => {
@@ -118,6 +125,125 @@ describe('BsAgentManager', () => {
     expect(manager.isBackground('a1')).toBe(true)
     manager.setBackground('a1', false)
     expect(manager.isBackground('a1')).toBe(false)
+  })
+
+  it('materializes an OAuth-only OpenAI provider for assignment and model selection', async () => {
+    const providerAccounts: ProviderConnection[] = [{
+      providerId: 'openai',
+      activeAccountId: 'oauth-1',
+      accounts: [{
+        id: 'oauth-1', providerId: 'openai', label: 'plus@example.com', authMode: 'oauth', status: 'active',
+        models: ['gpt-5.6-sol'], createdAt: 1, lastUsedAt: 1
+      }]
+    }]
+    const { manager } = await makeManager({ providerAccounts })
+    manager.setModel('a1', 'openai', 'gpt-5.6-sol')
+    expect(manager.getAgentModel('a1')).toEqual({ provider: 'openai', model: 'gpt-5.6-sol' })
+    expect(manager.getAgentAssignment('a1')).toMatchObject({ provider: 'openai', model: 'gpt-5.6-sol', accountId: 'oauth-1' })
+    expect(manager.getProviderModels()).not.toContainEqual({ provider: 'openai', model: 'gpt-5.5' })
+    expect(manager.getProviderModels()).toContainEqual({ provider: 'openai', model: 'gpt-5.6-sol' })
+  })
+
+  it('validates and persists canonical provider account model assignments', async () => {
+    const providerAccounts: ProviderConnection[] = [{ providerId: 'test', activeAccountId: 'acct-1', accounts: [{ id: 'acct-1', providerId: 'test', label: 'test', authMode: 'api-key', status: 'active', models: ['test-model'], createdAt: 1, lastUsedAt: 1 }] }]
+    const { manager } = await makeManager({ providerAccounts })
+    const assignment = manager.setAgentAssignmentSnapshot({ agentId: 'a1', providerId: 'test', accountId: 'acct-1', modelId: 'test-model', speed: 'fast' })
+    expect(assignment).toMatchObject({ providerId: 'test', accountId: 'acct-1', modelId: 'test-model', speed: 'fast', status: 'ready' })
+    expect(manager.getAgentAssignmentSnapshot('a1')).toEqual(assignment)
+    const invalid = manager.setAgentAssignmentSnapshot({ agentId: 'a1', providerId: 'test', accountId: 'missing', modelId: 'missing-model', speed: 'standard' })
+    expect(invalid).toMatchObject({ accountId: 'missing', modelId: 'missing-model', status: 'needs-review' })
+    expect(manager.getAgentAssignmentSnapshot('a1')).toEqual(invalid)
+    expect(manager.getAgentModel('a1')).toBeNull()
+  })
+
+  it('does not silently normalize an unsupported OpenAI model to the first code model', async () => {
+    const providerAccounts: ProviderConnection[] = [{
+      providerId: 'openai', activeAccountId: 'oauth-1', accounts: [{
+        id: 'oauth-1', providerId: 'openai', label: 'plus@example.com', authMode: 'oauth', status: 'active',
+        models: ['gpt-5.6-sol'], createdAt: 1, lastUsedAt: 1
+      }]
+    }]
+    const { manager } = await makeManager({ providerAccounts })
+
+    const invalid = manager.setAgentAssignmentSnapshot({ agentId: 'a1', providerId: 'openai', accountId: 'oauth-1', modelId: 'gpt-5.5', speed: 'standard' })
+
+    expect(invalid).toMatchObject({ modelId: 'gpt-5.5', status: 'needs-review' })
+    expect(manager.getAgentModel('a1')).toBeNull()
+  })
+
+  it('chats through an OAuth provider runtime without requiring an API key', async () => {
+    const providerAccounts: ProviderConnection[] = [{
+      providerId: 'antigravity', activeAccountId: 'oauth-1', accounts: [{
+        id: 'oauth-1', providerId: 'antigravity', label: 'pro@example.com', authMode: 'oauth', status: 'active',
+        models: ['gemini-code'], createdAt: 1, lastUsedAt: 1
+      }]
+    }]
+    const providerRuntime = vi.fn((): LlmClient => ({
+      async *stream() { yield { kind: 'text', text: 'OAuth works' }; yield { kind: 'finish' } }
+    }))
+    const { manager, events } = await makeManager({ providerAccounts, providerRuntime })
+    manager.setAgentAssignmentSnapshot({ agentId: 'a1', providerId: 'antigravity', accountId: 'oauth-1', modelId: 'gemini-code', speed: 'standard' })
+
+    await manager.send('a1', 'hello')
+
+    expect(providerRuntime).toHaveBeenCalledWith('antigravity', 'oauth-1', 'gemini-code')
+    expect(events).toContainEqual(expect.objectContaining({ type: 'text-delta', delta: 'OAuth works' }))
+    expect(events.some(event => event.type === 'error' && event.message.includes('API key'))).toBe(false)
+  })
+
+  it('does not fall back to another active account when the assigned account becomes disabled', async () => {
+    const providerAccounts: ProviderConnection[] = [{
+      providerId: 'antigravity', activeAccountId: 'account-1', accounts: [
+        { id: 'account-1', providerId: 'antigravity', label: 'Assigned', authMode: 'oauth', status: 'active', models: ['gemini-code'], createdAt: 1, lastUsedAt: 1 },
+        { id: 'account-2', providerId: 'antigravity', label: 'Other', authMode: 'oauth', status: 'disabled', models: ['gemini-code'], createdAt: 1, lastUsedAt: 1 }
+      ]
+    }]
+    const { manager } = await makeManager({ providerAccounts })
+    manager.setAgentAssignmentSnapshot({ agentId: 'a1', providerId: 'antigravity', accountId: 'account-1', modelId: 'gemini-code', speed: 'standard' })
+    providerAccounts[0].accounts[0].status = 'disabled'
+    providerAccounts[0].accounts[1].status = 'active'
+    providerAccounts[0].activeAccountId = 'account-2'
+
+    manager.revalidateAssignments()
+
+    expect(manager.getAgentAssignmentSnapshot('a1')).toMatchObject({ accountId: 'account-1', modelId: 'gemini-code', status: 'error' })
+    expect(manager.getAgentAssignment('a1')).toBeNull()
+  })
+
+  it('emits the canonical assignment mutation when speed changes', async () => {
+    const providerAccounts: ProviderConnection[] = [{ providerId: 'test', activeAccountId: 'acct-1', accounts: [{ id: 'acct-1', providerId: 'test', label: 'test', authMode: 'api-key', status: 'active', models: ['test-model'], createdAt: 1, lastUsedAt: 1 }] }]
+    const { manager, assignmentEvents } = await makeManager({ providerAccounts })
+    manager.setAgentAssignmentSnapshot({ agentId: 'a1', providerId: 'test', accountId: 'acct-1', modelId: 'test-model', speed: 'standard' })
+    assignmentEvents.length = 0
+
+    manager.setSpeed('a1', 'fast')
+
+    expect(assignmentEvents).toHaveLength(1)
+    expect(assignmentEvents[0]).toMatchObject({ agentId: 'a1', accountId: 'acct-1', modelId: 'test-model', speed: 'fast', status: 'ready' })
+  })
+
+  it('syncs a chat model mutation back to the named Agent profile', async () => {
+    const providerAccounts: ProviderConnection[] = [{ providerId: 'test', activeAccountId: 'acct-1', accounts: [{ id: 'acct-1', providerId: 'test', label: 'test', authMode: 'api-key', status: 'active', models: ['test-model', 'test-model-2'], createdAt: 1, lastUsedAt: 1 }] }]
+    const { manager } = await makeManager({ providerAccounts })
+
+    manager.setModel('a1', 'test', 'test-model-2')
+
+    expect(manager.getSettings().agents.find(agent => agent.name === 'bs')).toMatchObject({ provider: 'test', accountId: 'acct-1', model: 'test-model-2' })
+  })
+
+  it('does not choose models[0] when switching to an incomplete Agent profile', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'bs-profile-review-'))
+    const configPath = path.join(dir, 'bs.json')
+    writeFileSync(configPath, JSON.stringify({
+      provider: { test: { apiKey: 'key', models: ['first-model'] } }, model: 'test',
+      agents: { bs: { systemPrompt: 'bs' }, reviewer: { provider: 'test', systemPrompt: 'review' } }
+    }))
+    const { manager } = await makeManager({ configPath })
+
+    manager.setProfile('a1', 'reviewer')
+
+    expect(manager.getAgentModel('a1')).toBeNull()
+    expect(manager.getAgentAssignmentSnapshot('a1')).toMatchObject({ profileName: 'reviewer', modelId: '', status: 'needs-review' })
   })
 
   it('seeds background state from the stored agent config on register', async () => {
@@ -332,15 +458,14 @@ describe('BsAgentManager', () => {
     expect(store.get(oldId)?.items.length).toBeGreaterThan(0)
   })
 
-  it('removeAgent deletes the agent sessions', async () => {
+  it('removeAgent retains attributed project sessions', async () => {
     const { manager, store } = await makeManager()
     await manager.send('a1', 'hello')
     expect(manager.listSessions('a1')).toHaveLength(1)
     manager.removeAgent('a1')
     expect(manager.isNative('a1')).toBe(false)
-    expect(manager.listSessions('a1')).toHaveLength(0)
-    // store no longer holds the orphaned session
-    expect(store.list('a1')).toHaveLength(0)
+    expect(manager.listSessions('a1')).toHaveLength(1)
+    expect(store.get(manager.listSessions('a1')[0].id)?.items.length).toBeGreaterThan(0)
   })
 
   it('undo removes the last turn transcript and redo restores it', async () => {
@@ -409,6 +534,23 @@ describe('BsAgentManager', () => {
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }
+  })
+
+  it('saves settings without creating a provider runtime from an incomplete account assignment', async () => {
+    const providerRuntime = vi.fn(() => { throw new Error('provider runtime must not be created') })
+    const accounts: ProviderConnection[] = [{
+      providerId: 'openai',
+      activeAccountId: 'openai-a',
+      accounts: [{
+        id: 'openai-a', providerId: 'openai', label: 'first@example.com', authMode: 'oauth', status: 'active',
+        createdAt: 1, lastUsedAt: 1, models: ['gpt-code'], keyRef: 'account:openai-a'
+      }]
+    }]
+    const { manager } = await makeManager({ providerAccounts: accounts, providerRuntime })
+    manager.setAgentAssignmentSnapshot({ agentId: 'a1', providerId: '', accountId: 'openai-a', modelId: '', speed: 'standard' })
+
+    await expect(manager.saveSettings(manager.getSettings())).resolves.toBeDefined()
+    expect(providerRuntime).not.toHaveBeenCalled()
   })
 
   it('plan mode denies a write tool call', async () => {

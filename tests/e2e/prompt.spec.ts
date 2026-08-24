@@ -15,12 +15,17 @@ async function launchPrompt() {
   const window = await app.firstWindow()
   await window.locator('.project-row').click()
   await expect(window.locator('.chat-panel')).toBeVisible()
-  await app.evaluate(async ({ BrowserWindow }) => {
+  const scope = await window.locator('.chat-panel').evaluate(element => ({
+    projectPath: (element as HTMLElement).dataset.projectPath!,
+    sessionId: (element as HTMLElement).dataset.sessionId!
+  }))
+  await app.evaluate(async ({ BrowserWindow }, active) => {
     BrowserWindow.getAllWindows()[0].webContents.send('chat:event', {
       type: 'prompt-request', agentId: 'a1', promptId: 'p1', kind: 'permission',
+      projectPath: active.projectPath, sessionId: active.sessionId, turnId: 'turn-prompt',
       call: { id: 'c1', tool: 'bash', input: { command: 'x' }, permission: 'pending' }
     })
-  })
+  }, scope)
   await expect(window.locator('.chat-prompt')).toBeVisible()
   return { app, window }
 }
@@ -58,12 +63,17 @@ async function launchQuestion() {
   const window = await app.firstWindow()
   await window.locator('.project-row').click()
   await expect(window.locator('.chat-panel')).toBeVisible()
-  await app.evaluate(async ({ BrowserWindow }) => {
+  const scope = await window.locator('.chat-panel').evaluate(element => ({
+    projectPath: (element as HTMLElement).dataset.projectPath!,
+    sessionId: (element as HTMLElement).dataset.sessionId!
+  }))
+  await app.evaluate(async ({ BrowserWindow }, active) => {
     BrowserWindow.getAllWindows()[0].webContents.send('chat:event', {
       type: 'prompt-request', agentId: 'a1', promptId: 'p1', kind: 'question',
+      projectPath: active.projectPath, sessionId: active.sessionId, turnId: 'turn-question',
       question: 'Please enter your username:', custom: true
     })
-  })
+  }, scope)
   await expect(window.locator('.chat-prompt')).toBeVisible()
   return { app, window }
 }

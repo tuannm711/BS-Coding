@@ -8,6 +8,9 @@ export interface SnapshotFile {
 
 export interface SnapshotTurn {
   agentId: string
+  projectPath?: string
+  sessionId?: string
+  turnId?: string
   ts: number
   before: Record<string, string>
   after: Record<string, string>
@@ -19,7 +22,15 @@ type RawEntry = Partial<SnapshotTurn> & { filePath?: string; content?: string }
 
 function normalize(raw: RawEntry): SnapshotTurn {
   if (raw.before) {
-    return { agentId: raw.agentId ?? '', ts: raw.ts ?? 0, before: raw.before, after: raw.after ?? {} }
+    return {
+      agentId: raw.agentId ?? '',
+      projectPath: raw.projectPath,
+      sessionId: raw.sessionId,
+      turnId: raw.turnId,
+      ts: raw.ts ?? 0,
+      before: raw.before,
+      after: raw.after ?? {}
+    }
   }
   // Legacy per-file entry {agentId, filePath, content} → single-file turn.
   return {
@@ -31,7 +42,10 @@ function normalize(raw: RawEntry): SnapshotTurn {
 }
 
 export class SnapshotStore {
-  private buffer = new Map<string, Map<string, string>>()
+  private buffer = new Map<string, {
+    files: Map<string, string>
+    metadata?: Pick<SnapshotTurn, 'projectPath' | 'sessionId' | 'turnId' | 'agentId'>
+  }>()
 
   constructor(private store: JsonStore<SnapshotTurn>) {}
 
@@ -44,11 +58,14 @@ export class SnapshotStore {
   }
 
   private turnsFor(agentId: string): SnapshotTurn[] {
-    return this.loadTurns().filter(t => t.agentId === agentId)
+    return this.loadTurns().filter(t => (t.sessionId ?? t.agentId) === agentId)
   }
 
-  beginTurn(agentId: string): void {
-    if (!this.buffer.has(agentId)) this.buffer.set(agentId, new Map())
+  beginTurn(
+    scopeId: string,
+    metadata?: Pick<SnapshotTurn, 'projectPath' | 'sessionId' | 'turnId' | 'agentId'>
+  ): void {
+    if (!this.buffer.has(scopeId)) this.buffer.set(scopeId, { files: new Map(), metadata })
   }
 
   abortTurn(agentId: string): void {
@@ -59,16 +76,16 @@ export class SnapshotStore {
   snapshot(agentId: string, filePath: string, content: string): void {
     const buf = this.buffer.get(agentId)
     if (!buf) return
-    if (!buf.has(filePath)) buf.set(filePath, content)
+    if (!buf.files.has(filePath)) buf.files.set(filePath, content)
   }
 
   commitTurn(agentId: string): void {
     const buf = this.buffer.get(agentId)
     this.buffer.delete(agentId)
-    if (!buf || buf.size === 0) return
+    if (!buf || buf.files.size === 0) return
     const before: Record<string, string> = {}
     const after: Record<string, string> = {}
-    for (const [filePath, content] of buf) {
+    for (const [filePath, content] of buf.files) {
       before[filePath] = content
       try {
         after[filePath] = readFileSync(filePath, 'utf-8')
@@ -77,9 +94,10 @@ export class SnapshotStore {
       }
     }
     const all = this.loadTurns()
-    const others = all.filter(t => t.agentId !== agentId)
-    const mine = all.filter(t => t.agentId === agentId)
-    mine.push({ agentId, ts: Date.now(), before, after })
+    const scopeId = buf.metadata?.sessionId ?? agentId
+    const others = all.filter(t => (t.sessionId ?? t.agentId) !== scopeId)
+    const mine = all.filter(t => (t.sessionId ?? t.agentId) === scopeId)
+    mine.push({ agentId, ...buf.metadata, ts: Date.now(), before, after })
     mine.sort((a, b) => a.ts - b.ts)
     this.saveTurns([...others, ...mine.slice(-MAX_SNAPSHOTS)])
   }
@@ -89,7 +107,7 @@ export class SnapshotStore {
     const all = this.loadTurns()
     let idx = -1
     for (let i = all.length - 1; i >= 0; i--) {
-      if (all[i].agentId === agentId) {
+      if ((all[i].sessionId ?? all[i].agentId) === agentId) {
         idx = i
         break
       }
@@ -107,11 +125,31 @@ export class SnapshotStore {
     return turn
   }
 
+  undoTurn(scopeId: string, turnId: string): SnapshotTurn | null {
+    const all = this.loadTurns()
+    let idx = -1
+    for (let i = all.length - 1; i >= 0; i--) {
+      const turn = all[i]
+      if ((turn.sessionId ?? turn.agentId) === scopeId && turn.turnId === turnId) {
+        idx = i
+        break
+      }
+    }
+    if (idx < 0) return null
+    const [turn] = all.splice(idx, 1)
+    this.saveTurns(all)
+    for (const [filePath, content] of Object.entries(turn.before)) {
+      try { writeFileSync(filePath, content) } catch { /* file may have been deleted */ }
+    }
+    return turn
+  }
+
   // Re-inserts a turn (used by redo so the change can be undone again).
   pushTurn(turn: SnapshotTurn): void {
     const all = this.loadTurns()
-    const others = all.filter(t => t.agentId !== turn.agentId)
-    const mine = all.filter(t => t.agentId === turn.agentId)
+    const scopeId = turn.sessionId ?? turn.agentId
+    const others = all.filter(t => (t.sessionId ?? t.agentId) !== scopeId)
+    const mine = all.filter(t => (t.sessionId ?? t.agentId) === scopeId)
     mine.push(turn)
     mine.sort((a, b) => a.ts - b.ts)
     this.saveTurns([...others, ...mine.slice(-MAX_SNAPSHOTS)])
@@ -130,6 +168,6 @@ export class SnapshotStore {
 
   clear(agentId: string): void {
     this.buffer.delete(agentId)
-    this.saveTurns(this.loadTurns().filter(t => t.agentId !== agentId))
+    this.saveTurns(this.loadTurns().filter(t => (t.sessionId ?? t.agentId) !== agentId))
   }
 }

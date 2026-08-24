@@ -18,6 +18,7 @@ export interface ToolContext {
   emitSubagent?(taskId: string, e: SubagentToolEvent): void
   signal?: AbortSignal
   agentId?: string
+  snapshotScopeId?: string
   taskId?: string
   turn?: number
   snapshots?: SnapshotStore

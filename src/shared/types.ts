@@ -1,9 +1,33 @@
+import type { ProviderModel, ProviderModelCapabilities } from './providers'
+
 export type AgentStatus = 'spawning' | 'running' | 'idle' | 'exited' | 'stopped' | 'error'
 export type AlertLevel = 'normal' | 'attention' | 'error'
 export type AgentKind = 'pty' | 'native'
 export type AgentMode = 'build' | 'plan'
 export type ModelVariant = string
+export type AgentSpeed = 'standard' | 'fast'
 export type ChatRole = 'user' | 'assistant'
+
+export const CHAT_SESSION_SCHEMA_VERSION = 2 as const
+export type TurnExecutionStatus = 'running' | 'completed' | 'stopped' | 'failed'
+
+export interface TurnExecutionSnapshot {
+  turnId: string
+  agentId: string
+  agentName: string
+  providerId?: string
+  accountId?: string
+  accountLabel?: string
+  modelId?: string
+  modelLabel?: string
+  speed: AgentSpeed
+  startedAt: number
+  completedAt?: number
+  status: TurnExecutionStatus
+}
+
+export type ResolvedTurnExecutionSnapshot = TurnExecutionSnapshot &
+  Required<Pick<TurnExecutionSnapshot, 'providerId' | 'modelId'>>
 
 export interface Template {
   id: string
@@ -22,7 +46,10 @@ export interface AgentConfig {
   kind?: AgentKind
   mode?: AgentMode
   variant?: ModelVariant
+  speed?: AgentSpeed
   model?: string
+  accountId?: string
+  fallback?: Array<{ provider: string; accountId?: string; model: string }>
   background?: boolean
 }
 
@@ -100,6 +127,8 @@ export interface ChatMessage {
   reasoning?: string
   tokens?: MessageTokens
   images?: ImageAttachment[]
+  turnId?: string
+  execution?: TurnExecutionSnapshot
   createdAt: number
 }
 
@@ -107,6 +136,9 @@ export interface ToolCallData {
   id: string
   tool: string
   input: Record<string, unknown>
+  thoughtSignature?: string
+  turnId?: string
+  execution?: TurnExecutionSnapshot
   output?: string
   error?: string
   permission: 'pending' | 'allowed' | 'denied'
@@ -123,6 +155,11 @@ export interface SessionSummary {
   messageCount: number
   createdAt: number
   updatedAt: number
+}
+
+export type ProjectSessionSummary = Omit<SessionSummary, 'agentId'> & {
+  projectPath: string
+  lastAgentId?: string
 }
 
 export type ChatEvent =
@@ -151,12 +188,23 @@ export type ChatEvent =
   | { type: 'message-removed'; agentId: string; messageId: string }
   | { type: 'session-created'; agentId: string }
 
+export interface ChatEventScope {
+  projectPath: string
+  sessionId: string
+  agentId: string
+  turnId?: string
+}
+
+export type ScopedChatEvent = ChatEvent & ChatEventScope
+
 export interface QueuedMessage {
   id: string
   text: string
   displayText?: string
   images?: ImageAttachment[]
 }
+
+export type SessionQueuedMessage = QueuedMessage & { agentId: string }
 
 export interface TokenUsage {
   input: number
@@ -219,6 +267,121 @@ export interface ProviderSettings {
   models: string[]
 }
 
+export type AccountStatus = 'active' | 'disabled' | 'expired' | 'error'
+export type AuthMode = 'api-key' | 'oauth' | 'imported'
+export type ProviderErrorKind = 'auth' | 'quota-exhausted' | 'capacity-exhausted' | 'runtime-entity-not-found' | 'unavailable' | 'invalid-request' | 'unknown'
+export interface ProviderErrorState {
+  kind: ProviderErrorKind
+  message: string
+  statusCode?: number
+  retryAt?: number
+  updatedAt: number
+}
+export type ProviderRefreshStageStatus = 'idle' | 'refreshing' | 'ready' | 'error' | 'unavailable'
+export interface ProviderRefreshStages {
+  credentials: ProviderRefreshStageStatus
+  models: ProviderRefreshStageStatus
+  usage: ProviderRefreshStageStatus
+}
+
+/** Safe account metadata; secrets stay in the main-process vault. */
+export interface ProviderAccount {
+  id: string
+  providerId: string
+  label: string
+  authMode: AuthMode
+  status: AccountStatus
+  profile?: { email?: string; name?: string; planName?: string }
+  createdAt: number
+  lastUsedAt: number
+  oauthExpiresAt?: number
+  keyRef?: string
+  capabilities?: ProviderModelCapabilities
+  models?: string[]
+  modelCatalog?: ProviderModel[]
+  refreshStages?: ProviderRefreshStages
+  lastError?: string
+  providerError?: ProviderErrorState
+  usage?: ProviderUsage
+}
+
+export interface ProviderQuotaWindow {
+  id: string
+  label: string
+  kind: 'session' | 'weekly' | 'monthly' | 'additional' | 'unknown'
+  remainingPercent?: number
+  resetAt?: number
+  windowMinutes?: number
+  usageKnown: boolean
+  source: 'provider' | 'legacy-provider'
+}
+
+export interface ProviderQuotaGroup {
+  id: string
+  label: string
+  modelIds: string[]
+  windows: ProviderQuotaWindow[]
+}
+
+export interface ProviderTrackedUsage {
+  periodKey: string
+  periodStart: number
+  periodEnd?: number
+  requests: number
+  tokensInput: number
+  tokensCache: number
+  tokensOutput: number
+  estimatedBilled: number
+  source: 'bs-tracked'
+}
+
+export interface ProviderUsage {
+  accountId: string
+  accountLabel?: string
+  accountType?: 'oauth' | 'api-key' | 'session'
+  periodStart?: number
+  periodEnd?: number
+  resetAt?: number
+  secondaryResetAt?: number
+  requestsUsed?: number
+  requestLimit?: number
+  tokensUsed?: number
+  tokenLimit?: number
+  bankedUsed?: number
+  bankedLimit?: number
+  primaryUsedPercent?: number
+  secondaryUsedPercent?: number
+  modelQuotas?: Record<string, { remainingPercent: number; resetAt?: number }>
+  tokensInput?: number
+  tokensOutput?: number
+  estimatedBilled?: number
+  planName?: string
+  subscriptionExpiresAt?: number
+  quotaGroups?: ProviderQuotaGroup[]
+  tracked?: ProviderTrackedUsage
+  lastSuccessfulRefreshAt?: number
+  stale?: boolean
+  refreshError?: string
+  refreshedAt: number
+  source: 'provider' | 'internal' | 'unavailable'
+  status: 'ok' | 'near-limit' | 'expired' | 'unavailable'
+  unavailableReason?: string
+}
+
+export interface ProviderConnection {
+  providerId: string
+  accounts: ProviderAccount[]
+  activeAccountId: string | null
+}
+
+export interface AgentModelAssignment {
+  provider: string
+  accountId?: string
+  model: string
+  speed?: AgentSpeed
+  fallback?: Array<{ provider: string; accountId?: string; model: string }>
+}
+
 export type PermissionRule = 'allow' | 'ask' | 'deny'
 
 export interface McpServerConfig {
@@ -252,6 +415,9 @@ export interface AgentSettings {
   systemPrompt: string
   provider?: string
   model?: string
+  accountId?: string
+  fallback?: Array<{ provider: string; accountId?: string; model: string }>
+  speed?: AgentSpeed
 }
 
 export interface BsSettings {

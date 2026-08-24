@@ -1,10 +1,13 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { Channels } from '../shared/ipc'
 import type { ArtifactsChangedEvent } from '../shared/ipc'
-import type { ChatEvent, Command, ContextChangedEvent, FileViewerPayload, ImageAttachment, BsSettings, NewAgentInput, PromptResponse, Template, TraceEvent, UpdaterStatusEvent } from '../shared/types'
+import type { ChatEvent, Command, ContextChangedEvent, FileViewerPayload, ImageAttachment, BsSettings, NewAgentInput, PromptResponse, ProviderConnection, ProviderUsage, Template, TraceEvent, UpdaterStatusEvent, WorkspaceRuntime } from '../shared/types'
 import type { AgentApi, AgentConfigEvent, AgentStateEvent, BrowserInstallGuideEvent, GitStatusEvent, PtyDataEvent, TerminalExitEvent, WindowMaximizedChangeEvent } from '../shared/ipc'
 import type { BrowserStatusInfo } from '../shared/browser-types'
 import type { RemoteStatus } from '../shared/remote-types'
+import type { ProviderAuthorizationRequest, ProviderAuthorizationSession, ProviderConnectRequest } from '../shared/providers'
+import type { AgentAssignmentSetRequest, AgentAssignmentSnapshot } from '../shared/provider-state'
+import type { ProviderSnapshot } from '../shared/provider-state'
 
 function subscribe<T>(channel: string, cb: (e: T) => void): () => void {
   const listener = (_event: unknown, payload: T) => cb(payload)
@@ -20,6 +23,8 @@ const api: AgentApi = {
     ipcRenderer.invoke(Channels.WorkspaceRemove, projectPath),
   openWorkspace: (projectPath: string) =>
     ipcRenderer.invoke(Channels.WorkspaceOpen, projectPath),
+  onWorkspaceRuntimeChanged: (cb: (runtime: WorkspaceRuntime) => void) =>
+    subscribe(Channels.EventWorkspaceRuntimeChanged, cb),
   openInEditor: (projectPath: string) =>
     ipcRenderer.invoke(Channels.ProjectOpenInEditor, projectPath),
   openFolder: (projectPath: string) =>
@@ -56,14 +61,35 @@ const api: AgentApi = {
     ipcRenderer.invoke(Channels.AgentGetVariants, agentId),
   setAgentModel: (agentId: string, provider: string, model: string) =>
     ipcRenderer.invoke(Channels.AgentSetModel, agentId, provider, model),
+  setAgentSpeed: (agentId: string, speed: 'standard' | 'fast') =>
+    ipcRenderer.invoke(Channels.AgentSetSpeed, agentId, speed),
+  setAgentProfile: (agentId: string, profileName: string) =>
+    ipcRenderer.invoke(Channels.AgentSetProfile, agentId, profileName),
+  setAgentAccount: (agentId: string, accountId: string | null) =>
+    ipcRenderer.invoke(Channels.AgentSetAccount, agentId, accountId),
+  getAgentAssignment: (agentId: string) => ipcRenderer.invoke(Channels.AgentGetAssignment, agentId),
   getAgentModel: (agentId: string) => ipcRenderer.invoke(Channels.AgentGetModel, agentId),
   getContextInfo: (agentId: string) => ipcRenderer.invoke(Channels.AgentGetContext, agentId),
   getProviderModels: () => ipcRenderer.invoke(Channels.ProviderModels),
   fetchProviderModels: (providerId: string) => ipcRenderer.invoke(Channels.ProviderFetchModels, providerId),
   listProviderCatalog: () => ipcRenderer.invoke(Channels.ProviderCatalog),
+  listProviderCapabilities: () => ipcRenderer.invoke(Channels.ProviderCapabilities),
+  connectProviderMethod: (request: ProviderConnectRequest) => ipcRenderer.invoke(Channels.ProviderConnectMethod, request),
+  createProviderAuthorization: (request: ProviderAuthorizationRequest) => ipcRenderer.invoke(Channels.ProviderAuthorizationCreate, request),
+  getProviderAuthorization: (loginId: string) => ipcRenderer.invoke(Channels.ProviderAuthorizationGet, loginId),
+  openProviderAuthorization: (loginId: string) => ipcRenderer.invoke(Channels.ProviderAuthorizationOpen, loginId),
+  cancelProviderAuthorization: (loginId: string) => ipcRenderer.invoke(Channels.ProviderAuthorizationCancel, loginId),
   connectProvider: (providerId: string, apiKey: string, baseUrl?: string) =>
     ipcRenderer.invoke(Channels.ProviderConnect, providerId, apiKey, baseUrl),
   disconnectProvider: (providerId: string) => ipcRenderer.invoke(Channels.ProviderDisconnect, providerId),
+  listProviderAccounts: (providerId?: string) => ipcRenderer.invoke(Channels.ProviderAccounts, providerId),
+  setProviderAccountEnabled: (accountId: string, enabled: boolean) =>
+    ipcRenderer.invoke(enabled ? Channels.ProviderAccountEnable : Channels.ProviderAccountDisable, accountId),
+  switchProviderAccount: (providerId: string, accountId: string) =>
+    ipcRenderer.invoke(Channels.ProviderAccountSwitch, providerId, accountId),
+  removeProviderAccount: (accountId: string) => ipcRenderer.invoke(Channels.ProviderAccountRemove, accountId),
+  refreshProviderUsage: (providerId?: string, accountId?: string) =>
+    ipcRenderer.invoke(Channels.ProviderUsageRefresh, providerId, accountId),
   listTemplates: () => ipcRenderer.invoke(Channels.TemplateList),
   saveTemplate: (template: Template) => ipcRenderer.invoke(Channels.TemplateSave, template),
   removeTemplate: (id: string) => ipcRenderer.invoke(Channels.TemplateRemove, id),
@@ -84,8 +110,25 @@ const api: AgentApi = {
   checkForUpdates: () => ipcRenderer.invoke(Channels.UpdaterCheck),
   installUpdate: () => ipcRenderer.invoke(Channels.UpdaterInstall),
   sendChat: (agentId: string, text: string, images?: ImageAttachment[]) =>
-    ipcRenderer.invoke(Channels.ChatSend, agentId, text, images),
-  stopChat: (agentId: string) => ipcRenderer.invoke(Channels.ChatStop, agentId),
+    ipcRenderer.invoke(Channels.ChatSendLegacy, agentId, text, images),
+  stopChat: (agentId: string) => ipcRenderer.invoke(Channels.ChatStopLegacy, agentId),
+  listProjectSessions: (projectPath: string) => ipcRenderer.invoke(Channels.ProjectSessionList, projectPath),
+  createProjectSession: (projectPath: string, agentId?: string) => ipcRenderer.invoke(Channels.ProjectSessionCreate, projectPath, agentId),
+  switchProjectSession: (projectPath: string, sessionId: string) => ipcRenderer.invoke(Channels.ProjectSessionSwitch, projectPath, sessionId),
+  deleteProjectSession: (projectPath: string, sessionId: string) => ipcRenderer.invoke(Channels.ProjectSessionDelete, projectPath, sessionId),
+  renameProjectSession: (projectPath: string, sessionId: string, title: string) => ipcRenderer.invoke(Channels.ProjectSessionRename, projectPath, sessionId, title),
+  selectProjectSessionAgent: (projectPath: string, sessionId: string, agentId: string) => ipcRenderer.invoke(Channels.SessionSelectAgent, projectPath, sessionId, agentId),
+  sendSessionChat: (projectPath: string, sessionId: string, agentId: string, text: string, images?: ImageAttachment[]) =>
+    ipcRenderer.invoke(Channels.ChatSend, projectPath, sessionId, agentId, text, images),
+  stopSessionChat: (projectPath: string, sessionId: string) => ipcRenderer.invoke(Channels.ChatStop, projectPath, sessionId),
+  listSessionTranscript: (projectPath: string, sessionId: string) => ipcRenderer.invoke(Channels.SessionTranscript, projectPath, sessionId),
+  getSessionTodos: (projectPath: string, sessionId: string) => ipcRenderer.invoke(Channels.SessionTodos, projectPath, sessionId),
+  getSessionUsage: (projectPath: string, sessionId: string) => ipcRenderer.invoke(Channels.SessionUsage, projectPath, sessionId),
+  isSessionChatRunning: (projectPath: string, sessionId: string) => ipcRenderer.invoke(Channels.SessionIsRunning, projectPath, sessionId),
+  undoSessionChat: (projectPath: string, sessionId: string) => ipcRenderer.invoke(Channels.SessionUndo, projectPath, sessionId),
+  redoSessionChat: (projectPath: string, sessionId: string) => ipcRenderer.invoke(Channels.SessionRedo, projectPath, sessionId),
+  removeSessionQueued: (projectPath: string, sessionId: string, messageId: string) => ipcRenderer.invoke(Channels.SessionQueueRemove, projectPath, sessionId, messageId),
+  editSessionQueued: (projectPath: string, sessionId: string, messageId: string, text: string) => ipcRenderer.invoke(Channels.SessionQueueEdit, projectPath, sessionId, messageId, text),
   runCommand: (agentId: string, name: string, args: string) =>
     ipcRenderer.invoke(Channels.ChatRunCommand, agentId, name, args),
   undoChat: (agentId: string) => ipcRenderer.invoke(Channels.ChatUndo, agentId),
@@ -135,6 +178,16 @@ const api: AgentApi = {
   onGitStatus: (cb: (e: GitStatusEvent) => void) => subscribe(Channels.EventGitStatus, cb),
   onContextChanged: (cb: (e: ContextChangedEvent) => void) => subscribe(Channels.EventContextChanged, cb),
   onChatEvent: (cb: (e: ChatEvent) => void) => subscribe(Channels.EventChat, cb),
+  onProviderAccountsChanged: (cb: (e: ProviderConnection[]) => void) =>
+    subscribe(Channels.EventProviderAccountsChanged, cb),
+  onProviderUsage: (cb: (e: ProviderUsage) => void) => subscribe(Channels.EventProviderUsage, cb),
+  onAgentAssignmentChanged: (cb: (e: AgentAssignmentSnapshot) => void) => subscribe(Channels.EventAgentAssignmentChanged, cb),
+  getProviderSnapshot: () => ipcRenderer.invoke(Channels.ProviderSnapshotGet),
+  onProviderSnapshotChanged: (cb: (e: ProviderSnapshot) => void) => subscribe(Channels.EventProviderSnapshotChanged, cb),
+  onProviderAuthorizationChanged: (cb: (e: ProviderAuthorizationSession) => void) => subscribe(Channels.EventProviderAuthorizationChanged, cb),
+  refreshProviderAccount: (providerId: string, accountId: string) => ipcRenderer.invoke(Channels.ProviderAccountRefresh, providerId, accountId),
+  getAgentAssignmentSnapshot: (agentId: string) => ipcRenderer.invoke(Channels.AgentAssignmentGetSnapshot, agentId),
+  setAgentAssignmentSnapshot: (request: AgentAssignmentSetRequest) => ipcRenderer.invoke(Channels.AgentAssignmentSetSnapshot, request),
   getBrowserStatus: () => ipcRenderer.invoke(Channels.BrowserGetStatus),
   pairBrowser: () => ipcRenderer.invoke(Channels.BrowserPair),
   openBrowserInstallGuide: () => ipcRenderer.invoke(Channels.BrowserOpenInstallGuide),

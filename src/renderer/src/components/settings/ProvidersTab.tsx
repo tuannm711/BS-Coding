@@ -1,201 +1,59 @@
-import { useState } from 'react'
-import type { CatalogProviderSummary, BsSettings } from '@shared/types'
-import Modal from './Modal'
+import { useEffect, useState } from 'react'
+import { shouldAcceptSnapshot, type ProviderAccountSnapshot, type ProviderSnapshot } from '@shared/provider-state'
+import QuotaAccountCard from '../quota/QuotaAccountCard'
+import AddProviderModal from './AddProviderModal'
+import { providerQuotaGroups } from '../quota/quota-view'
 
-interface Props {
-  settings: BsSettings
-  catalog: CatalogProviderSummary[]
-  onChange: (patch: Partial<BsSettings>) => void
+export function groupProviderAccounts(snapshot: ProviderSnapshot | null) {
+  return (snapshot?.providers ?? []).map(provider => ({ provider, accounts: snapshot?.accounts.filter(account => account.providerId === provider.id) ?? [] })).filter(group => group.accounts.length > 0)
 }
 
-type ConnectModal =
-  | { kind: 'catalog'; id: string; name: string }
-  | { kind: 'manual' }
-  | null
-
-export default function ProvidersTab({ settings, catalog, onChange }: Props) {
-  const [search, setSearch] = useState('')
-  const [modal, setModal] = useState<ConnectModal>(null)
-  const [providerId, setProviderId] = useState('')
-  const [apiKey, setApiKey] = useState('')
-  const [baseUrl, setBaseUrl] = useState('')
-  const [expandedId, setExpandedId] = useState<string | null>(null)
-  const [models, setModels] = useState<string[]>([])
+export default function ProvidersTab() {
+  const [modalAccount, setModalAccount] = useState<ProviderAccountSnapshot | null | undefined>(undefined)
   const [status, setStatus] = useState('')
+  const [snapshot, setSnapshot] = useState<ProviderSnapshot | null>(null)
+  const [expandedAccounts, setExpandedAccounts] = useState<Set<string>>(() => new Set())
 
-  const connected = settings.providers
+  const applySnapshot = (next: ProviderSnapshot) => setSnapshot(previous => !previous || shouldAcceptSnapshot(previous.revision, next.revision) ? next : previous)
+  const refreshAccounts = async () => applySnapshot(await window.api.getProviderSnapshot())
+  useEffect(() => {
+    void window.api.getProviderSnapshot().then(applySnapshot)
+    return window.api.onProviderSnapshotChanged(applySnapshot)
+  }, [])
 
-  const filtered = catalog.filter(c =>
-    !search ||
-    c.name.toLowerCase().includes(search.toLowerCase()) ||
-    c.id.toLowerCase().includes(search.toLowerCase())
-  )
-
-  const openCatalog = (id: string, name: string) => {
-    setProviderId(id)
-    setApiKey('')
-    setBaseUrl('')
-    setModal({ kind: 'catalog', id, name })
+  const toggleAccount = async (accountId: string, enabled: boolean) => {
+    await window.api.setProviderAccountEnabled(accountId, enabled)
+    await refreshAccounts()
   }
 
-  const openManual = () => {
-    setProviderId('')
-    setApiKey('')
-    setBaseUrl('')
-    setModal({ kind: 'manual' })
-  }
-
-  const connect = async () => {
-    const id = providerId.trim()
-    if (!id || !apiKey.trim()) return
-    setStatus('')
-    const result = await window.api.connectProvider(id, apiKey.trim(), baseUrl.trim() || undefined)
-    setModal(null)
-    onChange({ providers: result.providers, defaultProvider: result.defaultProvider })
-    const provider = result.providers.find(p => p.id === id)
-    setStatus(provider && provider.models.length > 0
-      ? `Connected ${id}. ${provider.models.length} model(s) synced.`
-      : `Connected ${id}. Models will sync when models.dev is reachable.`)
-  }
-
-  const disconnect = async (id: string) => {
-    const result = await window.api.disconnectProvider(id)
-    if (expandedId === id) {
-      setExpandedId(null)
-      setModels([])
-    }
-    onChange({ providers: result.providers, defaultProvider: result.defaultProvider })
-    setStatus(`Disconnected ${id}.`)
-  }
-
-  const maskKey = (key: string): string =>
-    key.length <= 8 ? '••••' : `${key.slice(0, 4)}…${key.slice(-4)}`
-
-  const viewModels = async (id: string) => {
-    if (expandedId === id) {
-      setExpandedId(null)
-      setModels([])
-      return
-    }
-    setExpandedId(id)
-    setModels(await window.api.fetchProviderModels(id))
-  }
-
-  const setDefault = async (id: string) => {
-    // Persist immediately (like connect/disconnect) instead of patching the
-    // draft: onRefresh would re-fetch the unsaved value and clobber the change.
-    await window.api.saveSettings({ ...settings, defaultProvider: id })
-    onChange({ defaultProvider: id })
-  }
-
-  return (
-    <div className="settings-tab providers-tab">
-      <div className="provider-actions">
-        <button className="btn" onClick={openManual}>+ Connect provider</button>
-      </div>
-      <p className="settings-hint">
-        Find a provider below and enter your API key, or use "+ Connect provider". Models are synced
-        automatically from models.dev. API keys are stored encrypted in the OS keychain.
-      </p>
-
-      <div className="provider-connect">
-        <input
-          className="input provider-search"
-          placeholder="Search providers..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-        />
-        <div className="provider-catalog">
-          {filtered.map(c => {
-            const isConnected = connected.some(p => p.id === c.id)
-            return (
-              <div className="provider-catalog-row" key={c.id}>
-                <span className="provider-catalog-name">
-                  {c.name} <code>{c.id}</code>
-                </span>
-                <span className="provider-catalog-meta">{c.modelCount} models</span>
-                {isConnected ? (
-                  <span className="provider-catalog-connected">Connected</span>
-                ) : (
-                  <button className="btn small" onClick={() => openCatalog(c.id, c.name)}>
-                    Connect
-                  </button>
-                )}
-              </div>
-            )
-          })}
-          {filtered.length === 0 && <p className="settings-hint">No providers match.</p>}
-        </div>
-      </div>
-
-      <div className="provider-connected">
-        <h4>Connected</h4>
-        {connected.map(p => (
-          <div key={p.id}>
-            <div className="provider-connected-row">
-              <button className="provider-connected-toggle" onClick={() => void viewModels(p.id)}>
-                <span className="mcp-dot connected" />
-                <span className="provider-connected-name">{p.id}</span>
-              </button>
-              {p.keyRef
-                ? <span className="provider-connected-secure" title="Key stored encrypted in OS keychain">🔒 key vaulted</span>
-                : p.apiKey
-                  ? <span className="provider-connected-secure" title="Key stored in settings (not encrypted)">key {maskKey(p.apiKey)}</span>
-                  : null}
-              {p.baseUrl && <span className="provider-connected-baseurl">{p.baseUrl}</span>}
-              <button className="btn small" onClick={() => void setDefault(p.id)}>
-                {settings.defaultProvider === p.id ? 'default' : 'set default'}
-              </button>
-              <button className="btn small" onClick={() => void disconnect(p.id)}>Disconnect</button>
+  return <div className="settings-tab providers-tab">
+    <div className="provider-actions"><button className="btn primary" onClick={() => setModalAccount(null)}>＋ Add provider ▾</button></div>
+    <p className="settings-hint">Connected accounts are available to Agents and chat. Credentials stay encrypted in the OS keychain.</p>
+    <div className="provider-connected">
+      <h4>Connected accounts</h4>
+      {groupProviderAccounts(snapshot).map(({ provider, accounts: providerAccounts }) => {
+        return <section className="provider-group" key={provider.id} aria-label={`${provider.displayName} accounts`}>
+          <div className="provider-group-head"><div><h5>{provider.displayName}</h5><span>{provider.description}</span></div><span className="quota-plan-badge">{providerAccounts.length} account{providerAccounts.length === 1 ? '' : 's'}</span></div>
+          {providerAccounts.map(account => {
+            const active = account.status === 'active'
+            const refreshing = Object.values(account.refreshStages ?? {}).some(stage => stage === 'refreshing')
+            return <div className={`provider-account-block ${active ? '' : 'provider-account-disabled'}`} key={account.id}>
+              <QuotaAccountCard account={account} groups={providerQuotaGroups(account.usage)} tracked={account.usage?.tracked} providerLabel={provider.displayName} variant="provider" providerState={account.error ? account.error.kind === 'auth' ? 'auth-error' : account.error.kind === 'quota-exhausted' ? 'quota-exhausted' : account.error.kind === 'capacity-exhausted' ? 'capacity-exhausted' : 'unavailable' : account.usage?.status === 'unavailable' ? 'unavailable' : 'ready'} expandedModels={expandedAccounts.has(account.id)} refreshing={refreshing} onToggleModels={() => setExpandedAccounts(current => {
+                const next = new Set(current)
+                if (next.has(account.id)) next.delete(account.id)
+                else next.add(account.id)
+                return next
+              })} onAccountToggle={() => void toggleAccount(account.id, !active)} onReconnect={() => setModalAccount(account)} onRemove={() => void window.api.removeProviderAccount(account.id).then(refreshAccounts)} onRefresh={() => {
+                setStatus(`Refreshing ${account.label}: credentials, models and usage…`)
+                void window.api.refreshProviderAccount(provider.id, account.id).then(next => { applySnapshot(next); setStatus(`${account.label} refreshed.`) }).catch(error => setStatus(`Refresh failed: ${String(error)}`))
+              }} />
             </div>
-            {expandedId === p.id && (
-              <div className="provider-models">
-                {models.length > 0 ? models.map(m => <code key={m}>{m}</code>) : <span className="settings-hint">Loading models…</span>}
-              </div>
-            )}
-          </div>
-        ))}
-        {connected.length === 0 && <p className="settings-hint">No providers connected yet.</p>}
-      </div>
-
-      {status && <div className="settings-status">{status}</div>}
-
-      {modal && (
-        <Modal
-          title={modal.kind === 'catalog' ? `Connect ${modal.name}` : 'Connect provider'}
-          onClose={() => setModal(null)}
-          onSubmit={() => void connect()}
-          submitLabel="Connect"
-          submitDisabled={!providerId.trim() || !apiKey.trim()}
-        >
-          {modal.kind === 'catalog' ? (
-            <p className="settings-hint">
-              Provider <code>{modal.id}</code> — enter your API key below. It will be stored encrypted
-              in the OS keychain.
-            </p>
-          ) : (
-            <input
-              className="input"
-              placeholder="provider id (e.g. deepseek)"
-              value={providerId}
-              onChange={e => setProviderId(e.target.value)}
-            />
-          )}
-          <input
-            className="input provider-key"
-            type="password"
-            placeholder="api key"
-            value={apiKey}
-            onChange={e => setApiKey(e.target.value)}
-          />
-          <input
-            className="input provider-baseurl"
-            placeholder="baseUrl (optional)"
-            value={baseUrl}
-            onChange={e => setBaseUrl(e.target.value)}
-          />
-        </Modal>
-      )}
+          })}
+        </section>
+      })}
+      {(snapshot?.accounts.length ?? 0) === 0 && <p className="settings-hint">No providers connected yet.</p>}
     </div>
-  )
+    {status && <div className="settings-status" aria-live="polite">{status}</div>}
+    {modalAccount !== undefined && <AddProviderModal providers={snapshot?.providers} reconnectAccount={modalAccount ?? undefined} onClose={() => setModalAccount(undefined)} onConnected={message => { setStatus(message); void refreshAccounts() }} />}
+  </div>
 }

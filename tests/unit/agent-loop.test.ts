@@ -99,7 +99,7 @@ describe('SessionRunner', () => {
     h.llm.queue = [
       [
         { kind: 'text', text: 'reading...' },
-        { kind: 'tool-call', toolCallId: 'tc1', toolName: 'read', toolInput: { file_path: 'a.ts' } },
+        { kind: 'tool-call', toolCallId: 'tc1', toolName: 'read', toolInput: { file_path: 'a.ts' }, thoughtSignature: 'signature-1' },
         { kind: 'finish' }
       ],
       textParts('done')
@@ -116,6 +116,7 @@ describe('SessionRunner', () => {
     const toolMsg = secondMessages.find(m => m.role === 'tool')
     expect(toolMsg).toBeDefined()
     expect(JSON.stringify(toolMsg)).toContain('file content')
+    expect(JSON.stringify(secondMessages)).toContain('signature-1')
   })
 
   it('denies tool execution when permission is denied', async () => {

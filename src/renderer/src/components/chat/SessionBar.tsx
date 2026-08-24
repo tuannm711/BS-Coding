@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import type { SessionSummary } from '@shared/types'
+import type { ProjectSessionSummary } from '@shared/types'
 
 interface Props {
-  sessions: SessionSummary[]
+  sessions: ProjectSessionSummary[]
   activeSessionId: string | null
   onSelect: (sessionId: string) => void
   onCreate: () => void
@@ -52,7 +52,7 @@ export default function SessionBar({ sessions, activeSessionId, onSelect, onCrea
     }
   }, [])
 
-  const startRename = (s: SessionSummary) => {
+  const startRename = (s: ProjectSessionSummary) => {
     setRenamingId(s.id)
     setRenameValue(s.title)
   }

@@ -181,13 +181,14 @@ describe('BsAgentManager trace wiring', () => {
     expect(trace.deleted).toContain(sessionId)
   })
 
-  it('deletes trace files for all sessions when an agent is removed', async () => {
+  it('retains session traces when an attributed agent is removed', async () => {
     const { manager, trace } = await makeManager()
     manager.addAgent(BS_AGENT)
     const s1 = manager.newSession('a1').id
     const s2 = manager.newSession('a1').id
     manager.removeAgent('a1')
-    expect(trace.deleted).toContain(s1)
-    expect(trace.deleted).toContain(s2)
+    expect(trace.deleted).not.toContain(s1)
+    expect(trace.deleted).not.toContain(s2)
+    expect(manager.listProjectSessions('/proj').map(session => session.id)).toEqual(expect.arrayContaining([s1, s2]))
   })
 })

@@ -6,7 +6,7 @@ import type { ToolDefinition, ToolSchema } from './tools/types'
 
 export type TranscriptItem = ChatTranscriptItem
 
-type AssistantPart = { type: 'text'; text: string } | { type: 'tool-call'; toolCallId: string; toolName: string; input: unknown }
+type AssistantPart = { type: 'text'; text: string } | { type: 'tool-call'; toolCallId: string; toolName: string; input: unknown; providerOptions?: { google: { thoughtSignature: string } } }
 
 export interface ToLlmOptions {
   toolOutputMaxChars?: number
@@ -51,7 +51,8 @@ export function toLlmMessages(items: TranscriptItem[], opts?: ToLlmOptions): Mod
           type: 'tool-call',
           toolCallId: call.id,
           toolName: call.tool,
-          input: normalizeToolInput(call.input)
+          input: normalizeToolInput(call.input),
+          ...(call.thoughtSignature ? { providerOptions: { google: { thoughtSignature: call.thoughtSignature } } } : {})
         })
       }
       result.push({ role: 'assistant', content })

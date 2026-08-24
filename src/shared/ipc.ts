@@ -1,17 +1,27 @@
 import type {
-  AgentConfig, AgentState, ArtifactEntry, CatalogProviderSummary, ChatEvent, ChatMessage, ChatTranscriptItem, Command,
+  AgentConfig, AgentModelAssignment, AgentState, ArtifactEntry, CatalogProviderSummary, ChatEvent, ChatMessage, ChatTranscriptItem, Command,
   ContextChangedEvent, ContextInfo, DirEntry, FileContentResult, FileSuggestion, FileViewerPayload,
   GitStatus, ImageAttachment, McpServerStatus, BsSettings, ModelRef, NewAgentInput, PromptResponse,
-  SessionSummary, StatsSummary, Template, TerminalInfo, TodoItem, TraceEvent, TraceSummary, UpdaterStatusEvent, WorkspaceRuntime, WorkspaceSummary
+  ProjectSessionSummary, ProviderAccount, ProviderConnection, ProviderUsage, SessionSummary, StatsSummary, Template, TerminalInfo, TodoItem, TraceEvent, TraceSummary, UpdaterStatusEvent, UsageSummary, WorkspaceRuntime, WorkspaceSummary
 } from './types'
 import type { BrowserStatusInfo, PairingInfo } from './browser-types'
+import type { AgentAssignmentSetRequest, AgentAssignmentSnapshot } from './provider-state'
+import type { ProviderSnapshot } from './provider-state'
 import type { RemoteStatus } from './remote-types'
+import type {
+  ProviderAuthorizationRequest,
+  ProviderAuthorizationSession,
+  ProviderCapability,
+  ProviderConnectRequest,
+  ProviderConnectResult
+} from './providers'
 
 export const Channels = {
   WorkspaceList: 'workspace:list',
   WorkspaceAdd: 'workspace:add',
   WorkspaceRemove: 'workspace:remove',
   WorkspaceOpen: 'workspace:open',
+  EventWorkspaceRuntimeChanged: 'workspace:runtime-changed',
   ProjectOpenFolder: 'project:open-folder',
   ProjectOpenInEditor: 'project:open-in-editor',
   FileOpen: 'file:open',
@@ -24,6 +34,10 @@ export const Channels = {
   AgentSetVariant: 'agent:set-variant',
   AgentGetVariants: 'agent:get-variants',
   AgentSetModel: 'agent:set-model',
+  AgentSetSpeed: 'agent:set-speed',
+  AgentSetProfile: 'agent:set-profile',
+  AgentSetAccount: 'agent:set-account',
+  AgentGetAssignment: 'agent:get-assignment',
   AgentGetModel: 'agent:get-model',
   AgentGetContext: 'agent:get-context',
   ProviderModels: 'provider:models',
@@ -31,6 +45,18 @@ export const Channels = {
   ProviderCatalog: 'provider:catalog',
   ProviderConnect: 'provider:connect',
   ProviderDisconnect: 'provider:disconnect',
+  ProviderAccounts: 'provider:accounts',
+  ProviderAuthorizationCreate: 'provider:authorization-create',
+  ProviderAuthorizationGet: 'provider:authorization-get',
+  ProviderAuthorizationOpen: 'provider:authorization-open',
+  ProviderAuthorizationCancel: 'provider:authorization-cancel',
+  ProviderAccountEnable: 'provider:account-enable',
+  ProviderAccountDisable: 'provider:account-disable',
+  ProviderAccountSwitch: 'provider:account-switch',
+  ProviderAccountRemove: 'provider:account-remove',
+  ProviderUsageRefresh: 'provider:usage-refresh',
+  ProviderCapabilities: 'provider:capabilities',
+  ProviderConnectMethod: 'provider:connect-method',
   TemplateList: 'template:list',
   TemplateSave: 'template:save',
   TemplateRemove: 'template:remove',
@@ -49,7 +75,9 @@ export const Channels = {
   UpdaterInstall: 'updater:install',
   EventUpdaterStatus: 'updater:status',
   ChatSend: 'chat:send',
+  ChatSendLegacy: 'chat:send-legacy',
   ChatStop: 'chat:stop',
+  ChatStopLegacy: 'chat:stop-legacy',
   ChatRunCommand: 'chat:run-command',
   ChatUndo: 'chat:undo',
   ChatRedo: 'chat:redo',
@@ -66,6 +94,20 @@ export const Channels = {
   SessionSwitch: 'session:switch',
   SessionDelete: 'session:delete',
   SessionRename: 'session:rename',
+  ProjectSessionList: 'project-session:list',
+  ProjectSessionCreate: 'project-session:create',
+  ProjectSessionSwitch: 'project-session:switch',
+  ProjectSessionDelete: 'project-session:delete',
+  ProjectSessionRename: 'project-session:rename',
+  SessionSelectAgent: 'session:select-agent',
+  SessionTranscript: 'session:transcript',
+  SessionTodos: 'session:todos',
+  SessionUsage: 'session:usage',
+  SessionIsRunning: 'session:is-running',
+  SessionUndo: 'session:undo',
+  SessionRedo: 'session:redo',
+  SessionQueueRemove: 'session:queue-remove',
+  SessionQueueEdit: 'session:queue-edit',
   SettingsGet: 'settings:get',
   SettingsSave: 'settings:save',
   CommandList: 'commands:list',
@@ -112,7 +154,16 @@ export const Channels = {
   DirList: 'dir:list',
   ArtifactsList: 'artifacts:list',
   ArtifactsClear: 'artifacts:clear',
-  EventArtifactsChanged: 'artifacts:changed'
+  EventArtifactsChanged: 'artifacts:changed',
+  EventProviderAccountsChanged: 'provider:accounts-changed',
+  EventProviderUsage: 'provider:usage',
+  ProviderSnapshotGet: 'provider:snapshot-get',
+  ProviderAccountRefresh: 'provider:account-refresh',
+  EventProviderSnapshotChanged: 'provider:snapshot-changed',
+  AgentAssignmentGetSnapshot: 'agent:assignment-get-snapshot',
+  AgentAssignmentSetSnapshot: 'agent:assignment-set-snapshot',
+  EventAgentAssignmentChanged: 'agent:assignment-changed',
+  EventProviderAuthorizationChanged: 'provider:authorization-changed'
 } as const
 
 export interface PtyDataEvent { agentId: string; data: string }
@@ -137,6 +188,7 @@ export interface AgentApi {
   addWorkspace(projectPath: string, name: string): Promise<WorkspaceRuntime | null>
   removeWorkspace(projectPath: string): Promise<void>
   openWorkspace(projectPath: string): Promise<WorkspaceRuntime>
+  onWorkspaceRuntimeChanged(cb: (runtime: WorkspaceRuntime) => void): () => void
   openInEditor(projectPath: string): Promise<void>
   openFolder(projectPath: string): Promise<void>
   openFile(payload: FileViewerPayload): Promise<void>
@@ -155,13 +207,37 @@ export interface AgentApi {
   setAgentVariant(agentId: string, variant: string | null): Promise<void>
   getAgentVariants(agentId: string): Promise<string[]>
   setAgentModel(agentId: string, provider: string, model: string): Promise<void>
+  setAgentSpeed(agentId: string, speed: 'standard' | 'fast'): Promise<void>
+  setAgentProfile(agentId: string, profileName: string): Promise<void>
+  setAgentAccount(agentId: string, accountId: string | null): Promise<void>
+  getAgentAssignment(agentId: string): Promise<AgentModelAssignment | null>
   getAgentModel(agentId: string): Promise<ModelRef | null>
   getContextInfo(agentId: string): Promise<ContextInfo>
   getProviderModels(): Promise<ModelRef[]>
   fetchProviderModels(providerId: string): Promise<string[]>
   listProviderCatalog(): Promise<CatalogProviderSummary[]>
+  listProviderCapabilities(): Promise<ProviderCapability[]>
+  connectProviderMethod(request: ProviderConnectRequest): Promise<ProviderConnectResult>
+  createProviderAuthorization(request: ProviderAuthorizationRequest): Promise<ProviderAuthorizationSession>
+  getProviderAuthorization(loginId: string): Promise<ProviderAuthorizationSession | undefined>
+  openProviderAuthorization(loginId: string): Promise<void>
+  cancelProviderAuthorization(loginId: string): Promise<ProviderAuthorizationSession | undefined>
   connectProvider(providerId: string, apiKey: string, baseUrl?: string): Promise<BsSettings>
   disconnectProvider(providerId: string): Promise<BsSettings>
+  listProviderAccounts(providerId?: string): Promise<ProviderConnection[]>
+  setProviderAccountEnabled(accountId: string, enabled: boolean): Promise<void>
+  switchProviderAccount(providerId: string, accountId: string): Promise<void>
+  removeProviderAccount(accountId: string): Promise<void>
+  refreshProviderUsage(providerId?: string, accountId?: string): Promise<ProviderUsage[]>
+  onProviderAccountsChanged(cb: (e: ProviderConnection[]) => void): () => void
+  onProviderUsage(cb: (e: ProviderUsage) => void): () => void
+  onAgentAssignmentChanged(cb: (e: AgentAssignmentSnapshot) => void): () => void
+  getProviderSnapshot(): Promise<ProviderSnapshot>
+  onProviderSnapshotChanged(cb: (e: ProviderSnapshot) => void): () => void
+  onProviderAuthorizationChanged(cb: (e: ProviderAuthorizationSession) => void): () => void
+  refreshProviderAccount(providerId: string, accountId: string): Promise<ProviderSnapshot>
+  getAgentAssignmentSnapshot(agentId: string): Promise<AgentAssignmentSnapshot | null>
+  setAgentAssignmentSnapshot(request: AgentAssignmentSetRequest): Promise<AgentAssignmentSnapshot>
   listTemplates(): Promise<Template[]>
   saveTemplate(template: Template): Promise<Template>
   removeTemplate(id: string): Promise<void>
@@ -180,6 +256,22 @@ export interface AgentApi {
   installUpdate(): Promise<void>
   sendChat(agentId: string, text: string, images?: ImageAttachment[]): Promise<void>
   stopChat(agentId: string): Promise<void>
+  listProjectSessions(projectPath: string): Promise<ProjectSessionSummary[]>
+  createProjectSession(projectPath: string, agentId?: string): Promise<ProjectSessionSummary>
+  switchProjectSession(projectPath: string, sessionId: string): Promise<ProjectSessionSummary | null>
+  deleteProjectSession(projectPath: string, sessionId: string): Promise<ProjectSessionSummary>
+  renameProjectSession(projectPath: string, sessionId: string, title: string): Promise<ProjectSessionSummary | null>
+  selectProjectSessionAgent(projectPath: string, sessionId: string, agentId: string): Promise<ProjectSessionSummary>
+  sendSessionChat(projectPath: string, sessionId: string, agentId: string, text: string, images?: ImageAttachment[]): Promise<void>
+  stopSessionChat(projectPath: string, sessionId: string): Promise<void>
+  listSessionTranscript(projectPath: string, sessionId: string): Promise<ChatTranscriptItem[]>
+  getSessionTodos(projectPath: string, sessionId: string): Promise<TodoItem[]>
+  getSessionUsage(projectPath: string, sessionId: string): Promise<UsageSummary>
+  isSessionChatRunning(projectPath: string, sessionId: string): Promise<boolean>
+  undoSessionChat(projectPath: string, sessionId: string): Promise<{ agentId: string; turnId: string } | null>
+  redoSessionChat(projectPath: string, sessionId: string): Promise<{ agentId: string; turnId: string } | null>
+  removeSessionQueued(projectPath: string, sessionId: string, messageId: string): Promise<void>
+  editSessionQueued(projectPath: string, sessionId: string, messageId: string, text: string): Promise<void>
   suggestFiles(agentId: string, prefix: string): Promise<FileSuggestion[]>
   setAgentBackground(agentId: string, background: boolean): Promise<void>
   onAgentBackground(cb: (e: { agentId: string; background: boolean }) => void): () => void

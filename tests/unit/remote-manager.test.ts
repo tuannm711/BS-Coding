@@ -136,6 +136,16 @@ describe('RemoteManager', () => {
     expect(fake.client.sendEvent).toHaveBeenCalledWith({ type: 'chat:event', event: e })
   })
 
+  it('preserves project, session, and turn scope for running events', () => {
+    manager.setEnabled(true)
+    const e = {
+      type: 'turn-started' as const,
+      agentId: 'a1', projectPath: '/work', sessionId: 's1', turnId: 't1'
+    }
+    manager.handleAgentEvent(e)
+    expect(fake.client.sendEvent).toHaveBeenCalledWith({ type: 'chat:event', event: e })
+  })
+
   it('handleAgentEvent forwards user-message as chat:event', () => {
     manager.setEnabled(true)
     const e: ChatEvent = {
