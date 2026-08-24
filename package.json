@@ -5,9 +5,10 @@
   "main": "./out/main/index.js",
   "scripts": {
     "build:extension": "node scripts/build-extension.mjs",
+    "build:icon": "node scripts/build-windows-icon.mjs",
     "predev": "npm run build:extension",
     "prebuild": "npm run build:extension",
-    "predist": "npm run build:extension",
+    "predist": "npm run build:extension && npm run build:icon",
     "predist:dir": "npm run build:extension",
     "predist:linux": "npm run build:extension",
     "predist:linux:dir": "npm run build:extension",
