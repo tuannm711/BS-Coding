@@ -1,8 +1,7 @@
 import type { ModelMessage } from 'ai'
 import type { MessageTokens } from '../../shared/types'
 import type { LlmClient, LlmStreamOptions, LlmStreamPart } from './llm'
-import type { ToolDefinition } from './tools/types'
-import { toToolDefinition } from './message'
+import type { ToolDefinition, ToolSchema } from './tools/types'
 import { decodeProviderResponse } from './provider-stream'
 
 interface ResponsesUsage {
@@ -137,11 +136,25 @@ export function toResponsesInput(messages: ModelMessage[]): ResponsesInputItem[]
   return input
 }
 
+function toResponsesParameters(schema: ToolSchema): Record<string, unknown> {
+  const convertible = schema as { toJSONSchema?: () => unknown }
+  const converted = typeof convertible.toJSONSchema === 'function'
+    ? convertible.toJSONSchema()
+    : schema
+  if (!converted || typeof converted !== 'object' || Array.isArray(converted)) {
+    return { type: 'object', properties: {} }
+  }
+  const { $schema: _schema, ...parameters } = converted as Record<string, unknown>
+  return parameters
+}
+
 function toTools(tools: ToolDefinition[]): unknown[] {
-  return tools.map(tool => {
-    const definition = toToolDefinition(tool) as { description?: string; parameters?: unknown }
-    return { type: 'function', name: tool.name, description: definition.description, parameters: definition.parameters }
-  })
+  return tools.map(definition => ({
+    type: 'function',
+    name: definition.name,
+    description: definition.description,
+    parameters: toResponsesParameters(definition.schema)
+  }))
 }
 
 export class OpenAIResponsesClient implements LlmClient {
