@@ -864,6 +864,7 @@ function registerIpcHandlers(): void {
   ipcMain.handle(Channels.SessionSelectAgent, (_e, projectPath: string, sessionId: string, agentId: string) => mainApp.bsAgent.selectProjectSessionAgent(projectPath, sessionId, agentId))
   ipcMain.handle(Channels.SessionTranscript, (_e, projectPath: string, sessionId: string) => mainApp.bsAgent.listSessionTranscript(projectPath, sessionId))
   ipcMain.handle(Channels.SessionTodos, (_e, projectPath: string, sessionId: string) => mainApp.bsAgent.listSessionTodos(projectPath, sessionId))
+  ipcMain.handle(Channels.SessionUsage, (_e, projectPath: string, sessionId: string) => mainApp.bsAgent.getSessionUsage(projectPath, sessionId))
   ipcMain.handle(Channels.SessionIsRunning, (_e, projectPath: string, sessionId: string) => mainApp.bsAgent.isSessionChatRunning(projectPath, sessionId))
   ipcMain.handle(Channels.SessionUndo, (_e, projectPath: string, sessionId: string) => mainApp.bsAgent.undoSession(projectPath, sessionId))
   ipcMain.handle(Channels.SessionRedo, (_e, projectPath: string, sessionId: string) => mainApp.bsAgent.redoSession(projectPath, sessionId))

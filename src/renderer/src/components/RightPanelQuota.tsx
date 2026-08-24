@@ -68,6 +68,10 @@ export function mergeAssignmentEvent(snapshot: ProviderSnapshot, event: AgentAss
   return { ...snapshot, assignments: [...snapshot.assignments.filter(assignment => assignment.agentId !== event.agentId), event] }
 }
 
+export function quotaSelectedAgentLabel(rows: QuotaRow[]): string {
+  return rows.flatMap(row => row.agents).map(agent => agent.modelLabel ?? agent.assignment.model).join(', ')
+}
+
 export default function RightPanelQuota({ agents }: { agents: QuotaAgent[] }) {
   const [snapshot, setSnapshot] = useState<ProviderSnapshot | null>(null)
   const [telemetry, setTelemetry] = useState<Record<string, SessionTelemetry>>({})
@@ -106,7 +110,7 @@ export default function RightPanelQuota({ agents }: { agents: QuotaAgent[] }) {
     <section className="right-panel-quota" aria-label="Session model quota">
       <div className="right-panel-quota-header">
         <span>Session models</span>
-        <span>{rows.length}</span>
+        <span data-testid="quota-selected-agent">{quotaSelectedAgentLabel(rows) || 'No model selected'}</span>
       </div>
       <div className="right-panel-quota-list">
         {rows.length === 0 && <span className="right-panel-quota-empty">No active model in this session</span>}

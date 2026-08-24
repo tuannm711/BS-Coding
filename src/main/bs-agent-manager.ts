@@ -740,6 +740,11 @@ export class BsAgentManager {
     return this.deps.store.todos(sessionId)
   }
 
+  getSessionUsage(projectPath: string, sessionId: string): UsageSummary {
+    if (!this.deps.store.listProject(projectPath).some(item => item.id === sessionId)) return { ...EMPTY_USAGE }
+    return this.deps.store.getUsage(sessionId)
+  }
+
   isSessionChatRunning(projectPath: string, sessionId: string): boolean {
     return this.deps.store.listProject(projectPath).some(item => item.id === sessionId)
       && this.coordinator.state(sessionId) !== null

@@ -2,7 +2,7 @@ import type {
   AgentConfig, AgentModelAssignment, AgentState, ArtifactEntry, CatalogProviderSummary, ChatEvent, ChatMessage, ChatTranscriptItem, Command,
   ContextChangedEvent, ContextInfo, DirEntry, FileContentResult, FileSuggestion, FileViewerPayload,
   GitStatus, ImageAttachment, McpServerStatus, BsSettings, ModelRef, NewAgentInput, PromptResponse,
-  ProjectSessionSummary, ProviderAccount, ProviderConnection, ProviderUsage, SessionSummary, StatsSummary, Template, TerminalInfo, TodoItem, TraceEvent, TraceSummary, UpdaterStatusEvent, WorkspaceRuntime, WorkspaceSummary
+  ProjectSessionSummary, ProviderAccount, ProviderConnection, ProviderUsage, SessionSummary, StatsSummary, Template, TerminalInfo, TodoItem, TraceEvent, TraceSummary, UpdaterStatusEvent, UsageSummary, WorkspaceRuntime, WorkspaceSummary
 } from './types'
 import type { BrowserStatusInfo, PairingInfo } from './browser-types'
 import type { AgentAssignmentSetRequest, AgentAssignmentSnapshot } from './provider-state'
@@ -93,6 +93,7 @@ export const Channels = {
   SessionSelectAgent: 'session:select-agent',
   SessionTranscript: 'session:transcript',
   SessionTodos: 'session:todos',
+  SessionUsage: 'session:usage',
   SessionIsRunning: 'session:is-running',
   SessionUndo: 'session:undo',
   SessionRedo: 'session:redo',
@@ -251,6 +252,7 @@ export interface AgentApi {
   stopSessionChat(projectPath: string, sessionId: string): Promise<void>
   listSessionTranscript(projectPath: string, sessionId: string): Promise<ChatTranscriptItem[]>
   getSessionTodos(projectPath: string, sessionId: string): Promise<TodoItem[]>
+  getSessionUsage(projectPath: string, sessionId: string): Promise<UsageSummary>
   isSessionChatRunning(projectPath: string, sessionId: string): Promise<boolean>
   undoSessionChat(projectPath: string, sessionId: string): Promise<{ agentId: string; turnId: string } | null>
   redoSessionChat(projectPath: string, sessionId: string): Promise<{ agentId: string; turnId: string } | null>

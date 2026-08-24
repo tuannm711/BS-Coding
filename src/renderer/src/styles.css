@@ -1818,3 +1818,13 @@ select.input { width: 100%; }
 /* Windows titleBarOverlay draws the OS min/max/close buttons over the right
    ~138px of the bar — keep the panel toggle clear of them. */
 .title-bar-win32 .title-bar-right { margin-right: 138px; }
+.chat-turn-agent-badge {
+  display: inline-flex;
+  margin-bottom: 6px;
+  padding: 2px 7px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-muted);
+  font-size: 10px;
+  line-height: 1.4;
+}

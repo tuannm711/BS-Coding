@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import React from 'react'
 import type { ProviderAccountSnapshot, ProviderSnapshot } from '../../src/shared/provider-state'
-import { buildQuotaRows, quotaAccountState } from '../../src/renderer/src/components/RightPanelQuota'
+import { buildQuotaRows, quotaAccountState, quotaSelectedAgentLabel } from '../../src/renderer/src/components/RightPanelQuota'
 import * as quotaModule from '../../src/renderer/src/components/RightPanelQuota'
 import { renderToStaticMarkup } from 'react-dom/server'
 import QuotaAccountCard from '../../src/renderer/src/components/quota/QuotaAccountCard'
@@ -80,6 +80,13 @@ describe('snapshot-driven quota cards', () => {
     const agents = [{ id: 'agent-1', name: 'Reviewer' }]
     expect(buildQuotaRows(agents, snapshot('model-a'), {})[0].agents[0].assignment?.model).toBe('model-a')
     expect(buildQuotaRows(agents, snapshot('model-b'), {})[0].agents[0].assignment?.model).toBe('model-b')
+  })
+
+  it('projects the selected Agent model independently from session totals', () => {
+    const next = snapshot('gemini-3.1-pro-high')
+    next.accounts[0].models = [{ id: 'gemini-3.1-pro-high', name: 'Gemini 3.1 Pro', discoveredAt: 1 }]
+    const rows = buildQuotaRows([{ id: 'agent-1', name: 'Reviewer' }], next, {})
+    expect(quotaSelectedAgentLabel(rows)).toBe('Gemini 3.1 Pro')
   })
 
   it('groups every assigned agent and model under one account card', () => {

@@ -119,6 +119,7 @@ const api: AgentApi = {
   stopSessionChat: (projectPath: string, sessionId: string) => ipcRenderer.invoke(Channels.ChatStop, projectPath, sessionId),
   listSessionTranscript: (projectPath: string, sessionId: string) => ipcRenderer.invoke(Channels.SessionTranscript, projectPath, sessionId),
   getSessionTodos: (projectPath: string, sessionId: string) => ipcRenderer.invoke(Channels.SessionTodos, projectPath, sessionId),
+  getSessionUsage: (projectPath: string, sessionId: string) => ipcRenderer.invoke(Channels.SessionUsage, projectPath, sessionId),
   isSessionChatRunning: (projectPath: string, sessionId: string) => ipcRenderer.invoke(Channels.SessionIsRunning, projectPath, sessionId),
   undoSessionChat: (projectPath: string, sessionId: string) => ipcRenderer.invoke(Channels.SessionUndo, projectPath, sessionId),
   redoSessionChat: (projectPath: string, sessionId: string) => ipcRenderer.invoke(Channels.SessionRedo, projectPath, sessionId),

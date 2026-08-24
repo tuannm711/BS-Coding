@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import { ChevronDown } from 'lucide-react'
-import type { AgentConfig, AgentMode, ChatEvent, ChatMessage, Command, ImageAttachment, ProjectSessionSummary, QuestionOption, QueuedMessage, TodoItem, TodoStatus, ToolCallData } from '@shared/types'
+import type { AgentConfig, AgentMode, ChatEvent, ChatMessage, Command, ImageAttachment, ProjectSessionSummary, QuestionOption, QueuedMessage, TodoItem, TodoStatus, ToolCallData, TurnExecutionSnapshot } from '@shared/types'
 import { appendStreamDelta } from '@shared/text'
 import { contextTokens } from '@shared/usage'
 import ChatInput from './ChatInput'
@@ -15,7 +15,7 @@ import ContextFooter from './ContextFooter'
 import { acceptChatEvent } from './chat-event-scope'
 
 type FeedItem =
-  | { kind: 'message'; id: string; role: ChatMessage['role']; text: string; reasoning?: string; images?: ImageAttachment[] }
+  | { kind: 'message'; id: string; role: ChatMessage['role']; text: string; reasoning?: string; images?: ImageAttachment[]; execution?: TurnExecutionSnapshot }
   | { kind: 'tool'; id: string; call: ToolCallData }
   | { kind: 'error'; id: string; text: string }
   | { kind: 'compaction'; id: string; failed?: boolean }
@@ -37,6 +37,17 @@ const MENTION_SPLIT_RE = /(@[\w./\\-]+)/g
 // Leading slash command token ("/init", "/review", ...).
 const SLASH_RE = /^(\/[\w-]+)/
 
+export function TurnAttributionBadge({ execution }: { execution: TurnExecutionSnapshot }) {
+  const model = execution.modelLabel ?? execution.modelId ?? 'Model not reported'
+  const provider = execution.providerId ?? 'Provider not reported'
+  const account = execution.accountLabel ?? execution.accountId ?? 'Account not reported'
+  return (
+    <span className="chat-turn-agent-badge" title={`${provider} · ${account}`}>
+      {execution.agentName} · {model}
+    </span>
+  )
+}
+
 function MentionText({ text, commands }: { text: string; commands: Command[] }) {
   const m = SLASH_RE.exec(text)
   const slash = m && commands.some(c => c.name === m[1].slice(1)) ? m[1] : null
@@ -57,11 +68,12 @@ function MentionText({ text, commands }: { text: string; commands: Command[] }) 
 // Owns the per-message subtree so streamed deltas only re-render the message
 // that changed, not the whole feed. Props are primitives or stable state
 // references (commands), so React.memo works.
-const FeedMessage = memo(function FeedMessage({ role, text, reasoning, images, commands, onOpenImage, onOpenFile }: {
+const FeedMessage = memo(function FeedMessage({ role, text, reasoning, images, execution, commands, onOpenImage, onOpenFile }: {
   role: ChatMessage['role']
   text: string
   reasoning?: string
   images?: ImageAttachment[]
+  execution?: TurnExecutionSnapshot
   commands: Command[]
   onOpenImage?: (dataUrl: string) => void
   onOpenFile?: (path: string) => void
@@ -70,6 +82,7 @@ const FeedMessage = memo(function FeedMessage({ role, text, reasoning, images, c
     <div className={`chat-msg ${role}`}>
       {role === 'assistant' ? (
         <>
+          {execution ? <TurnAttributionBadge execution={execution} /> : null}
           {reasoning ? (
             <details className="chat-reasoning">
               <summary>Thinking</summary>
@@ -177,11 +190,21 @@ function ChatPanel({ agentId, agents, onAgentChange, projectPath, sessionId, onS
     void window.api.getContextInfo(agentId).then(info => {
       setContextLimit(info.limit)
       setCompactThreshold(info.compactThreshold)
-      setSessionCost(info.sessionCost)
     })
   }, [agentId])
 
+  const loadSessionUsage = useCallback(() => {
+    void window.api.getSessionUsage(projectPath, sessionId).then(usage => {
+      setSessionCost(usage.cost)
+      setSessionTokens({
+        input: usage.input + usage.cacheRead + usage.cacheWrite,
+        output: usage.output
+      })
+    })
+  }, [projectPath, sessionId])
+
   useEffect(() => { refreshVariants(); loadContextInfo() }, [refreshVariants, loadContextInfo])
+  useEffect(() => { loadSessionUsage() }, [loadSessionUsage])
 
   useEffect(() => {
     const onModelChanged = (e: Event) => {
@@ -204,7 +227,7 @@ function ChatPanel({ agentId, agents, onAgentChange, projectPath, sessionId, onS
         ? {
             kind: 'message', id: it.message.id, role: it.message.role,
             text: it.message.displayText ?? it.message.text,
-            reasoning: it.message.reasoning, images: it.message.images
+            reasoning: it.message.reasoning, images: it.message.images, execution: it.message.execution
           }
         : { kind: 'tool', id: it.tool.id, call: { ...it.tool } }
       ))
@@ -242,6 +265,7 @@ function ChatPanel({ agentId, agents, onAgentChange, projectPath, sessionId, onS
     setSessionCost(0)
     setSessionTokens(null)
     loadContextInfo()
+    loadSessionUsage()
     setTodos([])
     setQueue([])
     queueRef.current = []
@@ -249,7 +273,7 @@ function ChatPanel({ agentId, agents, onAgentChange, projectPath, sessionId, onS
     setLiveTaskId(null)
     loadTranscript()
     loadTodos()
-  }, [loadTranscript, loadTodos, loadContextInfo])
+  }, [loadTranscript, loadTodos, loadContextInfo, loadSessionUsage])
 
   useEffect(() => {
     reloadSessions()
@@ -475,6 +499,7 @@ if (e.type === 'usage') {
       if (e.type === 'error') {
         setItems(prev => [...prev, { kind: 'error', id: 'err-' + Date.now(), text: e.message }])
       }
+      if (e.type === 'done') { loadTranscript(); loadSessionUsage() }
       return
     }
     if (e.type === 'session-created') {
@@ -526,7 +551,7 @@ if (e.type === 'usage') {
       }
       return next
     })
-  }, [projectPath, sessionId, flushDeltas, resetView, reloadSessions])
+  }, [projectPath, sessionId, flushDeltas, resetView, reloadSessions, loadTranscript, loadSessionUsage])
 
   const send = useCallback((text: string, images?: ImageAttachment[]) => {
     const trimmed = text.trim()
@@ -812,6 +837,7 @@ if (e.type === 'usage') {
                 text={item.text}
                 reasoning={item.reasoning}
                 images={item.images}
+                execution={item.execution}
                 commands={commands}
                 onOpenImage={setLightboxUrl}
                 onOpenFile={openFile}
