@@ -360,15 +360,14 @@ describe('BsAgentManager', () => {
     expect(store.get(oldId)?.items.length).toBeGreaterThan(0)
   })
 
-  it('removeAgent deletes the agent sessions', async () => {
+  it('removeAgent retains attributed project sessions', async () => {
     const { manager, store } = await makeManager()
     await manager.send('a1', 'hello')
     expect(manager.listSessions('a1')).toHaveLength(1)
     manager.removeAgent('a1')
     expect(manager.isNative('a1')).toBe(false)
-    expect(manager.listSessions('a1')).toHaveLength(0)
-    // store no longer holds the orphaned session
-    expect(store.list('a1')).toHaveLength(0)
+    expect(manager.listSessions('a1')).toHaveLength(1)
+    expect(store.get(manager.listSessions('a1')[0].id)?.items.length).toBeGreaterThan(0)
   })
 
   it('undo removes the last turn transcript and redo restores it', async () => {

@@ -755,7 +755,7 @@ if (e.type === 'usage') {
   const doneCount = todos.filter(t => t.status === 'completed' || t.status === 'cancelled').length
 
   return (
-    <div className="chat-panel" data-testid="chat-panel" onKeyDown={onPanelKeyDown}>
+    <div className="chat-panel" data-testid="chat-panel" data-project-path={projectPath} data-session-id={sessionId} onKeyDown={onPanelKeyDown}>
       {lightboxUrl && (
         <div className="chat-lightbox" onClick={() => setLightboxUrl(null)}>
           <img src={lightboxUrl} alt="preview" />

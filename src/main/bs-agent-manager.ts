@@ -211,18 +211,22 @@ export class BsAgentManager {
   }
 
   removeAgent(agentId: string): void {
+    for (const context of [...this.sessionExecutions.values()]) {
+      if (context.execution.agentId !== agentId) continue
+      context.execution.status = 'stopped'
+      this.controllers.get(context.sessionId)?.abort()
+      this.coordinator.stop(context.sessionId)
+      this.sessionExecutions.delete(context.sessionId)
+    }
     this.stop(agentId)
     this.runners.delete(agentId)
     this.agents.delete(agentId)
     this.resolved.delete(agentId)
+    this.assignments.remove(agentId)
     this.activeSessions.delete(agentId)
     this.backgrounds.delete(agentId)
     this.queues.delete(agentId)
-    this.deps.snapshots.clear(agentId)
-    // Capture session ids before deleteForAgent purges them from the store.
-    const sessionIds = this.deps.store.list(agentId).map(s => s.id)
-    this.deps.store.deleteForAgent(agentId)
-    for (const id of sessionIds) this.deps.trace?.delete(id)
+    this.coordinator.reconcileAgents([...this.agents.values()])
   }
 
   private summary(session: StoredSession): SessionSummary {
@@ -1216,7 +1220,7 @@ export class BsAgentManager {
     const variantOptions = validVariant ? this.modelVariants.get(modelKey)?.[validVariant] : undefined
     const runner = new SessionRunner({
       agentId: agent.id,
-      turn: this.turnCounters.get(this.activeSessionId(agent.id)) ?? 1,
+      turn: 1,
       model: resolved.model,
       system: resolved.systemPrompt + modeNote + instructions + skillListText(skills),
       systemInstructionPaths: new Set(instructionFiles.map(f => f.path)),
