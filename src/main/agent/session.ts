@@ -1,13 +1,28 @@
 import { randomUUID } from 'node:crypto'
+import path from 'node:path'
 import type { JsonStore } from '../json-store'
-import type { ChatMessage, ChatTranscriptItem, SessionSummary, TodoItem, ToolCallData, UsageSummary } from '../../shared/types'
+import {
+  CHAT_SESSION_SCHEMA_VERSION,
+  type ChatMessage,
+  type ChatTranscriptItem,
+  type ProjectSessionSummary,
+  type SessionSummary,
+  type TodoItem,
+  type ToolCallData,
+  type TurnExecutionSnapshot,
+  type UsageSummary
+} from '../../shared/types'
 
 export const DEFAULT_SESSION_TITLE = 'New session'
 
 export interface StoredSession {
+  schemaVersion: typeof CHAT_SESSION_SCHEMA_VERSION
   id: string
+  /** Legacy Agent ownership retained for compatibility during schema v2 migration. */
   agentId: string
   projectPath: string
+  lastAgentId?: string
+  legacyAgentId?: string
   title: string
   items: ChatTranscriptItem[]
   todos: TodoItem[]
@@ -39,10 +54,14 @@ function titleFromItems(items: ChatTranscriptItem[]): string {
 function normalize(raw: RawSession): StoredSession {
   const items: ChatTranscriptItem[] = Array.isArray(raw.items) ? (raw.items as ChatTranscriptItem[]) : []
   const id = String(raw.id ?? randomUUID())
+  const legacyAgentId = String(raw.legacyAgentId ?? raw.agentId ?? raw.id ?? '')
   return {
+    schemaVersion: CHAT_SESSION_SCHEMA_VERSION,
     id,
-    agentId: String(raw.agentId ?? raw.id ?? ''),
+    agentId: legacyAgentId,
     projectPath: String(raw.projectPath ?? ''),
+    lastAgentId: typeof raw.lastAgentId === 'string' && raw.lastAgentId ? raw.lastAgentId : legacyAgentId || undefined,
+    legacyAgentId: legacyAgentId || undefined,
     title: typeof raw.title === 'string' && raw.title ? raw.title : titleFromItems(items),
     items,
     todos: Array.isArray(raw.todos) ? (raw.todos as TodoItem[]) : [],
@@ -50,6 +69,11 @@ function normalize(raw: RawSession): StoredSession {
     createdAt: typeof raw.createdAt === 'number' ? raw.createdAt : (raw.updatedAt ?? Date.now()),
     updatedAt: typeof raw.updatedAt === 'number' ? raw.updatedAt : Date.now()
   }
+}
+
+function canonicalProjectPath(projectPath: string): string {
+  const normalized = path.resolve(projectPath || '.').replace(/\\/g, '/')
+  return process.platform === 'win32' ? normalized.toLowerCase() : normalized
 }
 
 export class SessionStore {
@@ -60,7 +84,12 @@ export class SessionStore {
   constructor(private store: JsonStore<StoredSession>) {}
 
   private loadSessions(): StoredSession[] {
-    return (this.store.load() as unknown as RawSession[]).map(normalize)
+    const raw = this.store.load() as unknown as RawSession[]
+    const normalized = raw.map(normalize)
+    const latest = normalized.reduce((max, session) => Math.max(max, session.updatedAt), 0)
+    this.lastUpdatedAt = Math.max(this.lastUpdatedAt, latest)
+    if (JSON.stringify(raw) !== JSON.stringify(normalized)) this.saveSessions(normalized)
+    return normalized
   }
 
   private saveSessions(sessions: StoredSession[]): void {
@@ -88,6 +117,22 @@ export class SessionStore {
       }))
   }
 
+  listProject(projectPath: string): ProjectSessionSummary[] {
+    const canonical = canonicalProjectPath(projectPath)
+    return this.loadSessions()
+      .filter(session => canonicalProjectPath(session.projectPath) === canonical)
+      .sort((a, b) => b.updatedAt - a.updatedAt)
+      .map(session => ({
+        id: session.id,
+        projectPath: session.projectPath,
+        lastAgentId: session.lastAgentId,
+        title: session.title,
+        messageCount: session.items.length,
+        createdAt: session.createdAt,
+        updatedAt: session.updatedAt
+      }))
+  }
+
   listAll(): StoredSession[] {
     return this.loadSessions()
   }
@@ -103,11 +148,21 @@ export class SessionStore {
     return all[0] ?? null
   }
 
+  latestProject(projectPath: string): StoredSession | null {
+    const canonical = canonicalProjectPath(projectPath)
+    return this.loadSessions()
+      .filter(session => canonicalProjectPath(session.projectPath) === canonical)
+      .sort((a, b) => b.updatedAt - a.updatedAt)[0] ?? null
+  }
+
   create(agentId: string, projectPath: string): StoredSession {
     const session: StoredSession = {
+      schemaVersion: CHAT_SESSION_SCHEMA_VERSION,
       id: randomUUID(),
       agentId,
       projectPath,
+      lastAgentId: agentId || undefined,
+      legacyAgentId: agentId || undefined,
       title: DEFAULT_SESSION_TITLE,
       items: [],
       todos: [],
@@ -117,6 +172,60 @@ export class SessionStore {
     }
     this.saveSessions([...this.loadSessions(), session])
     return session
+  }
+
+  createProject(projectPath: string, lastAgentId?: string): StoredSession {
+    return this.create(lastAgentId ?? '', projectPath)
+  }
+
+  setLastAgent(id: string, agentId: string): void {
+    const all = this.loadSessions()
+    const session = all.find(item => item.id === id)
+    if (!session || session.lastAgentId === agentId) return
+    session.lastAgentId = agentId
+    session.updatedAt = this.nextUpdatedAt()
+    this.saveSessions(all)
+  }
+
+  backfillLegacyExecution(
+    resolve: (agentId: string) => Omit<TurnExecutionSnapshot, 'turnId' | 'startedAt' | 'completedAt' | 'status'> | null
+  ): void {
+    const all = this.loadSessions()
+    let changed = false
+    for (const session of all) {
+      const agentId = session.legacyAgentId ?? session.agentId
+      const metadata = agentId ? resolve(agentId) : null
+      if (!metadata) continue
+      let turnId: string | undefined
+      let turnStartedAt = session.createdAt
+      for (const item of session.items) {
+        if (item.kind === 'message' && item.message.role === 'user') {
+          turnId = item.message.turnId ?? `legacy:${session.id}:${item.message.id}`
+          turnStartedAt = item.message.createdAt
+          if (!item.message.turnId) {
+            item.message.turnId = turnId
+            changed = true
+          }
+          continue
+        }
+        if (!turnId) turnId = `legacy:${session.id}:initial`
+        const execution: TurnExecutionSnapshot = {
+          ...metadata,
+          turnId,
+          startedAt: turnStartedAt,
+          completedAt: session.updatedAt,
+          status: 'completed'
+        }
+        if (item.kind === 'message') {
+          if (!item.message.turnId) { item.message.turnId = turnId; changed = true }
+          if (!item.message.execution) { item.message.execution = execution; changed = true }
+        } else {
+          if (!item.tool.turnId) { item.tool.turnId = turnId; changed = true }
+          if (!item.tool.execution) { item.tool.execution = execution; changed = true }
+        }
+      }
+    }
+    if (changed) this.saveSessions(all)
   }
 
   transcript(id: string): ChatTranscriptItem[] {
