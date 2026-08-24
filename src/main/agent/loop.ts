@@ -14,6 +14,7 @@ import type { CompactionSettings } from './compact'
 import { estimateUsage } from './token'
 import type { TruncationStore } from './truncation'
 import type { SnapshotStore } from './snapshot'
+import { validateToolInput } from './tool-input'
 
 export interface LoopDeps {
   agentId: string
@@ -296,12 +297,18 @@ export class SessionRunner {
           },
           onArtifact: (entry) => this.deps.onArtifact?.(entry)
         }
-        try {
-          const r = await def.run(call.input, toolCtx)
-          call.output = r.output
-          call.error = r.error
-        } catch (err) {
-          call.error = String(err)
+        const validated = validateToolInput(def, call.input)
+        if (!validated.ok) {
+          call.error = validated.error
+        } else {
+          call.input = validated.input
+          try {
+            const r = await def.run(validated.input, toolCtx)
+            call.output = r.output
+            call.error = r.error
+          } catch (err) {
+            call.error = String(err)
+          }
         }
       }
     }

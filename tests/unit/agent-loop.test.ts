@@ -3,6 +3,7 @@ import { execFileSync } from 'node:child_process'
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { z } from 'zod'
 import { SessionRunner } from '../../src/main/agent/loop'
 import type { LoopDeps } from '../../src/main/agent/loop'
 import type { LlmClient, LlmStreamOptions, LlmStreamPart } from '../../src/main/agent/llm'
@@ -117,6 +118,66 @@ describe('SessionRunner', () => {
     expect(toolMsg).toBeDefined()
     expect(JSON.stringify(toolMsg)).toContain('file content')
     expect(JSON.stringify(secondMessages)).toContain('signature-1')
+  })
+
+  it('rejects invalid Zod tool input before the implementation runs', async () => {
+    const runSpy = vi.fn(async () => ({ output: 'must not run' }))
+    const read: ToolDefinition = {
+      name: 'read',
+      description: 'Read a file',
+      schema: z.object({ file_path: z.string() }),
+      run: runSpy
+    }
+    const h = makeHarness({ tools: new Map([['read', read]]) })
+    h.llm.queue = [
+      [{ kind: 'tool-call', toolCallId: 'tc-invalid', toolName: 'read', toolInput: {} }, { kind: 'finish' }],
+      textParts('corrected')
+    ]
+
+    await h.runner.run()
+
+    expect(runSpy).not.toHaveBeenCalled()
+    const result = h.items.find(item => item.kind === 'tool' && item.tool.id === 'tc-invalid')
+    expect(result?.kind === 'tool' && result.tool.error).toMatch(/^read: invalid input: file_path:/)
+    expect(JSON.stringify(h.llm.calls[1]?.messages)).toContain('read: invalid input')
+  })
+
+  it('runs a Zod tool with its parsed input', async () => {
+    const runSpy = vi.fn(async () => ({ output: 'ok' }))
+    const tool: ToolDefinition = {
+      name: 'read',
+      description: 'Read',
+      schema: z.object({ file_path: z.string(), limit: z.number().default(20) }),
+      run: runSpy
+    }
+    const h = makeHarness({ tools: new Map([['read', tool]]) })
+    h.llm.queue = [
+      [{ kind: 'tool-call', toolCallId: 'tc-valid', toolName: 'read', toolInput: { file_path: 'a.ts' } }, { kind: 'finish' }],
+      textParts('done')
+    ]
+
+    await h.runner.run()
+
+    expect(runSpy).toHaveBeenCalledWith({ file_path: 'a.ts', limit: 20 }, expect.anything())
+  })
+
+  it('preserves raw JSON Schema tool execution', async () => {
+    const runSpy = vi.fn(async () => ({ output: 'raw ok' }))
+    const tool: ToolDefinition = {
+      name: 'mcp_raw',
+      description: 'Raw MCP tool',
+      schema: { type: 'object', properties: { value: { type: 'string' } } },
+      run: runSpy
+    }
+    const h = makeHarness({ tools: new Map([['mcp_raw', tool]]) })
+    h.llm.queue = [
+      [{ kind: 'tool-call', toolCallId: 'tc-raw', toolName: 'mcp_raw', toolInput: { value: 'x' } }, { kind: 'finish' }],
+      textParts('done')
+    ]
+
+    await h.runner.run()
+
+    expect(runSpy).toHaveBeenCalledWith({ value: 'x' }, expect.anything())
   })
 
   it('denies tool execution when permission is denied', async () => {
