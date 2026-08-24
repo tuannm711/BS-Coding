@@ -50,6 +50,9 @@ jobs:
       - run: npm ci
       - run: npx @electron/rebuild -f -w @lydell/node-pty
       - run: npm run build
+      - name: Build Windows multi-resolution icon
+        if: matrix.target == 'win'
+        run: npm run build:icon
       - name: Azure login for Windows code signing
         if: matrix.target == 'win' && env.AZURE_CLIENT_ID != '' && env.AZURE_TRUSTED_SIGNING_ENDPOINT != '' && env.AZURE_TRUSTED_SIGNING_ACCOUNT_NAME != '' && env.AZURE_TRUSTED_SIGNING_CERTIFICATE_PROFILE != ''
         uses: azure/login@v2
