@@ -35,7 +35,7 @@ const config: Configuration = {
     owner: 'tuannm711',
     repo: 'BS-Coding'
   },
-  icon: 'bs-coding-logo.png',
+  icon: 'build/icons/512x512.png',
   directories: {
     output: 'release'
   },
@@ -50,6 +50,7 @@ const config: Configuration = {
   ],
   asar: true,
   win: {
+    icon: 'build/icons/icon.ico',
     target: [
       { target: 'nsis', arch: ['x64'] },
       { target: 'portable', arch: ['x64'] }
@@ -61,6 +62,9 @@ const config: Configuration = {
   },
   nsis: {
     artifactName: 'BS.Coding.Setup.${version}.${ext}',
+    installerIcon: 'build/icons/icon.ico',
+    uninstallerIcon: 'build/icons/icon.ico',
+    installerHeaderIcon: 'build/icons/icon.ico',
     oneClick: false,
     allowToChangeInstallationDirectory: true,
     createDesktopShortcut: true,
