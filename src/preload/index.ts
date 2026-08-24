@@ -106,8 +106,18 @@ const api: AgentApi = {
   checkForUpdates: () => ipcRenderer.invoke(Channels.UpdaterCheck),
   installUpdate: () => ipcRenderer.invoke(Channels.UpdaterInstall),
   sendChat: (agentId: string, text: string, images?: ImageAttachment[]) =>
-    ipcRenderer.invoke(Channels.ChatSend, agentId, text, images),
-  stopChat: (agentId: string) => ipcRenderer.invoke(Channels.ChatStop, agentId),
+    ipcRenderer.invoke(Channels.ChatSendLegacy, agentId, text, images),
+  stopChat: (agentId: string) => ipcRenderer.invoke(Channels.ChatStopLegacy, agentId),
+  listProjectSessions: (projectPath: string) => ipcRenderer.invoke(Channels.ProjectSessionList, projectPath),
+  createProjectSession: (projectPath: string, agentId?: string) => ipcRenderer.invoke(Channels.ProjectSessionCreate, projectPath, agentId),
+  switchProjectSession: (projectPath: string, sessionId: string) => ipcRenderer.invoke(Channels.ProjectSessionSwitch, projectPath, sessionId),
+  deleteProjectSession: (projectPath: string, sessionId: string) => ipcRenderer.invoke(Channels.ProjectSessionDelete, projectPath, sessionId),
+  renameProjectSession: (projectPath: string, sessionId: string, title: string) => ipcRenderer.invoke(Channels.ProjectSessionRename, projectPath, sessionId, title),
+  selectProjectSessionAgent: (projectPath: string, sessionId: string, agentId: string) => ipcRenderer.invoke(Channels.SessionSelectAgent, projectPath, sessionId, agentId),
+  sendSessionChat: (projectPath: string, sessionId: string, agentId: string, text: string, images?: ImageAttachment[]) =>
+    ipcRenderer.invoke(Channels.ChatSend, projectPath, sessionId, agentId, text, images),
+  stopSessionChat: (projectPath: string, sessionId: string) => ipcRenderer.invoke(Channels.ChatStop, projectPath, sessionId),
+  listSessionTranscript: (projectPath: string, sessionId: string) => ipcRenderer.invoke(Channels.SessionTranscript, projectPath, sessionId),
   runCommand: (agentId: string, name: string, args: string) =>
     ipcRenderer.invoke(Channels.ChatRunCommand, agentId, name, args),
   undoChat: (agentId: string) => ipcRenderer.invoke(Channels.ChatUndo, agentId),

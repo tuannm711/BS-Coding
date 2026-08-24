@@ -8,7 +8,8 @@ export type RemoteCommandResult = Omit<RemoteCmdResult, 'type' | 'id'>
 export interface RemoteCommandContext {
   bsAgent: Pick<BsAgentManager, 'listAgents' | 'listSessions' | 'createSession' | 'switchSession' |
     'renameSession' | 'listMessages' | 'send' | 'respondPrompt' | 'runCommand' |
-    'listCommands' | 'isRunning' | 'isBackground'>
+    'listCommands' | 'isRunning' | 'isBackground' | 'listProjectSessions' | 'createProjectSession' |
+    'switchProjectSession' | 'selectProjectSessionAgent' | 'listSessionTranscript' | 'sendInSession'>
   workspaceStore: Pick<WorkspaceStore, 'list'>
   isEnabled(): boolean
 }
@@ -45,16 +46,30 @@ export async function dispatchRemoteCommand(
         }
       }
       case 'session:list': {
+        if (typeof params.projectPath === 'string') {
+          return { ok: true, result: ctx.bsAgent.listProjectSessions(params.projectPath) }
+        }
         const missing = agentError()
         if (missing) return missing
         return { ok: true, result: ctx.bsAgent.listSessions(agentId!) }
       }
       case 'session:create': {
+        if (typeof params.projectPath === 'string') {
+          if (agentId && !ctx.bsAgent.listAgents().some(a => a.id === agentId)) return { ok: false, error: `unknown agent: ${agentId}` }
+          return { ok: true, result: ctx.bsAgent.createProjectSession(params.projectPath, agentId) }
+        }
         const missing = agentError()
         if (missing) return missing
         return { ok: true, result: ctx.bsAgent.createSession(agentId!) }
       }
       case 'session:switch': {
+        if (typeof params.projectPath === 'string') {
+          if (typeof params.sessionId !== 'string') return { ok: false, error: 'missing required param: sessionId' }
+          if (!ctx.bsAgent.listProjectSessions(params.projectPath).some(session => session.id === params.sessionId)) {
+            return { ok: false, error: `unknown session: ${params.sessionId}` }
+          }
+          return { ok: true, result: ctx.bsAgent.switchProjectSession(params.projectPath, params.sessionId) }
+        }
         const missing = agentError()
         if (missing) return missing
         if (typeof params.sessionId !== 'string') return { ok: false, error: 'missing required param: sessionId' }
@@ -68,6 +83,12 @@ export async function dispatchRemoteCommand(
         return { ok: true, result: ctx.bsAgent.renameSession(agentId!, params.sessionId, params.title) }
       }
       case 'session:messages': {
+        if (typeof params.projectPath === 'string' && typeof params.sessionId === 'string') {
+          if (!ctx.bsAgent.listProjectSessions(params.projectPath).some(session => session.id === params.sessionId)) {
+            return { ok: false, error: `unknown session: ${params.sessionId}` }
+          }
+          return { ok: true, result: ctx.bsAgent.listSessionTranscript(params.projectPath, params.sessionId) }
+        }
         const missing = agentError()
         if (missing) return missing
         return { ok: true, result: ctx.bsAgent.listMessages(agentId!) }
@@ -88,6 +109,13 @@ export async function dispatchRemoteCommand(
         const missing = agentError()
         if (missing) return missing
         if (typeof params.text !== 'string' || !params.text.trim()) return { ok: false, error: 'text is required' }
+        if (typeof params.projectPath === 'string' && typeof params.sessionId === 'string') {
+          if (!ctx.bsAgent.listProjectSessions(params.projectPath).some(session => session.id === params.sessionId)) {
+            return { ok: false, error: `unknown session: ${params.sessionId}` }
+          }
+          await ctx.bsAgent.sendInSession(params.projectPath, params.sessionId, agentId!, params.text)
+          return { ok: true, result: { queued: true } }
+        }
         // Slash commands must go through runCommand (like the desktop input),
         // not send(): send() would persist the raw "/cmd …" text as a user
         // message and hand the command string to the model as a prompt.

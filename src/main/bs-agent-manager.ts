@@ -705,6 +705,28 @@ export class BsAgentManager {
     return this.coordinator.selectAgent(projectPath, sessionId, agentId, [...this.agents.values()])
   }
 
+  deleteProjectSession(projectPath: string, sessionId: string): ProjectSessionSummary {
+    const session = this.deps.store.get(sessionId)
+    if (!session || !this.deps.store.listProject(projectPath).some(item => item.id === sessionId)) {
+      throw new Error(`[bs] Session ${sessionId} does not belong to ${projectPath}`)
+    }
+    this.stopSessionChat(projectPath, sessionId)
+    this.deps.store.delete(sessionId)
+    this.deps.snapshots.clear(sessionId)
+    this.deps.trace?.delete(sessionId)
+    const next = this.deps.store.latestProject(projectPath)
+      ?? this.deps.store.createProject(projectPath, this.coordinator.resolveAgent(session.lastAgentId, [...this.agents.values()]) ?? undefined)
+    this.activeProjectSessions.set(projectPath, next.id)
+    return this.projectSummary(next)
+  }
+
+  renameProjectSession(projectPath: string, sessionId: string, title: string): ProjectSessionSummary | null {
+    if (!this.deps.store.listProject(projectPath).some(session => session.id === sessionId)) return null
+    this.deps.store.setTitle(sessionId, title)
+    const session = this.deps.store.get(sessionId)
+    return session ? this.projectSummary(session) : null
+  }
+
   listSessionTranscript(projectPath: string, sessionId: string): ChatTranscriptItem[] {
     if (!this.deps.store.listProject(projectPath).some(item => item.id === sessionId)) return []
     return this.deps.store.transcript(sessionId)

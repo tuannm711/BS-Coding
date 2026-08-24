@@ -2,7 +2,7 @@ import type {
   AgentConfig, AgentModelAssignment, AgentState, ArtifactEntry, CatalogProviderSummary, ChatEvent, ChatMessage, ChatTranscriptItem, Command,
   ContextChangedEvent, ContextInfo, DirEntry, FileContentResult, FileSuggestion, FileViewerPayload,
   GitStatus, ImageAttachment, McpServerStatus, BsSettings, ModelRef, NewAgentInput, PromptResponse,
-  ProviderAccount, ProviderConnection, ProviderUsage, SessionSummary, StatsSummary, Template, TerminalInfo, TodoItem, TraceEvent, TraceSummary, UpdaterStatusEvent, WorkspaceRuntime, WorkspaceSummary
+  ProjectSessionSummary, ProviderAccount, ProviderConnection, ProviderUsage, SessionSummary, StatsSummary, Template, TerminalInfo, TodoItem, TraceEvent, TraceSummary, UpdaterStatusEvent, WorkspaceRuntime, WorkspaceSummary
 } from './types'
 import type { BrowserStatusInfo, PairingInfo } from './browser-types'
 import type { AgentAssignmentSetRequest, AgentAssignmentSnapshot } from './provider-state'
@@ -66,7 +66,9 @@ export const Channels = {
   UpdaterInstall: 'updater:install',
   EventUpdaterStatus: 'updater:status',
   ChatSend: 'chat:send',
+  ChatSendLegacy: 'chat:send-legacy',
   ChatStop: 'chat:stop',
+  ChatStopLegacy: 'chat:stop-legacy',
   ChatRunCommand: 'chat:run-command',
   ChatUndo: 'chat:undo',
   ChatRedo: 'chat:redo',
@@ -83,6 +85,13 @@ export const Channels = {
   SessionSwitch: 'session:switch',
   SessionDelete: 'session:delete',
   SessionRename: 'session:rename',
+  ProjectSessionList: 'project-session:list',
+  ProjectSessionCreate: 'project-session:create',
+  ProjectSessionSwitch: 'project-session:switch',
+  ProjectSessionDelete: 'project-session:delete',
+  ProjectSessionRename: 'project-session:rename',
+  SessionSelectAgent: 'session:select-agent',
+  SessionTranscript: 'session:transcript',
   SettingsGet: 'settings:get',
   SettingsSave: 'settings:save',
   CommandList: 'commands:list',
@@ -226,6 +235,15 @@ export interface AgentApi {
   installUpdate(): Promise<void>
   sendChat(agentId: string, text: string, images?: ImageAttachment[]): Promise<void>
   stopChat(agentId: string): Promise<void>
+  listProjectSessions(projectPath: string): Promise<ProjectSessionSummary[]>
+  createProjectSession(projectPath: string, agentId?: string): Promise<ProjectSessionSummary>
+  switchProjectSession(projectPath: string, sessionId: string): Promise<ProjectSessionSummary | null>
+  deleteProjectSession(projectPath: string, sessionId: string): Promise<ProjectSessionSummary>
+  renameProjectSession(projectPath: string, sessionId: string, title: string): Promise<ProjectSessionSummary | null>
+  selectProjectSessionAgent(projectPath: string, sessionId: string, agentId: string): Promise<ProjectSessionSummary>
+  sendSessionChat(projectPath: string, sessionId: string, agentId: string, text: string, images?: ImageAttachment[]): Promise<void>
+  stopSessionChat(projectPath: string, sessionId: string): Promise<void>
+  listSessionTranscript(projectPath: string, sessionId: string): Promise<ChatTranscriptItem[]>
   suggestFiles(agentId: string, prefix: string): Promise<FileSuggestion[]>
   setAgentBackground(agentId: string, background: boolean): Promise<void>
   onAgentBackground(cb: (e: { agentId: string; background: boolean }) => void): () => void

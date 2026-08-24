@@ -849,9 +849,20 @@ function registerIpcHandlers(): void {
   ipcMain.handle(Channels.LogOpen, (_e, agentId: string) => {
     void shell.openPath(mainApp.logs.pathFor(agentId))
   })
-  ipcMain.handle(Channels.ChatSend, (_e, agentId: string, text: string, images?: ImageAttachment[]) =>
+  ipcMain.handle(Channels.ChatSendLegacy, (_e, agentId: string, text: string, images?: ImageAttachment[]) =>
     mainApp.bsAgent.send(agentId, text, images))
-  ipcMain.handle(Channels.ChatStop, (_e, agentId: string) => mainApp.bsAgent.stopAndDrain(agentId))
+  ipcMain.handle(Channels.ChatStopLegacy, (_e, agentId: string) => mainApp.bsAgent.stopAndDrain(agentId))
+  ipcMain.handle(Channels.ChatSend, (_e, projectPath: string, sessionId: string, agentId: string, text: string, images?: ImageAttachment[]) =>
+    mainApp.bsAgent.sendInSession(projectPath, sessionId, agentId, text, images))
+  ipcMain.handle(Channels.ChatStop, (_e, projectPath: string, sessionId: string) =>
+    mainApp.bsAgent.stopSessionChat(projectPath, sessionId))
+  ipcMain.handle(Channels.ProjectSessionList, (_e, projectPath: string) => mainApp.bsAgent.listProjectSessions(projectPath))
+  ipcMain.handle(Channels.ProjectSessionCreate, (_e, projectPath: string, agentId?: string) => mainApp.bsAgent.createProjectSession(projectPath, agentId))
+  ipcMain.handle(Channels.ProjectSessionSwitch, (_e, projectPath: string, sessionId: string) => mainApp.bsAgent.switchProjectSession(projectPath, sessionId))
+  ipcMain.handle(Channels.ProjectSessionDelete, (_e, projectPath: string, sessionId: string) => mainApp.bsAgent.deleteProjectSession(projectPath, sessionId))
+  ipcMain.handle(Channels.ProjectSessionRename, (_e, projectPath: string, sessionId: string, title: string) => mainApp.bsAgent.renameProjectSession(projectPath, sessionId, title))
+  ipcMain.handle(Channels.SessionSelectAgent, (_e, projectPath: string, sessionId: string, agentId: string) => mainApp.bsAgent.selectProjectSessionAgent(projectPath, sessionId, agentId))
+  ipcMain.handle(Channels.SessionTranscript, (_e, projectPath: string, sessionId: string) => mainApp.bsAgent.listSessionTranscript(projectPath, sessionId))
   ipcMain.handle(Channels.ChatRunCommand, (_e, agentId: string, name: string, args: string) =>
     mainApp.bsAgent.runCommand(agentId, name, args))
   ipcMain.handle(Channels.ChatUndo, (_e, agentId: string) => mainApp.bsAgent.undo(agentId))

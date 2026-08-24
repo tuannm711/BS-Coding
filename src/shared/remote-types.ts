@@ -1,5 +1,10 @@
 import type { ChatEvent } from './types'
 
+export interface RemoteSessionTarget {
+  projectPath: string
+  sessionId: string
+}
+
 export type RemoteCommandName =
   | 'workspace:list' | 'agent:list' | 'agent:state'
   | 'session:list' | 'session:switch' | 'session:create' | 'session:rename'
@@ -8,7 +13,7 @@ export type RemoteCommandName =
 
 export type RemoteEvent =
   | { type: 'agent:state'; agentId: string; running: boolean; background: boolean }
-  | { type: 'session:changed'; agentId: string }
+  | ({ type: 'session:changed'; agentId?: string } & RemoteSessionTarget)
   | { type: 'chat:event'; event: ChatEvent }
 
 export interface RemoteHello {

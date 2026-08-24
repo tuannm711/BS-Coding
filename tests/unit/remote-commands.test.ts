@@ -27,6 +27,12 @@ function makeCtx(overrides: Partial<RemoteCommandContext> = {}) {
     listCommands: vi.fn(() => []),
     isRunning: vi.fn(),
     isBackground: vi.fn()
+    ,listProjectSessions: vi.fn()
+    ,createProjectSession: vi.fn()
+    ,switchProjectSession: vi.fn()
+    ,selectProjectSessionAgent: vi.fn()
+    ,listSessionTranscript: vi.fn()
+    ,sendInSession: vi.fn(async () => {})
   }
   const workspaceStore = { list: vi.fn() }
   const ctx: RemoteCommandContext = {
@@ -209,6 +215,29 @@ describe('dispatchRemoteCommand', () => {
     expect(bsAgent.send).toHaveBeenCalledTimes(1)
     expect(bsAgent.send).toHaveBeenCalledWith('a1', 'hello there')
     expect(res).toEqual({ ok: true, result: { queued: true } })
+  })
+
+  it('routes project/session chat to the exact shared session', async () => {
+    const { ctx, bsAgent } = makeCtx()
+    bsAgent.listAgents.mockReturnValue([agent('a1', 'One')])
+    bsAgent.listProjectSessions.mockReturnValue([{ id: 's1', projectPath: '/work', title: 'S', messageCount: 0, createdAt: 1, updatedAt: 1 }])
+    const res = await dispatchRemoteCommand('chat:send', {
+      projectPath: '/work', sessionId: 's1', agentId: 'a1', text: 'continue'
+    }, ctx)
+    expect(bsAgent.sendInSession).toHaveBeenCalledWith('/work', 's1', 'a1', 'continue')
+    expect(bsAgent.send).not.toHaveBeenCalled()
+    expect(res).toEqual({ ok: true, result: { queued: true } })
+  })
+
+  it('rejects a remote session outside the requested project', async () => {
+    const { ctx, bsAgent } = makeCtx()
+    bsAgent.listAgents.mockReturnValue([agent('a1', 'One')])
+    bsAgent.listProjectSessions.mockReturnValue([])
+    const res = await dispatchRemoteCommand('chat:send', {
+      projectPath: '/other', sessionId: 's1', agentId: 'a1', text: 'continue'
+    }, ctx)
+    expect(res).toEqual({ ok: false, error: 'unknown session: s1' })
+    expect(bsAgent.sendInSession).not.toHaveBeenCalled()
   })
 
   it('chat:send rejects empty text without calling send', async () => {
