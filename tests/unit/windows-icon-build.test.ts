@@ -2,7 +2,7 @@ import { copyFileSync, mkdtempSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { buildWindowsIcon, readIcoEntries } from '../../scripts/build-windows-icon.mjs'
+import { buildWindowsIcon, readIcoEntries, syncTrayIcon } from '../../scripts/build-windows-icon.mjs'
 
 const sizes = [16, 24, 32, 48, 64, 128, 256]
 
@@ -25,6 +25,12 @@ describe('Windows icon build', () => {
     expect(readFileSync(path.resolve('resources/tray-icon.png'))).toEqual(
       readFileSync(path.resolve('build/icons/32x32.png'))
     )
+  })
+
+  it('syncTrayIcon writes the 32x32 source to the tray destination', () => {
+    const dest = path.join(mkdtempSync(path.join(tmpdir(), 'bs-tray-')), 'tray-icon.png')
+    syncTrayIcon(path.resolve('build/icons'), dest)
+    expect(readFileSync(dest)).toEqual(readFileSync(path.resolve('build/icons/32x32.png')))
   })
 
   it('rejects a PNG whose pixels do not match its declared size', () => {
