@@ -13,9 +13,9 @@ session. For the product view — features, screenshots, how to install — read
 | [The documents](#the-documents) | 38-54 |  |
 | [Finding a name](#finding-a-name) | 55-212 | `.cmd`, `.exe`, `.github/workflows/build.yml`, `.ico`, `'near-limit'`, `/bin/bash` |
 | [What is here and what is history](#what-is-here-and-what-is-history) | 213-222 | `docs/design/`, `docs/superpowers/`, `docs/evidence/` |
-| [Current work](#current-work) | 223-227 |  |
-| [Next work](#next-work) | 228-240 | `docs/superpowers/notes/2026-08-05-opencode-feature-diff.md` |
-| [Debt](#debt) | 241-247 | `docs/technical-debt.md` |
+| [Current work](#current-work) | 223-230 | `docs/superpowers/specs/2026-08-25-narrated-tool-calls-design.md` |
+| [Next work](#next-work) | 231-239 |  |
+| [Debt](#debt) | 240-246 | `docs/technical-debt.md` |
 <!-- /toc -->
 
 ## How the domains relate
@@ -222,19 +222,18 @@ beside them carry the release history.
 
 ## Current work
 
-The branch named docs/design-documentation: this reference, its generator, and
-a pass over the remaining documentation.
+None. v1.1.6 closed the narrated tool call defect: shared-session history no
+longer attributes tool records to the assistant role, and a model that writes
+one out instead of calling the tool raises a visible notice.
+`docs/superpowers/specs/2026-08-25-narrated-tool-calls-design.md` has the
+measurements that showed it was three providers, not a Gemini incompatibility.
 
 ## Next work
 
-1. **Audit the opencode gap list.** `docs/superpowers/notes/2026-08-05-opencode-feature-diff.md`
-   catalogues what opencode has that BS Coding does not. It is dated — verify each
-   item is still missing before planning it, then order the survivors by what the
-   multi-account goal needs.
-2. **Strengthen multi-account routing.** The stated goal is many accounts across
+1. **Strengthen multi-account routing.** The stated goal is many accounts across
    many providers in one session, which works but not well enough yet. Quota
    accuracy landed in v1.1.4; account selection itself has not been examined.
-3. **The orchestrator agent.** Task assignment per agent, with a coordinator that
+2. **The orchestrator agent.** Task assignment per agent, with a coordinator that
    takes a command and directs a project. A new surface, deliberately separate
    from the chat frame, and dependent on routing being trustworthy first.
 

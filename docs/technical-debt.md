@@ -7,7 +7,7 @@ purpose — none of it is a forgotten TODO.
 Add an entry when you decide *not* to do something you found. Remove it when the
 work lands, naming the commit.
 
-Last reviewed: 2026-08-25 (v1.1.4, revised after the opencode gap audit)
+Last reviewed: 2026-08-26 (v1.1.6, after the narrated tool call fix)
 
 ## Index
 
@@ -24,6 +24,8 @@ Last reviewed: 2026-08-25 (v1.1.4, revised after the opencode gap audit)
 | 9 | [opencode feature gaps](#9-opencode-feature-gaps) | Product | Medium |
 | 10 | [The test runner crashes intermittently](#10-the-test-runner-crashes-intermittently) | Build | Medium |
 | 11 | [No guard checks whether a design sentence is true](#11-no-guard-checks-whether-a-design-sentence-is-true) | Docs | Medium |
+| 12 | [The narrated-call notice is never rendered in a test](#12-the-narrated-call-notice-is-never-rendered-in-a-test) | Renderer | Low |
+| 13 | [Narration is detected only as it is written](#13-narration-is-detected-only-as-it-is-written) | Agent | Low |
 
 ---
 
@@ -264,3 +266,44 @@ considered and rejected as prone to false positives: a symbol can exist while th
 behaviour described is still absent, which is precisely the case for
 auto-continue. Until something better exists, Known limits sections are reviewed
 by reading the code, and the audit that finds a drift records it here.
+
+## 12. The narrated-call notice is never rendered in a test
+
+**Found:** 2026-08-26, while implementing the narrated tool call fix.
+
+`ChatPanel.tsx` renders `.chat-notice` when a `narrated-tool-call` event
+arrives. Nothing exercises that branch. The detector has unit tests and the
+event has a contract test, but the row itself has only ever existed as source.
+
+Testing it means rendering `ChatPanel`, which needs `window.api`; the suite
+runs with `environment: 'node'` and the component fetches on mount. The
+existing renderer tests avoid this by extracting a pure view function, which
+`ChatPanel` is too large to do incidentally.
+
+**Why it matters.** The notice exists to make a silent failure visible. If it
+renders wrong, the failure it was built to expose stays silent, and the fix
+that suppresses narration makes the bug rarer and so harder to notice.
+
+**To close:** extract the feed row rendering into a pure function taking a
+`FeedItem`, the way `formatStatsRows` was extracted from `StatsTab`, and
+assert against `renderToStaticMarkup`.
+
+## 13. Narration is detected only as it is written
+
+**Found:** 2026-08-26, while implementing the narrated tool call fix.
+
+`looksLikeNarratedToolCall` runs in the manager's `appendMessage`, so a
+narrated call raises its notice as the message is stored. Reopening a session
+that already contains one shows nothing: `listSessionTranscript` returns stored
+items and never re-examines their text.
+
+The 17 narrated messages found in the affected session are therefore invisible
+in the app, which is how they went unnoticed in the first place.
+
+**Why it matters.** Small. New narration is flagged, and the point of the fix
+is that there should be little of it. But a user reviewing an old session still
+has to spot it by eye, which is the problem this work started from.
+
+**To close:** run the detector over assistant messages as the transcript loads
+and mark those items, rather than emitting an event. It was left out because it
+changes `ChatTranscriptItem` for a case the fix is meant to eliminate.
