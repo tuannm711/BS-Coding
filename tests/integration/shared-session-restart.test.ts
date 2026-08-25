@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import type { JsonStore } from '../../src/main/json-store'
 import { SessionStore, type StoredSession } from '../../src/main/agent/session'
-import { SnapshotStore, type SnapshotEntry } from '../../src/main/agent/snapshot'
+import { SnapshotStore, type SnapshotTurn } from '../../src/main/agent/snapshot'
 import { SavedPermissions, type SavedPermission } from '../../src/main/agent/saved-permissions'
 import { TruncationStore } from '../../src/main/agent/truncation'
 import { createDefaultTools } from '../../src/main/agent/tools/registry'
@@ -30,7 +30,7 @@ describe('shared session restart and deleted-Agent fallback', () => {
     const legacy = store.create('reviewer-id', dir)
     store.appendMessage(legacy.id, { id: 'u1', role: 'user', text: 'review this', createdAt: 1 })
     store.appendMessage(legacy.id, { id: 'a1', role: 'assistant', text: 'first answer', createdAt: 2 })
-    const snapshots = new SnapshotStore(memoryStore<SnapshotEntry>())
+    const snapshots = new SnapshotStore(memoryStore<SnapshotTurn>())
     const savedPermissions = new SavedPermissions(memoryStore<SavedPermission>())
     const agents = [
       { id: 'bs-id', name: 'bs', templateId: 'bs', cwd: dir, kind: 'native' as const },

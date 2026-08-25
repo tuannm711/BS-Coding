@@ -5,7 +5,7 @@ import path from 'node:path'
 import type { JsonStore } from '../../src/main/json-store'
 import { BsAgentManager } from '../../src/main/bs-agent-manager'
 import { SessionStore, type StoredSession } from '../../src/main/agent/session'
-import { SnapshotStore, type SnapshotEntry } from '../../src/main/agent/snapshot'
+import { SnapshotStore, type SnapshotTurn } from '../../src/main/agent/snapshot'
 import { SavedPermissions, type SavedPermission } from '../../src/main/agent/saved-permissions'
 import { TruncationStore } from '../../src/main/agent/truncation'
 import { createDefaultTools } from '../../src/main/agent/tools/registry'
@@ -36,14 +36,14 @@ describe('shared session execution lock', () => {
       }
     }
     const connection: ProviderConnection = {
-      providerId: 'openai', models: ['gpt-code'],
-      accounts: [{ id: 'account', label: 'Pro', authMode: 'oauth', status: 'active', models: ['gpt-code'] }]
+      providerId: 'openai', activeAccountId: 'account',
+      accounts: [{ id: 'account', providerId: 'openai', label: 'Pro', authMode: 'oauth', status: 'active', models: ['gpt-code'], createdAt: 1, lastUsedAt: 1 }]
     }
     const manager = new BsAgentManager({
       configPath,
       assignmentPath: path.join(dir, 'assignments.json'),
       store: new SessionStore(memoryStore<StoredSession>()),
-      snapshots: new SnapshotStore(memoryStore<SnapshotEntry>()),
+      snapshots: new SnapshotStore(memoryStore<SnapshotTurn>()),
       savedPermissions: new SavedPermissions(memoryStore<SavedPermission>()),
       truncation: new TruncationStore(path.join(dir, 'truncation')),
       tools: createDefaultTools(),
@@ -81,7 +81,7 @@ describe('shared session execution lock', () => {
     const configPath = path.join(dir, 'bs.json')
     writeFileSync(configPath, JSON.stringify({ provider: {}, model: '', agents: {} }))
     const sessionStore = new SessionStore(memoryStore<StoredSession>())
-    const snapshotStore = new SnapshotStore(memoryStore<SnapshotEntry>())
+    const snapshotStore = new SnapshotStore(memoryStore<SnapshotTurn>())
     const manager = new BsAgentManager({
       configPath,
       store: sessionStore,

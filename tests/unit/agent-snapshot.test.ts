@@ -24,7 +24,7 @@ function makeStore() {
 
 describe('SnapshotStore', () => {
   it('persists project, session, turn, and Agent ownership for shared-session undo', () => {
-    const entries: SnapshotEntry[] = []
+    const entries: SnapshotTurn[] = []
     const store = new SnapshotStore({
       load: () => entries,
       save: next => entries.splice(0, entries.length, ...next)

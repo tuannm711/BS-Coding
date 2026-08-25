@@ -9,8 +9,9 @@ import type { StoredSession } from '../../src/main/agent/session'
 import type { JsonStore } from '../../src/main/json-store'
 import { ModelsCatalog } from '../../src/main/models-catalog'
 import { createDefaultTools } from '../../src/main/agent/tools/registry'
+import { configToSettings, DEFAULT_BS_CONFIG } from '../../src/main/agent/config'
 import { SnapshotStore } from '../../src/main/agent/snapshot'
-import type { SnapshotEntry } from '../../src/main/agent/snapshot'
+import type { SnapshotTurn } from '../../src/main/agent/snapshot'
 import { TruncationStore } from '../../src/main/agent/truncation'
 import { CommandStore } from '../../src/main/agent/commands'
 import { SavedPermissions } from '../../src/main/agent/saved-permissions'
@@ -51,7 +52,7 @@ async function makeManager(opts: StubLlmOptions & {
     save: (next) => sessions.splice(0, sessions.length, ...next)
   }
   const store = new SessionStore(json)
-  const snapshotEntries: SnapshotEntry[] = []
+  const snapshotEntries: SnapshotTurn[] = []
   const snapshots = new SnapshotStore({
     load: () => snapshotEntries,
     save: (next) => snapshotEntries.splice(0, snapshotEntries.length, ...next)
@@ -324,7 +325,7 @@ describe('BsAgentManager', () => {
     // rebuild manager without key
     const sessions: StoredSession[] = []
     const store = new SessionStore({ load: () => sessions, save: (n) => sessions.splice(0, sessions.length, ...n) })
-    const snapEntries: SnapshotEntry[] = []
+    const snapEntries: SnapshotTurn[] = []
     const snapshots = new SnapshotStore({ load: () => snapEntries, save: (n) => snapEntries.splice(0, snapEntries.length, ...n) })
     const permEntries: SavedPermission[] = []
     const savedPermissions = new SavedPermissions({ load: () => permEntries, save: (n) => permEntries.splice(0, permEntries.length, ...n) })
@@ -529,6 +530,7 @@ describe('BsAgentManager', () => {
       const { manager, createLlm } = await makeManager({ configPath })
       createLlm.mockClear()
       const saved = await manager.saveSettings({
+        ...configToSettings(DEFAULT_BS_CONFIG),
         defaultProvider: 'deepseek',
         providers: [
           { id: 'deepseek', apiKey: 'sk-ds', baseUrl: 'https://api.deepseek.com/v1', models: ['deepseek-chat'] }

@@ -7,7 +7,7 @@ import { SessionStore } from '../../src/main/agent/session'
 import type { StoredSession } from '../../src/main/agent/session'
 import type { JsonStore } from '../../src/main/json-store'
 import { SnapshotStore } from '../../src/main/agent/snapshot'
-import type { SnapshotEntry } from '../../src/main/agent/snapshot'
+import type { SnapshotTurn } from '../../src/main/agent/snapshot'
 import { TruncationStore } from '../../src/main/agent/truncation'
 import { SavedPermissions } from '../../src/main/agent/saved-permissions'
 import type { SavedPermission } from '../../src/main/agent/saved-permissions'
@@ -52,7 +52,7 @@ async function makeManager(opts: { trace?: boolean } = {}) {
     save: (next) => sessions.splice(0, sessions.length, ...next)
   }
   const store = new SessionStore(json)
-  const snapshotEntries: SnapshotEntry[] = []
+  const snapshotEntries: SnapshotTurn[] = []
   const snapshots = new SnapshotStore({
     load: () => snapshotEntries,
     save: (next) => snapshotEntries.splice(0, snapshotEntries.length, ...next)

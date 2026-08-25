@@ -30,7 +30,7 @@ describe('provider snapshot', () => {
   })
 
   it('joins capability, account and model metadata in one revisioned snapshot', () => {
-    const snapshot = buildProviderSnapshot(7, [{ id: 'antigravity', displayName: 'Antigravity IDE', description: 'Google', status: 'experimental', methods: [{ id: 'oauth', label: 'OAuth', description: '', kind: 'oauth', fields: [] }] }], [{ providerId: 'antigravity', activeAccountId: 'a1', accounts: [{ id: 'a1', providerId: 'antigravity', label: 'a@example.com', authMode: 'oauth', status: 'active', models: ['gemini-3.1-pro-high'], createdAt: 1, lastUsedAt: 2 }] }], 9)
+    const snapshot = buildProviderSnapshot(7, [{ id: 'antigravity', displayName: 'Antigravity IDE', description: 'Google', status: 'experimental', chatTransport: 'cloud-code', methods: [{ id: 'oauth', label: 'OAuth', description: '', kind: 'oauth', fields: [] }] }], [{ providerId: 'antigravity', activeAccountId: 'a1', accounts: [{ id: 'a1', providerId: 'antigravity', label: 'a@example.com', authMode: 'oauth', status: 'active', models: ['gemini-3.1-pro-high'], createdAt: 1, lastUsedAt: 2 }] }], 9)
     expect(snapshot.revision).toBe(7)
     expect(snapshot.accounts[0].models[0].id).toBe('gemini-3.1-pro-high')
     expect(snapshot.providers[0].capabilities.modelDiscovery).toBe('remote')
@@ -39,7 +39,7 @@ describe('provider snapshot', () => {
   })
 
   it('preserves remotely discovered model display names and capabilities', () => {
-    const snapshot = buildProviderSnapshot(3, [{ id: 'antigravity', displayName: 'Antigravity IDE', status: 'experimental', methods: [] }], [{
+    const snapshot = buildProviderSnapshot(3, [{ id: 'antigravity', displayName: 'Antigravity IDE', status: 'experimental', chatTransport: 'cloud-code', methods: [] }], [{
       providerId: 'antigravity',
       activeAccountId: 'a1',
       accounts: [{

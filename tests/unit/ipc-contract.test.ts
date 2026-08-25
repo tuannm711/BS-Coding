@@ -3,6 +3,11 @@ import { Channels } from '../../src/shared/ipc'
 import type { AgentApi, BrowserStatusEvent, PtyDataEvent, AgentStateEvent, GitStatusEvent, ChatEvent } from '../../src/shared/ipc'
 import type { BrowserStatusInfo } from '../../src/shared/browser-types'
 import type { AgentConfig, ChatMessage, BsSettings } from '../../src/shared/types'
+import { configToSettings, DEFAULT_BS_CONFIG } from '../../src/main/agent/config'
+
+// A stub standing in for the real API must return what the real API returns,
+// or the contract it claims to check is looser than the contract itself.
+const settings = (): BsSettings => configToSettings(DEFAULT_BS_CONFIG)
 
 describe('IPC contract', () => {
   it('defines all channels used by the preload api', () => {
@@ -64,7 +69,7 @@ describe('IPC contract', () => {
       cancelProviderAuthorization: async () => undefined,
       onProviderAuthorizationChanged: () => () => {},
       connectProvider: async () => ({ providers: [], defaultProvider: '' }),
-      disconnectProvider: async () => ({ providers: [], defaultProvider: '' }),
+      disconnectProvider: async () => settings(),
       listTemplates: async () => [],
       saveTemplate: async (t) => t,
       removeTemplate: async () => {},
