@@ -66,10 +66,23 @@ describe('OpenAI provider authorization', () => {
 })
 
 describe('ChatGPT id_token claims', () => {
-  it('reads the account and organization ids from the auth claim', () => {
-    const claim = { email: 'a@b.c', 'https://api.openai.com/auth': { account_id: 'acct-1', organization_id: 'org-1' } }
+  it('reads the chatgpt-prefixed identifiers and subscription window from the auth claim', () => {
+    const claim = { email: 'a@b.c', 'https://api.openai.com/auth': { chatgpt_account_id: 'acct-1', chatgpt_plan_type: 'plus', chatgpt_subscription_active_until: '2026-09-18T05:47:59+00:00' } }
     const token = `x.${Buffer.from(JSON.stringify(claim)).toString('base64url')}.y`
-    expect(decodeJwtProfile(token)).toMatchObject({ email: 'a@b.c', accountId: 'acct-1', organizationId: 'org-1' })
+    expect(decodeJwtProfile(token)).toMatchObject({
+      email: 'a@b.c',
+      accountId: 'acct-1',
+      planName: 'plus',
+      subscriptionExpiresAt: Date.parse('2026-09-18T05:47:59+00:00')
+    })
+  })
+
+  it('ignores an auth claim that carries no subscription window', () => {
+    const claim = { 'https://api.openai.com/auth': { chatgpt_account_id: 'acct-2' } }
+    const token = `x.${Buffer.from(JSON.stringify(claim)).toString('base64url')}.y`
+    const profile = decodeJwtProfile(token)
+    expect(profile.accountId).toBe('acct-2')
+    expect(profile.subscriptionExpiresAt).toBeUndefined()
   })
 
   it('returns nothing for a malformed token', () => {

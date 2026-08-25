@@ -99,12 +99,10 @@ export function createOpenAiAdapter(options: OpenAiAdapterOptions = {}): Provide
       if (account.authMode !== 'oauth' || !secret.accessToken) {
         return account.usage ?? { accountId: account.id, accountLabel: account.profile?.email ?? account.label, accountType: account.authMode === 'api-key' ? 'api-key' : 'oauth', refreshedAt: Date.now(), source: 'unavailable', status: 'unavailable', unavailableReason: 'OpenAI API quota is unavailable for this connection method' }
       }
-      // Accounts imported from a Codex auth file never carried accountId, which
-      // left /backend-api/subscriptions unreachable. The id is in the stored claim.
-      if (!secret.accountId && secret.idToken) {
-        const recovered = decodeJwtProfile(secret.idToken)
-        if (recovered.accountId) Object.assign(secret, { accountId: recovered.accountId, organizationId: recovered.organizationId })
-      }
+      // The stored id_token carries the account id and the subscription window,
+      // so neither depends on an HTTP call that a Codex bearer may be refused.
+      const claim = decodeJwtProfile(secret.idToken)
+      if (!secret.accountId && claim.accountId) Object.assign(secret, { accountId: claim.accountId })
       let lastStatus = 0
       for (let authAttempt = 0; authAttempt < 2; authAttempt++) {
         const headers: Record<string, string> = {
@@ -127,8 +125,8 @@ export function createOpenAiAdapter(options: OpenAiAdapterOptions = {}): Provide
           normalized.accountType = 'oauth'
           normalized.planName = normalized.planName ?? account.profile?.planName
           const subscription = await fetchSubscriptionMetadata(headers, secret.accountId)
-          normalized.planName = normalized.planName ?? subscription.planName
-          normalized.subscriptionExpiresAt = subscription.subscriptionExpiresAt ?? normalized.subscriptionExpiresAt
+          normalized.planName = normalized.planName ?? subscription.planName ?? claim.planName
+          normalized.subscriptionExpiresAt = subscription.subscriptionExpiresAt ?? normalized.subscriptionExpiresAt ?? claim.subscriptionExpiresAt
           return normalized
         }
         if (authAttempt === 0 && (lastStatus === 401 || lastStatus === 403) && secret.refreshToken) {

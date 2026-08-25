@@ -22,8 +22,9 @@ describe('OAuth helpers', () => {
   })
 
   it('extracts account metadata from an id token', () => {
-    const payload = Buffer.from(JSON.stringify({ email: 'a@example.com', name: 'A', 'https://api.openai.com/auth': { account_id: 'acct-1' } })).toString('base64url')
-    expect(decodeJwtProfile(`x.${payload}.y`)).toEqual({ email: 'a@example.com', name: 'A', accountId: 'acct-1' })
+    const auth = { chatgpt_account_id: 'acct-1', chatgpt_plan_type: 'plus' }
+    const payload = Buffer.from(JSON.stringify({ email: 'a@example.com', name: 'A', 'https://api.openai.com/auth': auth })).toString('base64url')
+    expect(decodeJwtProfile(`x.${payload}.y`)).toEqual({ email: 'a@example.com', name: 'A', accountId: 'acct-1', planName: 'plus' })
   })
 
   it('merges Codex auth and preserves unrelated fields', () => {
