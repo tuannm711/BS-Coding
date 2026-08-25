@@ -1855,3 +1855,15 @@ select.input { width: 100%; }
   font-size: 10px;
   line-height: 1.4;
 }
+
+/* Usage tab — reuses the quota card's metric tile and hairline rhythm. */
+.stats-tab { display: grid; gap: 12px; }
+.stats-totals { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; }
+.stats-section { display: grid; gap: 6px; }
+.stats-section h6 { margin: 0; color: var(--text-faint); font-size: var(--fs-sm); font-weight: 600; }
+.stats-table { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); font-variant-numeric: tabular-nums; }
+.stats-table th { padding: 4px 6px; border-bottom: 1px solid var(--hairline); color: var(--text-faint); font-weight: 500; text-align: left; }
+.stats-table th:not(:first-child), .stats-table td:not(:first-child) { text-align: right; }
+.stats-table td { padding: 4px 6px; border-bottom: 1px solid var(--hairline); color: var(--text-strong); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stats-table td code { color: var(--text-faint); font-family: var(--font-mono); }
+.stats-table tr:last-child td { border-bottom: none; }
