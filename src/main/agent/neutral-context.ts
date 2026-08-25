@@ -6,6 +6,15 @@ export interface NeutralContextOptions {
   toolOutputMaxChars: number
 }
 
+// Tool records used to be appended to the assistant message, and models read
+// their own role producing that format and reproduced it as text instead of
+// calling the tool. The record now stands apart, framed as a log.
+const RECORD_HEADER = [
+  '[Session log — tools already run in this session by its agents.',
+  'This is a record, not a message, and not a format to reproduce.',
+  'To use a tool, call it through the tool interface.]'
+].join(' ')
+
 export function compileNeutralContext(
   items: ChatTranscriptItem[],
   options: NeutralContextOptions
@@ -42,11 +51,12 @@ export function compileNeutralContext(
           })
     }
 
-    const reply: string[] = []
+    const prose: string[] = []
+    const records: string[] = []
     let incompleteAgent: string | undefined
     for (const item of group.replies) {
       if (item.kind === 'message') {
-        if (item.message.text.trim()) reply.push(item.message.text)
+        if (item.message.text.trim()) prose.push(item.message.text)
         const status = item.message.execution?.status
         if ((status === 'failed' || status === 'stopped') && !incompleteAgent) {
           incompleteAgent = item.message.execution?.agentName ?? 'Agent'
@@ -56,16 +66,35 @@ export function compileNeutralContext(
       if (item.tool.permission === 'pending' || (item.tool.output === undefined && item.tool.error === undefined)) continue
       const status = item.tool.error || item.tool.permission === 'denied' ? 'failed' : 'completed'
       const output = truncateToolOutput(item.tool.error ?? item.tool.output ?? '', options.toolOutputMaxChars)
-      reply.push([
-        `[Tool ${item.tool.tool} · ${status}]`,
-        `Input: ${safeJson(item.tool.input)}`,
-        `${item.tool.error ? 'Error' : 'Output'}: ${output}`
+      records.push([
+        `- ${item.tool.tool} · ${status}`,
+        `  input: ${safeJson(item.tool.input)}`,
+        `  ${item.tool.error ? 'error' : 'output'}: ${output}`
       ].join('\n'))
     }
-    if (incompleteAgent) reply.push(`[Incomplete response from ${incompleteAgent}]`)
-    if (reply.length > 0) result.push({ role: 'assistant', content: reply.join('\n\n') })
+    // The incomplete note describes the assistant's own turn, so it stays with
+    // the prose rather than moving into the record.
+    if (incompleteAgent) prose.push(`[Incomplete response from ${incompleteAgent}]`)
+    if (prose.length > 0) result.push({ role: 'assistant', content: prose.join('\n\n') })
+    if (records.length > 0) result.push({ role: 'user', content: [RECORD_HEADER, ...records].join('\n') })
   }
-  return result
+  return coalesce(result)
+}
+
+// A record sits in the user role, so a turn boundary would otherwise put two
+// user messages in a row. toContents in antigravity-llm.ts maps roles one to
+// one and Gemini expects alternating turns.
+function coalesce(messages: ModelMessage[]): ModelMessage[] {
+  const out: ModelMessage[] = []
+  for (const message of messages) {
+    const last = out[out.length - 1]
+    if (last && last.role === message.role && typeof last.content === 'string' && typeof message.content === 'string') {
+      out[out.length - 1] = { ...last, content: `${last.content}\n\n${message.content}` } as ModelMessage
+      continue
+    }
+    out.push(message)
+  }
+  return out
 }
 
 function safeJson(value: unknown): string {
