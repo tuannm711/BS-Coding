@@ -72,7 +72,7 @@ export default function QuotaAccountCard({
       {stageDetails.length > 0 ? <div className="provider-refresh-stages" aria-label={`Refresh stages for ${accountLabel}`}>
         {stageDetails.map(([stage, status]) => <span key={stage} className={`provider-refresh-stage ${status}`}>{stage} · {status}</span>)}
       </div> : null}
-      {usage?.refreshError || usage?.unavailableReason ? <div className="quota-account-error" role="status">{usage.refreshError ?? usage.unavailableReason}</div> : null}
+      {accountWarning(usage) ? <div className="quota-account-error" role="status">{accountWarning(usage)}</div> : null}
 
       {variant === 'provider' ? <div className="quota-model-summary">
         <span><strong>{account.models.length}</strong> code model{account.models.length === 1 ? '' : 's'}{modelNames.length > 0 ? ` · ${modelNames.slice(0, 3).join(' · ')}` : ''}</span>

@@ -159,4 +159,20 @@ describe('snapshot-driven quota cards', () => {
     expect(markup).toContain('19:09:02 25/08/2026')
     expect(markup).toContain('Next reset')
   })
+
+  it('does not print an exhaustion warning while a group still has quota', () => {
+    const usage = { accountId: 'account-1', refreshedAt: 1, source: 'provider' as const, status: 'ok' as const, unavailableReason: 'Quota exhausted', quotaGroups: [{ id: 'gemini', label: 'Gemini Models', modelIds: [], windows: [{ id: 'gemini-5h', label: '5-hour', kind: 'session' as const, remainingPercent: 94, resetAt: 200, usageKnown: true, source: 'provider' as const }] }] }
+    const markup = renderToStaticMarkup(React.createElement(QuotaAccountCard, { account: account({ usage }), variant: 'chat', groups: usage.quotaGroups } as never))
+    expect(markup).not.toContain('Quota exhausted')
+  })
+
+  it('keeps the account state ready while a group still has quota', () => {
+    const usage = { accountId: 'account-1', refreshedAt: 1, source: 'provider' as const, status: 'ok' as const, unavailableReason: 'Quota exhausted', resetAt: 20, quotaGroups: [{ id: 'gemini', label: 'Gemini Models', modelIds: [], windows: [{ id: 'gemini-5h', label: '5-hour', kind: 'session' as const, remainingPercent: 94, resetAt: 200, usageKnown: true, source: 'provider' as const }] }] }
+    expect(quotaAccountState(account({ usage }), 10)).toBe('ready')
+  })
+
+  it('still reports cooldown when every window is drained', () => {
+    const usage = { accountId: 'account-1', refreshedAt: 1, source: 'provider' as const, status: 'ok' as const, unavailableReason: 'Quota exhausted', resetAt: 20, quotaGroups: [{ id: 'gemini', label: 'Gemini Models', modelIds: [], windows: [{ id: 'gemini-5h', label: '5-hour', kind: 'session' as const, remainingPercent: 0, resetAt: 200, usageKnown: true, source: 'provider' as const }] }] }
+    expect(quotaAccountState(account({ usage }), 10)).toBe('cooldown')
+  })
 })

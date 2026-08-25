@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { AgentModelAssignment, ProviderQuotaGroup, ProviderUsage } from '@shared/types'
 import { shouldAcceptSnapshot, type AgentAssignmentSnapshot, type ProviderAccountSnapshot, type ProviderSnapshot } from '@shared/provider-state'
 import QuotaAccountCard from './quota/QuotaAccountCard'
-import { chatQuotaGroups } from './quota/quota-view'
+import { chatQuotaGroups, hasRemainingQuota } from './quota/quota-view'
 
 export interface QuotaAgent {
   id: string
@@ -31,9 +31,9 @@ export interface QuotaRow {
 export function quotaAccountState(account: ProviderAccountSnapshot | undefined, now = Date.now()): QuotaAccountUiState {
   if (!account) return 'unavailable'
   if (account.error?.retryAt && account.error.retryAt > now) return 'cooldown'
-  if (account.usage?.resetAt && account.usage.resetAt > now && /quota exhausted|capacity exhausted/i.test(account.usage.unavailableReason ?? '')) return 'cooldown'
-  if (account.error?.kind === 'quota-exhausted' || account.usage?.unavailableReason?.toLowerCase().includes('quota exhausted')) return 'quota-exhausted'
-  if (account.error?.kind === 'capacity-exhausted' || account.usage?.unavailableReason?.toLowerCase().includes('capacity exhausted')) return 'capacity-exhausted'
+  if (account.usage?.resetAt && account.usage.resetAt > now && /quota exhausted|capacity exhausted/i.test(account.usage.unavailableReason ?? '') && !hasRemainingQuota(account.usage)) return 'cooldown'
+  if (account.error?.kind === 'quota-exhausted' || (account.usage?.unavailableReason?.toLowerCase().includes('quota exhausted') && !hasRemainingQuota(account.usage))) return 'quota-exhausted'
+  if (account.error?.kind === 'capacity-exhausted' || (account.usage?.unavailableReason?.toLowerCase().includes('capacity exhausted') && !hasRemainingQuota(account.usage))) return 'capacity-exhausted'
   if (account.error?.kind === 'auth' || account.usage?.unavailableReason?.toLowerCase().includes('authentication')) return 'auth-error'
   if (!account.usage || account.usage.status === 'unavailable') return 'unavailable'
   return 'ready'
