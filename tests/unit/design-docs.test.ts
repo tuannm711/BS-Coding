@@ -65,6 +65,15 @@ describe('design doc toc generator', () => {
     }
   })
 
+  it('keeps the line endings the document already uses', () => {
+    const lines = ['# Title', '', '<!-- toc -->', '<!-- /toc -->', '', '## Alpha', '', 'body']
+    const crlf = applyToc(lines.join('\r\n'))
+    expect(crlf).not.toMatch(/(?<!\r)\n/)
+    expect(applyToc(crlf)).toBe(crlf)
+    const lf = applyToc(lines.join('\n'))
+    expect(lf).not.toContain('\r')
+  })
+
   it('leaves a document without toc markers untouched', () => {
     const doc = '# Title\n\n## Section\n'
     expect(applyToc(doc)).toBe(doc)

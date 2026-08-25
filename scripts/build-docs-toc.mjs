@@ -4,9 +4,22 @@ import { fileURLToPath } from 'node:url'
 
 export const TOC_OPEN = '<!-- toc -->'
 export const TOC_CLOSE = '<!-- /toc -->'
+export const NAMES_OPEN = '<!-- names -->'
+export const NAMES_CLOSE = '<!-- /names -->'
 
 const CITED_PREFIXES = ['src/', 'tests/', 'scripts/', 'docs/', 'resources/']
 const NAMES_PER_SECTION = 6
+
+// A checkout may materialise these files with either line ending, so a generated
+// block has to match what the document already uses. Emitting LF into a CRLF file
+// makes every guard fail on one platform while passing on another.
+function eolOf(markdown) {
+  return /\r\n/.test(markdown) ? '\r\n' : '\n'
+}
+
+function withEol(text, eol) {
+  return eol === '\r\n' ? text.replace(/\r?\n/g, '\r\n') : text.replace(/\r\n/g, '\n')
+}
 
 // GitHub builds anchors by lowercasing, dropping punctuation and joining the
 // remaining words with hyphens.
@@ -40,7 +53,7 @@ function namesIn(body) {
 // Sections span from their heading to the line before the next heading, so a
 // reader can pull exactly one section out of the file by line range.
 export function sectionsOf(markdown) {
-  const lines = markdown.split('\n')
+  const lines = markdown.split(/\r?\n/)
   const found = []
   let inFence = false
   lines.forEach((line, index) => {
@@ -52,11 +65,10 @@ export function sectionsOf(markdown) {
     const match = /^(#{2,3}) +(.+?)\s*$/.exec(line)
     if (match) found.push({ depth: match[1].length, text: match[2], line: index + 1 })
   })
-  return found.map((section, index) => ({
-    ...section,
-    endLine: index + 1 < found.length ? found[index + 1].line - 1 : lines.length,
-    names: namesIn(lines.slice(section.line, index + 1 < found.length ? found[index + 1].line - 1 : lines.length).join('\n'))
-  }))
+  return found.map((section, index) => {
+    const end = index + 1 < found.length ? found[index + 1].line - 1 : lines.length
+    return { ...section, endLine: end, names: namesIn(lines.slice(section.line, end).join('\n')) }
+  })
 }
 
 function renderRows(sections, shift) {
@@ -81,11 +93,12 @@ export function applyToc(markdown) {
   const open = markdown.indexOf(TOC_OPEN)
   const close = markdown.indexOf(TOC_CLOSE)
   if (open === -1 || close === -1 || close < open) return markdown
+  const eol = eolOf(markdown)
   const head = markdown.slice(0, open + TOC_OPEN.length)
   const tail = markdown.slice(close)
-  const placeholder = `${head}\n${TOC_CLOSE}${markdown.slice(close + TOC_CLOSE.length)}`
+  const placeholder = `${head}${eol}${TOC_CLOSE}${markdown.slice(close + TOC_CLOSE.length)}`
   const sections = sectionsOf(placeholder)
-  return `${head}\n${renderRows(sections, sections.length + 2)}\n${tail}`
+  return `${head}${eol}${withEol(renderRows(sections, sections.length + 2), eol)}${eol}${tail}`
 }
 
 export function collectCitedPaths(markdown) {
@@ -100,7 +113,9 @@ export function collectCitedPaths(markdown) {
   return found
 }
 
-// One hop from a name to the document and line that explains it.
+// One hop from a name to the section that introduces it. The first document to
+// mention a name owns it, so the index points at an explanation rather than a
+// passing reference.
 export function buildNameIndex(dir) {
   const index = new Map()
   if (!existsSync(dir)) return index
@@ -116,16 +131,11 @@ export function buildNameIndex(dir) {
   return index
 }
 
-export const NAMES_OPEN = '<!-- names -->'
-export const NAMES_CLOSE = '<!-- /names -->'
-
-// One hop from a name to the section that introduces it. The first document to
-// mention a name owns it, so the index points at an explanation rather than a
-// passing reference.
 export function renderNameIndex(dir) {
   const rows = []
   for (const [symbol, where] of buildNameIndex(dir)) {
-    rows.push(`| \`${symbol}\` | [${where.file}#${anchorFor(where.section)}](${where.file}#${anchorFor(where.section)}) | ${where.line} |`)
+    const target = `${where.file}#${anchorFor(where.section)}`
+    rows.push(`| \`${symbol}\` | [${target}](${target}) | ${where.line} |`)
   }
   rows.sort((a, b) => a.localeCompare(b))
   return ['| Name | Where | Line |', '| --- | --- | --- |', ...rows].join('\n')
@@ -135,8 +145,9 @@ export function applyNameIndex(markdown, dir) {
   const open = markdown.indexOf(NAMES_OPEN)
   const close = markdown.indexOf(NAMES_CLOSE)
   if (open === -1 || close === -1 || close < open) return markdown
+  const eol = eolOf(markdown)
   const head = markdown.slice(0, open + NAMES_OPEN.length)
-  return `${head}\n${renderNameIndex(dir)}\n${markdown.slice(close)}`
+  return `${head}${eol}${withEol(renderNameIndex(dir), eol)}${eol}${markdown.slice(close)}`
 }
 
 export function applyTocToDir(dir) {
