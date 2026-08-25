@@ -99,6 +99,10 @@ export function createOpenAiAdapter(options: OpenAiAdapterOptions = {}): Provide
       if (account.authMode !== 'oauth' || !secret.accessToken) {
         return account.usage ?? { accountId: account.id, accountLabel: account.profile?.email ?? account.label, accountType: account.authMode === 'api-key' ? 'api-key' : 'oauth', refreshedAt: Date.now(), source: 'unavailable', status: 'unavailable', unavailableReason: 'OpenAI API quota is unavailable for this connection method' }
       }
+      // The stored id_token carries the account id and the subscription window,
+      // so neither depends on an HTTP call that a Codex bearer may be refused.
+      const claim = decodeJwtProfile(secret.idToken)
+      if (!secret.accountId && claim.accountId) Object.assign(secret, { accountId: claim.accountId })
       let lastStatus = 0
       for (let authAttempt = 0; authAttempt < 2; authAttempt++) {
         const headers: Record<string, string> = {
@@ -121,8 +125,8 @@ export function createOpenAiAdapter(options: OpenAiAdapterOptions = {}): Provide
           normalized.accountType = 'oauth'
           normalized.planName = normalized.planName ?? account.profile?.planName
           const subscription = await fetchSubscriptionMetadata(headers, secret.accountId)
-          normalized.planName = normalized.planName ?? subscription.planName
-          normalized.subscriptionExpiresAt = subscription.subscriptionExpiresAt ?? normalized.subscriptionExpiresAt
+          normalized.planName = normalized.planName ?? subscription.planName ?? claim.planName
+          normalized.subscriptionExpiresAt = subscription.subscriptionExpiresAt ?? normalized.subscriptionExpiresAt ?? claim.subscriptionExpiresAt
           return normalized
         }
         if (authAttempt === 0 && (lastStatus === 401 || lastStatus === 403) && secret.refreshToken) {
@@ -141,13 +145,16 @@ async function fetchSubscriptionMetadata(headers: Record<string, string>, accoun
     'https://chatgpt.com/backend-api/accounts/check/v4-2023-04-27?timezone_offset_min=420',
     ...(accountId ? [`https://chatgpt.com/backend-api/subscriptions?account_id=${encodeURIComponent(accountId)}`] : [])
   ]
+  const merged: { planName?: string; subscriptionExpiresAt?: number } = {}
   for (const endpoint of endpoints) {
+    if (merged.planName && merged.subscriptionExpiresAt) break
     try {
       const response = await fetch(endpoint, { headers })
       if (!response.ok) continue
       const metadata = extractOpenAISubscriptionMetadata(await response.json())
-      if (metadata.planName || metadata.subscriptionExpiresAt) return metadata
+      merged.planName = merged.planName ?? metadata.planName
+      merged.subscriptionExpiresAt = merged.subscriptionExpiresAt ?? metadata.subscriptionExpiresAt
     } catch { /* usage remains valid when subscription metadata is unavailable */ }
   }
-  return {}
+  return merged
 }

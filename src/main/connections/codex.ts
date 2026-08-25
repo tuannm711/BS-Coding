@@ -56,16 +56,22 @@ export async function refreshCodexToken(refreshToken: string, fetchImpl: typeof 
   return { accessToken: body.access_token, refreshToken: body.refresh_token ?? refreshToken, idToken: body.id_token, expiresAt: Date.now() + (body.expires_in ?? 3600) * 1000 }
 }
 
-export function decodeJwtProfile(idToken?: string): { email?: string; name?: string; accountId?: string } {
+// The auth claim prefixes its identifiers with chatgpt_, and it carries the
+// subscription window directly, so no HTTP call is needed to learn the expiry.
+export function decodeJwtProfile(idToken?: string): { email?: string; name?: string; accountId?: string; planName?: string; subscriptionExpiresAt?: number } {
   if (!idToken) return {}
   try {
     const payload = idToken.split('.')[1]
     const parsed = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as Record<string, unknown>
     const auth = parsed['https://api.openai.com/auth'] as Record<string, unknown> | undefined
+    const activeUntil = auth?.chatgpt_subscription_active_until
+    const expiresAt = typeof activeUntil === 'number' ? activeUntil : typeof activeUntil === 'string' ? Date.parse(activeUntil) : Number.NaN
     return {
       email: typeof parsed.email === 'string' ? parsed.email : undefined,
       name: typeof parsed.name === 'string' ? parsed.name : undefined,
-      accountId: typeof auth?.account_id === 'string' ? auth.account_id : undefined
+      accountId: typeof auth?.chatgpt_account_id === 'string' ? auth.chatgpt_account_id : undefined,
+      planName: typeof auth?.chatgpt_plan_type === 'string' ? auth.chatgpt_plan_type : undefined,
+      ...(Number.isFinite(expiresAt) ? { subscriptionExpiresAt: expiresAt > 10_000_000_000 ? expiresAt : expiresAt * 1000 } : {})
     }
   } catch {
     return {}

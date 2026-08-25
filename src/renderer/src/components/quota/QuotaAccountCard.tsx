@@ -1,7 +1,7 @@
 import type { AgentModelAssignment, AgentSpeed, ProviderQuotaGroup, ProviderTrackedUsage } from '@shared/types'
 import type { ProviderAccountSnapshot } from '@shared/provider-state'
 import { ChevronDown, Gauge, Link2, Power, RefreshCw, Trash2, Zap } from 'lucide-react'
-import { formatAge, formatCountdown, formatCount, formatExpiry, formatMoney, formatPercent, formatProviderAccountType, quotaWindowState } from './quota-view'
+import { accountWarning, formatAge, formatCountdown, formatCount, formatExpiry, formatInstant, formatMoney, formatPercent, formatProviderAccountType, quotaWindowState } from './quota-view'
 
 export interface QuotaCardAgent {
   id: string
@@ -72,7 +72,7 @@ export default function QuotaAccountCard({
       {stageDetails.length > 0 ? <div className="provider-refresh-stages" aria-label={`Refresh stages for ${accountLabel}`}>
         {stageDetails.map(([stage, status]) => <span key={stage} className={`provider-refresh-stage ${status}`}>{stage} · {status}</span>)}
       </div> : null}
-      {usage?.refreshError || usage?.unavailableReason ? <div className="quota-account-error" role="status">{usage.refreshError ?? usage.unavailableReason}</div> : null}
+      {accountWarning(usage) ? <div className="quota-account-error" role="status">{accountWarning(usage)}</div> : null}
 
       {variant === 'provider' ? <div className="quota-model-summary">
         <span><strong>{account.models.length}</strong> code model{account.models.length === 1 ? '' : 's'}{modelNames.length > 0 ? ` · ${modelNames.slice(0, 3).join(' · ')}` : ''}</span>
@@ -101,7 +101,7 @@ export default function QuotaAccountCard({
         </section>)}
       </div> : <div className="quota-empty">Quota not reported by provider</div>}
 
-      {variant === 'provider' ? <ProviderMetrics tracked={tracked} /> : <SessionMetrics session={session} />}
+      {variant === 'provider' ? <ProviderMetrics tracked={tracked} /> : <SessionMetrics session={session} tracked={tracked} />}
 
       {variant === 'provider' ? <footer className="quota-card-actions">
         <button className="btn small" type="button" disabled={refreshing} onClick={onRefresh}><RefreshCw size={13} aria-hidden="true" />{refreshing ? 'Refreshing…' : 'Refresh'}</button>
@@ -119,7 +119,7 @@ function QuotaWindow({ window }: { window: ProviderQuotaGroup['windows'][number]
   return <div className={`quota-window state-${state}`}>
     <div className="quota-window-label"><span>{window.label}</span><strong>{known ? `${formatPercent(window.remainingPercent)} left` : 'Not reported'}</strong></div>
     {known ? <div className="quota-progress" role="progressbar" aria-label={`${window.label} remaining`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={window.remainingPercent}><span style={{ width: `${window.remainingPercent}%` }} /></div> : null}
-    <span className="quota-window-reset">{window.resetAt ? `Next reset · ${formatCountdown(window.resetAt)}` : 'Reset not reported'}</span>
+    <span className="quota-window-reset">{window.resetAt ? `Next reset · ${formatCountdown(window.resetAt)} · ${formatInstant(window.resetAt)}` : 'Reset not reported'}</span>
   </div>
 }
 
@@ -134,9 +134,10 @@ function ProviderMetrics({ tracked }: { tracked?: ProviderTrackedUsage }) {
   </div>
 }
 
-function SessionMetrics({ session }: { session?: Props['session'] }) {
+function SessionMetrics({ session, tracked }: { session?: Props['session']; tracked?: ProviderTrackedUsage }) {
   return <div className="quota-metrics">
     <span className="quota-metrics-source">Session estimate</span>
+    <Metric label="Requests" value={formatCount(tracked?.requests)} />
     <Metric label="Token in" value={formatCount(session?.input ?? 0)} />
     <Metric label="Token out" value={formatCount(session?.output ?? 0)} />
     <Metric label="Estimated" value={formatMoney(session?.estimatedCost ?? 0)} />

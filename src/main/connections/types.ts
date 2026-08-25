@@ -11,6 +11,7 @@ export interface ProviderSecrets {
   refreshToken?: string
   idToken?: string
   accountId?: string
+  organizationId?: string
   expiresAt?: number
   projectId?: string
   planName?: string

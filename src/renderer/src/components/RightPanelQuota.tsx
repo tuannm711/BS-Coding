@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { AgentModelAssignment, ProviderQuotaGroup, ProviderUsage } from '@shared/types'
 import { shouldAcceptSnapshot, type AgentAssignmentSnapshot, type ProviderAccountSnapshot, type ProviderSnapshot } from '@shared/provider-state'
 import QuotaAccountCard from './quota/QuotaAccountCard'
-import { chatQuotaGroups } from './quota/quota-view'
+import { chatQuotaGroups, quotaAccountState, type QuotaAccountUiState } from './quota/quota-view'
 
 export interface QuotaAgent {
   id: string
@@ -15,8 +15,6 @@ interface SessionTelemetry {
   sessionCost?: number
 }
 
-export type QuotaAccountUiState = 'ready' | 'unavailable' | 'quota-exhausted' | 'capacity-exhausted' | 'cooldown' | 'auth-error'
-
 export interface QuotaRow {
   key: string
   account?: ProviderAccountSnapshot
@@ -26,17 +24,6 @@ export interface QuotaRow {
   models: string[]
   agents: Array<{ id: string; name: string; assignment: AgentModelAssignment; modelLabel?: string; input: number; output: number; cost: number }>
   running: boolean
-}
-
-export function quotaAccountState(account: ProviderAccountSnapshot | undefined, now = Date.now()): QuotaAccountUiState {
-  if (!account) return 'unavailable'
-  if (account.error?.retryAt && account.error.retryAt > now) return 'cooldown'
-  if (account.usage?.resetAt && account.usage.resetAt > now && /quota exhausted|capacity exhausted/i.test(account.usage.unavailableReason ?? '')) return 'cooldown'
-  if (account.error?.kind === 'quota-exhausted' || account.usage?.unavailableReason?.toLowerCase().includes('quota exhausted')) return 'quota-exhausted'
-  if (account.error?.kind === 'capacity-exhausted' || account.usage?.unavailableReason?.toLowerCase().includes('capacity exhausted')) return 'capacity-exhausted'
-  if (account.error?.kind === 'auth' || account.usage?.unavailableReason?.toLowerCase().includes('authentication')) return 'auth-error'
-  if (!account.usage || account.usage.status === 'unavailable') return 'unavailable'
-  return 'ready'
 }
 
 export function buildQuotaRows(agents: QuotaAgent[], snapshot: ProviderSnapshot | null, telemetry: Record<string, SessionTelemetry>): QuotaRow[] {
@@ -118,7 +105,7 @@ export default function RightPanelQuota({ agents }: { agents: QuotaAgent[] }) {
           const providerLabel = snapshot?.providers.find(provider => provider.id === row.account?.providerId)?.displayName
           const account = row.account ?? { id: row.key, providerId: row.agents[0]?.assignment.provider ?? 'provider', label: row.key, authMode: 'imported' as const, status: 'error' as const, models: [], updatedAt: 0 }
           const session = row.agents.reduce((total, agent) => ({ input: total.input + agent.input, output: total.output + agent.output, estimatedCost: total.estimatedCost + agent.cost }), { input: 0, output: 0, estimatedCost: 0 })
-          return <QuotaAccountCard key={row.key} account={account} groups={row.groups} agents={row.agents} session={session} variant="chat" providerLabel={providerLabel} providerState={row.state} onSpeedChange={(agentId, speed) => {
+          return <QuotaAccountCard key={row.key} account={account} groups={row.groups} agents={row.agents} session={session} tracked={account.usage?.tracked} variant="chat" providerLabel={providerLabel} providerState={row.state} onSpeedChange={(agentId, speed) => {
             setSnapshot(previous => previous ? { ...previous, assignments: previous.assignments.map(assignment => assignment.agentId === agentId ? { ...assignment, speed } : assignment) } : previous)
             void window.api.setAgentSpeed(agentId, speed)
           }} />

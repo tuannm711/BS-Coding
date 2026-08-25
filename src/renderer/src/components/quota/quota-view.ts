@@ -1,3 +1,4 @@
+import type { ProviderAccountSnapshot } from '@shared/provider-state'
 import type { ProviderQuotaGroup, ProviderQuotaWindow, ProviderUsage } from '@shared/types'
 
 export function remainingPercent(used?: number): number | undefined {
@@ -28,10 +29,33 @@ export function formatCountdown(timestamp: number | undefined, now = Date.now())
   return `${minutes}m`
 }
 
+export function formatInstant(timestamp?: number): string {
+  if (timestamp === undefined || !Number.isFinite(timestamp)) return '—'
+  const date = new Date(timestamp)
+  const pad = (value: number): string => String(value).padStart(2, '0')
+  return `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())} ${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${date.getFullYear()}`
+}
+
+// A 429 earned by one quota group is stored on the account, so an account-level
+// exhaustion warning must not speak for groups that still have quota.
+export function hasRemainingQuota(usage?: ProviderUsage): boolean {
+  const windows = usage?.quotaGroups?.flatMap(group => group.windows) ?? []
+  return windows.some(window => window.usageKnown && (window.remainingPercent ?? 0) > 0)
+}
+
+export function accountWarning(usage?: ProviderUsage): string | undefined {
+  if (usage?.refreshError) return usage.refreshError
+  const reason = usage?.unavailableReason
+  if (!reason) return undefined
+  if (/quota exhausted|capacity exhausted/i.test(reason) && hasRemainingQuota(usage)) return undefined
+  return reason
+}
+
 export function formatExpiry(timestamp: number | undefined, now = Date.now()): string {
-  if (timestamp === undefined) return '—'
+  if (timestamp === undefined || !Number.isFinite(timestamp)) return '—'
   const days = Math.max(0, Math.ceil((timestamp - now) / 86400000))
-  return days === 0 ? 'expires today' : `expires in ${days}d`
+  const term = timestamp <= now ? 'Expired' : `Term ${days}d`
+  return `${term} · ${formatInstant(timestamp)}`
 }
 
 export function formatAge(timestamp: number | undefined, now = Date.now()): string {
@@ -121,4 +145,18 @@ function legacyModelQuotaGroup(usage: ProviderUsage, modelIds: string[]): Provid
 export function formatProviderAccountType(providerId: string | undefined, authMode: string | undefined): string {
   const name = providerId === 'antigravity' ? 'Antigravity' : providerId === 'openai' ? 'ChatGPT' : providerId ? providerId : 'Provider'
   return authMode === 'oauth' ? `${name} OAuth` : authMode === 'api-key' ? `${name} API key` : `${name} ${authMode ?? 'Account'}`
+}
+
+export type QuotaAccountUiState = 'ready' | 'unavailable' | 'quota-exhausted' | 'capacity-exhausted' | 'cooldown' | 'auth-error'
+
+export function quotaAccountState(account: ProviderAccountSnapshot | undefined, now = Date.now()): QuotaAccountUiState {
+  if (!account) return 'unavailable'
+  if (account.error?.retryAt && account.error.retryAt > now) return 'cooldown'
+  if (account.usage?.resetAt && account.usage.resetAt > now && /quota exhausted|capacity exhausted/i.test(account.usage.unavailableReason ?? '') && !hasRemainingQuota(account.usage)) return 'cooldown'
+  const exhausted = !hasRemainingQuota(account.usage)
+  if (exhausted && (account.error?.kind === 'quota-exhausted' || account.usage?.unavailableReason?.toLowerCase().includes('quota exhausted'))) return 'quota-exhausted'
+  if (exhausted && (account.error?.kind === 'capacity-exhausted' || account.usage?.unavailableReason?.toLowerCase().includes('capacity exhausted'))) return 'capacity-exhausted'
+  if (account.error?.kind === 'auth' || account.usage?.unavailableReason?.toLowerCase().includes('authentication')) return 'auth-error'
+  if (!account.usage || account.usage.status === 'unavailable') return 'unavailable'
+  return 'ready'
 }

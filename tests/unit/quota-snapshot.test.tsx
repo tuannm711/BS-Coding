@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import React from 'react'
 import type { ProviderAccountSnapshot, ProviderSnapshot } from '../../src/shared/provider-state'
-import { buildQuotaRows, quotaAccountState, quotaSelectedAgentLabel } from '../../src/renderer/src/components/RightPanelQuota'
+import { buildQuotaRows, quotaSelectedAgentLabel } from '../../src/renderer/src/components/RightPanelQuota'
+import { quotaAccountState } from '../../src/renderer/src/components/quota/quota-view'
 import * as quotaModule from '../../src/renderer/src/components/RightPanelQuota'
 import { renderToStaticMarkup } from 'react-dom/server'
 import QuotaAccountCard from '../../src/renderer/src/components/quota/QuotaAccountCard'
@@ -148,5 +149,55 @@ describe('snapshot-driven quota cards', () => {
     expect(quotaAccountState(account({ error: { kind: 'capacity-exhausted', message: 'capacity', updatedAt: 1 } }), 10)).toBe('capacity-exhausted')
     expect(quotaAccountState(account({ error: { kind: 'auth', message: 'auth', updatedAt: 1 } }), 10)).toBe('auth-error')
     expect(quotaAccountState(account({ usage: { accountId: 'account-1', refreshedAt: 1, source: 'provider', status: 'ok', unavailableReason: 'Quota exhausted', resetAt: 20 } }), 10)).toBe('cooldown')
+  })
+
+  it('shows both the countdown and the exact reset instant', () => {
+    const resetAt = new Date(2026, 7, 25, 19, 9, 2).getTime()
+    const markup = renderToStaticMarkup(React.createElement(QuotaAccountCard, {
+      account: account(), variant: 'chat',
+      groups: [{ id: 'gemini', label: 'Gemini Models', modelIds: [], windows: [{ id: 'gemini-5h', label: '5-hour', kind: 'session', remainingPercent: 70, resetAt, usageKnown: true, source: 'provider' }] }]
+    } as never))
+    expect(markup).toContain('19:09:02 25/08/2026')
+    expect(markup).toContain('Next reset')
+  })
+
+  it('does not print an exhaustion warning while a group still has quota', () => {
+    const usage = { accountId: 'account-1', refreshedAt: 1, source: 'provider' as const, status: 'ok' as const, unavailableReason: 'Quota exhausted', quotaGroups: [{ id: 'gemini', label: 'Gemini Models', modelIds: [], windows: [{ id: 'gemini-5h', label: '5-hour', kind: 'session' as const, remainingPercent: 94, resetAt: 200, usageKnown: true, source: 'provider' as const }] }] }
+    const markup = renderToStaticMarkup(React.createElement(QuotaAccountCard, { account: account({ usage }), variant: 'chat', groups: usage.quotaGroups } as never))
+    expect(markup).not.toContain('Quota exhausted')
+  })
+
+  it('keeps the account state ready while a group still has quota', () => {
+    const usage = { accountId: 'account-1', refreshedAt: 1, source: 'provider' as const, status: 'ok' as const, unavailableReason: 'Quota exhausted', resetAt: 20, quotaGroups: [{ id: 'gemini', label: 'Gemini Models', modelIds: [], windows: [{ id: 'gemini-5h', label: '5-hour', kind: 'session' as const, remainingPercent: 94, resetAt: 200, usageKnown: true, source: 'provider' as const }] }] }
+    expect(quotaAccountState(account({ usage }), 10)).toBe('ready')
+  })
+
+  it('still reports cooldown when every window is drained', () => {
+    const usage = { accountId: 'account-1', refreshedAt: 1, source: 'provider' as const, status: 'ok' as const, unavailableReason: 'Quota exhausted', resetAt: 20, quotaGroups: [{ id: 'gemini', label: 'Gemini Models', modelIds: [], windows: [{ id: 'gemini-5h', label: '5-hour', kind: 'session' as const, remainingPercent: 0, resetAt: 200, usageKnown: true, source: 'provider' as const }] }] }
+    expect(quotaAccountState(account({ usage }), 10)).toBe('cooldown')
+  })
+
+  it('shows the tracked request count in the chat panel', () => {
+    const tracked = { periodKey: 'weekly:1', periodStart: 1, requests: 603, tokensInput: 0, tokensCache: 0, tokensOutput: 0, estimatedBilled: 0, source: 'bs-tracked' as const }
+    const markup = renderToStaticMarkup(React.createElement(QuotaAccountCard, { account: account(), variant: 'chat', groups: [], tracked } as never))
+    expect(markup).toContain('Requests')
+    expect(markup).toContain('603')
+  })
+
+  it('does not report exhaustion from a group-scoped provider error while another group has quota', () => {
+    const usage = { accountId: 'account-1', refreshedAt: 1, source: 'provider' as const, status: 'ok' as const, quotaGroups: [{ id: 'gemini', label: 'Gemini Models', modelIds: [], windows: [{ id: 'gemini-5h', label: '5-hour', kind: 'session' as const, remainingPercent: 94, resetAt: 200, usageKnown: true, source: 'provider' as const }] }] }
+    const error = { kind: 'quota-exhausted' as const, message: 'Antigravity request failed (429): model claude-sonnet-4-6', updatedAt: 1 }
+    expect(quotaAccountState(account({ usage, error }), 10)).toBe('ready')
+  })
+
+  it('still reports exhaustion from a provider error once every window is drained', () => {
+    const usage = { accountId: 'account-1', refreshedAt: 1, source: 'provider' as const, status: 'ok' as const, quotaGroups: [{ id: 'gemini', label: 'Gemini Models', modelIds: [], windows: [{ id: 'gemini-5h', label: '5-hour', kind: 'session' as const, remainingPercent: 0, resetAt: 200, usageKnown: true, source: 'provider' as const }] }] }
+    const error = { kind: 'quota-exhausted' as const, message: 'x', updatedAt: 1 }
+    expect(quotaAccountState(account({ usage, error }), 10)).toBe('quota-exhausted')
+  })
+
+  it('reports exhaustion from a provider error when no quota windows are known at all', () => {
+    const error = { kind: 'quota-exhausted' as const, message: 'x', updatedAt: 1 }
+    expect(quotaAccountState(account({ error }), 10)).toBe('quota-exhausted')
   })
 })
