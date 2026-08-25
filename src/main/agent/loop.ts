@@ -23,6 +23,10 @@ export interface LoopDeps {
   turn?: number
   model: string
   system: string
+  // Appended at stream time, so the caller can vary it per turn. The shared
+  // session uses this: its prompt is decided when the turn runs, not when the
+  // runner is built and cached for the agent.
+  systemSuffix?: () => string
   systemInstructionPaths?: ReadonlySet<string>
   cwd: string
   llm: LlmClient
@@ -129,7 +133,7 @@ export class SessionRunner {
       try {
         const stream = this.deps.llm.stream({
           model: this.deps.model,
-          system: this.deps.system,
+          system: this.deps.system + (this.deps.systemSuffix?.() ?? ''),
           messages: llmMessages,
           tools: isLastStep ? [] : this.visibleToolDefs(),
           signal,

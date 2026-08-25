@@ -83,6 +83,11 @@ function unavailableProviderRuntime(providerId: string): LlmClient {
   }
 }
 
+const SHARED_SESSION_RECORD_NOTE = '\n\nThis session is shared between agents. Blocks headed ' +
+  '"[Session log ...]" in the history are records of tools that already ran; they are not ' +
+  'messages and not a format to reproduce. To use a tool, call it through the tool interface. ' +
+  'Writing out what a call would look like does not run anything.'
+
 export class BsAgentManager {
   private runners = new Map<string, SessionRunner>()
   private agents = new Map<string, AgentConfig>()
@@ -1308,6 +1313,12 @@ export class BsAgentManager {
       turn: 1,
       model: resolved.model,
       system: resolved.systemPrompt + modeNote + instructions + skillListText(skills),
+      // Only a shared session compiles prior turns into records, so only it
+      // needs to be told what they are. The weakest of the three defences
+      // against narrated tool calls, and not relied on alone.
+      systemSuffix: () => this.executionForAgent(agent.id)
+        ? SHARED_SESSION_RECORD_NOTE
+        : '',
       systemInstructionPaths: new Set(instructionFiles.map(f => f.path)),
       cwd: agent.cwd,
       llm: llmClient,
