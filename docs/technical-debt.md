@@ -195,15 +195,18 @@ shared asset and would need to learn the variants.
 `docs/superpowers/audits/2026-08-25-opencode-gap-audit.md`, which supersedes the
 note this entry used to summarise.
 
-Of the eight high-value items, four are built and three are partly built. What
+Of the eight high-value items, five are built and three are partly built. What
 remains, in the order the audit recommends:
 
 1. **A stats surface.** `calcCost` and `StatsSummary` are computed in
    `src/main/bs-agent-manager.ts` and read by nothing in `src/renderer`. The
    numbers exist and cannot be seen. Cheapest item, and it serves routing: what
    an account has cost is the other half of what quota it has left.
-2. **Compaction auto-continue.** `pruneToolOutputs` exists; resuming a turn
-   after compaction does not, so a long turn that compacts simply stops.
+2. **Compaction robustness.** Both halves of the original item are built:
+   `pruneToolOutputs` prunes, and `compactIfOverThreshold` runs in-loop so the
+   turn continues. What remains is a cap and a blind spot — `MAX_COMPACT_PER_RUN`
+   is 2, past which the turn proceeds over the limit, and a provider rejection
+   for length is not recovered from.
 3. **LLM session titles.** Renaming works; the automatic title is still the
    `titleFrom` heuristic.
 4. **Message-granular undo.** `undoTurn` and `pushTurn` give turn-granular undo
