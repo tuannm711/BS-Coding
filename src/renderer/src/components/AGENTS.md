@@ -20,8 +20,12 @@ terminal/chat, sidebar, status bar, title bar, and dialogs. All data flows throu
 | `UpdateDialog.tsx` | Auto-update status + install prompt. |
 | `BrowserDialog.tsx` | Chrome bridge pairing + status UI. |
 | `InstallGuideDialog.tsx` | Extension install steps for the browser bridge. |
-| `ChallengeToast.tsx` | ChatGPT web challenge toast. |
 | `AddAgentDialog.tsx` / `AddProjectDialog.tsx` | Creation dialogs. |
+| `RightPanel.tsx` | Tab host for the file tree, artifacts and quota. |
+| `RightPanelTree.tsx` / `RightPanelArtifacts.tsx` / `RightPanelQuota.tsx` | The three right-panel tabs. |
+| `FileViewer.tsx` / `FileContextMenu.tsx` | Read-only file view and its context menu. |
+| `quota/` | Quota cards and their shared view model — see `docs/design/03-providers.md`. |
+| `trace/` | Trace inspector, timeline and subagent tree. |
 | `chat/` | The native-agent chat UI — see its own AGENTS.md. |
 | `settings/` | Settings dialog + tabs — see its own AGENTS.md. |
 

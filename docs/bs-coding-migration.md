@@ -1,5 +1,8 @@
 # BS Coding migration
 
+> Migration notes from the Meow Coding profile. Mentions of the former name here are
+> historical and correct.
+
 BS Coding is the renamed distribution of this application. The first BS release uses a new Electron application identity (`com.bs.coding`) and publishes from `tuannm711/BS-Coding`.
 
 On first launch, BS Coding copies missing data from the legacy Meow Coding profile into the BS profile and converts known native-agent records (`meow` to `bs`). The legacy directory is never deleted or overwritten, so it remains available for recovery. Existing BS files always take precedence.

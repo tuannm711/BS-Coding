@@ -27,6 +27,10 @@ commands, references, compaction and usage accounting. Orchestrated by `BsAgentM
 | `plugin.ts` | Loads user tools from `userData/tools`. |
 | `skill.ts` | Collects skills (builtin + user) into `skillListText` for the system prompt. |
 | `instructions.ts` | Loads `AGENTS.md`-style instructions into the system prompt. |
+| `shared-session-coordinator.ts` | `SharedSessionCoordinator`: one session, several agents, one turn at a time — the per-project lock and its queue. |
+| `assignments.ts` | Which provider account and model an agent is bound to. |
+| `provider-stream.ts` / `openai-responses.ts` / `antigravity-llm.ts` | Provider-specific stream adapters behind `LlmClient`. |
+| `workspace-reconcile.ts` | Reconciles stored agents against the workspace on open. |
 | `tools/` `lsp/` `mcp/` | Tool implementations and service clients — see their own AGENTS.md. |
 
 ## Conventions

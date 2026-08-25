@@ -65,6 +65,10 @@ Alias `@shared` → `src/shared` (đã cấu hình trong electron.vite.config.ts
 
 ## Docs
 
+- `docs/design/` — **tài liệu thiết kế: hệ thống hiện là gì.** Bắt đầu từ `docs/design/README.md`;
+  mỗi tài liệu miền mở đầu bằng TOC có khoảng dòng và danh sách tên, và overview có chỉ mục tên
+  xuyên file để nhảy thẳng tới nơi giải thích.
+- `docs/technical-debt.md` — việc đã hoãn, kèm lý do hoãn và điều kiện để đóng.
 - `docs/superpowers/specs` — design specs; `docs/superpowers/plans` — kế hoạch triển khai.
 - `docs/changelog-format.md` — format viết changelog giữa các version (tái sử dụng mỗi release).
 - Workflow: brainstorm → spec → plan → thực thi (chi tiết trong docs hiện có).

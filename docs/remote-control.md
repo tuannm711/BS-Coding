@@ -1,5 +1,8 @@
 # Remote Control (Mobile)
 
+> Protocol and operator guide. For the design — the command gate, pairing, and what
+> is actually built — see `docs/design/08-remote-control.md`.
+
 Desktop and phone both connect **outbound** to a self-hosted WebSocket relay, so no ports or NAT
 config are needed on either side. The relay only routes opaque messages between a single paired
 desktop–mobile pair and stores nothing; it never interprets payloads. Trust is established by a

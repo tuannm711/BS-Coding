@@ -1,5 +1,10 @@
 # ChatGPT Web Provider — Manual Smoke Test
 
+> **Superseded.** The ChatGPT web provider was removed; `src/main/providers/adapters/`
+> now holds only openai, antigravity, github-copilot, openai-compatible and a test
+> fixture. Kept as a record of how that provider was verified. For the providers
+> that exist today see `docs/design/03-providers.md`.
+
 Automated tests cover every pure function (prompt compiling, response parsing,
 model catalog, session store, manager facade). They cannot cover real browser
 automation. Run this checklist by hand after any change to

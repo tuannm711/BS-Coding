@@ -19,6 +19,10 @@ main process config.
 | `UpdatesTab.tsx` | Update channel + check/install. |
 | `Modal.tsx` | Reusable modal shell for the settings dialog. |
 
+| `RemoteTab.tsx` | Remote control: enable, pairing code, revoke. |
+| `AddProviderModal.tsx` | Connect a provider account. |
+| `AgentPromptModal.tsx` | Per-agent system prompt override. |
+
 ## Conventions
 
 - `BsSettings` shape lives in `src/shared/types.ts`; adding a setting touches shared types + `src/main/agent/config.ts` normalize + this dialog.
