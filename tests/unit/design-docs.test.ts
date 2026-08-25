@@ -7,14 +7,36 @@ const designDir = path.resolve('docs/design')
 const designFiles = existsSync(designDir) ? readdirSync(designDir).filter(name => name.endsWith('.md')) : []
 
 describe('design doc toc generator', () => {
-  it('lists every heading with its anchor and line number', () => {
+  it('lists every heading with its anchor and range, nesting the deeper ones', () => {
     const doc = ['# Title', '', '<!-- toc -->', '<!-- /toc -->', '', '## First section', '', 'body', '', '### Nested bit'].join('\n')
     expect(renderToc(doc)).toBe([
-      '| Section | Line |',
-      '| --- | --- |',
-      '| [First section](#first-section) | 6 |',
-      '| &nbsp;&nbsp;[Nested bit](#nested-bit) | 10 |'
+      '| Section | Lines | Names |',
+      '| --- | --- | --- |',
+      '| [First section](#first-section) | 6-9 |  |',
+      '| &nbsp;&nbsp;[Nested bit](#nested-bit) | 10-10 |  |'
     ].join('\n'))
+  })
+
+  it('gives each section a line range and the symbols it names', () => {
+    const doc = ['# Title', '', '<!-- toc -->', '<!-- /toc -->', '', '## Alpha', '', 'uses `MainApp` and `Channels` here', '', '## Beta', '', 'body'].join('\n')
+    const toc = applyToc(doc)
+    expect(toc).toContain('| Section | Lines | Names |')
+    expect(toc).toMatch(/\[Alpha\]\(#alpha\) \| 10-13 \| `MainApp`, `Channels` \|/)
+  })
+
+  it('ends the last range at the last line of the document', () => {
+    const doc = ['# Title', '', '<!-- toc -->', '<!-- /toc -->', '', '## Only', '', 'last line'].join('\n')
+    const applied = applyToc(doc)
+    const lines = applied.split('\n')
+    const range = /\| \d+-(\d+) \|/.exec(applied)
+    expect(Number(range[1])).toBe(lines.length)
+  })
+
+  it('drops backticked prose and commands from the names column', () => {
+    const doc = ['# Title', '', '<!-- toc -->', '<!-- /toc -->', '', '## Alpha', '', 'run `npm test` then call `applyToc`'].join('\n')
+    const tocBlock = applyToc(doc).split('<!-- toc -->')[1].split('<!-- /toc -->')[0]
+    expect(tocBlock).toContain('`applyToc`')
+    expect(tocBlock).not.toContain('npm test')
   })
 
   it('ignores headings inside fenced code blocks', () => {
@@ -35,10 +57,11 @@ describe('design doc toc generator', () => {
     const doc = ['# Title', '', '<!-- toc -->', '<!-- /toc -->', '', '## Alpha', '', 'body', '', '## Beta'].join('\n')
     const applied = applyToc(doc)
     const lines = applied.split('\n')
-    const cited = [...applied.matchAll(/\| \[([^\]]+)\]\([^)]+\) \| (\d+) \|/g)]
+    const cited = [...applied.matchAll(/\| \[([^\]]+)\]\([^)]+\) \| (\d+)-(\d+) \|/g)]
     expect(cited).toHaveLength(2)
-    for (const [, section, line] of cited) {
-      expect(lines[Number(line) - 1]).toBe('## ' + section)
+    for (const [, section, start, end] of cited) {
+      expect(lines[Number(start) - 1]).toBe('## ' + section)
+      expect(Number(end)).toBeGreaterThanOrEqual(Number(start))
     }
   })
 

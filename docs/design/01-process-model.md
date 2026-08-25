@@ -6,13 +6,13 @@ touch, how a message crosses, and how the build keeps the split honest. What run
 *inside* each process belongs to the other design documents.
 
 <!-- toc -->
-| Section | Line |
-| --- | --- |
-| [Pieces](#pieces) | 18 |
-| [Data flow](#data-flow) | 33 |
-| [Types that carry it](#types-that-carry-it) | 54 |
-| [Design decisions](#design-decisions) | 70 |
-| [Known limits](#known-limits) | 99 |
+| Section | Lines | Names |
+| --- | --- | --- |
+| [Pieces](#pieces) | 18-32 | `src/main/index.ts`, `MainApp`, `src/preload/index.ts`, `AgentApi`, `window.api`, `contextBridge` |
+| [Data flow](#data-flow) | 33-53 | `window.api`, `registerIpcHandlers`, `ipcRenderer.on`, `onX`, `AgentApi`, `Event*` |
+| [Types that carry it](#types-that-carry-it) | 54-69 | `src/shared/ipc.ts`, `Channels`, `AgentApi`, `window.api`, `PtyDataEvent`, `AgentStateEvent` |
+| [Design decisions](#design-decisions) | 70-98 | `src/shared`, `src/shared/AGENTS.md`, `Channels`, `AgentApi`, `registerIpcHandlers`, `tests/unit/ipc-contract.test.ts` |
+| [Known limits](#known-limits) | 99-107 | `tests/`, `docs/technical-debt.md` |
 <!-- /toc -->
 
 ## Pieces
