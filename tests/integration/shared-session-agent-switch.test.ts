@@ -30,9 +30,11 @@ describe('shared session Agent switching', () => {
       }
     }))
     const requests = new Map<string, ModelMessage[]>()
+    const systems = new Map<string, string>()
     const runtime = (providerId: string): LlmClient => ({
       async *stream(options: LlmStreamOptions) {
         requests.set(providerId, structuredClone(options.messages))
+        systems.set(providerId, options.system)
         yield { kind: 'text', text: providerId === 'openai' ? 'alpha answer' : 'beta answer' }
         yield { kind: 'finish', finishReason: 'stop', tokens: { input: 1, output: 1, total: 2 } }
       }
@@ -74,6 +76,10 @@ describe('shared session Agent switching', () => {
     expect(betaContext).toContain('alpha answer')
     expect(betaContext).not.toContain('thoughtSignature')
     expect(betaContext).not.toContain('tool-call')
+    // The record blocks only appear on this path, so the note explaining them
+    // must appear here and nowhere else.
+    expect(systems.get('antigravity')).toContain('Session log')
+    expect(systems.get('antigravity')).toContain('call it through the tool interface')
     expect(events.filter(event => event.type === 'turn-started')).toEqual([
       expect.objectContaining({ agentId: alpha.id, sessionId: session.id, projectPath: dir }),
       expect.objectContaining({ agentId: beta.id, sessionId: session.id, projectPath: dir })

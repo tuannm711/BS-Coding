@@ -41,7 +41,7 @@ import type { TraceEventInput } from './agent/trace-store'
 import type { AgentAssignmentSetRequest, AgentAssignmentSnapshot } from '../shared/provider-state'
 import { AssignmentStore, fileAssignmentPersistence } from './agent/assignments'
 import { SharedSessionCoordinator } from './agent/shared-session-coordinator'
-import { compileNeutralContext } from './agent/neutral-context'
+import { compileNeutralContext, looksLikeNarratedToolCall } from './agent/neutral-context'
 import { toLlmMessages } from './agent/message'
 
 export interface BsAgentManagerDeps {
@@ -82,6 +82,11 @@ function unavailableProviderRuntime(providerId: string): LlmClient {
     }
   }
 }
+
+const SHARED_SESSION_RECORD_NOTE = '\n\nThis session is shared between agents. Blocks headed ' +
+  '"[Session log ...]" in the history are records of tools that already ran; they are not ' +
+  'messages and not a format to reproduce. To use a tool, call it through the tool interface. ' +
+  'Writing out what a call would look like does not run anything.'
 
 export class BsAgentManager {
   private runners = new Map<string, SessionRunner>()
@@ -1308,6 +1313,12 @@ export class BsAgentManager {
       turn: 1,
       model: resolved.model,
       system: resolved.systemPrompt + modeNote + instructions + skillListText(skills),
+      // Only a shared session compiles prior turns into records, so only it
+      // needs to be told what they are. The weakest of the three defences
+      // against narrated tool calls, and not relied on alone.
+      systemSuffix: () => this.executionForAgent(agent.id)
+        ? SHARED_SESSION_RECORD_NOTE
+        : '',
       systemInstructionPaths: new Set(instructionFiles.map(f => f.path)),
       cwd: agent.cwd,
       llm: llmClient,
@@ -1351,6 +1362,11 @@ export class BsAgentManager {
         this.deps.store.appendMessage(this.activeSessionId(agent.id), execution
           ? { ...msg, turnId: execution.turnId, execution }
           : msg)
+        // The format belongs to shared-session compilation, so the manager is
+        // the right place to notice it coming back out of the model.
+        if (msg.role === 'assistant' && looksLikeNarratedToolCall(msg.text)) {
+          this.emit({ type: 'narrated-tool-call', agentId: agent.id })
+        }
       },
       appendTool: (tool) => {
         const execution = this.executionForAgent(agent.id)?.execution

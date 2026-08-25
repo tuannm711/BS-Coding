@@ -20,6 +20,7 @@ type FeedItem =
   | { kind: 'tool'; id: string; call: ToolCallData }
   | { kind: 'error'; id: string; text: string }
   | { kind: 'compaction'; id: string; failed?: boolean }
+  | { kind: 'notice'; id: string; text: string }
   | { kind: 'subagent'; taskId: string; subagentType?: string; text: string; reasoning?: string; result?: string; background?: boolean; tools: string[]; state: 'running' | 'completed' | 'cancelled' | 'error' }
 
 interface PendingPrompt {
@@ -423,6 +424,14 @@ if (e.type === 'usage') {
       setItems(prev => [...prev, { kind: 'compaction', id: 'c-' + Date.now(), failed: true }])
       return
     }
+    if (e.type === 'narrated-tool-call') {
+      setItems(prev => [...prev, {
+        kind: 'notice',
+        id: 'n-' + Date.now(),
+        text: 'The model wrote out a tool call instead of making one. Nothing ran.'
+      }])
+      return
+    }
     if (e.type === 'message-removed') {
       setItems(prev => prev.filter(i =>
         !(i.kind === 'message' && (i.id === e.messageId || i.id === 'u-' + e.messageId))
@@ -772,6 +781,9 @@ if (e.type === 'usage') {
         >
         <div className="chat-feed-content" ref={scroll.contentRef}>
         {items.map(item => {
+          if (item.kind === 'notice') {
+            return <div key={item.id} className="chat-notice">{item.text}</div>
+          }
           if (item.kind === 'compaction') {
             return (
               <div key={item.id} className={`chat-compacted ${item.failed ? 'failed' : ''}`}>

@@ -576,6 +576,14 @@ describe('BsAgentManager', () => {
     expect(result.call.error).toMatch(/not permitted in the current mode/)
   })
 
+  it('leaves plain chat without the shared-session record note', async () => {
+    const { manager, llmSystems } = await makeManager()
+    await manager.send('a1', 'first')
+    // Plain chat builds its context with toLlmMessages and never sees a
+    // record, so the note would be advice about something that is not there.
+    expect(llmSystems[0]).not.toContain('Session log')
+  })
+
   it('setMode rebuilds the runner system prompt with a plan note', async () => {
     const { manager, llmSystems } = await makeManager({
       partsQueue: [[{ kind: 'text', text: 'a' }, { kind: 'finish' }], [{ kind: 'text', text: 'b' }, { kind: 'finish' }]]
