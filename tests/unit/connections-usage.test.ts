@@ -26,8 +26,9 @@ describe('provider usage normalization', () => {
     expect(toRemainingPercent(undefined)).toBeUndefined()
   })
 
-  it('marks usage near limit at 90 percent', () => {
-    expect(normalizeUsage({ accountId: 'a', tokensUsed: 90, tokenLimit: 100, refreshedAt: 1 }).status).toBe('near-limit')
+  it('defaults status to ok when the caller does not supply one', () => {
+    expect(normalizeUsage({ accountId: 'a', tokensUsed: 90, tokenLimit: 100, refreshedAt: 1 }).status).toBe('ok')
+    expect(normalizeUsage({ accountId: 'a', refreshedAt: 1, status: 'unavailable' }).status).toBe('unavailable')
   })
 
   it('maps Codex usage fields', () => {

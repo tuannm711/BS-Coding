@@ -112,7 +112,7 @@ export function parseAntigravityQuotaSummary(accountId: string, payload: unknown
     quotaGroups,
     refreshedAt: now,
     source: 'provider',
-    status: remaining <= 20 ? 'near-limit' : 'ok',
+    status: 'ok',
     primaryUsedPercent: 100 - remaining,
     ...(resetAt === undefined ? {} : { resetAt }),
     ...(remaining === 0 ? { unavailableReason: 'Quota exhausted' } : {})
@@ -155,7 +155,7 @@ export function parseAntigravityUsage(accountId: string, payload: unknown, metad
     }
     return [{ id: groupId, label: groupId === 'gemini' ? 'Gemini Models' : 'Claude and GPT models', modelIds: members.map(item => item.modelId), windows: [window] } satisfies ProviderQuotaGroup]
   })
-  return { accountId, ...metadata, refreshedAt: now, source: 'provider', status: remaining <= 0.2 ? 'near-limit' : 'ok', primaryUsedPercent: 100 - fractionPercent(remaining), ...(resetAt === undefined ? {} : { resetAt }), modelQuotas, quotaGroups, ...(remaining === 0 ? { unavailableReason: 'Quota exhausted' } : {}) }
+  return { accountId, ...metadata, refreshedAt: now, source: 'provider', status: 'ok', primaryUsedPercent: 100 - fractionPercent(remaining), ...(resetAt === undefined ? {} : { resetAt }), modelQuotas, quotaGroups, ...(remaining === 0 ? { unavailableReason: 'Quota exhausted' } : {}) }
 }
 
 function quotaGroupsFrom(payload: unknown): CloudCodeQuotaGroup[] {

@@ -364,7 +364,7 @@ export interface ProviderUsage {
   refreshError?: string
   refreshedAt: number
   source: 'provider' | 'internal' | 'unavailable'
-  status: 'ok' | 'near-limit' | 'expired' | 'unavailable'
+  status: 'ok' | 'unavailable'
   unavailableReason?: string
 }
 

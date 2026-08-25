@@ -44,15 +44,11 @@ export function retainLastKnownUsage(previous: ProviderUsage, error: unknown, no
 }
 
 export function normalizeUsage(input: Partial<ProviderUsage> & Pick<ProviderUsage, 'accountId'>): ProviderUsage {
-  const limit = input.tokenLimit ?? 0
-  const used = input.tokensUsed ?? 0
-  const ratio = limit > 0 ? used / limit : 0
-  const percent = input.primaryUsedPercent ?? (ratio * 100)
   return {
     ...input,
     refreshedAt: input.refreshedAt ?? Date.now(),
     source: input.source ?? 'provider',
-    status: input.status ?? (input.subscriptionExpiresAt && input.subscriptionExpiresAt <= Date.now() ? 'expired' : percent >= 90 ? 'near-limit' : 'ok')
+    status: input.status ?? 'ok'
   }
 }
 
