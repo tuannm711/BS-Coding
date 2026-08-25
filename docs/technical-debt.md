@@ -22,6 +22,7 @@ Last reviewed: 2026-08-25 (v1.1.4)
 | 7 | [Google OAuth client secret is public](#7-google-oauth-client-secret-is-public) | Security | Accepted |
 | 8 | [Tray artwork is not platform-specific](#8-tray-artwork-is-not-platform-specific) | Desktop | Low |
 | 9 | [opencode feature gaps](#9-opencode-feature-gaps) | Product | Medium |
+| 10 | [The test runner crashes intermittently](#10-the-test-runner-crashes-intermittently) | Build | Medium |
 
 ---
 
@@ -205,3 +206,24 @@ against opencode 1.18.11 and lists what is missing. The high-value group:
 
 **To close:** each is its own task. The note is dated — verify an item is still
 missing before planning it. This is the agreed next work after v1.1.4.
+
+## 10. The test runner crashes intermittently
+
+**Found:** 2026-08-25, twice while writing the design documentation.
+
+`npm test` exited non-zero with `Serialized Error: { code: 'ERR_IPC_CHANNEL_CLOSED' }`
+and a truncated file count, while reporting no failing assertion. Re-running
+immediately gave a clean pass three times in a row, both times.
+
+Both occurrences followed a burst of `Stop-Process` calls against Electron, so
+it may be a worker-teardown race specific to this machine under load. CI has
+never shown it.
+
+**Why it matters.** The exit code is the gate before a commit. A runner that
+fails for its own reasons trains you to re-run and shrug, which is exactly the
+habit that lets a real failure through. It already cost one commit made against
+a red run in this session.
+
+**To close:** capture a full `--reporter=verbose` log the next time it happens
+rather than re-running, and check whether vitest's `pool` or `poolOptions`
+settings avoid it. Do not chase it without a captured instance.

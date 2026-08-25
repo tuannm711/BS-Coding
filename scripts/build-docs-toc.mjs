@@ -116,16 +116,53 @@ export function buildNameIndex(dir) {
   return index
 }
 
+export const NAMES_OPEN = '<!-- names -->'
+export const NAMES_CLOSE = '<!-- /names -->'
+
+// One hop from a name to the section that introduces it. The first document to
+// mention a name owns it, so the index points at an explanation rather than a
+// passing reference.
+export function renderNameIndex(dir) {
+  const rows = []
+  for (const [symbol, where] of buildNameIndex(dir)) {
+    rows.push(`| \`${symbol}\` | [${where.file}#${anchorFor(where.section)}](${where.file}#${anchorFor(where.section)}) | ${where.line} |`)
+  }
+  rows.sort((a, b) => a.localeCompare(b))
+  return ['| Name | Where | Line |', '| --- | --- | --- |', ...rows].join('\n')
+}
+
+export function applyNameIndex(markdown, dir) {
+  const open = markdown.indexOf(NAMES_OPEN)
+  const close = markdown.indexOf(NAMES_CLOSE)
+  if (open === -1 || close === -1 || close < open) return markdown
+  const head = markdown.slice(0, open + NAMES_OPEN.length)
+  return `${head}\n${renderNameIndex(dir)}\n${markdown.slice(close)}`
+}
+
 export function applyTocToDir(dir) {
   if (!existsSync(dir)) return []
   const rewritten = []
-  for (const name of readdirSync(dir).filter(file => file.endsWith('.md'))) {
+  // Two passes, and the order matters. The name index cites lines in the domain
+  // documents, so their tocs must be settled before it is built. And inserting
+  // the index shifts every line below it, so the host document's own toc has to
+  // be rendered after the index, not before.
+  const files = readdirSync(dir).filter(file => file.endsWith('.md'))
+  for (const name of files) {
     const file = path.join(dir, name)
     const raw = readFileSync(file, 'utf8')
     const next = applyToc(raw)
     if (next !== raw) {
       writeFileSync(file, next)
       rewritten.push(name)
+    }
+  }
+  for (const name of files) {
+    const file = path.join(dir, name)
+    const raw = readFileSync(file, 'utf8')
+    const next = applyToc(applyNameIndex(raw, dir))
+    if (next !== raw) {
+      writeFileSync(file, next)
+      if (!rewritten.includes(name)) rewritten.push(name)
     }
   }
   return rewritten

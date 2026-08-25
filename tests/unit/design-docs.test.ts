@@ -1,7 +1,7 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { applyToc, collectCitedPaths, renderToc } from '../../scripts/build-docs-toc.mjs'
+import { applyToc, collectCitedPaths, renderNameIndex, renderToc } from '../../scripts/build-docs-toc.mjs'
 
 const designDir = path.resolve('docs/design')
 const designFiles = existsSync(designDir) ? readdirSync(designDir).filter(name => name.endsWith('.md')) : []
@@ -78,6 +78,41 @@ describe('design doc toc generator', () => {
   it('strips a line suffix and deduplicates cited paths', () => {
     const doc = 'See `src/main/index.ts:651` and `src/main/index.ts` again.'
     expect(collectCitedPaths(doc)).toEqual(['src/main/index.ts'])
+  })
+})
+
+describe('the name index', () => {
+  it('renders each name once, pointing at the document and line that introduces it', () => {
+    const rendered = renderNameIndex(designDir)
+    expect(rendered).toContain('| Name | Where |')
+    const names = [...rendered.matchAll(/^\| `([^`]+)`/gm)].map(match => match[1])
+    expect(new Set(names).size).toBe(names.length)
+  })
+
+  it('cites a line that really holds that section heading', () => {
+    for (const [, file, line] of renderNameIndex(designDir).matchAll(/\]\((\d{2}-[a-z-]+\.md)#[^)]*\) \| (\d+)/g)) {
+      const lines = readFileSync(path.join(designDir, file), 'utf8').split('\n')
+      expect(lines[Number(line) - 1]).toMatch(/^#{2,3} /)
+    }
+  })
+})
+
+describe('the design overview indexes the detail files', () => {
+  const overview = readFileSync(path.join(designDir, 'README.md'), 'utf8')
+
+  it('links to every domain document', () => {
+    const linked = [...overview.matchAll(/\]\((\d{2}-[a-z-]+\.md)\)/g)].map(match => match[1])
+    expect([...new Set(linked)].sort()).toEqual(designFiles.filter(name => /^\d{2}-/.test(name)).sort())
+  })
+
+  it('carries current work, next work and a pointer to debt', () => {
+    expect(overview).toContain('## Current work')
+    expect(overview).toContain('## Next work')
+    expect(overview).toContain('docs/technical-debt.md')
+  })
+
+  it('does not restate the debt items', () => {
+    expect(overview).not.toContain('Test files are typechecked by nothing')
   })
 })
 
