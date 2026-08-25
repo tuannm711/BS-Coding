@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import React from 'react'
 import type { ProviderAccountSnapshot, ProviderSnapshot } from '../../src/shared/provider-state'
-import { buildQuotaRows, quotaAccountState, quotaSelectedAgentLabel } from '../../src/renderer/src/components/RightPanelQuota'
+import { buildQuotaRows, quotaSelectedAgentLabel } from '../../src/renderer/src/components/RightPanelQuota'
+import { quotaAccountState } from '../../src/renderer/src/components/quota/quota-view'
 import * as quotaModule from '../../src/renderer/src/components/RightPanelQuota'
 import { renderToStaticMarkup } from 'react-dom/server'
 import QuotaAccountCard from '../../src/renderer/src/components/quota/QuotaAccountCard'
@@ -181,5 +182,22 @@ describe('snapshot-driven quota cards', () => {
     const markup = renderToStaticMarkup(React.createElement(QuotaAccountCard, { account: account(), variant: 'chat', groups: [], tracked } as never))
     expect(markup).toContain('Requests')
     expect(markup).toContain('603')
+  })
+
+  it('does not report exhaustion from a group-scoped provider error while another group has quota', () => {
+    const usage = { accountId: 'account-1', refreshedAt: 1, source: 'provider' as const, status: 'ok' as const, quotaGroups: [{ id: 'gemini', label: 'Gemini Models', modelIds: [], windows: [{ id: 'gemini-5h', label: '5-hour', kind: 'session' as const, remainingPercent: 94, resetAt: 200, usageKnown: true, source: 'provider' as const }] }] }
+    const error = { kind: 'quota-exhausted' as const, message: 'Antigravity request failed (429): model claude-sonnet-4-6', updatedAt: 1 }
+    expect(quotaAccountState(account({ usage, error }), 10)).toBe('ready')
+  })
+
+  it('still reports exhaustion from a provider error once every window is drained', () => {
+    const usage = { accountId: 'account-1', refreshedAt: 1, source: 'provider' as const, status: 'ok' as const, quotaGroups: [{ id: 'gemini', label: 'Gemini Models', modelIds: [], windows: [{ id: 'gemini-5h', label: '5-hour', kind: 'session' as const, remainingPercent: 0, resetAt: 200, usageKnown: true, source: 'provider' as const }] }] }
+    const error = { kind: 'quota-exhausted' as const, message: 'x', updatedAt: 1 }
+    expect(quotaAccountState(account({ usage, error }), 10)).toBe('quota-exhausted')
+  })
+
+  it('reports exhaustion from a provider error when no quota windows are known at all', () => {
+    const error = { kind: 'quota-exhausted' as const, message: 'x', updatedAt: 1 }
+    expect(quotaAccountState(account({ error }), 10)).toBe('quota-exhausted')
   })
 })

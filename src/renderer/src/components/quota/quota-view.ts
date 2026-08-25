@@ -1,3 +1,4 @@
+import type { ProviderAccountSnapshot } from '@shared/provider-state'
 import type { ProviderQuotaGroup, ProviderQuotaWindow, ProviderUsage } from '@shared/types'
 
 export function remainingPercent(used?: number): number | undefined {
@@ -143,4 +144,18 @@ function legacyModelQuotaGroup(usage: ProviderUsage, modelIds: string[]): Provid
 export function formatProviderAccountType(providerId: string | undefined, authMode: string | undefined): string {
   const name = providerId === 'antigravity' ? 'Antigravity' : providerId === 'openai' ? 'ChatGPT' : providerId ? providerId : 'Provider'
   return authMode === 'oauth' ? `${name} OAuth` : authMode === 'api-key' ? `${name} API key` : `${name} ${authMode ?? 'Account'}`
+}
+
+export type QuotaAccountUiState = 'ready' | 'unavailable' | 'quota-exhausted' | 'capacity-exhausted' | 'cooldown' | 'auth-error'
+
+export function quotaAccountState(account: ProviderAccountSnapshot | undefined, now = Date.now()): QuotaAccountUiState {
+  if (!account) return 'unavailable'
+  if (account.error?.retryAt && account.error.retryAt > now) return 'cooldown'
+  if (account.usage?.resetAt && account.usage.resetAt > now && /quota exhausted|capacity exhausted/i.test(account.usage.unavailableReason ?? '') && !hasRemainingQuota(account.usage)) return 'cooldown'
+  const exhausted = !hasRemainingQuota(account.usage)
+  if (exhausted && (account.error?.kind === 'quota-exhausted' || account.usage?.unavailableReason?.toLowerCase().includes('quota exhausted'))) return 'quota-exhausted'
+  if (exhausted && (account.error?.kind === 'capacity-exhausted' || account.usage?.unavailableReason?.toLowerCase().includes('capacity exhausted'))) return 'capacity-exhausted'
+  if (account.error?.kind === 'auth' || account.usage?.unavailableReason?.toLowerCase().includes('authentication')) return 'auth-error'
+  if (!account.usage || account.usage.status === 'unavailable') return 'unavailable'
+  return 'ready'
 }

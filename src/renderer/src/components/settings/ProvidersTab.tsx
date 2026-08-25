@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { shouldAcceptSnapshot, type ProviderAccountSnapshot, type ProviderSnapshot } from '@shared/provider-state'
 import QuotaAccountCard from '../quota/QuotaAccountCard'
 import AddProviderModal from './AddProviderModal'
-import { providerQuotaGroups } from '../quota/quota-view'
+import { providerQuotaGroups, quotaAccountState } from '../quota/quota-view'
 
 export function groupProviderAccounts(snapshot: ProviderSnapshot | null) {
   return (snapshot?.providers ?? []).map(provider => ({ provider, accounts: snapshot?.accounts.filter(account => account.providerId === provider.id) ?? [] })).filter(group => group.accounts.length > 0)
@@ -38,7 +38,7 @@ export default function ProvidersTab() {
             const active = account.status === 'active'
             const refreshing = Object.values(account.refreshStages ?? {}).some(stage => stage === 'refreshing')
             return <div className={`provider-account-block ${active ? '' : 'provider-account-disabled'}`} key={account.id}>
-              <QuotaAccountCard account={account} groups={providerQuotaGroups(account.usage)} tracked={account.usage?.tracked} providerLabel={provider.displayName} variant="provider" providerState={account.error ? account.error.kind === 'auth' ? 'auth-error' : account.error.kind === 'quota-exhausted' ? 'quota-exhausted' : account.error.kind === 'capacity-exhausted' ? 'capacity-exhausted' : 'unavailable' : account.usage?.status === 'unavailable' ? 'unavailable' : 'ready'} expandedModels={expandedAccounts.has(account.id)} refreshing={refreshing} onToggleModels={() => setExpandedAccounts(current => {
+              <QuotaAccountCard account={account} groups={providerQuotaGroups(account.usage)} tracked={account.usage?.tracked} providerLabel={provider.displayName} variant="provider" providerState={quotaAccountState(account)} expandedModels={expandedAccounts.has(account.id)} refreshing={refreshing} onToggleModels={() => setExpandedAccounts(current => {
                 const next = new Set(current)
                 if (next.has(account.id)) next.delete(account.id)
                 else next.add(account.id)

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { AgentModelAssignment, ProviderQuotaGroup, ProviderUsage } from '@shared/types'
 import { shouldAcceptSnapshot, type AgentAssignmentSnapshot, type ProviderAccountSnapshot, type ProviderSnapshot } from '@shared/provider-state'
 import QuotaAccountCard from './quota/QuotaAccountCard'
-import { chatQuotaGroups, hasRemainingQuota } from './quota/quota-view'
+import { chatQuotaGroups, quotaAccountState, type QuotaAccountUiState } from './quota/quota-view'
 
 export interface QuotaAgent {
   id: string
@@ -15,8 +15,6 @@ interface SessionTelemetry {
   sessionCost?: number
 }
 
-export type QuotaAccountUiState = 'ready' | 'unavailable' | 'quota-exhausted' | 'capacity-exhausted' | 'cooldown' | 'auth-error'
-
 export interface QuotaRow {
   key: string
   account?: ProviderAccountSnapshot
@@ -26,17 +24,6 @@ export interface QuotaRow {
   models: string[]
   agents: Array<{ id: string; name: string; assignment: AgentModelAssignment; modelLabel?: string; input: number; output: number; cost: number }>
   running: boolean
-}
-
-export function quotaAccountState(account: ProviderAccountSnapshot | undefined, now = Date.now()): QuotaAccountUiState {
-  if (!account) return 'unavailable'
-  if (account.error?.retryAt && account.error.retryAt > now) return 'cooldown'
-  if (account.usage?.resetAt && account.usage.resetAt > now && /quota exhausted|capacity exhausted/i.test(account.usage.unavailableReason ?? '') && !hasRemainingQuota(account.usage)) return 'cooldown'
-  if (account.error?.kind === 'quota-exhausted' || (account.usage?.unavailableReason?.toLowerCase().includes('quota exhausted') && !hasRemainingQuota(account.usage))) return 'quota-exhausted'
-  if (account.error?.kind === 'capacity-exhausted' || (account.usage?.unavailableReason?.toLowerCase().includes('capacity exhausted') && !hasRemainingQuota(account.usage))) return 'capacity-exhausted'
-  if (account.error?.kind === 'auth' || account.usage?.unavailableReason?.toLowerCase().includes('authentication')) return 'auth-error'
-  if (!account.usage || account.usage.status === 'unavailable') return 'unavailable'
-  return 'ready'
 }
 
 export function buildQuotaRows(agents: QuotaAgent[], snapshot: ProviderSnapshot | null, telemetry: Record<string, SessionTelemetry>): QuotaRow[] {
