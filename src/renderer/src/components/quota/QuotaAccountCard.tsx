@@ -101,7 +101,7 @@ export default function QuotaAccountCard({
         </section>)}
       </div> : <div className="quota-empty">Quota not reported by provider</div>}
 
-      {variant === 'provider' ? <ProviderMetrics tracked={tracked} /> : <SessionMetrics session={session} />}
+      {variant === 'provider' ? <ProviderMetrics tracked={tracked} /> : <SessionMetrics session={session} tracked={tracked} />}
 
       {variant === 'provider' ? <footer className="quota-card-actions">
         <button className="btn small" type="button" disabled={refreshing} onClick={onRefresh}><RefreshCw size={13} aria-hidden="true" />{refreshing ? 'Refreshing…' : 'Refresh'}</button>
@@ -134,9 +134,10 @@ function ProviderMetrics({ tracked }: { tracked?: ProviderTrackedUsage }) {
   </div>
 }
 
-function SessionMetrics({ session }: { session?: Props['session'] }) {
+function SessionMetrics({ session, tracked }: { session?: Props['session']; tracked?: ProviderTrackedUsage }) {
   return <div className="quota-metrics">
     <span className="quota-metrics-source">Session estimate</span>
+    <Metric label="Requests" value={formatCount(tracked?.requests)} />
     <Metric label="Token in" value={formatCount(session?.input ?? 0)} />
     <Metric label="Token out" value={formatCount(session?.output ?? 0)} />
     <Metric label="Estimated" value={formatMoney(session?.estimatedCost ?? 0)} />

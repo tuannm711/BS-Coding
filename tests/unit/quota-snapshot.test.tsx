@@ -175,4 +175,11 @@ describe('snapshot-driven quota cards', () => {
     const usage = { accountId: 'account-1', refreshedAt: 1, source: 'provider' as const, status: 'ok' as const, unavailableReason: 'Quota exhausted', resetAt: 20, quotaGroups: [{ id: 'gemini', label: 'Gemini Models', modelIds: [], windows: [{ id: 'gemini-5h', label: '5-hour', kind: 'session' as const, remainingPercent: 0, resetAt: 200, usageKnown: true, source: 'provider' as const }] }] }
     expect(quotaAccountState(account({ usage }), 10)).toBe('cooldown')
   })
+
+  it('shows the tracked request count in the chat panel', () => {
+    const tracked = { periodKey: 'weekly:1', periodStart: 1, requests: 603, tokensInput: 0, tokensCache: 0, tokensOutput: 0, estimatedBilled: 0, source: 'bs-tracked' as const }
+    const markup = renderToStaticMarkup(React.createElement(QuotaAccountCard, { account: account(), variant: 'chat', groups: [], tracked } as never))
+    expect(markup).toContain('Requests')
+    expect(markup).toContain('603')
+  })
 })
