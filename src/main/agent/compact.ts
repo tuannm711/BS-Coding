@@ -205,6 +205,30 @@ export interface CompactDeps {
 }
 
 // Runs the compaction LLM call. Returns the summary text or null on failure.
+const TITLE_SYSTEM = 'Reply with a short title for this coding session. Five words at most. No quotes, no trailing punctuation, no explanation.'
+const TITLE_MAX_CHARS = 60
+
+// A model asked for five words will sometimes answer with a sentence anyway, so
+// anything sentence-length is refused rather than stored — the caller keeps the
+// heuristic title, which is wrong but short.
+export async function titleSession(deps: CompactDeps): Promise<string | null> {
+  const { llm, model, prompt, signal } = deps
+  try {
+    let text = ''
+    for await (const part of llm.stream({ model, system: TITLE_SYSTEM, messages: [{ role: 'user', content: prompt }], tools: [], signal })) {
+      if (signal?.aborted) return null
+      if (part.kind === 'text') text += part.text
+      if (part.kind === 'error') return null
+    }
+    if (signal?.aborted) return null
+    const title = text.trim().replace(/^["'“‘]+|["'”’]+$/g, '').replace(/[.!?]+$/, '').trim()
+    if (!title || title.length > TITLE_MAX_CHARS) return null
+    return title
+  } catch {
+    return null
+  }
+}
+
 export async function compactTranscript(deps: CompactDeps): Promise<string | null> {
   const { llm, model, prompt, signal } = deps
   const options: LlmStreamOptions = {

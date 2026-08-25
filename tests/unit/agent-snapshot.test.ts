@@ -156,3 +156,60 @@ describe('revert tool + file tools snapshot', () => {
     expect(r.output).toContain('no changes')
   })
 })
+
+describe('call-granular undo', () => {
+  function setup() {
+    const dir = mkdtempSync(path.join(tmpdir(), 'bs-snap-call-'))
+    const a = path.join(dir, 'a.txt')
+    const b = path.join(dir, 'b.txt')
+    const c = path.join(dir, 'c.txt')
+    for (const [file, text] of [[a, 'A0'], [b, 'B0'], [c, 'C0']] as const) writeFileSync(file, text)
+    const { store } = makeStore()
+    store.beginTurn('s1', { sessionId: 's1', turnId: 't1', agentId: 'ag1' })
+    store.snapshot('s1', a, 'A0', 'call-1')
+    store.snapshot('s1', b, 'B0', 'call-1')
+    store.snapshot('s1', c, 'C0', 'call-2')
+    for (const [file, text] of [[a, 'A1'], [b, 'B1'], [c, 'C1']] as const) writeFileSync(file, text)
+    store.commitTurn('s1')
+    return { store, a, b, c }
+  }
+
+  it('restores only the files one call touched', () => {
+    const { store, a, b, c } = setup()
+    expect(store.undoCall('s1', 'call-1')).not.toBeNull()
+    expect(readFileSync(a, 'utf-8')).toBe('A0')
+    expect(readFileSync(b, 'utf-8')).toBe('B0')
+    expect(readFileSync(c, 'utf-8')).toBe('C1')
+  })
+
+  it('still undoes the whole turn after one call has been undone', () => {
+    const { store, c } = setup()
+    store.undoCall('s1', 'call-1')
+    expect(store.undo('s1')).not.toBeNull()
+    expect(readFileSync(c, 'utf-8')).toBe('C0')
+  })
+
+  it('reports nothing for a call it never recorded', () => {
+    const { store } = setup()
+    expect(store.undoCall('s1', 'call-missing')).toBeNull()
+  })
+
+  it('keeps call ids across a load, which strips any field normalize forgets', () => {
+    const { store } = setup()
+    expect(store.undoCall('s1', 'call-2')).not.toBeNull()
+  })
+
+  it('undoes at turn level for a snapshot stored without call ids', () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'bs-snap-legacy-'))
+    const file = path.join(dir, 'legacy.txt')
+    writeFileSync(file, 'L0')
+    const { store } = makeStore()
+    store.beginTurn('s2', { sessionId: 's2', turnId: 't1', agentId: 'ag1' })
+    store.snapshot('s2', file, 'L0')
+    writeFileSync(file, 'L1')
+    store.commitTurn('s2')
+    expect(store.undoCall('s2', 'any')).toBeNull()
+    expect(store.undo('s2')).not.toBeNull()
+    expect(readFileSync(file, 'utf-8')).toBe('L0')
+  })
+})

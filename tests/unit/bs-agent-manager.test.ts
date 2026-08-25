@@ -71,6 +71,15 @@ async function makeManager(opts: StubLlmOptions & {
   const createLlm = vi.fn((): LlmClient => {
     llmClient = {
       async *stream(request: LlmStreamOptions): AsyncGenerator<LlmStreamPart> {
+        // A session's first turn is followed by a short request asking the model
+        // for a title. In production that is its own request; here it must not
+        // consume a queued turn response or read as a turn in these records,
+        // which every assertion below reads positionally.
+        if (request.system.startsWith('Reply with a short title')) {
+          yield { kind: 'text', text: 'A test session' }
+          yield { kind: 'finish' }
+          return
+        }
         llmCalls.push((request.tools ?? []).map(t => t.name))
         llmSystems.push(request.system)
         llmVariants.push(request.variantOptions)

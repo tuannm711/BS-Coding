@@ -9,8 +9,9 @@ import CommandsTab from './CommandsTab'
 import RemoteTab from './RemoteTab'
 import TemplatesTab from './TemplatesTab'
 import UpdatesTab from './UpdatesTab'
+import StatsTab from './StatsTab'
 
-type TabId = 'providers' | 'agents' | 'permissions' | 'mcp' | 'context' | 'commands' | 'remote' | 'templates' | 'updates'
+type TabId = 'providers' | 'agents' | 'permissions' | 'mcp' | 'context' | 'commands' | 'remote' | 'templates' | 'updates' | 'stats'
 
 const TABS: Array<{ id: TabId; label: string }> = [
   { id: 'providers', label: 'Providers' },
@@ -19,7 +20,8 @@ const TABS: Array<{ id: TabId; label: string }> = [
   { id: 'mcp', label: 'MCP' },
   { id: 'context', label: 'Context' },
   { id: 'commands', label: 'Commands' },
-  { id: 'updates', label: 'Updates' }
+  { id: 'updates', label: 'Updates' },
+  { id: 'stats', label: 'Usage' }
 ]
 
 interface Props {
@@ -151,6 +153,7 @@ export default function SettingsDialog({ onClose, projectPath, templates, onTemp
             {tab === 'remote' && <RemoteTab />}
             {tab === 'templates' && <TemplatesTab templates={templates} onChange={onTemplatesChange} />}
             {tab === 'updates' && <UpdatesTab />}
+            {tab === 'stats' && <StatsTab />}
           </div>
         </div>
         {status && <div className="settings-status">{status}</div>}

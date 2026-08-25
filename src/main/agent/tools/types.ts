@@ -19,6 +19,9 @@ export interface ToolContext {
   signal?: AbortSignal
   agentId?: string
   snapshotScopeId?: string
+  // The id of the tool call being executed, so a snapshot can be attributed to
+  // it and undone on its own.
+  toolCallId?: string
   taskId?: string
   turn?: number
   snapshots?: SnapshotStore

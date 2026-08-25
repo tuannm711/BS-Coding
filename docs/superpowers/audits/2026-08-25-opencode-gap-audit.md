@@ -58,7 +58,23 @@ The first draft of this audit called item 8 partly built, repeating the note's
 claim without reading `loop.ts`. That is the same failure the audit was written
 to correct, made inside the correction.
 
-## What genuinely remains
+## Closed on 2026-08-25
+
+All four were built in `feat/close-opencode-gaps`, in the order below.
+
+| # | Item | Commit | What landed |
+|---|---|---|---|
+| 1 | Stats surface | `d5a92ed` | A Usage tab reading `window.api.getStats()`, which nothing had called |
+| 2 | Compaction robustness | `147a9ff`, `d8ab907` | `context-overflow` as its own error kind, and a forced compaction plus one retry per step |
+| 3 | LLM session title | `752e7c9` | One short request per session, guarded against repeats and user renames |
+| 4 | Call-granular undo | `e78440f` | `undoCall` on the tool call id the transcript already carried |
+
+Two estimates in the list below were wrong when written, both claiming something
+absent that was partly present. Item 2's auto-continue already existed; what was
+missing was recovery from a provider rejection. Item 4 was said to need a finer
+identity in the transcript; the identity was there and simply unused.
+
+## What was thought to remain
 
 Ordered by what the multi-account goal needs, not by opencode parity.
 

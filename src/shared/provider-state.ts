@@ -81,6 +81,13 @@ export function isAssignmentCompatible(assignment: Pick<AgentAssignmentSnapshot,
 export function classifyProviderError(statusCode: number | undefined, message: string, now = Date.now()): ProviderErrorState {
   const normalized = message.toLowerCase()
   const capacity = normalized.includes('capacity') || normalized.includes('model_out_of_compute') || normalized.includes('out_of_compute')
+  // A length rejection is recoverable by compacting and retrying, so it must be
+  // distinguishable from every other bad request. Providers word it differently
+  // and a stream error may carry no status code at all.
+  const overflow = normalized.includes('context_length_exceeded')
+    || normalized.includes('maximum context length')
+    || normalized.includes('too many tokens')
+    || normalized.includes('prompt is too long')
   const kind: ProviderErrorKind = statusCode === 401 || statusCode === 403
     ? 'auth'
     : statusCode === 404 && (normalized.includes('not_found') || normalized.includes('not found'))
@@ -91,7 +98,9 @@ export function classifyProviderError(statusCode: number | undefined, message: s
       ? 'quota-exhausted'
       : statusCode === 429
         ? 'capacity-exhausted'
-        : statusCode === 400
+        : overflow
+          ? 'context-overflow'
+          : statusCode === 400
           ? 'invalid-request'
           : statusCode && statusCode >= 500
             ? 'unavailable'
