@@ -28,6 +28,28 @@ export function formatCountdown(timestamp: number | undefined, now = Date.now())
   return `${minutes}m`
 }
 
+export function formatInstant(timestamp?: number): string {
+  if (timestamp === undefined || !Number.isFinite(timestamp)) return '—'
+  const date = new Date(timestamp)
+  const pad = (value: number): string => String(value).padStart(2, '0')
+  return `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())} ${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${date.getFullYear()}`
+}
+
+// A 429 earned by one quota group is stored on the account, so an account-level
+// exhaustion warning must not speak for groups that still have quota.
+export function hasRemainingQuota(usage?: ProviderUsage): boolean {
+  const windows = usage?.quotaGroups?.flatMap(group => group.windows) ?? []
+  return windows.some(window => window.usageKnown && (window.remainingPercent ?? 0) > 0)
+}
+
+export function accountWarning(usage?: ProviderUsage): string | undefined {
+  if (usage?.refreshError) return usage.refreshError
+  const reason = usage?.unavailableReason
+  if (!reason) return undefined
+  if (/quota exhausted|capacity exhausted/i.test(reason) && hasRemainingQuota(usage)) return undefined
+  return reason
+}
+
 export function formatExpiry(timestamp: number | undefined, now = Date.now()): string {
   if (timestamp === undefined) return '—'
   const days = Math.max(0, Math.ceil((timestamp - now) / 86400000))

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { chatQuotaGroups, formatCountdown, formatExpiry, providerQuotaGroups, quotaWindowState, remainingPercent, usageRemaining } from '../../src/renderer/src/components/quota/quota-view'
+import { accountWarning, chatQuotaGroups, formatCountdown, formatExpiry, formatInstant, hasRemainingQuota, providerQuotaGroups, quotaWindowState, remainingPercent, usageRemaining } from '../../src/renderer/src/components/quota/quota-view'
 import type { ProviderUsage } from '../../src/shared/types'
 
 describe('quota card view model', () => {
@@ -48,5 +48,40 @@ describe('quota card view model', () => {
 
   it('does not show healthy remaining quota while the provider reports quota exhaustion', () => {
     expect(usageRemaining({ accountId: 'a1', refreshedAt: 1, source: 'provider', status: 'ok', primaryUsedPercent: 0 }, 'quota-exhausted')).toEqual({ primary: 0, secondary: undefined })
+  })
+
+  it('formats an instant as zero-padded 24-hour local time', () => {
+    expect(formatInstant(new Date(2026, 7, 25, 9, 5, 2).getTime())).toBe('09:05:02 25/08/2026')
+    expect(formatInstant(new Date(2026, 11, 3, 19, 9, 2).getTime())).toBe('19:09:02 03/12/2026')
+  })
+
+  it('returns a dash when no instant is known', () => {
+    expect(formatInstant(undefined)).toBe('—')
+    expect(formatInstant(Number.NaN)).toBe('—')
+  })
+
+  it('reports remaining quota when any window is above zero', () => {
+    expect(hasRemainingQuota(groupedUsage)).toBe(true)
+    expect(hasRemainingQuota(undefined)).toBe(false)
+  })
+
+  it('reports no remaining quota when every window is at zero', () => {
+    const drained: ProviderUsage = { ...groupedUsage, quotaGroups: groupedUsage.quotaGroups!.map(group => ({ ...group, windows: group.windows.map(window => ({ ...window, remainingPercent: 0 })) })) }
+    expect(hasRemainingQuota(drained)).toBe(false)
+  })
+
+  it('hides an exhaustion warning while some group still has quota', () => {
+    expect(accountWarning({ ...groupedUsage, unavailableReason: 'Quota exhausted' })).toBeUndefined()
+    expect(accountWarning({ ...groupedUsage, unavailableReason: 'Model capacity exhausted' })).toBeUndefined()
+  })
+
+  it('keeps an exhaustion warning when every group is drained', () => {
+    const drained: ProviderUsage = { ...groupedUsage, unavailableReason: 'Quota exhausted', quotaGroups: groupedUsage.quotaGroups!.map(group => ({ ...group, windows: group.windows.map(window => ({ ...window, remainingPercent: 0 })) })) }
+    expect(accountWarning(drained)).toBe('Quota exhausted')
+  })
+
+  it('never hides a refresh error or a non-exhaustion reason', () => {
+    expect(accountWarning({ ...groupedUsage, refreshError: 'boom', unavailableReason: 'Quota exhausted' })).toBe('boom')
+    expect(accountWarning({ ...groupedUsage, unavailableReason: 'Authentication expired' })).toBe('Authentication expired')
   })
 })
