@@ -4,12 +4,12 @@ import type { AddressInfo } from 'node:net'
 import { createLlm } from '../../src/main/agent/llm'
 import type { LlmStreamOptions } from '../../src/main/agent/llm'
 
-function openaiCompletion() {
-  return JSON.stringify({
-    id: 'chatcmpl-1', object: 'chat.completion', created: 1, model: 'x',
-    choices: [{ index: 0, message: { role: 'assistant', content: 'ok' }, finish_reason: 'stop' }],
-    usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 }
-  })
+function openaiStream() {
+  return [
+    'data: {"id":"chatcmpl-1","object":"chat.completion.chunk","created":1,"model":"x","choices":[{"index":0,"delta":{"role":"assistant","content":"ok"},"finish_reason":null}]}',
+    'data: {"id":"chatcmpl-1","object":"chat.completion.chunk","created":1,"model":"x","choices":[{"index":0,"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}',
+    'data: [DONE]'
+  ].map(line => line + '\n\n').join('')
 }
 
 function googleCompletion() {
@@ -20,14 +20,14 @@ function googleCompletion() {
   })
 }
 
-function captureServer(completionBody: string) {
+function captureServer(completionBody: string, contentType = 'application/json') {
   const bodies: string[] = []
   const server = createServer((req, res) => {
     let data = ''
     req.on('data', c => { data += c })
     req.on('end', () => {
       bodies.push(data)
-      res.writeHead(200, { 'content-type': 'application/json' })
+      res.writeHead(200, { 'content-type': contentType })
       res.end(completionBody)
     })
   })
@@ -40,7 +40,7 @@ function opts(partial: Partial<LlmStreamOptions>): LlmStreamOptions {
 
 describe('llm variantOptions merging', () => {
   it('openai-compatible: merges variantOptions into providerOptions', async () => {
-    const { server, bodies } = captureServer(openaiCompletion())
+    const { server, bodies } = captureServer(openaiStream(), 'text/event-stream')
     await new Promise<void>(r => server.listen(0, r))
     const port = (server.address() as AddressInfo).port
     const llm = createLlm('deepseek', 'sk-test', `http://127.0.0.1:${port}/v1`)
@@ -102,7 +102,7 @@ describe('llm variantOptions merging', () => {
   })
 
   it('sends nothing when variantOptions is absent', async () => {
-    const { server, bodies } = captureServer(openaiCompletion())
+    const { server, bodies } = captureServer(openaiStream(), 'text/event-stream')
     await new Promise<void>(r => server.listen(0, r))
     const port = (server.address() as AddressInfo).port
     const llm = createLlm('deepseek', 'sk-test', `http://127.0.0.1:${port}/v1`)
