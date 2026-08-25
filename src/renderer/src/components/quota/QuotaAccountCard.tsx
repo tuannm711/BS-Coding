@@ -1,7 +1,7 @@
 import type { AgentModelAssignment, AgentSpeed, ProviderQuotaGroup, ProviderTrackedUsage } from '@shared/types'
 import type { ProviderAccountSnapshot } from '@shared/provider-state'
 import { ChevronDown, Gauge, Link2, Power, RefreshCw, Trash2, Zap } from 'lucide-react'
-import { formatAge, formatCountdown, formatCount, formatExpiry, formatMoney, formatPercent, formatProviderAccountType, quotaWindowState } from './quota-view'
+import { accountWarning, formatAge, formatCountdown, formatCount, formatExpiry, formatInstant, formatMoney, formatPercent, formatProviderAccountType, quotaWindowState } from './quota-view'
 
 export interface QuotaCardAgent {
   id: string
@@ -119,7 +119,7 @@ function QuotaWindow({ window }: { window: ProviderQuotaGroup['windows'][number]
   return <div className={`quota-window state-${state}`}>
     <div className="quota-window-label"><span>{window.label}</span><strong>{known ? `${formatPercent(window.remainingPercent)} left` : 'Not reported'}</strong></div>
     {known ? <div className="quota-progress" role="progressbar" aria-label={`${window.label} remaining`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={window.remainingPercent}><span style={{ width: `${window.remainingPercent}%` }} /></div> : null}
-    <span className="quota-window-reset">{window.resetAt ? `Next reset · ${formatCountdown(window.resetAt)}` : 'Reset not reported'}</span>
+    <span className="quota-window-reset">{window.resetAt ? `Next reset · ${formatCountdown(window.resetAt)} · ${formatInstant(window.resetAt)}` : 'Reset not reported'}</span>
   </div>
 }
 

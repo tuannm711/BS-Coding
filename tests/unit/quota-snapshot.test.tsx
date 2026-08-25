@@ -149,4 +149,14 @@ describe('snapshot-driven quota cards', () => {
     expect(quotaAccountState(account({ error: { kind: 'auth', message: 'auth', updatedAt: 1 } }), 10)).toBe('auth-error')
     expect(quotaAccountState(account({ usage: { accountId: 'account-1', refreshedAt: 1, source: 'provider', status: 'ok', unavailableReason: 'Quota exhausted', resetAt: 20 } }), 10)).toBe('cooldown')
   })
+
+  it('shows both the countdown and the exact reset instant', () => {
+    const resetAt = new Date(2026, 7, 25, 19, 9, 2).getTime()
+    const markup = renderToStaticMarkup(React.createElement(QuotaAccountCard, {
+      account: account(), variant: 'chat',
+      groups: [{ id: 'gemini', label: 'Gemini Models', modelIds: [], windows: [{ id: 'gemini-5h', label: '5-hour', kind: 'session', remainingPercent: 70, resetAt, usageKnown: true, source: 'provider' }] }]
+    } as never))
+    expect(markup).toContain('19:09:02 25/08/2026')
+    expect(markup).toContain('Next reset')
+  })
 })
