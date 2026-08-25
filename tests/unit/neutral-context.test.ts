@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { compileNeutralContext } from '../../src/main/agent/neutral-context'
+import { compileNeutralContext, looksLikeNarratedToolCall } from '../../src/main/agent/neutral-context'
 import type { ChatTranscriptItem, TurnExecutionSnapshot } from '../../src/shared/types'
 
 const execution = (status: TurnExecutionSnapshot['status']): TurnExecutionSnapshot => ({
@@ -57,5 +57,22 @@ describe('compileNeutralContext', () => {
     const serialized = JSON.stringify(compileNeutralContext(items, { toolOutputMaxChars: 4 }))
     expect(serialized).toContain('Session log')
     expect(serialized).toContain('tool interface')
+  })
+})
+
+describe('looksLikeNarratedToolCall', () => {
+  it('recognises a narrated call', () => {
+    expect(looksLikeNarratedToolCall('[Tool bash · completed]\nInput: {"command":"ls"}\nOutput: a')).toBe(true)
+    expect(looksLikeNarratedToolCall('text before\n\n[Tool read · failed]\nInput: {}\nError: no')).toBe(true)
+  })
+
+  it('recognises the record framing being imitated', () => {
+    expect(looksLikeNarratedToolCall('[Session log — tools already run]\n- bash · completed\n  input: {}')).toBe(true)
+  })
+
+  it('does not fire on ordinary prose that mentions tools', () => {
+    expect(looksLikeNarratedToolCall('I will use the bash tool to list files.')).toBe(false)
+    expect(looksLikeNarratedToolCall('The [Tool] section of the docs explains Input: and Output:.')).toBe(false)
+    expect(looksLikeNarratedToolCall('')).toBe(false)
   })
 })

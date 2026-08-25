@@ -41,7 +41,7 @@ import type { TraceEventInput } from './agent/trace-store'
 import type { AgentAssignmentSetRequest, AgentAssignmentSnapshot } from '../shared/provider-state'
 import { AssignmentStore, fileAssignmentPersistence } from './agent/assignments'
 import { SharedSessionCoordinator } from './agent/shared-session-coordinator'
-import { compileNeutralContext } from './agent/neutral-context'
+import { compileNeutralContext, looksLikeNarratedToolCall } from './agent/neutral-context'
 import { toLlmMessages } from './agent/message'
 
 export interface BsAgentManagerDeps {
@@ -1351,6 +1351,11 @@ export class BsAgentManager {
         this.deps.store.appendMessage(this.activeSessionId(agent.id), execution
           ? { ...msg, turnId: execution.turnId, execution }
           : msg)
+        // The format belongs to shared-session compilation, so the manager is
+        // the right place to notice it coming back out of the model.
+        if (msg.role === 'assistant' && looksLikeNarratedToolCall(msg.text)) {
+          this.emit({ type: 'narrated-tool-call', agentId: agent.id })
+        }
       },
       appendTool: (tool) => {
         const execution = this.executionForAgent(agent.id)?.execution
