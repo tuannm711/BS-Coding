@@ -269,7 +269,7 @@ export interface ProviderSettings {
 
 export type AccountStatus = 'active' | 'disabled' | 'expired' | 'error'
 export type AuthMode = 'api-key' | 'oauth' | 'imported'
-export type ProviderErrorKind = 'auth' | 'quota-exhausted' | 'capacity-exhausted' | 'runtime-entity-not-found' | 'unavailable' | 'invalid-request' | 'unknown'
+export type ProviderErrorKind = 'auth' | 'quota-exhausted' | 'capacity-exhausted' | 'runtime-entity-not-found' | 'unavailable' | 'invalid-request' | 'context-overflow' | 'unknown'
 export interface ProviderErrorState {
   kind: ProviderErrorKind
   message: string

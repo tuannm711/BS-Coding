@@ -65,3 +65,24 @@ describe('provider state contracts', () => {
     expect(shouldAcceptSnapshot(8, 9)).toBe(true)
   })
 })
+
+describe('context overflow classification', () => {
+  it('separates a length rejection from other bad requests', () => {
+    for (const message of [
+      'context_length_exceeded',
+      "This model's maximum context length is 200000 tokens",
+      'too many tokens in the request',
+      'prompt is too long: 250000 tokens > 200000 maximum'
+    ]) {
+      expect(classifyProviderError(400, message).kind).toBe('context-overflow')
+    }
+  })
+
+  it('leaves an unrelated bad request alone', () => {
+    expect(classifyProviderError(400, 'missing required parameter: model').kind).toBe('invalid-request')
+  })
+
+  it('recognises the shape without a status code, as a stream error carries it', () => {
+    expect(classifyProviderError(undefined, 'context_length_exceeded').kind).toBe('context-overflow')
+  })
+})
