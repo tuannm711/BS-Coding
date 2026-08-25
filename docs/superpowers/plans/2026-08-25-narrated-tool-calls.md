@@ -49,7 +49,7 @@ restores the alternation the current output already has.
 - Produces: `compileNeutralContext` output where no assistant message contains a
   tool record, and no two adjacent messages share a role.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Add to `tests/unit/neutral-context.test.ts`:
 
@@ -82,7 +82,7 @@ existing `it` into the `describe` scope. Change the existing assertion
 `expect(serialized).toContain('[Tool read · completed]')` to match the new record
 shape; leave every `not.toContain` assertion exactly as it is.
 
-- [ ] **Step 2: Run to confirm failure**
+- [x] **Step 2: Run to confirm failure**
 
 ```bash
 npx vitest run tests/unit/neutral-context.test.ts
@@ -90,7 +90,7 @@ npx vitest run tests/unit/neutral-context.test.ts
 
 Expected: the three new cases fail; the stripping assertions still pass.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `neutral-context.ts`, replace the per-group reply assembly. Prose stays in the
 assistant message; tool records become their own user-role message:
@@ -137,7 +137,7 @@ function coalesce(messages: ModelMessage[]): ModelMessage[] {
 Only string contents merge; a message carrying image parts is left alone, which
 is why the check tests both sides.
 
-- [ ] **Step 4: Verify and commit**
+- [x] **Step 4: Verify and commit**
 
 ```bash
 npm test && npm run typecheck
@@ -162,7 +162,7 @@ Body must say why: a model imitates the format it sees its own role producing.
 - Produces: `looksLikeNarratedToolCall(text: string): boolean` and a
   `{ type: 'narrated-tool-call'; agentId: string }` chat event.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```ts
 describe('looksLikeNarratedToolCall', () => {
@@ -179,11 +179,11 @@ describe('looksLikeNarratedToolCall', () => {
 })
 ```
 
-- [ ] **Step 2: Run to confirm failure**
+- [x] **Step 2: Run to confirm failure**
 
 Expected: `looksLikeNarratedToolCall is not a function`.
 
-- [ ] **Step 3: Implement the detector**
+- [x] **Step 3: Implement the detector**
 
 In `neutral-context.ts`, beside the format it owns:
 
@@ -198,7 +198,7 @@ export function looksLikeNarratedToolCall(text: string): boolean {
 }
 ```
 
-- [ ] **Step 4: Add the event and emit it**
+- [x] **Step 4: Add the event and emit it**
 
 In `src/shared/types.ts`, add to `ChatEvent`:
 
@@ -218,7 +218,7 @@ runner, after storing the message:
 The manager is the right place: `loop.ts` has no business knowing about a format
 that belongs to shared-session compilation.
 
-- [ ] **Step 5: Check the contract test**
+- [x] **Step 5: Check the contract test**
 
 ```bash
 npx vitest run tests/unit/ipc-contract.test.ts
@@ -226,7 +226,7 @@ npx vitest run tests/unit/ipc-contract.test.ts
 
 A new `ChatEvent` member may need listing there. Extend it if so.
 
-- [ ] **Step 6: Verify and commit**
+- [x] **Step 6: Verify and commit**
 
 Expected: **1047**. Commit as `feat: detect a tool call a model narrated instead of making`.
 
@@ -238,7 +238,7 @@ Expected: **1047**. Commit as `feat: detect a tool call a model narrated instead
 - Modify: `src/renderer/src/components/chat/ChatPanel.tsx`
 - Modify: `src/renderer/src/styles.css`
 
-- [ ] **Step 1: Add the feed item**
+- [x] **Step 1: Add the feed item**
 
 Extend `FeedItem` at `ChatPanel.tsx:18`:
 
@@ -246,7 +246,7 @@ Extend `FeedItem` at `ChatPanel.tsx:18`:
   | { kind: 'notice'; id: string; text: string }
 ```
 
-- [ ] **Step 2: Handle the event**
+- [x] **Step 2: Handle the event**
 
 Beside the `compaction-failed` branch at `ChatPanel.tsx:422`:
 
@@ -261,7 +261,7 @@ Beside the `compaction-failed` branch at `ChatPanel.tsx:422`:
     }
 ```
 
-- [ ] **Step 3: Render it**
+- [x] **Step 3: Render it**
 
 Beside the compaction row at `ChatPanel.tsx:775`:
 
@@ -274,7 +274,7 @@ Beside the compaction row at `ChatPanel.tsx:775`:
 Add a `.chat-notice` rule to `styles.css` next to `.chat-compacted`, using the
 warning colour tokens already defined there rather than new ones.
 
-- [ ] **Step 4: Verify and commit**
+- [x] **Step 4: Verify and commit**
 
 Expected: **1047**, unchanged — this task adds rendering, not behaviour. Commit as
 `feat: surface a narrated tool call in the transcript`.
@@ -286,7 +286,7 @@ Expected: **1047**, unchanged — this task adds rendering, not behaviour. Commi
 **Files:**
 - Modify: `src/main/bs-agent-manager.ts`
 
-- [ ] **Step 1: Add the line**
+- [x] **Step 1: Add the line**
 
 Where the shared-session system prompt is assembled, append one sentence: records
 in the history are logs of tools already run, and a tool is used by calling it
@@ -295,7 +295,7 @@ through the tool interface, never by writing out what a call would look like.
 Add it only on the shared-session path, where the records appear. Single-agent
 chat never sees them and does not need the warning.
 
-- [ ] **Step 2: Verify and commit**
+- [x] **Step 2: Verify and commit**
 
 Expected: **1047**. Commit as `feat: tell shared sessions that history records are logs`.
 
@@ -306,7 +306,7 @@ relied on alone.
 
 ### Task 5: Verify and report
 
-- [ ] **Step 1: Full verification**
+- [x] **Step 1: Full verification**
 
 ```bash
 npm test && npm run typecheck
@@ -314,19 +314,19 @@ npm test && npm run typecheck
 
 Check the exit status of each, not a grep of the output.
 
-- [ ] **Step 2: Confirm the compiled context by inspection**
+- [x] **Step 2: Confirm the compiled context by inspection**
 
 Compile a small fixture through `compileNeutralContext` in a scratch script and
 read the output. Confirm by eye that no assistant message contains a record and
 the roles alternate. The tests assert both, but this is the artefact a model
 actually reads and it is worth looking at once.
 
-- [ ] **Step 3: Run the app**
+- [x] **Step 3: Run the app**
 
 Start a shared session with two agents on one project. Confirm a turn produces
 real tool cards, and that no notice appears. The detector firing here would mean
 the fix did not take.
 
-- [ ] **Step 4: Report and stop**
+- [x] **Step 4: Report and stop**
 
 Do not merge, tag, or push. Report all five tasks and wait for the final gate.

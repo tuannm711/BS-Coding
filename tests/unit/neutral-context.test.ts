@@ -76,3 +76,20 @@ describe('looksLikeNarratedToolCall', () => {
     expect(looksLikeNarratedToolCall('')).toBe(false)
   })
 })
+
+describe('a turn whose reply was only tool calls', () => {
+  it('still alternates roles and keeps the record out of the assistant role', () => {
+    const toolOnly: ChatTranscriptItem[] = [
+      { kind: 'message', message: { id: 'u1', role: 'user', text: 'look', turnId: 't1', createdAt: 1 } },
+      { kind: 'tool', tool: { id: 'c1', tool: 'read', input: { file_path: 'a.ts' }, output: 'x', permission: 'allowed', turnId: 't1', execution: execution('completed') } },
+      { kind: 'message', message: { id: 'u2', role: 'user', text: 'again', turnId: 't2', createdAt: 2 } },
+      { kind: 'tool', tool: { id: 'c2', tool: 'read', input: { file_path: 'b.ts' }, output: 'y', permission: 'allowed', turnId: 't2', execution: execution('completed') } }
+    ]
+    const messages = compileNeutralContext(toolOnly, { toolOutputMaxChars: 20 })
+    for (let i = 1; i < messages.length; i++) {
+      expect(messages[i].role).not.toBe(messages[i - 1].role)
+    }
+    expect(messages.every(message => message.role === 'user')).toBe(true)
+    expect(String(messages[0].content)).toContain('b.ts')
+  })
+})
