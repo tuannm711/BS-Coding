@@ -58,7 +58,20 @@ export function buildWindowsIcon(sourceDir, outputFile) {
   writeFileSync(outputFile, Buffer.concat([header, ...ICO_SIZES.map(size => sources.get(size))]))
 }
 
+// The packaged tray icon lives outside build/icons, which is how it fell a
+// rebrand behind the rest of the artwork. Regenerate it from the same source.
+export function syncTrayIcon(sourceDir, outputFile) {
+  const data = readFileSync(path.join(sourceDir, '32x32.png'))
+  const dimensions = readPngDimensions(data)
+  if (dimensions.width !== 32 || dimensions.height !== 32) {
+    throw new Error(`32x32.png has ${dimensions.width}x${dimensions.height} pixels`)
+  }
+  mkdirSync(path.dirname(outputFile), { recursive: true })
+  writeFileSync(outputFile, data)
+}
+
 const invokedFile = process.argv[1] ? path.resolve(process.argv[1]) : ''
 if (invokedFile === fileURLToPath(import.meta.url)) {
   buildWindowsIcon(path.resolve('build/icons'), path.resolve('build/icons/icon.ico'))
+  syncTrayIcon(path.resolve('build/icons'), path.resolve('resources/tray-icon.png'))
 }
