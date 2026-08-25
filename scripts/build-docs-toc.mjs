@@ -33,16 +33,23 @@ function headings(markdown) {
   return found
 }
 
-export function renderToc(markdown) {
-  const rows = headings(markdown).map(heading => {
+function renderRows(found, shift) {
+  const rows = found.map(heading => {
     const indent = heading.depth === 3 ? '&nbsp;&nbsp;' : ''
-    return `| ${indent}[${heading.text}](#${anchorFor(heading.text)}) | ${heading.line} |`
+    return `| ${indent}[${heading.text}](#${anchorFor(heading.text)}) | ${heading.line + shift} |`
   })
   return ['| Section | Line |', '| --- | --- |', ...rows].join('\n')
 }
 
-// Rewriting must converge: the toc block itself contains no headings, so a
-// second pass over the output produces the same rows as the first.
+export function renderToc(markdown) {
+  return renderRows(headings(markdown), 0)
+}
+
+// Headings are located in the document with its toc collapsed, then shifted by
+// the rows about to be inserted above them, so a line cited in the toc reads
+// back as that heading in the finished file. The shift is the two table header
+// rows plus one row per heading, and it does not depend on the numbers being
+// written, so a single pass reaches the fixed point.
 export function applyToc(markdown) {
   const open = markdown.indexOf(TOC_OPEN)
   const close = markdown.indexOf(TOC_CLOSE)
@@ -50,7 +57,8 @@ export function applyToc(markdown) {
   const head = markdown.slice(0, open + TOC_OPEN.length)
   const tail = markdown.slice(close)
   const placeholder = `${head}\n${TOC_CLOSE}${markdown.slice(close + TOC_CLOSE.length)}`
-  return `${head}\n${renderToc(placeholder)}\n${tail}`
+  const found = headings(placeholder)
+  return `${head}\n${renderRows(found, found.length + 2)}\n${tail}`
 }
 
 export function collectCitedPaths(markdown) {
@@ -82,7 +90,6 @@ export function applyTocToDir(dir) {
 
 const invokedFile = process.argv[1] ? path.resolve(process.argv[1]) : ''
 if (invokedFile === fileURLToPath(import.meta.url)) {
-  const dir = path.resolve('docs/design')
-  const rewritten = applyTocToDir(dir)
+  const rewritten = applyTocToDir(path.resolve('docs/design'))
   console.log(rewritten.length === 0 ? 'docs/design: every toc already current' : `docs/design: rewrote ${rewritten.join(', ')}`)
 }

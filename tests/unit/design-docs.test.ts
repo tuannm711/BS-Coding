@@ -31,6 +31,17 @@ describe('design doc toc generator', () => {
     expect(applyToc(once)).toBe(once)
   })
 
+  it('numbers each line as it will read after the toc is inserted', () => {
+    const doc = ['# Title', '', '<!-- toc -->', '<!-- /toc -->', '', '## Alpha', '', 'body', '', '## Beta'].join('\n')
+    const applied = applyToc(doc)
+    const lines = applied.split('\n')
+    const cited = [...applied.matchAll(/\| \[([^\]]+)\]\([^)]+\) \| (\d+) \|/g)]
+    expect(cited).toHaveLength(2)
+    for (const [, section, line] of cited) {
+      expect(lines[Number(line) - 1]).toBe('## ' + section)
+    }
+  })
+
   it('leaves a document without toc markers untouched', () => {
     const doc = '# Title\n\n## Section\n'
     expect(applyToc(doc)).toBe(doc)
