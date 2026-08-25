@@ -15,6 +15,7 @@ import { estimateUsage } from './token'
 import type { TruncationStore } from './truncation'
 import type { SnapshotStore } from './snapshot'
 import { validateToolInput } from './tool-input'
+import { classifyProviderError } from '../../shared/provider-state'
 
 export interface LoopDeps {
   agentId: string
@@ -103,6 +104,8 @@ export class SessionRunner {
       }
       steps++
       const isLastStep = steps >= this.maxSteps
+      let retriedOverflow = false
+      let overflowRetry = false
 
       await this.compactIfOverThreshold(signal)
 
@@ -174,20 +177,34 @@ export class SessionRunner {
               this.deps.onUsage?.(part.tokens)
             }
           } else if (part.kind === 'error') {
+            const message = part.error ?? 'llm error'
+            if (await this.recoverFromOverflow(message, retriedOverflow, signal)) {
+              retriedOverflow = true
+              overflowRetry = true
+              break
+            }
             persistPartial()
-            this.deps.onEvent({ type: 'error', agentId, message: part.error ?? 'llm error' })
+            this.deps.onEvent({ type: 'error', agentId, message })
             return
           }
         }
       } catch (err) {
-        persistPartial()
         if (signal?.aborted) {
+          persistPartial()
           this.deps.onEvent({ type: 'done', agentId, reason: 'stopped' })
-        } else {
-          this.deps.onEvent({ type: 'error', agentId, message: formatLlmError(err) })
+          return
         }
-        return
+        const message = formatLlmError(err)
+        if (await this.recoverFromOverflow(message, retriedOverflow, signal)) {
+          retriedOverflow = true
+          overflowRetry = true
+        } else {
+          persistPartial()
+          this.deps.onEvent({ type: 'error', agentId, message })
+          return
+        }
       }
+      if (overflowRetry) continue
 
       if (signal?.aborted) {
         persistPartial()
@@ -325,7 +342,22 @@ export class SessionRunner {
   // when the estimated request size approaches the model context limit, run an
   // LLM compaction that summarizes the older head and keeps the recent tail
   // verbatim.
-  async compactIfOverThreshold(signal?: AbortSignal): Promise<void> {
+  // A provider that rejects a request for length is telling us the proactive
+  // estimate was wrong. Compacting and retrying the step once turns that from a
+  // dead turn into a slower one. The retry is capped per step and the compaction
+  // is still bounded by MAX_COMPACT_PER_RUN, so a request that overflows again
+  // fails exactly as it did before.
+  private async recoverFromOverflow(message: string, alreadyRetried: boolean, signal?: AbortSignal): Promise<boolean> {
+    if (alreadyRetried || signal?.aborted) return false
+    if (classifyProviderError(undefined, message).kind !== 'context-overflow') return false
+    if (this.compactedThisRun >= MAX_COMPACT_PER_RUN) return false
+    const before = this.compactedThisRun
+    await this.compactIfOverThreshold(signal, true)
+    // Retrying an identical request would just overflow again.
+    return this.compactedThisRun > before
+  }
+
+  async compactIfOverThreshold(signal?: AbortSignal, force = false): Promise<void> {
     const { compaction, maxContextTokens, replaceItems } = this.deps
     if (!compaction?.auto || !maxContextTokens || maxContextTokens <= 0 || !replaceItems) return
     const usable = maxContextTokens - compaction.buffer
@@ -341,7 +373,7 @@ export class SessionRunner {
         this.lastTokens.input + this.lastTokens.output +
         (this.lastTokens.cacheRead ?? 0) + (this.lastTokens.cacheWrite ?? 0)
       : estimateUsage(toLlmMessages(items, opts))
-    if (usedTokens < usable) return
+    if (!force && usedTokens < usable) return
 
     // Prune old tool outputs first (cheap) before spending an LLM compact call.
     const pruned = pruneToolOutputs(items, compaction)
@@ -350,7 +382,7 @@ export class SessionRunner {
       const afterPrune = this.lastTokens
         ? usedTokens
         : estimateUsage(toLlmMessages(items, opts))
-      if (afterPrune < usable) return
+      if (!force && afterPrune < usable) return
     }
 
     const { head, tail } = selectHeadTail(items, compaction.keepTokens, compaction.tailTurns)

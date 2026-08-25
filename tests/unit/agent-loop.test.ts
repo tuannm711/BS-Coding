@@ -276,6 +276,69 @@ describe('SessionRunner', () => {
     expect(h.events).toEqual([{ type: 'error', agentId: 'a1', message: 'rate limited' }])
   })
 
+  // Recovery only makes sense when a compaction can actually shrink the
+  // request; resending an identical one would overflow again. The limit sits
+  // well above the estimate on purpose: this path exists for when our estimate
+  // says a request is fine and the provider disagrees. A lower limit would fire
+  // proactive compaction first and the overflow would never be reached.
+  function overflowHarness() {
+    const items: TranscriptItem[] = []
+    for (let i = 0; i < 8; i++) {
+      items.push({ kind: 'message', message: { id: 'm' + i, role: i % 2 ? 'assistant' : 'user', text: 'a fairly long message body '.repeat(20), turnId: 't' + i, createdAt: i } })
+    }
+    const h = makeHarness({
+      maxContextTokens: 100000,
+      compaction: { auto: true, buffer: 0, keepTokens: 20, tailTurns: 1, toolOutputMaxChars: 500 },
+      getItems: () => items,
+      replaceItems: (next: TranscriptItem[]) => { items.length = 0; items.push(...next) }
+    })
+    return h
+  }
+
+  it('compacts and retries the step once after a length rejection', async () => {
+    const h = overflowHarness()
+    h.llm.queue = [
+      [{ kind: 'error', error: 'context_length_exceeded' }],
+      textParts('a summary of the earlier turns'),
+      textParts('recovered')
+    ]
+    h.runner.run()
+    await new Promise(r => setTimeout(r, 60))
+    expect(h.events.some(e => e.type === 'compacted')).toBe(true)
+    expect(h.events.some(e => e.type === 'error')).toBe(false)
+    expect(h.events.some(e => e.type === 'done' && e.reason === 'complete')).toBe(true)
+  })
+
+  it('surfaces the overflow when the retried request overflows again', async () => {
+    const h = overflowHarness()
+    h.llm.queue = [
+      [{ kind: 'error', error: 'context_length_exceeded' }],
+      textParts('a summary of the earlier turns'),
+      [{ kind: 'error', error: 'context_length_exceeded' }]
+    ]
+    h.runner.run()
+    await new Promise(r => setTimeout(r, 60))
+    expect(h.events.filter(e => e.type === 'error')).toHaveLength(1)
+  })
+
+  it('does not retry when compaction is not configured, since nothing would shrink', async () => {
+    const h = makeHarness()
+    h.llm.queue = [[{ kind: 'error', error: 'context_length_exceeded' }], textParts('never reached')]
+    h.runner.run()
+    await new Promise(r => setTimeout(r, 30))
+    expect(h.llm.calls).toHaveLength(1)
+    expect(h.events.filter(e => e.type === 'error')).toHaveLength(1)
+  })
+
+  it('does not retry an error that is not a length rejection', async () => {
+    const h = makeHarness()
+    h.llm.queue = [[{ kind: 'error', error: 'rate limited' }], textParts('never reached')]
+    h.runner.run()
+    await new Promise(r => setTimeout(r, 30))
+    expect(h.llm.calls).toHaveLength(1)
+    expect(h.events).toEqual([{ type: 'error', agentId: 'a1', message: 'rate limited' }])
+  })
+
   it('does not append an empty assistant message for a no-op turn', async () => {
     const h = makeHarness()
     h.llm.queue = [[{ kind: 'finish' }]]
