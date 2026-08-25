@@ -126,7 +126,9 @@ export function parseAntigravityUsage(accountId: string, payload: unknown, metad
     const groupId = antigravityQuotaGroupForModel(modelId)
     return groupId ? [{ modelId, groupId, quota: model.quotaInfo }] : []
   })
-  const quotas = entries.map(([, model]) => model.quotaInfo).filter((quota): quota is NonNullable<CloudCodeModel['quotaInfo']> => quota?.remainingFraction !== undefined)
+  const allQuotas = entries.map(([, model]) => model.quotaInfo).filter((quota): quota is NonNullable<CloudCodeModel['quotaInfo']> => quota?.remainingFraction !== undefined)
+  const groupedQuotas = classified.flatMap(item => item.quota?.remainingFraction === undefined ? [] : [item.quota])
+  const quotas = groupedQuotas.length > 0 ? groupedQuotas : allQuotas
   if (quotas.length === 0) return { accountId, ...metadata, refreshedAt: now, source: 'unavailable', status: 'unavailable', unavailableReason: 'No quota data returned by Cloud Code' }
   const remaining = Math.max(0, Math.min(1, Math.min(...quotas.map(quota => quota.remainingFraction ?? 0))))
   const resetAt = earliestReset(quotas.map(quota => parseReset(quota.resetTime)))
@@ -153,7 +155,7 @@ export function parseAntigravityUsage(accountId: string, payload: unknown, metad
     }
     return [{ id: groupId, label: groupId === 'gemini' ? 'Gemini Models' : 'Claude and GPT models', modelIds: members.map(item => item.modelId), windows: [window] } satisfies ProviderQuotaGroup]
   })
-  return { accountId, ...metadata, refreshedAt: now, source: 'provider', status: remaining <= 0.2 ? 'near-limit' : 'ok', primaryUsedPercent: (1 - remaining) * 100, ...(resetAt === undefined ? {} : { resetAt }), modelQuotas, quotaGroups, ...(remaining === 0 ? { unavailableReason: 'Quota exhausted' } : {}) }
+  return { accountId, ...metadata, refreshedAt: now, source: 'provider', status: remaining <= 0.2 ? 'near-limit' : 'ok', primaryUsedPercent: 100 - fractionPercent(remaining), ...(resetAt === undefined ? {} : { resetAt }), modelQuotas, quotaGroups, ...(remaining === 0 ? { unavailableReason: 'Quota exhausted' } : {}) }
 }
 
 function quotaGroupsFrom(payload: unknown): CloudCodeQuotaGroup[] {

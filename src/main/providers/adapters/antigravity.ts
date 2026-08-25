@@ -30,25 +30,40 @@ function projectIdFrom(value: unknown): string | undefined {
   return undefined
 }
 
-async function resolveCloudCodeContext(secret: Parameters<NonNullable<ProviderAdapter['refreshCredentials']>>[1]): Promise<{ baseUrl: string; projectId: string; planName?: string }> {
+type AntigravitySecret = Parameters<NonNullable<ProviderAdapter['refreshCredentials']>>[1]
+
+class CloudCodeHttpError extends Error {
+  constructor(readonly response: Response, readonly raw: string) {
+    super(`[bs] Antigravity account context discovery failed (${response.status})`)
+  }
+}
+
+async function cloudCodePost(secret: AntigravitySecret, url: string, body: unknown, headers: Record<string, string> = {}): Promise<Response> {
+  const send = () => fetch(url, {
+    method: 'POST',
+    headers: { ...headers, authorization: `Bearer ${secret.accessToken}`, 'content-type': 'application/json' },
+    body: JSON.stringify(body)
+  })
+  const response = await send()
+  if (![401, 403].includes(response.status) || !secret.refreshToken) return response
+  const refreshed = await refreshAntigravityToken(secret.refreshToken)
+  Object.assign(secret, refreshed)
+  return send()
+}
+
+async function resolveCloudCodeContext(secret: AntigravitySecret): Promise<{ baseUrl: string; projectId: string; planName?: string }> {
   if (!secret.accessToken) throw new Error('[bs] Antigravity OAuth access token unavailable')
   if (secret.projectId) return { baseUrl: secret.cloudCodeBaseUrl ?? CLOUD_CODE_DAILY_URL, projectId: secret.projectId, planName: secret.planName }
   const baseUrl = secret.cloudCodeBaseUrl ?? CLOUD_CODE_DAILY_URL
-  const response = await fetch(`${baseUrl}/v1internal:loadCodeAssist`, {
-    method: 'POST',
-    headers: {
-      authorization: `Bearer ${secret.accessToken}`,
-      'content-type': 'application/json',
-      accept: '*/*',
-      'user-agent': `${ANTIGRAVITY_USER_AGENT} google-api-nodejs-client/10.3.0`,
-      'x-goog-api-client': 'gl-node/22.21.1'
-    },
-    body: JSON.stringify({
-      metadata: { ideName: 'antigravity', ideType: 'ANTIGRAVITY', ideVersion: '1.20.5', pluginVersion: '1.1.0', platform: 'WINDOWS_AMD64', updateChannel: 'stable', pluginType: 'GEMINI' },
-      mode: 'FULL_ELIGIBILITY_CHECK'
-    })
+  const response = await cloudCodePost(secret, `${baseUrl}/v1internal:loadCodeAssist`, {
+    metadata: { ideName: 'antigravity', ideType: 'ANTIGRAVITY', ideVersion: '1.20.5', pluginVersion: '1.1.0', platform: 'WINDOWS_AMD64', updateChannel: 'stable', pluginType: 'GEMINI' },
+    mode: 'FULL_ELIGIBILITY_CHECK'
+  }, {
+    accept: '*/*',
+    'user-agent': `${ANTIGRAVITY_USER_AGENT} google-api-nodejs-client/10.3.0`,
+    'x-goog-api-client': 'gl-node/22.21.1'
   })
-  if (!response.ok) throw new Error(`[bs] Antigravity account context discovery failed (${response.status})`)
+  if (!response.ok) throw new CloudCodeHttpError(response, await response.text())
   const body = await response.json() as { cloudaicompanionProject?: unknown; paidTier?: { id?: string }; currentTier?: { id?: string } }
   const projectId = projectIdFrom(body.cloudaicompanionProject)
   if (!projectId) throw new Error('[bs] Antigravity account context did not return a project ID')
@@ -57,18 +72,14 @@ async function resolveCloudCodeContext(secret: Parameters<NonNullable<ProviderAd
   return { baseUrl, projectId, planName }
 }
 
-async function fetchAvailableModels(secret: Parameters<NonNullable<ProviderAdapter['refreshCredentials']>>[1]): Promise<Response> {
+async function fetchAvailableModels(secret: AntigravitySecret): Promise<Response> {
   const context = await resolveCloudCodeContext(secret)
-  return fetch(`${context.baseUrl}/v1internal:fetchAvailableModels`, {
-    method: 'POST',
-    headers: { authorization: `Bearer ${secret.accessToken}`, 'content-type': 'application/json', 'user-agent': ANTIGRAVITY_USER_AGENT },
-    body: JSON.stringify({ project: context.projectId })
-  })
+  return cloudCodePost(secret, `${context.baseUrl}/v1internal:fetchAvailableModels`, { project: context.projectId }, { 'user-agent': ANTIGRAVITY_USER_AGENT })
 }
 
 async function refreshCredentials(
   account: Parameters<ProviderAdapter['refreshAccount']>[0],
-  secret: Parameters<NonNullable<ProviderAdapter['refreshCredentials']>>[1],
+  secret: AntigravitySecret,
   options?: { force?: boolean }
 ) {
   const expiresAt = secret.expiresAt ?? account.oauthExpiresAt
@@ -81,15 +92,17 @@ async function refreshCredentials(
   return { ...secret, ...refreshed }
 }
 
-async function fetchQuotaPayload(secret: Parameters<NonNullable<ProviderAdapter['refreshCredentials']>>[1]): Promise<{ response: Response; raw: string; payload: unknown }> {
-  const context = await resolveCloudCodeContext(secret)
+async function fetchQuotaPayload(secret: AntigravitySecret): Promise<{ response: Response; raw: string; payload: unknown }> {
+  let context: Awaited<ReturnType<typeof resolveCloudCodeContext>>
+  try {
+    context = await resolveCloudCodeContext(secret)
+  } catch (error) {
+    if (!(error instanceof CloudCodeHttpError)) throw error
+    return { response: error.response, raw: error.raw, payload: {} }
+  }
   let last: { response: Response; raw: string; payload: unknown } | undefined
   for (const method of ['retrieveUserQuotaSummary', 'retrieveUserQuota', 'fetchAvailableModels']) {
-    const response = await fetch(`${context.baseUrl}/v1internal:${method}`, {
-      method: 'POST',
-      headers: { authorization: `Bearer ${secret.accessToken}`, 'content-type': 'application/json', 'user-agent': ANTIGRAVITY_USER_AGENT },
-      body: JSON.stringify({ project: context.projectId })
-    })
+    const response = await cloudCodePost(secret, `${context.baseUrl}/v1internal:${method}`, { project: context.projectId }, { 'user-agent': ANTIGRAVITY_USER_AGENT })
     const raw = await response.text()
     let payload: unknown = {}
     try { payload = raw ? JSON.parse(raw) : {} } catch { payload = {} }
@@ -175,13 +188,7 @@ export function createAntigravityAdapter(): ProviderAdapter {
     },
     async fetchUsage(account, secret) {
       if (!secret.accessToken) return { accountId: account.id, refreshedAt: Date.now(), source: 'unavailable', status: 'unavailable', unavailableReason: 'OAuth access token unavailable' }
-      const request = () => fetchQuotaPayload(secret)
-      let result = await request()
-      if ((result.response.status === 401 || result.response.status === 403) && secret.refreshToken) {
-        const refreshed = await refreshAntigravityToken(secret.refreshToken)
-        Object.assign(secret, refreshed)
-        result = await request()
-      }
+      const result = await fetchQuotaPayload(secret)
       const metadata = { accountLabel: account.profile?.email ?? account.label, accountType: 'oauth' as const, planName: secret.planName ?? account.profile?.planName }
       if (!result.response.ok) {
         const retryAfter = Number(result.response.headers.get('retry-after') ?? 0)
