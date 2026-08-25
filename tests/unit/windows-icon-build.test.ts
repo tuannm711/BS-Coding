@@ -21,6 +21,12 @@ describe('Windows icon build', () => {
     }
   })
 
+  it('ships the current 32x32 artwork as the packaged tray icon', () => {
+    expect(readFileSync(path.resolve('resources/tray-icon.png'))).toEqual(
+      readFileSync(path.resolve('build/icons/32x32.png'))
+    )
+  })
+
   it('rejects a PNG whose pixels do not match its declared size', () => {
     const source = mkdtempSync(path.join(tmpdir(), 'bs-icon-invalid-'))
     for (const size of [...sizes, 512]) {
