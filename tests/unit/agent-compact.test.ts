@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { selectHeadTail, buildCompactionPrompt, compactTranscript, COMPACTION_MARKER, truncateToolOutput, serializeItems, pruneToolOutputs } from '../../src/main/agent/compact'
+import { selectHeadTail, buildCompactionPrompt, compactTranscript, titleSession, COMPACTION_MARKER, truncateToolOutput, serializeItems, pruneToolOutputs } from '../../src/main/agent/compact'
 import type { TranscriptItem } from '../../src/main/agent/message'
 import type { ChatMessage, ToolCallData } from '../../src/shared/types'
 import type { LlmClient, LlmStreamPart } from '../../src/main/agent/llm'
@@ -194,5 +194,35 @@ describe('pruneToolOutputs', () => {
       msg('assistant', 'a2')
     ]
     expect(pruneToolOutputs(items, cfg)).toBe(false)
+  })
+})
+
+describe('titleSession', () => {
+  function stubLlm(parts: LlmStreamPart[]): LlmClient {
+    return {
+      async *stream(): AsyncGenerator<LlmStreamPart> {
+        for (const p of parts) yield p
+      }
+    }
+  }
+
+  it('returns a trimmed title', async () => {
+    const llm = stubLlm([{ kind: 'text', text: '  Fix the quota badge  ' }, { kind: 'finish' }])
+    expect(await titleSession({ llm, model: 'm', prompt: 'hello' })).toBe('Fix the quota badge')
+  })
+
+  it('strips quotes and a trailing period a model may add anyway', async () => {
+    const llm = stubLlm([{ kind: 'text', text: '"Fix the quota badge."' }, { kind: 'finish' }])
+    expect(await titleSession({ llm, model: 'm', prompt: 'hello' })).toBe('Fix the quota badge')
+  })
+
+  it('refuses a title long enough to be a sentence', async () => {
+    const llm = stubLlm([{ kind: 'text', text: 'x'.repeat(200) }, { kind: 'finish' }])
+    expect(await titleSession({ llm, model: 'm', prompt: 'hello' })).toBeNull()
+  })
+
+  it('returns null on an error or an empty answer, leaving the caller its old title', async () => {
+    expect(await titleSession({ llm: stubLlm([{ kind: 'error', error: 'boom' }]), model: 'm', prompt: 'p' })).toBeNull()
+    expect(await titleSession({ llm: stubLlm([{ kind: 'finish' }]), model: 'm', prompt: 'p' })).toBeNull()
   })
 })

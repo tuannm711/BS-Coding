@@ -10,7 +10,8 @@ import { SessionRunner } from './agent/loop'
 import { createLlm } from './agent/llm'
 import type { LlmClient } from './agent/llm'
 import { decidePermission } from './agent/permission'
-import { SessionStore } from './agent/session'
+import { SessionStore, DEFAULT_SESSION_TITLE, titleFrom } from './agent/session'
+import { titleSession } from './agent/compact'
 import type { SessionSummary, StoredSession } from './agent/session'
 import { McpManager } from './agent/mcp/manager'
 import { collectSkills, skillListText } from './agent/skill'
@@ -89,6 +90,10 @@ export class BsAgentManager {
   private controllers = new Map<string, AbortController>()
   private pendingPrompts = new Map<string, { agentId: string; tool?: string; resolve: (resp: PromptResponse | null) => void }>()
   private running = new Set<string>()
+  // Sessions already given a model-written title, so one is never asked for twice.
+  // Not persisted: a restart may spend one more request, which is cheaper than
+  // another field in the store.
+  private titledSessions = new Set<string>()
   private activeSessions = new Map<string, string>()
   private tools: Map<string, ToolDefinition>
   private modes = new Map<string, AgentMode>()
@@ -596,6 +601,25 @@ export class BsAgentManager {
       else this.deps.store.appendTool(sessionId, item.tool)
     }
     return { agentId: entry.agentId, turnId: entry.turnId }
+  }
+
+  // Costs one short non-streaming request against the account's provider quota,
+  // once per session. Skipped when the user has already chosen a title, and
+  // marked before the await so two done events cannot both spend a request.
+  private async maybeTitleSession(agentId: string, llm: LlmClient | undefined, model: string): Promise<void> {
+    if (!llm) return
+    const sessionId = this.activeSessionId(agentId)
+    if (!sessionId || this.titledSessions.has(sessionId)) return
+    const session = this.deps.store.get(sessionId)
+    if (!session) return
+    const firstUser = session.items.find(item => item.kind === 'message' && item.message.role === 'user')
+    if (!firstUser || firstUser.kind !== 'message') return
+    const text = firstUser.message.displayText ?? firstUser.message.text
+    if (!text.trim()) return
+    if (session.title !== titleFrom(text) && session.title !== DEFAULT_SESSION_TITLE) return
+    this.titledSessions.add(sessionId)
+    const title = await titleSession({ llm, model, prompt: text })
+    if (title) this.deps.store.setTitle(sessionId, title)
   }
 
   renameSession(agentId: string, sessionId: string, title: string): SessionSummary | null {
@@ -1304,7 +1328,11 @@ export class BsAgentManager {
       replaceItems: (items) => this.deps.store.replaceItems(this.activeSessionId(agent.id), items),
       snapshots: this.deps.snapshots,
       snapshotScopeId: () => this.lifecycleKey(agent.id),
-      onEvent: (e) => this.emit(e),
+      onEvent: (e) => {
+        this.emit(e)
+        // Fire and forget: a title must never delay or fail a turn.
+        if (e.type === 'done') void this.maybeTitleSession(agent.id, llmClient, resolved.model)
+      },
       onArtifact: (entry) => this.deps.onArtifact?.(entry),
       getItems: () => this.deps.store.get(this.activeSessionId(agent.id))?.items ?? [],
       buildMessages: (items) => {
