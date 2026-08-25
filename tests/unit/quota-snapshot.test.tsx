@@ -147,6 +147,6 @@ describe('snapshot-driven quota cards', () => {
     expect(quotaAccountState(account({ error: { kind: 'quota-exhausted', message: 'quota', retryAt: 20, updatedAt: 1 } }), 10)).toBe('cooldown')
     expect(quotaAccountState(account({ error: { kind: 'capacity-exhausted', message: 'capacity', updatedAt: 1 } }), 10)).toBe('capacity-exhausted')
     expect(quotaAccountState(account({ error: { kind: 'auth', message: 'auth', updatedAt: 1 } }), 10)).toBe('auth-error')
-    expect(quotaAccountState(account({ usage: { accountId: 'account-1', refreshedAt: 1, source: 'provider', status: 'near-limit', unavailableReason: 'Quota exhausted', resetAt: 20 } }), 10)).toBe('cooldown')
+    expect(quotaAccountState(account({ usage: { accountId: 'account-1', refreshedAt: 1, source: 'provider', status: 'ok', unavailableReason: 'Quota exhausted', resetAt: 20 } }), 10)).toBe('cooldown')
   })
 })

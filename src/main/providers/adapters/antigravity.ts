@@ -205,7 +205,7 @@ export function createAntigravityAdapter(): ProviderAdapter {
           ...metadata,
           refreshedAt: Date.now(),
           source: 'provider',
-          status: result.response.status === 429 ? 'near-limit' : 'unavailable',
+          status: result.response.status === 429 ? 'ok' : 'unavailable',
           unavailableReason,
           ...(retryAfter > 0 ? { resetAt: Date.now() + retryAfter * 1000 } : {})
         }

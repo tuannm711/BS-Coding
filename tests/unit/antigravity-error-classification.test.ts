@@ -59,7 +59,7 @@ describe('Antigravity error classification', () => {
     const account = { id: 'a1', providerId: 'antigravity', label: 'Pro', authMode: 'oauth' as const, status: 'active' as const, createdAt: 1, lastUsedAt: 1 }
     const usage = await createAntigravityAdapter().fetchUsage!(account, { accessToken: 'token', projectId: 'project-123' })
     expect(fetchMock).toHaveBeenCalledTimes(1)
-    expect(usage).toMatchObject({ status: 'near-limit', unavailableReason: 'Quota exhausted' })
+    expect(usage).toMatchObject({ status: 'ok', unavailableReason: 'Quota exhausted' })
     expect(usage.resetAt).toBeGreaterThanOrEqual(now + 119_000)
   })
 
@@ -69,6 +69,6 @@ describe('Antigravity error classification', () => {
 
     const usage = await createAntigravityAdapter().fetchUsage!(account, { accessToken: 'token', projectId: 'project-123' })
 
-    expect(usage).toMatchObject({ status: 'near-limit', unavailableReason: 'Model capacity exhausted' })
+    expect(usage).toMatchObject({ status: 'ok', unavailableReason: 'Model capacity exhausted' })
   })
 })
