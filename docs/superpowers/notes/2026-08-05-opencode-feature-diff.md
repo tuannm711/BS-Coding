@@ -1,5 +1,10 @@
 # BS Coding — Feature Diff với opencode 1.18.11 (ghi chú)
 
+> **Superseded by `docs/superpowers/audits/2026-08-25-opencode-gap-audit.md`.**
+> Measured against the code twenty days later, four of the eight high-value items
+> below are built and three are partly built. This file is kept as the record of
+> what was believed on 2026-08-05.
+
 Ngày: 2026-08-05 · Nguồn: `D:\GitHub\opencode-1.18.11` vs `D:\GitHub\bs-coding`
 
 Đây là ghi chú toàn bộ những tính năng opencode có mà bs-coding chưa có (hoặc có ở mức khác),
