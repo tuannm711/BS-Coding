@@ -69,7 +69,10 @@ async function makeManager(opts: StubLlmOptions & {
   const llmVariants: Array<Record<string, unknown> | undefined> = []
   const llmModels: string[] = []
   let llmClient: LlmClient
-  const createLlm = vi.fn((): LlmClient => {
+  // Declaring the parameters is the point: a mock whose signature does not
+  // match what it replaces cannot catch a caller passing the wrong thing,
+  // and mock.calls types as an empty tuple without them.
+  const createLlm = vi.fn((_provider: string, _apiKey: string, _baseUrl?: string): LlmClient => {
     llmClient = {
       async *stream(request: LlmStreamOptions): AsyncGenerator<LlmStreamPart> {
         // A session's first turn is followed by a short request asking the model

@@ -73,6 +73,9 @@ describe('BrowserBridge', () => {
     await b.start()
     const r = await b.execute('listTabs')
     expect(r.ok).toBe(false)
+    // Narrowing, not ceremony: it is what lets the compiler see `error`,
+    // and it turns a wrong shape into a readable failure.
+    if (r.ok) throw new Error('expected a failure')
     expect(r.error).toContain('not connected')
   })
 
@@ -105,6 +108,9 @@ describe('BrowserBridge', () => {
     await nextMsg(ws) // consume cmd, don't reply
     const r = await done
     expect(r.ok).toBe(false)
+    // Narrowing, not ceremony: it is what lets the compiler see `error`,
+    // and it turns a wrong shape into a readable failure.
+    if (r.ok) throw new Error('expected a failure')
     expect(r.error).toContain('timed out')
   })
 
@@ -141,6 +147,7 @@ describe('BrowserBridge', () => {
     ws.send(JSON.stringify({ type: 'result', id: cmd.id, ok: true, data: { base64: Buffer.from('pngdata').toString('base64') } }))
     const r = await done
     expect(r.ok).toBe(true)
+    if (!r.ok) throw new Error(r.error)
     const data = r.data as { path: string }
     expect(data.path).toMatch(/\.png$/)
     expect(data.path.startsWith(dir)).toBe(true)

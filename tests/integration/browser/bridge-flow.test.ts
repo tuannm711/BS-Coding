@@ -86,11 +86,13 @@ describe('BrowserBridge full flow (fake extension)', () => {
 
     const read = await b.execute('read')
     expect(read.ok).toBe(true)
+    if (!read.ok) throw new Error(read.error)
     expect((read.data as { title: string }).title).toBe('Example')
 
     // screenshot không có screenshotDir → trả nguyên data chứa base64
     const shot = await b.execute('screenshot')
     expect(shot.ok).toBe(true)
+    if (!shot.ok) throw new Error(shot.error)
     expect((shot.data as { base64: string }).base64.length).toBeGreaterThan(0)
 
     // event từ extension → ring buffer
