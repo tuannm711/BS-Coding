@@ -7,7 +7,7 @@ purpose — none of it is a forgotten TODO.
 Add an entry when you decide *not* to do something you found. Remove it when the
 work lands, naming the commit.
 
-Last reviewed: 2026-08-25 (v1.1.4)
+Last reviewed: 2026-08-25 (v1.1.4, revised after the opencode gap audit)
 
 ## Index
 
@@ -23,6 +23,7 @@ Last reviewed: 2026-08-25 (v1.1.4)
 | 8 | [Tray artwork is not platform-specific](#8-tray-artwork-is-not-platform-specific) | Desktop | Low |
 | 9 | [opencode feature gaps](#9-opencode-feature-gaps) | Product | Medium |
 | 10 | [The test runner crashes intermittently](#10-the-test-runner-crashes-intermittently) | Build | Medium |
+| 11 | [No guard checks whether a design sentence is true](#11-no-guard-checks-whether-a-design-sentence-is-true) | Docs | Medium |
 
 ---
 
@@ -190,22 +191,26 @@ shared asset and would need to learn the variants.
 
 ## 9. opencode feature gaps
 
-**Found:** catalogued 2026-08-05, still open.
+**Found:** catalogued 2026-08-05. **Re-measured 2026-08-25** — see
+`docs/superpowers/audits/2026-08-25-opencode-gap-audit.md`, which supersedes the
+note this entry used to summarise.
 
-`docs/superpowers/notes/2026-08-05-opencode-feature-diff.md` compares BS Coding
-against opencode 1.18.11 and lists what is missing. The high-value group:
+Of the eight high-value items, four are built and three are partly built. What
+remains, in the order the audit recommends:
 
-- Slash commands and prompt templates
-- Per-message undo/redo with snapshot history
-- Cost and usage stats per model, day and project
-- LSP tools and diagnostics
-- File watcher / auto-context
-- Tool output truncation service
-- LLM-generated session titles and rename
-- Compaction auto-continue and prune
+1. **A stats surface.** `calcCost` and `StatsSummary` are computed in
+   `src/main/bs-agent-manager.ts` and read by nothing in `src/renderer`. The
+   numbers exist and cannot be seen. Cheapest item, and it serves routing: what
+   an account has cost is the other half of what quota it has left.
+2. **Compaction auto-continue.** `pruneToolOutputs` exists; resuming a turn
+   after compaction does not, so a long turn that compacts simply stops.
+3. **LLM session titles.** Renaming works; the automatic title is still the
+   `titleFrom` heuristic.
+4. **Message-granular undo.** `undoTurn` and `pushTurn` give turn-granular undo
+   and redo. Going finer needs an identity below `turnId` in the transcript.
 
-**To close:** each is its own task. The note is dated — verify an item is still
-missing before planning it. This is the agreed next work after v1.1.4.
+**To close:** each is its own task. Re-measure before planning — this entry has
+already been wrong once by summarising a note instead of the code.
 
 ## 10. The test runner crashes intermittently
 
@@ -227,3 +232,29 @@ a red run in this session.
 **To close:** capture a full `--reporter=verbose` log the next time it happens
 rather than re-running, and check whether vitest's `pool` or `poolOptions`
 settings avoid it. Do not chase it without a captured instance.
+
+## 11. No guard checks whether a design sentence is true
+
+**Found:** 2026-08-25, by the opencode gap audit.
+
+The documentation tests in `tests/unit/design-docs.test.ts` verify that a table
+of contents matches its content and that every cited path exists. Neither can
+evaluate a claim.
+
+Two false statements reached `docs/design/` on the day it was written.
+`02-agent-runtime.md` said compaction does not prune old tool output;
+`pruneToolOutputs` exists and its own comment says it mirrors opencode's
+`compaction.prune`. `05-sessions.md` said there is no redo history; `pushTurn`
+is the redo path. Both sentences were written by citing debt item 9 rather than
+reading the code — the exact failure the design documents exist to prevent.
+
+**Why it matters.** The guards are good enough to make the mechanical parts
+trustworthy, which makes the prose feel trustworthy by association. A reader has
+no way to tell which parts are checked.
+
+**To close:** no clean mechanism is known. One idea — require every Known limits
+sentence to name a symbol, and fail if that symbol exists in the source — was
+considered and rejected as prone to false positives: a symbol can exist while the
+behaviour described is still absent, which is precisely the case for
+auto-continue. Until something better exists, Known limits sections are reviewed
+by reading the code, and the audit that finds a drift records it here.

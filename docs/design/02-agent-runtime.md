@@ -12,7 +12,7 @@ this document assumes an `LlmClient` already exists.
 | [Data flow](#data-flow) | 38-66 | `BsAgentManager`, `SessionRunner`, `LoopDeps`, `toLlmMessages(getItems())`, `LlmClient`, `text-delta` |
 | [Types that carry it](#types-that-carry-it) | 67-81 | `LoopDeps`, `src/main/agent/loop.ts`, `getItems`, `appendMessage`, `appendTool`, `tests/unit/agent-loop.test.ts` |
 | [Design decisions](#design-decisions) | 82-115 | `LoopDeps`, `createLlm`, `LlmClient`, `src/main/agent/AGENTS.md`, `takeSteers`, `tools/` |
-| [Known limits](#known-limits) | 116-123 | `docs/technical-debt.md`, `SnapshotStore` |
+| [Known limits](#known-limits) | 116-125 | `cfg.prune`, `docs/technical-debt.md`, `undoTurn`, `pushTurn`, `turnId` |
 <!-- /toc -->
 
 ## Pieces
@@ -115,8 +115,10 @@ after an edit.
 
 ## Known limits
 
-Compaction summarises but does not prune old tool output, and there is no
-auto-continue after a compaction — both listed under debt item 9 in
-`docs/technical-debt.md` as gaps against opencode.
+Compaction prunes old tool output when `cfg.prune` is set, but a turn that
+compacts then ends rather than resuming. Auto-continue has no implementation and
+no setting — debt item 9 in `docs/technical-debt.md`.
 
-Undo is whole-turn through `SnapshotStore`. There is no per-message revert.
+Undo and redo are turn-granular. `undoTurn` addresses a turn by id and
+`pushTurn` re-inserts it, so any turn can be reverted and re-applied, but a
+message cannot: `turnId` is the finest identity the transcript carries.

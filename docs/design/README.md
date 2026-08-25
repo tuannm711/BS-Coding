@@ -11,11 +11,11 @@ session. For the product view — features, screenshots, how to install — read
 | --- | --- | --- |
 | [How the domains relate](#how-the-domains-relate) | 21-37 | `LlmClient` |
 | [The documents](#the-documents) | 38-54 |  |
-| [Finding a name](#finding-a-name) | 55-209 | `.cmd`, `.exe`, `.github/workflows/build.yml`, `.ico`, `'near-limit'`, `/bin/bash` |
-| [What is here and what is history](#what-is-here-and-what-is-history) | 210-219 | `docs/design/`, `docs/superpowers/`, `docs/evidence/` |
-| [Current work](#current-work) | 220-224 |  |
-| [Next work](#next-work) | 225-237 | `docs/superpowers/notes/2026-08-05-opencode-feature-diff.md` |
-| [Debt](#debt) | 238-244 | `docs/technical-debt.md` |
+| [Finding a name](#finding-a-name) | 55-211 | `.cmd`, `.exe`, `.github/workflows/build.yml`, `.ico`, `'near-limit'`, `/bin/bash` |
+| [What is here and what is history](#what-is-here-and-what-is-history) | 212-221 | `docs/design/`, `docs/superpowers/`, `docs/evidence/` |
+| [Current work](#current-work) | 222-226 |  |
+| [Next work](#next-work) | 227-239 | `docs/superpowers/notes/2026-08-05-opencode-feature-diff.md` |
+| [Debt](#debt) | 240-246 | `docs/technical-debt.md` |
 <!-- /toc -->
 
 ## How the domains relate
@@ -76,11 +76,12 @@ Generated from every domain document: which one introduces a name, and where.
 | `appendMessage` | [02-agent-runtime.md#types-that-carry-it](02-agent-runtime.md#types-that-carry-it) | 67 |
 | `appendTool` | [02-agent-runtime.md#types-that-carry-it](02-agent-runtime.md#types-that-carry-it) | 67 |
 | `appId` | [07-build-release.md#types-that-carry-it](07-build-release.md#types-that-carry-it) | 46 |
-| `ArtifactStore` | [05-sessions.md#known-limits](05-sessions.md#known-limits) | 98 |
+| `ArtifactStore` | [05-sessions.md#known-limits](05-sessions.md#known-limits) | 100 |
 | `BsAgentManager` | [02-agent-runtime.md#pieces](02-agent-runtime.md#pieces) | 18 |
 | `buffersRef` | [06-ui-shell.md#data-flow](06-ui-shell.md#data-flow) | 32 |
 | `build/icons/32x32.png` | [07-build-release.md#design-decisions](07-build-release.md#design-decisions) | 58 |
 | `buildSpawnCommand` | [04-terminal-panes.md#design-decisions](04-terminal-panes.md#design-decisions) | 59 |
+| `cfg.prune` | [02-agent-runtime.md#known-limits](02-agent-runtime.md#known-limits) | 116 |
 | `Channels.EventPtyData` | [04-terminal-panes.md#data-flow](04-terminal-panes.md#data-flow) | 29 |
 | `Channels.EventRemoteStatus` | [08-remote-control.md#data-flow](08-remote-control.md#data-flow) | 30 |
 | `Channels` | [01-process-model.md#types-that-carry-it](01-process-model.md#types-that-carry-it) | 54 |
@@ -129,6 +130,7 @@ Generated from every domain document: which one introduces a name, and where.
 | `PtyDataEvent` | [01-process-model.md#types-that-carry-it](01-process-model.md#types-that-carry-it) | 54 |
 | `PtyManager` | [04-terminal-panes.md#pieces](04-terminal-panes.md#pieces) | 18 |
 | `PtySession` | [04-terminal-panes.md#types-that-carry-it](04-terminal-panes.md#types-that-carry-it) | 47 |
+| `pushTurn` | [02-agent-runtime.md#known-limits](02-agent-runtime.md#known-limits) | 116 |
 | `QuotaAccountUiState` | [06-ui-shell.md#types-that-carry-it](06-ui-shell.md#types-that-carry-it) | 51 |
 | `recoverRuntimeContext` | [03-providers.md#types-that-carry-it](03-providers.md#types-that-carry-it) | 60 |
 | `refreshAccount` | [03-providers.md#types-that-carry-it](03-providers.md#types-that-carry-it) | 60 |
@@ -152,7 +154,6 @@ Generated from every domain document: which one introduces a name, and where.
 | `sign-windows.ps1` | [07-build-release.md#design-decisions](07-build-release.md#design-decisions) | 58 |
 | `SnapshotFile[]` | [05-sessions.md#types-that-carry-it](05-sessions.md#types-that-carry-it) | 50 |
 | `SnapshotStore.snapshot` | [05-sessions.md#data-flow](05-sessions.md#data-flow) | 29 |
-| `SnapshotStore` | [02-agent-runtime.md#known-limits](02-agent-runtime.md#known-limits) | 116 |
 | `SnapshotTurn` | [05-sessions.md#types-that-carry-it](05-sessions.md#types-that-carry-it) | 50 |
 | `SpawnCommand` | [04-terminal-panes.md#types-that-carry-it](04-terminal-panes.md#types-that-carry-it) | 47 |
 | `src/main/agent/AGENTS.md` | [02-agent-runtime.md#design-decisions](02-agent-runtime.md#design-decisions) | 82 |
@@ -202,7 +203,8 @@ Generated from every domain document: which one introduces a name, and where.
 | `tools/` | [02-agent-runtime.md#design-decisions](02-agent-runtime.md#design-decisions) | 82 |
 | `tree-kill` | [04-terminal-panes.md#types-that-carry-it](04-terminal-panes.md#types-that-carry-it) | 47 |
 | `TruncationStore` | [05-sessions.md#design-decisions](05-sessions.md#design-decisions) | 66 |
-| `turnId` | [05-sessions.md#data-flow](05-sessions.md#data-flow) | 29 |
+| `turnId` | [02-agent-runtime.md#known-limits](02-agent-runtime.md#known-limits) | 116 |
+| `undoTurn` | [02-agent-runtime.md#known-limits](02-agent-runtime.md#known-limits) | 116 |
 | `window.api` | [01-process-model.md#pieces](01-process-model.md#pieces) | 18 |
 | `XtermHost` | [04-terminal-panes.md#data-flow](04-terminal-panes.md#data-flow) | 29 |
 <!-- /names -->

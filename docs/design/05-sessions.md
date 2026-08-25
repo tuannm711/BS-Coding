@@ -10,8 +10,8 @@ produces these records is in `docs/design/02-agent-runtime.md`.
 | [Pieces](#pieces) | 17-28 | `src/main/agent/session.ts`, `SessionStore`, `sessions.json`, `src/main/agent/shared-session-coordinator.ts`, `SharedSessionCoordinator`, `src/main/agent/snapshot.ts` |
 | [Data flow](#data-flow) | 29-49 | `appendMessage`, `appendTool`, `turnId`, `SharedSessionCoordinator`, `SessionExecutionState`, `SnapshotStore.snapshot` |
 | [Types that carry it](#types-that-carry-it) | 50-65 | `StoredSession`, `ChatTranscriptItem[]`, `turnId`, `SnapshotTurn`, `SnapshotFile[]`, `SessionExecutionState` |
-| [Design decisions](#design-decisions) | 66-97 | `turnId`, `docs/technical-debt.md`, `JsonStore`, `TruncationStore` |
-| [Known limits](#known-limits) | 98-105 | `ArtifactStore` |
+| [Design decisions](#design-decisions) | 66-99 | `undoTurn`, `pushTurn`, `turnId`, `docs/technical-debt.md`, `JsonStore`, `TruncationStore` |
+| [Known limits](#known-limits) | 100-107 | `ArtifactStore` |
 <!-- /toc -->
 
 ## Pieces
@@ -77,9 +77,11 @@ started. Keeping them separate is what lets a steer arrive mid-turn while a
 second agent's request waits its turn.
 
 **Snapshots are per turn, not per edit.** A turn is the unit a user thinks in —
-"undo what it just did" — and it is also the unit the transcript is keyed by. Per
-edit undo would need a finer identity than `turnId`, which is debt item 9's
-per-message undo entry in `docs/technical-debt.md`.
+"undo what it just did" — and it is also the unit the transcript is keyed by.
+`undoTurn` takes a turn id rather than only the most recent turn, and `pushTurn`
+re-inserts one so it can be undone again, which is redo. Going finer would need
+an identity below `turnId` in the transcript — debt item 9 in
+`docs/technical-debt.md`.
 
 **Every store sits on the same flat-file `JsonStore`.** No database. The data is
 small, the access pattern is read-all-write-all, and a JSON file is inspectable
@@ -97,8 +99,8 @@ though the model saw the short version.
 
 ## Known limits
 
-Undo is whole-turn. There is no per-message revert and no redo history beyond the
-last turn — debt item 9.
+Undo is turn-granular in both directions. What is missing is message
+granularity — debt item 9.
 
 `ArtifactStore` is in-memory, rebuilt from tool events, and scoped to a project
 for the lifetime of the window.
