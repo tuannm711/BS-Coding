@@ -14,6 +14,10 @@ export interface SnapshotTurn {
   ts: number
   before: Record<string, string>
   after: Record<string, string>
+  // Which tool call touched which files, so one call can be undone without the
+  // rest of its turn. Absent on anything written before this existed, which
+  // still undoes at turn level.
+  calls?: Record<string, Record<string, string>>
 }
 
 export const MAX_SNAPSHOTS = 50
@@ -29,7 +33,8 @@ function normalize(raw: RawEntry): SnapshotTurn {
       turnId: raw.turnId,
       ts: raw.ts ?? 0,
       before: raw.before,
-      after: raw.after ?? {}
+      after: raw.after ?? {},
+      ...(raw.calls ? { calls: raw.calls } : {})
     }
   }
   // Legacy per-file entry {agentId, filePath, content} → single-file turn.
@@ -44,6 +49,7 @@ function normalize(raw: RawEntry): SnapshotTurn {
 export class SnapshotStore {
   private buffer = new Map<string, {
     files: Map<string, string>
+    calls: Map<string, Set<string>>
     metadata?: Pick<SnapshotTurn, 'projectPath' | 'sessionId' | 'turnId' | 'agentId'>
   }>()
 
@@ -65,7 +71,7 @@ export class SnapshotStore {
     scopeId: string,
     metadata?: Pick<SnapshotTurn, 'projectPath' | 'sessionId' | 'turnId' | 'agentId'>
   ): void {
-    if (!this.buffer.has(scopeId)) this.buffer.set(scopeId, { files: new Map(), metadata })
+    if (!this.buffer.has(scopeId)) this.buffer.set(scopeId, { files: new Map(), calls: new Map(), metadata })
   }
 
   abortTurn(agentId: string): void {
@@ -73,10 +79,14 @@ export class SnapshotStore {
   }
 
   // Records the pre-change content of a file for the current in-progress turn.
-  snapshot(agentId: string, filePath: string, content: string): void {
+  snapshot(agentId: string, filePath: string, content: string, callId?: string): void {
     const buf = this.buffer.get(agentId)
     if (!buf) return
     if (!buf.files.has(filePath)) buf.files.set(filePath, content)
+    if (!callId) return
+    const forCall = buf.calls.get(callId) ?? new Set<string>()
+    forCall.add(filePath)
+    buf.calls.set(callId, forCall)
   }
 
   commitTurn(agentId: string): void {
@@ -97,7 +107,13 @@ export class SnapshotStore {
     const scopeId = buf.metadata?.sessionId ?? agentId
     const others = all.filter(t => (t.sessionId ?? t.agentId) !== scopeId)
     const mine = all.filter(t => (t.sessionId ?? t.agentId) === scopeId)
-    mine.push({ agentId, ...buf.metadata, ts: Date.now(), before, after })
+    const calls: Record<string, Record<string, string>> = {}
+    for (const [callId, paths] of buf.calls) {
+      const forCall: Record<string, string> = {}
+      for (const filePath of paths) forCall[filePath] = before[filePath]
+      calls[callId] = forCall
+    }
+    mine.push({ agentId, ...buf.metadata, ts: Date.now(), before, after, ...(buf.calls.size > 0 ? { calls } : {}) })
     mine.sort((a, b) => a.ts - b.ts)
     this.saveTurns([...others, ...mine.slice(-MAX_SNAPSHOTS)])
   }
@@ -122,6 +138,24 @@ export class SnapshotStore {
         /* file may have been deleted */
       }
     }
+    return turn
+  }
+
+  // Restores the files one tool call touched and leaves the rest of its turn
+  // in place, so undoTurn afterwards still restores what remains. Returns null
+  // for a call this store never recorded — including every snapshot written
+  // before call ids existed.
+  undoCall(scopeId: string, callId: string): SnapshotTurn | null {
+    const all = this.loadTurns()
+    const turn = all.find(t => (t.sessionId ?? t.agentId) === scopeId && t.calls?.[callId])
+    if (!turn?.calls) return null
+    const files = turn.calls[callId]
+    for (const [filePath, content] of Object.entries(files)) {
+      try { writeFileSync(filePath, content) } catch { /* file may have been deleted */ }
+    }
+    delete turn.calls[callId]
+    if (Object.keys(turn.calls).length === 0) delete turn.calls
+    this.saveTurns(all)
     return turn
   }
 

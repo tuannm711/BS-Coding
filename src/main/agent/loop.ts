@@ -274,6 +274,7 @@ export class SessionRunner {
           signal,
           agentId: this.deps.agentId,
           snapshotScopeId: this.deps.snapshotScopeId?.(),
+          toolCallId: call.id,
           taskId: this.deps.taskId,
           turn: this.deps.turn,
           snapshots: this.deps.snapshots,
