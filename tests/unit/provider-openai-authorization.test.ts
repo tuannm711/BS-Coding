@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { decodeJwtProfile } from '../../src/main/connections/codex'
 import { mkdtempSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -61,5 +62,18 @@ describe('OpenAI provider authorization', () => {
 
     const saved = JSON.parse(readFileSync(authFile, 'utf8'))
     expect(saved.tokens).toMatchObject({ access_token: 'access', refresh_token: 'refresh', account_id: 'acct-1' })
+  })
+})
+
+describe('ChatGPT id_token claims', () => {
+  it('reads the account and organization ids from the auth claim', () => {
+    const claim = { email: 'a@b.c', 'https://api.openai.com/auth': { account_id: 'acct-1', organization_id: 'org-1' } }
+    const token = `x.${Buffer.from(JSON.stringify(claim)).toString('base64url')}.y`
+    expect(decodeJwtProfile(token)).toMatchObject({ email: 'a@b.c', accountId: 'acct-1', organizationId: 'org-1' })
+  })
+
+  it('returns nothing for a malformed token', () => {
+    expect(decodeJwtProfile('not-a-jwt')).toEqual({})
+    expect(decodeJwtProfile(undefined)).toEqual({})
   })
 })

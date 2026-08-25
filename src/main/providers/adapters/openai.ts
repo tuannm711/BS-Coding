@@ -99,6 +99,12 @@ export function createOpenAiAdapter(options: OpenAiAdapterOptions = {}): Provide
       if (account.authMode !== 'oauth' || !secret.accessToken) {
         return account.usage ?? { accountId: account.id, accountLabel: account.profile?.email ?? account.label, accountType: account.authMode === 'api-key' ? 'api-key' : 'oauth', refreshedAt: Date.now(), source: 'unavailable', status: 'unavailable', unavailableReason: 'OpenAI API quota is unavailable for this connection method' }
       }
+      // Accounts imported from a Codex auth file never carried accountId, which
+      // left /backend-api/subscriptions unreachable. The id is in the stored claim.
+      if (!secret.accountId && secret.idToken) {
+        const recovered = decodeJwtProfile(secret.idToken)
+        if (recovered.accountId) Object.assign(secret, { accountId: recovered.accountId, organizationId: recovered.organizationId })
+      }
       let lastStatus = 0
       for (let authAttempt = 0; authAttempt < 2; authAttempt++) {
         const headers: Record<string, string> = {
@@ -141,13 +147,16 @@ async function fetchSubscriptionMetadata(headers: Record<string, string>, accoun
     'https://chatgpt.com/backend-api/accounts/check/v4-2023-04-27?timezone_offset_min=420',
     ...(accountId ? [`https://chatgpt.com/backend-api/subscriptions?account_id=${encodeURIComponent(accountId)}`] : [])
   ]
+  const merged: { planName?: string; subscriptionExpiresAt?: number } = {}
   for (const endpoint of endpoints) {
+    if (merged.planName && merged.subscriptionExpiresAt) break
     try {
       const response = await fetch(endpoint, { headers })
       if (!response.ok) continue
       const metadata = extractOpenAISubscriptionMetadata(await response.json())
-      if (metadata.planName || metadata.subscriptionExpiresAt) return metadata
+      merged.planName = merged.planName ?? metadata.planName
+      merged.subscriptionExpiresAt = merged.subscriptionExpiresAt ?? metadata.subscriptionExpiresAt
     } catch { /* usage remains valid when subscription metadata is unavailable */ }
   }
-  return {}
+  return merged
 }

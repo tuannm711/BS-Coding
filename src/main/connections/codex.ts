@@ -56,7 +56,7 @@ export async function refreshCodexToken(refreshToken: string, fetchImpl: typeof 
   return { accessToken: body.access_token, refreshToken: body.refresh_token ?? refreshToken, idToken: body.id_token, expiresAt: Date.now() + (body.expires_in ?? 3600) * 1000 }
 }
 
-export function decodeJwtProfile(idToken?: string): { email?: string; name?: string; accountId?: string } {
+export function decodeJwtProfile(idToken?: string): { email?: string; name?: string; accountId?: string; organizationId?: string } {
   if (!idToken) return {}
   try {
     const payload = idToken.split('.')[1]
@@ -65,7 +65,8 @@ export function decodeJwtProfile(idToken?: string): { email?: string; name?: str
     return {
       email: typeof parsed.email === 'string' ? parsed.email : undefined,
       name: typeof parsed.name === 'string' ? parsed.name : undefined,
-      accountId: typeof auth?.account_id === 'string' ? auth.account_id : undefined
+      accountId: typeof auth?.account_id === 'string' ? auth.account_id : undefined,
+      organizationId: typeof auth?.organization_id === 'string' ? auth.organization_id : undefined
     }
   } catch {
     return {}
