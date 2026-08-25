@@ -189,9 +189,9 @@ variant — glyph only, transparent background — would render better on all th
 `TrayManager.iconPath()`. `scripts/build-windows-icon.mjs` already regenerates the
 shared asset and would need to learn the variants.
 
-## 9. opencode feature gaps
+## 9. opencode feature gaps — closed
 
-**Found:** catalogued 2026-08-05. **Re-measured 2026-08-25** — see
+**Found:** catalogued 2026-08-05. **Re-measured and closed 2026-08-25** — see
 `docs/superpowers/audits/2026-08-25-opencode-gap-audit.md`, which supersedes the
 note this entry used to summarise.
 
@@ -212,8 +212,11 @@ remains, in the order the audit recommends:
 4. **Message-granular undo.** `undoTurn` and `pushTurn` give turn-granular undo
    and redo. Going finer needs an identity below `turnId` in the transcript.
 
-**To close:** each is its own task. Re-measure before planning — this entry has
-already been wrong once by summarising a note instead of the code.
+**Closed.** All four landed in `feat/close-opencode-gaps`; the audit records
+which commit carried each. Kept as an entry because of how it went wrong: this
+summary was written from a note rather than the code and was wrong twice, in the
+same direction both times — claiming something absent that was partly present.
+Re-measure before planning from any summary, including this one.
 
 ## 10. The test runner crashes intermittently
 
