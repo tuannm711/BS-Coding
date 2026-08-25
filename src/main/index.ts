@@ -34,7 +34,7 @@ import { isPathInside, listDir, shouldIgnore } from './dir-lister'
 import type { DirEntry } from '../shared/types'
 import { LspManager } from './agent/lsp/manager'
 import { ModelsCatalog } from './models-catalog'
-import { getWindowChromeOptions } from './window-chrome'
+import { APP_USER_MODEL_ID, getWindowChromeOptions, resolveWindowIconPath } from './window-chrome'
 import { Vault } from './vault'
 import { ProviderManager } from './connections/manager'
 import { ProviderUsageLedger } from './connections/usage-ledger'
@@ -648,11 +648,13 @@ class MainApp {
 let mainApp!: MainApp
 
 function createWindow(): void {
+  const windowIcon = resolveWindowIconPath(process.platform, app.isPackaged, app.getAppPath())
   win = new BrowserWindow({
     width: 1400,
     height: 900,
     title: 'BS Coding',
     backgroundColor: '#1e1e1e',
+    ...(windowIcon ? { icon: windowIcon } : {}),
     ...getWindowChromeOptions(process.platform),
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.js'),
@@ -977,6 +979,7 @@ app.whenReady().then(async () => {
     // Trace temporarily disabled: drop old trace data so nothing lingers.
     rmSync(path.join(app.getPath('userData'), 'traces'), { recursive: true, force: true })
   }
+  if (process.platform === 'win32') app.setAppUserModelId(APP_USER_MODEL_ID)
   registerIpcHandlers()
   createWindow()
   mainApp.startUsagePoll()
