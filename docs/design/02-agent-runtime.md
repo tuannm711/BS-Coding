@@ -12,7 +12,7 @@ this document assumes an `LlmClient` already exists.
 | [Data flow](#data-flow) | 38-66 | `BsAgentManager`, `SessionRunner`, `LoopDeps`, `toLlmMessages(getItems())`, `LlmClient`, `text-delta` |
 | [Types that carry it](#types-that-carry-it) | 67-81 | `LoopDeps`, `src/main/agent/loop.ts`, `getItems`, `appendMessage`, `appendTool`, `tests/unit/agent-loop.test.ts` |
 | [Design decisions](#design-decisions) | 82-115 | `LoopDeps`, `createLlm`, `LlmClient`, `src/main/agent/AGENTS.md`, `takeSteers`, `tools/` |
-| [Known limits](#known-limits) | 116-125 | `cfg.prune`, `docs/technical-debt.md`, `undoTurn`, `pushTurn`, `turnId` |
+| [Known limits](#known-limits) | 116-128 | `MAX_COMPACT_PER_RUN`, `compactIfOverThreshold`, `undoTurn`, `pushTurn`, `turnId` |
 <!-- /toc -->
 
 ## Pieces
@@ -115,9 +115,12 @@ after an edit.
 
 ## Known limits
 
-Compaction prunes old tool output when `cfg.prune` is set, but a turn that
-compacts then ends rather than resuming. Auto-continue has no implementation and
-no setting — debt item 9 in `docs/technical-debt.md`.
+Compaction runs at the top of each step and the turn continues into the next
+model call, so there is nothing to resume. What is capped is how often:
+`MAX_COMPACT_PER_RUN` is 2, after which `compactIfOverThreshold` returns early
+and the turn proceeds with a context it already knows is over the limit. Overflow
+detection is proactive only — a provider that rejects the request for length is
+not recovered from.
 
 Undo and redo are turn-granular. `undoTurn` addresses a turn by id and
 `pushTurn` re-inserts it, so any turn can be reverted and re-applied, but a

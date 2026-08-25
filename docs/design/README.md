@@ -11,11 +11,11 @@ session. For the product view — features, screenshots, how to install — read
 | --- | --- | --- |
 | [How the domains relate](#how-the-domains-relate) | 21-37 | `LlmClient` |
 | [The documents](#the-documents) | 38-54 |  |
-| [Finding a name](#finding-a-name) | 55-211 | `.cmd`, `.exe`, `.github/workflows/build.yml`, `.ico`, `'near-limit'`, `/bin/bash` |
-| [What is here and what is history](#what-is-here-and-what-is-history) | 212-221 | `docs/design/`, `docs/superpowers/`, `docs/evidence/` |
-| [Current work](#current-work) | 222-226 |  |
-| [Next work](#next-work) | 227-239 | `docs/superpowers/notes/2026-08-05-opencode-feature-diff.md` |
-| [Debt](#debt) | 240-246 | `docs/technical-debt.md` |
+| [Finding a name](#finding-a-name) | 55-212 | `.cmd`, `.exe`, `.github/workflows/build.yml`, `.ico`, `'near-limit'`, `/bin/bash` |
+| [What is here and what is history](#what-is-here-and-what-is-history) | 213-222 | `docs/design/`, `docs/superpowers/`, `docs/evidence/` |
+| [Current work](#current-work) | 223-227 |  |
+| [Next work](#next-work) | 228-240 | `docs/superpowers/notes/2026-08-05-opencode-feature-diff.md` |
+| [Debt](#debt) | 241-247 | `docs/technical-debt.md` |
 <!-- /toc -->
 
 ## How the domains relate
@@ -81,7 +81,6 @@ Generated from every domain document: which one introduces a name, and where.
 | `buffersRef` | [06-ui-shell.md#data-flow](06-ui-shell.md#data-flow) | 32 |
 | `build/icons/32x32.png` | [07-build-release.md#design-decisions](07-build-release.md#design-decisions) | 58 |
 | `buildSpawnCommand` | [04-terminal-panes.md#design-decisions](04-terminal-panes.md#design-decisions) | 59 |
-| `cfg.prune` | [02-agent-runtime.md#known-limits](02-agent-runtime.md#known-limits) | 116 |
 | `Channels.EventPtyData` | [04-terminal-panes.md#data-flow](04-terminal-panes.md#data-flow) | 29 |
 | `Channels.EventRemoteStatus` | [08-remote-control.md#data-flow](08-remote-control.md#data-flow) | 30 |
 | `Channels` | [01-process-model.md#types-that-carry-it](01-process-model.md#types-that-carry-it) | 54 |
@@ -90,6 +89,7 @@ Generated from every domain document: which one introduces a name, and where.
 | `ChatTranscriptItem[]` | [05-sessions.md#types-that-carry-it](05-sessions.md#types-that-carry-it) | 50 |
 | `cmd.exe` | [04-terminal-panes.md#design-decisions](04-terminal-panes.md#design-decisions) | 59 |
 | `com.bs.coding` | [07-build-release.md#types-that-carry-it](07-build-release.md#types-that-carry-it) | 46 |
+| `compactIfOverThreshold` | [02-agent-runtime.md#known-limits](02-agent-runtime.md#known-limits) | 116 |
 | `Configuration` | [07-build-release.md#types-that-carry-it](07-build-release.md#types-that-carry-it) | 46 |
 | `contextBridge` | [01-process-model.md#pieces](01-process-model.md#pieces) | 18 |
 | `createLlm` | [02-agent-runtime.md#design-decisions](02-agent-runtime.md#design-decisions) | 82 |
@@ -113,6 +113,7 @@ Generated from every domain document: which one introduces a name, and where.
 | `LoopDeps` | [02-agent-runtime.md#data-flow](02-agent-runtime.md#data-flow) | 38 |
 | `MainApp.startUsagePoll` | [03-providers.md#data-flow](03-providers.md#data-flow) | 37 |
 | `MainApp` | [01-process-model.md#pieces](01-process-model.md#pieces) | 18 |
+| `MAX_COMPACT_PER_RUN` | [02-agent-runtime.md#known-limits](02-agent-runtime.md#known-limits) | 116 |
 | `onExit` | [04-terminal-panes.md#design-decisions](04-terminal-panes.md#design-decisions) | 59 |
 | `onX` | [01-process-model.md#data-flow](01-process-model.md#data-flow) | 33 |
 | `openai.ts` | [03-providers.md#known-limits](03-providers.md#known-limits) | 124 |

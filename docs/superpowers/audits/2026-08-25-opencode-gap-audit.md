@@ -19,9 +19,9 @@ meant proposing work that is done.
 | 5 | File watcher / auto-context | "Không có" | **Built** | `src/main/file-watcher.ts` |
 | 6 | Tool output truncation service | "Cắt cứng trong toLlmMessages" | **Built** | `src/main/agent/truncation.ts` |
 | 7 | LLM session title and rename | "Auto-title heuristic, không rename" | **Partly built** | `renameSession` in `src/shared/ipc.ts`; title still `titleFrom` in `src/main/agent/session.ts` |
-| 8 | Compaction auto-continue and prune | "Compact nhưng không auto-continue/prune" | **Partly built** | `pruneToolOutputs` in `src/main/agent/compact.ts`; no auto-continue |
+| 8 | Compaction auto-continue and prune | "Compact nhưng không auto-continue/prune" | **Built** | `pruneToolOutputs` in `src/main/agent/compact.ts`; `compactIfOverThreshold` runs in-loop and the turn continues |
 
-Four built, three partly, one — auto-continue — not started.
+Five built, three partly, none untouched.
 
 ## The partly-built items, precisely
 
@@ -43,10 +43,20 @@ IPC contract, so renaming works. The automatic title is still
 `titleFrom` / `titleFromItems` — a heuristic over the first message text. There
 is no title prompt and no model call.
 
-**Item 8 — compaction.** `pruneToolOutputs` drops old tool output when
-`cfg.prune` is set, and its own comment says it mirrors opencode's
-`compaction.prune`. Auto-continue — resuming the turn after a compaction rather
-than ending it — has no implementation and no setting.
+**Item 8 — compaction. Corrected after a second reading.** Both halves are
+built. `pruneToolOutputs` drops old tool output when `cfg.prune` is set, and
+`compactIfOverThreshold` runs at the top of every step in `src/main/agent/loop.ts`
+before the messages are built, so the turn continues into the next model call —
+there is no interruption to resume from.
+
+What exists instead of a gap is a cap and a blind spot. `MAX_COMPACT_PER_RUN` is
+2; past that the turn proceeds with a context known to be over the limit.
+And detection is proactive only: a provider that rejects a request for length is
+not recovered from.
+
+The first draft of this audit called item 8 partly built, repeating the note's
+claim without reading `loop.ts`. That is the same failure the audit was written
+to correct, made inside the correction.
 
 ## What genuinely remains
 
@@ -55,9 +65,10 @@ Ordered by what the multi-account goal needs, not by opencode parity.
 1. **A stats surface.** The data is computed and thrown away. This is the
    cheapest item on the list and it directly serves routing: knowing what each
    account has actually cost is the other half of knowing what quota it has left.
-2. **Compaction auto-continue.** A long turn that compacts currently stops. With
-   several agents sharing a session this ends a turn that a coordinator expected
-   to finish.
+2. **Compaction robustness.** Not a missing feature — a cap and a blind spot.
+   Past `MAX_COMPACT_PER_RUN` the turn runs with an over-limit context, and a
+   provider rejection for length is not recovered from. Both matter more when a
+   coordinator is driving long turns it expects to finish.
 3. **LLM session titles.** Cosmetic against the product goal. Cheap, and it makes
    a project with many sessions navigable.
 4. **Message-granular undo.** Needs a finer identity than `turnId` in the
