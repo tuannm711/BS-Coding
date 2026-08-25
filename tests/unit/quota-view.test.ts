@@ -39,7 +39,6 @@ describe('quota card view model', () => {
   it('formats reset and subscription countdowns deterministically', () => {
     const now = Date.UTC(2026, 7, 23, 10, 0, 0)
     expect(formatCountdown(now + (2 * 60 * 60 + 14 * 60) * 1000, now)).toBe('2h 14m')
-    expect(formatExpiry(now + 3 * 86400000, now)).toBe('expires in 3d')
   })
 
   it('returns an empty view model when quota fields are unavailable', () => {
@@ -83,5 +82,22 @@ describe('quota card view model', () => {
   it('never hides a refresh error or a non-exhaustion reason', () => {
     expect(accountWarning({ ...groupedUsage, refreshError: 'boom', unavailableReason: 'Quota exhausted' })).toBe('boom')
     expect(accountWarning({ ...groupedUsage, unavailableReason: 'Authentication expired' })).toBe('Authentication expired')
+  })
+
+  it('states a subscription term with the exact instant it ends', () => {
+    // the real account, at the moment the comparison tool read Term 24d
+    const ends = new Date(2026, 8, 18, 12, 47, 59).getTime()
+    const now = new Date(2026, 7, 25, 14, 53, 0).getTime()
+    expect(formatExpiry(ends, now)).toBe('Term 24d · 12:47:59 18/09/2026')
+  })
+
+  it('counts a part-day as the day the term still runs into', () => {
+    const now = new Date(2026, 7, 25, 12, 0, 0).getTime()
+    expect(formatExpiry(now + 3_600_000, now)).toBe('Term 1d · 13:00:00 25/08/2026')
+    expect(formatExpiry(now - 3_600_000, now)).toBe('Expired · 11:00:00 25/08/2026')
+  })
+
+  it('returns a dash when no expiry is reported', () => {
+    expect(formatExpiry(undefined)).toBe('—')
   })
 })

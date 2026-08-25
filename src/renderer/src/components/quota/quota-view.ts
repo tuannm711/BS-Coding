@@ -52,9 +52,10 @@ export function accountWarning(usage?: ProviderUsage): string | undefined {
 }
 
 export function formatExpiry(timestamp: number | undefined, now = Date.now()): string {
-  if (timestamp === undefined) return '—'
+  if (timestamp === undefined || !Number.isFinite(timestamp)) return '—'
   const days = Math.max(0, Math.ceil((timestamp - now) / 86400000))
-  return days === 0 ? 'expires today' : `expires in ${days}d`
+  const term = timestamp <= now ? 'Expired' : `Term ${days}d`
+  return `${term} · ${formatInstant(timestamp)}`
 }
 
 export function formatAge(timestamp: number | undefined, now = Date.now()): string {
