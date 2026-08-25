@@ -28,6 +28,10 @@ handlers và vòng đời app.
 - `updater.ts` — electron-updater wrapper, phát `UpdaterStatusEvent`.
 - `window-chrome.ts` — `getWindowChromeOptions`: title-bar ẩn trên Windows/Linux.
 - `vault.ts` — encrypted secret store (safeStorage) cho API keys của providers.
+- `tray-manager.ts` — tray icon, menu, hide-to-tray; asset đọc từ `process.resourcesPath` khi packaged.
+- `artifact-store.ts` — artifact theo project, phát sự kiện ra renderer.
+- `file-viewer.ts` / `dir-lister.ts` — đọc file và liệt kê thư mục cho right panel.
+- `connections/` + `providers/` — tài khoản provider, quota, OAuth — xem `docs/design/03-providers.md`.
 - `browser/` — BrowserBridge (WS server local + pairing) + Chrome launcher + snapshot format.
 
 ## Quy ước

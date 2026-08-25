@@ -140,6 +140,9 @@ WebSocket.)
 Security: `contextIsolation: true`, `nodeIntegration: false`; the renderer never touches Node or
 Electron directly.
 
+For the technical reference — how each domain works, the types involved, and the reasoning behind
+the decisions — see [`docs/design/`](docs/design/README.md).
+
 ## Requirements
 
 - Node.js 20+

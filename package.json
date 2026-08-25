@@ -6,6 +6,7 @@
   "scripts": {
     "build:extension": "node scripts/build-extension.mjs",
     "build:icon": "node scripts/build-windows-icon.mjs",
+    "docs:toc": "node scripts/build-docs-toc.mjs",
     "predev": "npm run build:extension",
     "prebuild": "npm run build:extension",
     "predist": "npm run build:extension && npm run build:icon",

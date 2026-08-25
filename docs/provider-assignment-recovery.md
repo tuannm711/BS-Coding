@@ -1,5 +1,8 @@
 # Provider assignment migration and recovery
 
+> Operator runbook for recovering provider assignments. For how accounts and
+> assignments work see `docs/design/03-providers.md`.
+
 BS Coding stores provider accounts and agent assignments separately:
 
 - `connections/accounts.json` contains safe account metadata; secrets remain in `connections/vault.json` and are never exposed to the renderer.
