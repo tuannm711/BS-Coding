@@ -333,6 +333,16 @@ if (e.type === 'usage') {
       setItems(prev => [...prev, { kind: 'compaction', id: 'c-' + Date.now(), failed: true }])
       return
     }
+    if (e.type === 'agent-fallback') {
+      setItems(prev => [...prev, {
+        kind: 'notice',
+        id: 'f-' + Date.now(),
+        // The pool is named because two agents on different models can draw on
+        // one, and without it the choice reads as arbitrary.
+        text: `${e.reason}${e.pool ? ` on ${e.pool}` : ''} — continuing on ${e.toAgentName}.`
+      }])
+      return
+    }
     if (e.type === 'narrated-tool-call') {
       setItems(prev => [...prev, {
         kind: 'notice',
