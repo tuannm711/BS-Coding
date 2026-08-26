@@ -160,7 +160,7 @@ the other two, and addresses friction the owner meets daily.
 - **C1. The balance model**, for top-up providers. A real response is already
   available: the ChatGPT usage endpoint returns `credits.balance`,
   `credits.has_credits` and `spend_control.individual_limit`, none of them
-  parsed. Measured 2026-08-26; recorded as debt item 11. This corrects an
+  parsed. Measured 2026-08-26; recorded as debt item 10. This corrects an
   earlier assumption here that the work had to wait for a DeepSeek account.
 - **C2. Estimates for silent providers**, from the ledger, labelled as estimates.
 

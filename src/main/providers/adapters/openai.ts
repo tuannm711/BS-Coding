@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import type { ProviderModel } from '../../../shared/providers'
 import type { ProviderAdapter } from '../types'
 import { createLlm } from '../../agent/llm'
@@ -16,6 +17,22 @@ const models: ProviderModel[] = OPENAI_OAUTH_MODELS.map(id => ({ id, name: id, c
 interface OpenAiAdapterOptions {
   codexAuthFile?: string
   codexBackupFile?: string
+}
+
+const CONSUME_RESET_CREDIT_URL = 'https://chatgpt.com/backend-api/wham/rate-limit-reset-credits/consume'
+
+// One definition, so the usage read and the consume post cannot drift apart.
+function codexHeaders(secret: { accessToken?: string; accountId?: string }): Record<string, string> {
+  const headers: Record<string, string> = {
+    authorization: `Bearer ${secret.accessToken}`,
+    originator: 'codex_vscode',
+    'user-agent': 'codex_vscode/0.146.0',
+    accept: 'application/json',
+    origin: 'https://chatgpt.com',
+    referer: 'https://chatgpt.com/'
+  }
+  if (secret.accountId) headers['ChatGPT-Account-ID'] = secret.accountId
+  return headers
 }
 
 export function createOpenAiAdapter(options: OpenAiAdapterOptions = {}): ProviderAdapter {
@@ -95,6 +112,25 @@ export function createOpenAiAdapter(options: OpenAiAdapterOptions = {}): Provide
       }
       return createLlm('openai', secret.apiKey ?? '', secret.baseUrl)
     },
+    async consumeResetCredit(account, secret) {
+      if (account.authMode !== 'oauth' || !secret.accessToken) {
+        throw new Error('[bs] A reset credit needs a ChatGPT OAuth account')
+      }
+      // Generated once, before the first attempt: a retry that mints a new
+      // id spends a second credit.
+      const redeemRequestId = randomUUID()
+      const post = async (): Promise<Response> => fetch(CONSUME_RESET_CREDIT_URL, {
+        method: 'POST',
+        headers: { ...codexHeaders(secret), 'content-type': 'application/json' },
+        body: JSON.stringify({ redeem_request_id: redeemRequestId })
+      })
+      let response = await post()
+      if (response.status === 401 && secret.refreshToken) {
+        Object.assign(secret, await refreshCodexToken(secret.refreshToken))
+        response = await post()
+      }
+      if (!response.ok) throw new Error(`[bs] Reset credit refused (${response.status}): ${await response.text()}`)
+    },
     async fetchUsage(account, secret) {
       if (account.authMode !== 'oauth' || !secret.accessToken) {
         return account.usage ?? { accountId: account.id, accountLabel: account.profile?.email ?? account.label, accountType: account.authMode === 'api-key' ? 'api-key' : 'oauth', refreshedAt: Date.now(), source: 'unavailable', status: 'unavailable', statusReason: 'OpenAI API quota is unavailable for this connection method' }
@@ -105,15 +141,7 @@ export function createOpenAiAdapter(options: OpenAiAdapterOptions = {}): Provide
       if (!secret.accountId && claim.accountId) Object.assign(secret, { accountId: claim.accountId })
       let lastStatus = 0
       for (let authAttempt = 0; authAttempt < 2; authAttempt++) {
-        const headers: Record<string, string> = {
-          authorization: `Bearer ${secret.accessToken}`,
-          originator: 'codex_vscode',
-          'user-agent': 'codex_vscode/0.146.0',
-          accept: 'application/json',
-          origin: 'https://chatgpt.com',
-          referer: 'https://chatgpt.com/'
-        }
-        if (secret.accountId) headers['ChatGPT-Account-ID'] = secret.accountId
+        const headers = codexHeaders(secret)
         for (const endpoint of ['https://chatgpt.com/backend-api/wham/usage', 'https://chatgpt.com/backend-api/codex/usage']) {
           const response = await fetch(endpoint, { headers })
           const body = await response.text()

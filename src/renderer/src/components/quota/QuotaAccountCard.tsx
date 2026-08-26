@@ -1,5 +1,6 @@
 import type { AgentModelAssignment, AgentSpeed, ProviderQuotaGroup, ProviderTrackedUsage } from '@shared/types'
 import type { ProviderAccountSnapshot } from '@shared/provider-state'
+import { resetCreditGate } from '@shared/reset-credit'
 import { ChevronDown, Gauge, Link2, Power, RefreshCw, Trash2, Zap } from 'lucide-react'
 import { accountWarning, formatAge, formatCountdown, formatCount, formatExpiry, formatInstant, formatMoney, formatPercent, formatProviderAccountType, quotaWindowState } from './quota-view'
 
@@ -30,13 +31,16 @@ interface Props {
   onAccountToggle?: () => void
   onRemove?: () => void
   onSpeedChange?: (agentId: string, speed: AgentSpeed) => void
+  onConsumeResetCredit?: () => void
 }
+
+const resetCreditLabel = (available: number): string => `${available} reset${available === 1 ? '' : 's'}`
 
 const STATE_LABELS = { ready: 'Ready', unavailable: 'Usage unavailable', 'quota-exhausted': 'Quota exhausted', 'capacity-exhausted': 'Capacity exhausted', cooldown: 'Cooldown', 'auth-error': 'Auth error' } as const
 
 export default function QuotaAccountCard({
   account, groups, providerLabel, tracked, session, agents = [], variant, providerState,
-  expandedModels = false, refreshing = false, onToggleModels, onRefresh, onReconnect,
+  expandedModels = false, refreshing = false, onToggleModels, onRefresh, onReconnect, onConsumeResetCredit,
   onAccountToggle, onRemove, onSpeedChange
 }: Props) {
   const usage = account.usage
@@ -44,6 +48,7 @@ export default function QuotaAccountCard({
   const planName = usage?.planName ?? account.profile?.planName
   const accountType = formatProviderAccountType(account.providerId, account.authMode)
   const active = account.status === 'active'
+  const resetGate = resetCreditGate(usage)
   const modelNames = account.models.map(model => model.name)
   const stageDetails = Object.entries(account.refreshStages ?? {}).filter(([, status]) => status === 'refreshing' || status === 'error')
 
@@ -61,12 +66,19 @@ export default function QuotaAccountCard({
           <span className={`quota-account-status ${active ? 'active' : 'inactive'}`}>{active ? 'Active' : account.status}</span>
           {planName ? <span className="quota-plan-badge">{planName}</span> : null}
           {providerState ? <span className={`quota-plan-badge quota-state-${providerState}`} role="status">{STATE_LABELS[providerState]}</span> : null}
-          {/* A statement of fact, not a control: spending a credit is not
-              implemented, and a button would promise otherwise. */}
-          {usage?.resetCredits ? <span className="quota-plan-badge quota-reset-badge" role="status">
-            {usage.resetCredits.available} reset{usage.resetCredits.available === 1 ? '' : 's'}
-            {usage.resetCredits.applicable === 0 && usage.resetCredits.available > 0 ? ' · not usable now' : ''}
-          </span> : null}
+          {/* The count, and nothing about what it means: cockpit spends these
+              successfully while ignoring applicable_available_count, so any
+              claim built on that field is unsupported. */}
+          {usage?.resetCredits ? (onConsumeResetCredit
+            ? <button
+                className="quota-plan-badge quota-reset-badge"
+                type="button"
+                disabled={!resetGate.allowed}
+                title={resetGate.allowed ? 'Spend one reset credit' : resetGate.reason}
+                onClick={onConsumeResetCredit}
+              >{resetCreditLabel(usage.resetCredits.available)}</button>
+            : <span className="quota-plan-badge quota-reset-badge" role="status">{resetCreditLabel(usage.resetCredits.available)}</span>
+          ) : null}
         </div>
       </header>
 

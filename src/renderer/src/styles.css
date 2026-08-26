@@ -1697,6 +1697,10 @@ select.input { width: 100%; }
    badges; only the colour differs, since this states a fact rather than a
    status the account is in. */
 .quota-reset-badge { border-color: var(--hairline); color: var(--text); }
+.quota-reset-badge:enabled { cursor: pointer; }
+.quota-reset-badge:enabled:hover { border-color: var(--accent-border); color: var(--accent); }
+.quota-reset-badge:disabled { opacity: 0.55; cursor: not-allowed; }
+.right-panel-quota-note { font-size: var(--fs-sm); color: var(--text-faint); padding: 4px 8px; }
 .quota-refresh { flex: 0 0 auto; }
 .quota-account-subline { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 .quota-account-error { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 8px; border: 1px solid color-mix(in srgb, var(--danger) 45%, transparent); border-radius: 6px; color: var(--danger); font-size: var(--fs-sm); }

@@ -237,10 +237,13 @@ describe('reset credits', () => {
     expect(withCredits({ available: 2, applicable: 2 })).toContain('2 resets')
   })
 
-  it('says a held reset credit cannot be used right now', () => {
+  it('states the count without interpreting it', () => {
+    // The 'not usable now' wording asserted a meaning for
+    // applicable_available_count. Cockpit performs this action successfully
+    // while ignoring that field entirely, so the claim was unsupported.
     const markup = withCredits({ available: 1, applicable: 0 })
     expect(markup).toContain('1 reset')
-    expect(markup).toContain('not usable now')
+    expect(markup).not.toContain('not usable now')
   })
 
   it('shows nothing when the provider does not report reset credits', () => {
@@ -263,5 +266,38 @@ describe('snapshot shape the panel depends on', () => {
       {}
     )
     expect(rows).toEqual([])
+  })
+})
+
+describe('reset credit button', () => {
+  const weeklyUsage = (remainingPercent: number, available = 1) => ({
+    accountId: 'account-1', refreshedAt: 1, source: 'provider' as const, status: 'ok' as const,
+    resetCredits: { available, applicable: 0 },
+    quotaGroups: [{
+      id: 'openai-base', label: 'Codex', modelIds: [],
+      windows: [{ id: 'secondary', label: 'Weekly', kind: 'weekly' as const, remainingPercent, usageKnown: true, source: 'provider' as const }]
+    }]
+  })
+  const card = (remainingPercent: number) => renderToStaticMarkup(React.createElement(QuotaAccountCard, {
+    account: account({ usage: weeklyUsage(remainingPercent) }), groups: [], variant: 'chat' as const,
+    onConsumeResetCredit: () => {}
+  }))
+
+  it('enables the reset button when the week is nearly spent', () => {
+    expect(card(2)).not.toContain('disabled=""')
+  })
+
+  it('disables it while most of the week remains, and says why', () => {
+    const markup = card(69)
+    expect(markup).toContain('disabled=""')
+    expect(markup).toContain('69%')
+  })
+
+  it('stays a plain badge when no handler is given', () => {
+    const markup = renderToStaticMarkup(React.createElement(QuotaAccountCard, {
+      account: account({ usage: weeklyUsage(2) }), groups: [], variant: 'provider' as const
+    }))
+    expect(markup).toContain('1 reset')
+    expect(markup).not.toContain('<button class="quota-reset-badge')
   })
 })

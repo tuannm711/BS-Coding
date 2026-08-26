@@ -1,4 +1,5 @@
 import type { ProviderAccount, ProviderConnection, ProviderUsage } from '../../shared/types'
+import { resetCreditGate, type ConsumeResetCreditResult } from '../../shared/reset-credit'
 import type {
   ProviderAuthorizationError,
   ProviderAuthorizationRequest,
@@ -87,6 +88,40 @@ export class ProviderManager {
     await this.refreshModels(providerId, accountId)
     await this.refreshUsage(providerId, accountId)
     return this.getSnapshot()
+  }
+
+  // The gate is enforced here, not only on the button. A disabled control is
+  // a courtesy; this channel can be called regardless, and spending a credit
+  // cannot be undone.
+  async consumeResetCredit(providerId: string, accountId: string): Promise<ConsumeResetCreditResult> {
+    const account = this.store.get(accountId)
+    const secret = this.store.getSecret(accountId)
+    const adapter = this.registry.get(providerId)
+    if (!account || !secret || !adapter?.consumeResetCredit) {
+      return { status: 'refused', reason: 'This account cannot spend a reset credit' }
+    }
+    const gate = resetCreditGate(account.usage)
+    if (!gate.allowed) return { status: 'refused', reason: gate.reason }
+    try {
+      await adapter.consumeResetCredit(account, secret)
+    } catch (error) {
+      return { status: 'failed', error: String(error) }
+    }
+    // The credit is gone from here on. A refresh that fails must never read as
+    // a failed consume: that would tell the user to try again, spending another.
+    try {
+      const refreshed = await this.refreshUsage(providerId, accountId)
+      // fetchUsage swallows adapter errors and returns a degraded usage rather
+      // than throwing, so the signal is in the value, not in an exception.
+      const mine = refreshed.find(usage => usage.accountId === accountId)
+      if (mine?.refreshError) return { status: 'consumed', refreshError: mine.refreshError }
+      if (mine?.status === 'unavailable') {
+        return { status: 'consumed', refreshError: mine.statusReason ?? 'Quota could not be re-read' }
+      }
+    } catch (error) {
+      return { status: 'consumed', refreshError: String(error) }
+    }
+    return { status: 'consumed' }
   }
 
   createRuntime(providerId: string, accountId: string, modelId: string): LlmClient {
