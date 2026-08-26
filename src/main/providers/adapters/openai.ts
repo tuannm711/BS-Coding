@@ -112,6 +112,8 @@ export function createOpenAiAdapter(options: OpenAiAdapterOptions = {}): Provide
       }
       return createLlm('openai', secret.apiKey ?? '', secret.baseUrl)
     },
+    // One pool covers every Codex model on this provider.
+    quotaGroupForModel: () => 'openai-base',
     async consumeResetCredit(account, secret) {
       if (account.authMode !== 'oauth' || !secret.accessToken) {
         throw new Error('[bs] A reset credit needs a ChatGPT OAuth account')

@@ -1,6 +1,6 @@
 import type { ProviderAdapter } from '../types'
 import { createAntigravityLlm } from '../../agent/antigravity-llm'
-import { hasKnownAntigravityQuota, parseAntigravityModels, parseAntigravityQuotaSummary } from '../antigravity-models'
+import { antigravityQuotaGroupForModel, hasKnownAntigravityQuota, parseAntigravityModels, parseAntigravityQuotaSummary } from '../antigravity-models'
 import {
   antigravityAuthorizeUrl,
   exchangeAntigravityCode,
@@ -154,6 +154,9 @@ export function createAntigravityAdapter(): ProviderAdapter {
     async refreshCredentials(account, secret, options) {
       return refreshCredentials(account, secret, options)
     },
+    // The classifier has existed since the quota groups did; only the
+    // fallback construction path ever called it.
+    quotaGroupForModel: antigravityQuotaGroupForModel,
     async listModels(_account, secret) {
       if (secret.accessToken) {
         const response = await fetchAvailableModels(secret)

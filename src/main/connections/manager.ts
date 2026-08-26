@@ -221,14 +221,25 @@ export class ProviderManager {
     }
   }
 
+  // The provider knows this; quotaGroups[].modelIds does not — Antigravity
+  // leaves it empty, which is why every Antigravity ledger row written before
+  // this carries no pool at all. The old lookup stays as the fallback so a
+  // provider that does not answer behaves as it did.
+  private poolFor(providerId: string, modelId: string, account: ProviderAccount): string | undefined {
+    const declared = this.registry.get(providerId)?.quotaGroupForModel?.(modelId)
+    if (declared) return declared
+    const groups = account.usage?.quotaGroups
+    return groups?.find(group => group.modelIds.includes(modelId))?.id
+      ?? (groups?.length === 1 ? groups[0].id : undefined)
+  }
+
   private recordRuntimeUsage(providerId: string, accountId: string, modelId: string, tokens: { input: number; output: number; cacheRead: number; cacheWrite: number }): void {
     const ledger = this.deps.usageLedger
     const account = this.store.get(accountId)
     if (!ledger || !account) return
     const now = Date.now()
     const period = selectTrackedPeriod(account.usage, account.createdAt || now)
-    const groupId = account.usage?.quotaGroups?.find(group => group.modelIds.includes(modelId))?.id
-      ?? (account.usage?.quotaGroups?.length === 1 ? account.usage.quotaGroups[0].id : undefined)
+    const groupId = this.poolFor(providerId, modelId, account)
     const tracked = ledger.record({
       providerId,
       accountId,
