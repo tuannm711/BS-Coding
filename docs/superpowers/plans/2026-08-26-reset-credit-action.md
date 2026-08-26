@@ -50,7 +50,7 @@ body:    { "redeem_request_id": "<uuid v4>" }
   where `ResetCreditGate` is
   `{ allowed: true } | { allowed: false; reason: string }`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```ts
 import { describe, expect, it } from 'vitest'
@@ -107,7 +107,7 @@ describe('resetCreditGate', () => {
 })
 ```
 
-- [ ] **Step 2: Run to confirm failure**
+- [x] **Step 2: Run to confirm failure**
 
 ```bash
 npx vitest run tests/unit/reset-credit.test.ts
@@ -115,7 +115,7 @@ npx vitest run tests/unit/reset-credit.test.ts
 
 Expected: the module does not resolve.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 ```ts
 import type { ProviderUsage } from './types'
@@ -141,7 +141,7 @@ export function resetCreditGate(usage: ProviderUsage | undefined): ResetCreditGa
 }
 ```
 
-- [ ] **Step 4: Verify and commit**
+- [x] **Step 4: Verify and commit**
 
 ```bash
 npm test && npm run typecheck
@@ -160,7 +160,7 @@ Expected: **1079**. Commit as `feat: gate spending a reset credit on the weekly 
 **Interfaces:**
 - Produces: `ProviderAdapter.consumeResetCredit?(account, secret): Promise<void>`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```ts
 import { describe, expect, it, vi } from 'vitest'
@@ -206,11 +206,11 @@ Read `openai.ts` first for the adapter's real factory name and the shape of
 `refreshCodexToken`; the names above follow the file's existing conventions and
 must be corrected to match rather than the file changed to match them.
 
-- [ ] **Step 2: Run to confirm failure**
+- [x] **Step 2: Run to confirm failure**
 
 Expected: `consumeResetCredit` is not a function.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Add to `ProviderAdapter` in `src/main/providers/types.ts`:
 
@@ -247,7 +247,7 @@ In `openai.ts`, beside `fetchUsage`, reusing its header block:
 to a small local function so both use one definition rather than two copies that
 can drift.
 
-- [ ] **Step 4: Verify and commit**
+- [x] **Step 4: Verify and commit**
 
 ```bash
 npm test && npm run typecheck
@@ -273,7 +273,7 @@ Body must name the same-id retry and why it matters.
   `consumeResetCredit(providerId, accountId): Promise<ConsumeResetCreditResult>`
   on both the manager and `AgentApi`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```ts
   it('refuses without calling the adapter when the gate says no', async () => {
@@ -307,11 +307,11 @@ Build `makeManager` from the fakes already used in `tests/unit/connections-store
 and the adapter registry stub in `tests/unit/provider-snapshot.test.ts`; do not
 invent a new harness shape.
 
-- [ ] **Step 2: Run to confirm failure**
+- [x] **Step 2: Run to confirm failure**
 
 Expected: `consumeResetCredit` is not a function on the manager.
 
-- [ ] **Step 3: Implement the manager method**
+- [x] **Step 3: Implement the manager method**
 
 ```ts
   async consumeResetCredit(providerId: string, accountId: string): Promise<ConsumeResetCreditResult> {
@@ -337,13 +337,13 @@ Expected: `consumeResetCredit` is not a function on the manager.
   }
 ```
 
-- [ ] **Step 4: Add the channel**
+- [x] **Step 4: Add the channel**
 
 `Channels.ProviderResetCreditConsume` in `src/shared/ipc.ts`, the method on
 `AgentApi`, the implementation in `src/preload/index.ts`, and the handler in
 `src/main/index.ts` beside `ProviderAccountRefresh`.
 
-- [ ] **Step 5: Check the contract test**
+- [x] **Step 5: Check the contract test**
 
 ```bash
 npx vitest run tests/unit/ipc-contract.test.ts
@@ -352,7 +352,7 @@ npx vitest run tests/unit/ipc-contract.test.ts
 A new `AgentApi` member needs a stub there. That suite went 24 members behind
 once already; add it rather than letting it drift again.
 
-- [ ] **Step 6: Verify and commit**
+- [x] **Step 6: Verify and commit**
 
 Expected: **1085**. Commit as `feat: consume a reset credit through the provider manager`.
 
@@ -367,7 +367,7 @@ Expected: **1085**. Commit as `feat: consume a reset credit through the provider
 - Create: `src/renderer/src/components/quota/ResetCreditDialog.tsx`
 - Test: `tests/unit/quota-snapshot.test.tsx`
 
-- [ ] **Step 1: Rewrite the wording test**
+- [x] **Step 1: Rewrite the wording test**
 
 `tests/unit/quota-snapshot.test.tsx` currently contains
 `it('says a held reset credit cannot be used right now', ...)`, which asserts the
@@ -385,7 +385,7 @@ Replace it with:
   })
 ```
 
-- [ ] **Step 2: Add the button tests**
+- [x] **Step 2: Add the button tests**
 
 ```tsx
   it('enables the reset button only when the gate admits', () => {
@@ -405,7 +405,7 @@ Replace it with:
 `weeklyUsage(remaining)` builds the same shape as the gate test's `weekly`
 helper. Copy it into this file rather than importing across test files.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 The badge becomes a button when `onConsumeResetCredit` is passed, disabled when
 `resetCreditGate(usage).allowed` is false, with the gate's `reason` as its
@@ -421,7 +421,7 @@ be undone, and that weekly and 5-hour quota are both reset.
 the three outcomes distinctly — `consumed` with a `refreshError` says the credit
 was spent and the refresh failed, never "try again".
 
-- [ ] **Step 4: Verify and commit**
+- [x] **Step 4: Verify and commit**
 
 ```bash
 npm test && npm run typecheck && npm run build
@@ -433,18 +433,18 @@ Expected: **1087**. Commit as `feat: spend a reset credit from the quota card`.
 
 ### Task 5: Close the debt entry, verify, report
 
-- [ ] **Step 1: Remove debt item 10**
+- [x] **Step 1: Remove debt item 10**
 
 `docs/technical-debt.md` item 10 is closed by this work. Remove it, renumber the
 survivors, repoint the index anchors and any citation in `docs/design/`.
 
-- [ ] **Step 2: Regenerate the tables of contents**
+- [x] **Step 2: Regenerate the tables of contents**
 
 ```bash
 npm run docs:toc
 ```
 
-- [ ] **Step 3: Full verification**
+- [x] **Step 3: Full verification**
 
 ```bash
 npm test && npm run typecheck
@@ -452,7 +452,7 @@ npm test && npm run typecheck
 
 Check the exit status of each, chained with `&&`.
 
-- [ ] **Step 4: Run the app, and do not press the button**
+- [x] **Step 4: Run the app, and do not press the button**
 
 Confirm on `nguyenminhtuan.90vn@`, at 69% weekly remaining, that the button is
 **disabled** and its reason names the percentage. Confirm an Antigravity card
@@ -461,7 +461,7 @@ shows no reset control at all.
 **Do not spend the credit.** The first real use is the owner's decision. Say so
 in the report rather than leaving it implied.
 
-- [ ] **Step 5: Report and stop**
+- [x] **Step 5: Report and stop**
 
 Do not merge, tag, or push. Report all five tasks, and state plainly that the
 endpoint itself is unproven because proving it costs a credit.

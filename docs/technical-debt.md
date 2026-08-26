@@ -7,7 +7,7 @@ purpose — none of it is a forgotten TODO.
 Add an entry when you decide *not* to do something you found. Remove it when the
 work lands, naming the commit.
 
-Last reviewed: 2026-08-26 (after the quota surface work)
+Last reviewed: 2026-08-26 (after the reset credit action)
 
 ## Index
 
@@ -22,8 +22,8 @@ Last reviewed: 2026-08-26 (after the quota surface work)
 | 7 | [opencode feature gaps](#7-opencode-feature-gaps) | Product | Medium |
 | 8 | [The test runner crashes intermittently](#8-the-test-runner-crashes-intermittently) | Build | Medium |
 | 9 | [No guard checks whether a design sentence is true](#9-no-guard-checks-whether-a-design-sentence-is-true) | Docs | Medium |
-| 10 | [Spending a reset credit is not implemented](#10-spending-a-reset-credit-is-not-implemented) | Providers | Medium |
-| 11 | [The balance quota model is unparsed](#11-the-balance-quota-model-is-unparsed) | Providers | Medium |
+| 10 | [The balance quota model is unparsed](#10-the-balance-quota-model-is-unparsed) | Providers | Medium |
+| 11 | [A process-killing test times out under full-suite load](#11-a-process-killing-test-times-out-under-full-suite-load) | Build | Low |
 
 ---
 
@@ -53,6 +53,7 @@ consumers — which is why it was deferred. Do it when the orchestrator needs to
 route around a specific family rather than a whole account.
 
 
+
 ## 2. No designed quota-health signal for routing
 
 **Found:** 2026-08-25, removing the dead `'near-limit'` status.
@@ -74,6 +75,7 @@ deliberately. See `docs/superpowers/specs/2026-08-25-dead-usage-status-design.md
 for what was removed and why.
 
 
+
 ## 3. Only two providers report usage
 
 **Found:** 2026-08-25, while answering whether subscription expiry could be shown
@@ -93,6 +95,7 @@ through its own API. `openai-compatible` covers arbitrary endpoints and likely
 cannot report usage in general.
 
 
+
 ## 4. Antigravity reports no subscription term
 
 **Found:** 2026-08-25. **Status: won't fix — recorded so it is not re-investigated.**
@@ -108,6 +111,7 @@ ChatGPT accounts do show a term. It comes from the `id_token` claim
 
 **To close:** nothing, unless Google adds the field. Do not synthesise a term
 from `g1-pro-tier`.
+
 
 
 ## 5. Google OAuth client secret is public
@@ -135,6 +139,7 @@ using a first-party client this way likely conflicts with Google's API terms.
 Both are product decisions, not engineering ones.
 
 
+
 ## 6. Tray artwork is not platform-specific
 
 **Found:** 2026-08-25, fixing the stale tray icon.
@@ -150,6 +155,7 @@ variant — glyph only, transparent background — would render better on all th
 **To close:** add per-platform tray assets and select by `process.platform` in
 `TrayManager.iconPath()`. `scripts/build-windows-icon.mjs` already regenerates the
 shared asset and would need to learn the variants.
+
 
 
 ## 7. opencode feature gaps — closed
@@ -182,6 +188,7 @@ same direction both times — claiming something absent that was partly present.
 Re-measure before planning from any summary, including this one.
 
 
+
 ## 8. The test runner crashes intermittently
 
 **Found:** 2026-08-25, twice while writing the design documentation.
@@ -202,6 +209,7 @@ a red run in this session.
 **To close:** capture a full `--reporter=verbose` log the next time it happens
 rather than re-running, and check whether vitest's `pool` or `poolOptions`
 settings avoid it. Do not chase it without a captured instance.
+
 
 
 ## 9. No guard checks whether a design sentence is true
@@ -230,26 +238,8 @@ behaviour described is still absent, which is precisely the case for
 auto-continue. Until something better exists, Known limits sections are reviewed
 by reading the code, and the audit that finds a drift records it here.
 
-## 10. Spending a reset credit is not implemented
 
-**Found:** 2026-08-26, while adding the reset-credit badge.
-
-`ProviderUsage.resetCredits` now carries `available` and `applicable`, read
-from `rate_limit_reset_credits` on the ChatGPT usage response, and the quota
-card shows them. Nothing spends one. The cockpit tool can, so a POST endpoint
-exists; the usage response does not reveal it.
-
-It was not guessed. A wrong POST could consume the credit the owner still
-holds, and they asked for it to be left alone.
-
-**Why it matters.** The badge shows something a user will want to act on and
-cannot. That is the accepted cost of shipping the read half, but it is a cost.
-
-**To close:** obtain the endpoint by watching cockpit's own network traffic
-while its Resets control is used, or by reading its source. Then a button
-replaces the badge, enabled only while `applicable` is above zero.
-
-## 11. The balance quota model is unparsed
+## 10. The balance quota model is unparsed
 
 **Found:** 2026-08-26, in the same captured response.
 
@@ -271,3 +261,27 @@ currently zero.
 **To close:** design the balance model against this response, then decide
 whether a top-up provider such as DeepSeek maps onto the same shape or needs
 its own. Group C in `docs/design/00-goals.md`.
+
+## 11. A process-killing test times out under full-suite load
+
+**Found:** 2026-08-26, during the reset credit work.
+
+`tests/unit/agent-tools-bash.test.ts > kills the process when aborted mid-run`
+timed out at its 20s limit during one `npm test` run, then passed alone and
+passed on the next full run. The test spawns `ping -n 30` and asserts OS-level
+process death after an abort, which on Windows means a real spawn and kill
+while every other test file is running in parallel.
+
+This is **not** item 8. That one reports `ERR_IPC_CHANNEL_CLOSED` with a
+truncated file count and no failing assertion; this is a clean timeout on one
+named test.
+
+**Why it matters.** Same reason as item 8: a suite that fails for its own
+reasons trains you to re-run and shrug. Before re-running, this instance was
+checked against the change in flight and found unrelated — the file passes
+alone, and the failure is in process teardown, not in anything the change
+touched.
+
+**To close:** decide whether the 20s budget is right for a Windows spawn-and-
+kill under parallel load, or whether this test should run in its own pool.
+Do not simply raise the number without knowing which.
