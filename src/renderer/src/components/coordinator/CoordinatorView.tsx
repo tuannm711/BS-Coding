@@ -13,6 +13,50 @@ export interface CoordinatorBoardProps {
   onOpenFleet?: () => void
 }
 
+const STATE_LABEL: Record<CoordinationAssignment['state'], string> = {
+  running: 'running',
+  completed: 'done',
+  failed: 'failed',
+  // Ran, used tools, wrote no reply. Calling that "failed" was how a worker
+  // that invoked two skills and stopped looked identical to one that never
+  // started — and telling them apart meant opening its session by hand.
+  'no-result': 'no reply'
+}
+
+function Assignment({ item, onOpenWorker }: {
+  item: CoordinationAssignment
+  onOpenWorker: (workerId: string) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const tools = item.toolNames ?? []
+  return (
+    <div className={`coordinator-assignment state-${item.state}`}>
+      <button className="coordinator-assignment-head" type="button" aria-expanded={open} onClick={() => setOpen(value => !value)}>
+        <strong>{item.workerName}</strong>
+        <span className={`coordinator-state state-${item.state}`}>{STATE_LABEL[item.state]}</span>
+      </button>
+      <div className="coordinator-task">{item.task}</div>
+      {/* What it actually did, on the row. Without this the only way to learn
+          that a worker had run two skills was to open its own session. */}
+      {tools.length > 0 ? <div className="coordinator-tools">
+        {tools.length} tool{tools.length === 1 ? '' : 's'} · {[...new Set(tools)].join(', ')}
+      </div> : null}
+      {item.result ? <div className="coordinator-result">{item.result}</div> : null}
+      {item.state === 'no-result' && !item.result
+        ? <p className="coordinator-note">Used its tools and ended without a reply.</p>
+        : null}
+      {open ? <div className="coordinator-assignment-detail">
+        {tools.length > 0 ? <ol className="coordinator-tool-list">
+          {tools.map((tool, index) => <li key={`${tool}-${index}`}><code>{tool}</code></li>)}
+        </ol> : <p className="settings-hint">No tools used.</p>}
+        <button className="btn small" type="button" onClick={() => onOpenWorker(item.workerId)}>
+          Open {item.workerName} in Work
+        </button>
+      </div> : null}
+    </div>
+  )
+}
+
 // Presentational half, so every state can be asserted with renderToStaticMarkup
 // the way StatsView and FeedRow are.
 //
@@ -83,19 +127,7 @@ export function CoordinatorBoard({
         {assignments.length === 0
           ? <p className="settings-hint">No work assigned yet.</p>
           : assignments.map(item => (
-            <div
-              key={item.id}
-              className={`coordinator-assignment state-${item.state}`}
-              onClick={() => onOpenWorker(item.workerId)}
-              title={`Open ${item.workerName}'s session`}
-            >
-              <div className="coordinator-assignment-head">
-                <strong>{item.workerName}</strong>
-                <span className={`coordinator-state state-${item.state}`}>{item.state}</span>
-              </div>
-              <div className="coordinator-task">{item.task}</div>
-              {item.result ? <div className="coordinator-result">{item.result}</div> : null}
-            </div>
+            <Assignment key={item.id} item={item} onOpenWorker={onOpenWorker} />
           ))}
       </section>
     </div>

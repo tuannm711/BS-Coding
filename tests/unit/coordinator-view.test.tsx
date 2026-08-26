@@ -16,6 +16,23 @@ const board = (props: Partial<React.ComponentProps<typeof CoordinatorBoard>> = {
   }))
 
 describe('CoordinatorBoard', () => {
+  it('says on the row what the worker actually did', () => {
+    // The owner's case: two skills invoked, no reply. Learning that meant
+    // opening the worker's own session, which this record exists to spare.
+    const markup = board({
+      assignments: [assignment({ state: 'no-result', toolNames: ['skill', 'skill'] })]
+    })
+    expect(markup).toContain('2 tools')
+    expect(markup).toContain('skill')
+    expect(markup).toContain('no reply')
+    expect(markup).toContain('ended without a reply')
+  })
+
+  it('does not call a worker that ran and said nothing a failure', () => {
+    const markup = board({ assignments: [assignment({ state: 'no-result', toolNames: ['read'] })] })
+    expect(markup).not.toContain('>failed<')
+  })
+
   it('routes an empty board to Fleet rather than offering a second picker', () => {
     // One place gives the role. A picker here would be a second control doing
     // the same job, which is how the project ended up with two coordinators.

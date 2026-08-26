@@ -63,6 +63,15 @@ function FleetAgent({ agent, coordinatorName, onSelect, onSpeedChange, onSetCoor
       </button>
       {agent.coordinator ? <span className="fleet-role">coordinates</span> : null}
       {agent.mode === 'plan' ? <span className="fleet-role plan">plan</span> : null}
+      {/* The one place the role is given. It names who loses it, because the
+          role is exclusive and taking it demotes another agent silently
+          otherwise. */}
+      {!agent.coordinator && onSetCoordinator ? <button
+        className="btn small fleet-make-coordinator"
+        type="button"
+        title={coordinatorName ? `Take coordination from ${coordinatorName}` : 'Make this agent the coordinator'}
+        onClick={() => onSetCoordinator(agent.id)}
+      >{coordinatorName ? `Take from ${coordinatorName}` : 'Coordinate'}</button> : null}
       {/* One toggle, not two buttons. At this width two labelled buttons push
           the agent's own name out of the row, which is the one thing the row
           exists to show. Standard is the unlit state. */}
@@ -74,15 +83,6 @@ function FleetAgent({ agent, coordinatorName, onSelect, onSpeedChange, onSetCoor
         title={agent.speed === 'fast' ? 'Fast — click for standard' : 'Standard — click for fast'}
         onClick={() => onSpeedChange?.(agent.id, agent.speed === 'fast' ? 'standard' : 'fast')}
       ><Zap size={12} aria-hidden="true" /></button>
-      {/* The one place the role is given. It names who loses it, because the
-          role is exclusive and taking it demotes another agent silently
-          otherwise. */}
-      {!agent.coordinator && onSetCoordinator ? <button
-        className="btn small fleet-make-coordinator"
-        type="button"
-        title={coordinatorName ? `Take coordination from ${coordinatorName}` : 'Make this agent the coordinator'}
-        onClick={() => onSetCoordinator(agent.id)}
-      >{coordinatorName ? `Take from ${coordinatorName}` : 'Coordinate'}</button> : null}
     </div>
   )
 }

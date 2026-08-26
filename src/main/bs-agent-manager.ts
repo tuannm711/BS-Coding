@@ -462,6 +462,16 @@ export class BsAgentManager {
     this.emit({ type: 'queue-updated', agentId: state.agentId, queue: state.queue })
   }
 
+  // True while some coordinator has a running assignment on this agent. Derived
+  // rather than stored: one source of truth, and it cannot be left set after a
+  // turn ends the way a flag would be.
+  private isCarryingAssignment(agentId: string): boolean {
+    for (const list of this.assignmentsByCoordinator.values()) {
+      if (list.some(item => item.workerId === agentId && item.state === 'running')) return true
+    }
+    return false
+  }
+
   private settleQueued(id: string): void {
     const hook = this.queueHooks.get(id)
     if (!hook) return
@@ -1420,7 +1430,10 @@ export class BsAgentManager {
         cfg.permission,
         (t) => this.deps.savedPermissions.isAllowed(agent.cwd, t),
         tool,
-        input
+        input,
+        // Read live, not captured: runners are cached per agent, and an agent
+        // is a worker only for as long as an assignment is running on it.
+        this.isCarryingAssignment(agent.id)
       ),
       ask: (promptId, tool) => this.awaitPrompt(agent.id, promptId, tool),
       maxSteps: cfg.maxSteps,
@@ -1777,25 +1790,39 @@ export class BsAgentManager {
     list.push(assignment)
     this.assignmentsByCoordinator.set(coordinatorId, list)
     this.emit({ type: 'assignment-started', agentId: coordinatorId, assignment })
-    // One sentence, because this lands in the worker's own transcript where the
-    // user will read it. It asks for a report on failure rather than a redesign:
-    // the coordinator holds the context that judgement would need.
-    const framed = `${task}\n\n[Assigned by ${coordinator?.name ?? 'the coordinator'}. Carry this out as specified; if you cannot, stop and report back rather than changing the approach.]`
+    // "Dispatched ... to execute this specific task" is not a turn of phrase.
+    // superpowers' using-superpowers skill opens with a SUBAGENT-STOP block —
+    // "if you were dispatched as a subagent to execute a specific task, ignore
+    // this skill" — and the earlier wording, "Assigned by bs. Carry this out as
+    // specified", matched none of it. A worker therefore loaded the whole
+    // process, was told it had no choice but to invoke an applicable skill,
+    // reached dispatching-parallel-agents, and stopped: it had been instructed
+    // to hand the work on with no delegate tool to do it.
+    //
+    // So the sentence has three jobs: put the worker in the executing role, shut
+    // the delegating path, and require a written result — which is the only
+    // thing this method can read back as the assignment's outcome.
+    const framed = `${task}\n\n[Dispatched by ${coordinator?.name ?? 'the coordinator'} to execute this specific task. Carry it out yourself and report the result as your reply. Do not delegate, dispatch, or re-plan it. If you cannot finish, stop and say why.]`
     // A boundary rather than ChatMessage.turnId: that field comes from
     // executionForAgent(...)?.execution.turnId and is absent unless the agent
     // is in a shared execution, so keying on it would work under test and fail
     // in ordinary use. sendAwaited, not send, because send resolves the moment
     // a busy worker accepts the message into its queue.
-    const before = this.listMessages(target.id).length
+    // The whole transcript, not just messages: a worker that used tools and
+    // then said nothing looked identical to one that never ran, and telling
+    // them apart meant opening its session by hand.
+    const before = this.listTranscript(target.id).length
     await this.sendAwaited(target.id, framed)
-    const produced = this.listMessages(target.id).slice(before)
-      .filter(message => message.role === 'assistant')
-      .map(message => message.text)
+    const appended = this.listTranscript(target.id).slice(before)
+    const produced = appended
+      .flatMap(item => item.kind === 'message' && item.message.role === 'assistant' ? [item.message.text] : [])
       .filter(text => text.trim().length > 0)
       .join('\n')
+    const toolNames = appended.flatMap(item => item.kind === 'tool' ? [item.tool.tool] : [])
     assignment.finishedAt = Date.now()
-    assignment.state = produced ? 'completed' : 'failed'
+    assignment.state = produced ? 'completed' : toolNames.length > 0 ? 'no-result' : 'failed'
     assignment.result = produced || undefined
+    if (toolNames.length > 0) assignment.toolNames = toolNames
     this.emit({ type: 'assignment-finished', agentId: coordinatorId, assignment })
     return produced ? { output: produced } : { error: `[bs] ${name} produced no result` }
   }

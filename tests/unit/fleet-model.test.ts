@@ -83,6 +83,28 @@ describe('buildFleet', () => {
     expect(fleet.unassigned).toHaveLength(0)
   })
 
+  it('orders accounts by provider then account name', () => {
+    // A roster is scanned for a name; insertion order is whatever order the
+    // agents happened to be declared in.
+    const many = {
+      ...snapshot(),
+      accounts: [
+        { ...snapshot().accounts[0], id: 'z', providerId: 'openai', label: 'zed' },
+        { ...snapshot().accounts[0], id: 'b', providerId: 'antigravity', label: 'bravo' },
+        { ...snapshot().accounts[0], id: 'a', providerId: 'antigravity', label: 'alpha' }
+      ],
+      assignments: [
+        assignment('a1', 'claude-opus-4-6-thinking'),
+        { ...assignment('a2', 'claude-sonnet-4-6'), accountId: 'b' },
+        { ...assignment('a3', 'claude-sonnet-4-6'), accountId: 'z', providerId: 'openai' }
+      ].map(item => item.agentId === 'a1' ? { ...item, accountId: 'a' } : item)
+    } as ProviderSnapshot
+    const fleet = buildFleet([
+      agent({ id: 'a3', name: 'c' }), agent({ id: 'a2', name: 'b' }), agent({ id: 'a1', name: 'a' })
+    ], many)
+    expect(fleet.accounts.map(section => section.account.label)).toEqual(['alpha', 'bravo', 'zed'])
+  })
+
   it('ignores pty agents', () => {
     // They have no model and no quota; a roster of who can be assigned work
     // is a roster of native agents.

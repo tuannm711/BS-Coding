@@ -1409,8 +1409,47 @@ describe('the delegated task is framed', () => {
     await delegate(manager, 'a1', 'helper', 'change the readme heading')
     const sent = manager.listMessages('a3').find(message => message.role === 'user')
     expect(sent?.text).toContain('change the readme heading')
+    // "Dispatched ... to execute this specific task" is load-bearing, not
+    // phrasing: superpowers' using-superpowers skill opens with a SUBAGENT-STOP
+    // block keyed on exactly that, and the earlier "Assigned by bs. Carry this
+    // out as specified" matched none of it. A worker loaded the whole process,
+    // was told it had no choice but to invoke an applicable skill, reached
+    // dispatching-parallel-agents, and stopped with nothing to dispatch with.
+    expect(sent?.text).toContain('Dispatched by bs to execute this specific task')
+    expect(sent?.text).toContain('Do not delegate, dispatch, or re-plan it')
     // Reporting a failure is part of the job; redesigning around it is not,
     // because the coordinator holds the context that judgement would need.
-    expect(sent?.text).toContain('report back')
+    expect(sent?.text).toContain('stop and say why')
+  })
+
+  it('records what the turn did, and does not call a silent worker failed', async () => {
+    // The case the owner hit: two skills invoked, no reply written. Marking it
+    // failed with no detail meant opening the worker's session to learn that.
+    const { manager } = await makeManager({
+      secondAgent: true,
+      partsQueue: [[
+        { kind: 'tool-call', toolCallId: 'tc1', toolName: 'read', toolInput: { path: 'nope.txt' } },
+        { kind: 'finish' }
+      ], [{ kind: 'finish' }]]
+    })
+    manager.setMode('a1', 'coordinate')
+    await delegate(manager, 'a1', 'helper', 'look something up')
+    const assignment = manager.listAssignments('a1')[0]
+    expect(assignment.state).toBe('no-result')
+    expect(assignment.toolNames).toContain('read')
+  })
+
+  it('takes the task tool away from a worker carrying an assignment', async () => {
+    // Removing the tool, not asking it to refrain. Work done through an
+    // anonymous subagent runs outside the exchange: invisible on the board and
+    // unrecorded as an assignment.
+    const { manager } = await makeManager({ secondAgent: true, hangUntilAbort: true })
+    manager.setMode('a1', 'coordinate')
+    void delegate(manager, 'a1', 'helper', 'long job')
+    await new Promise(resolve => setTimeout(resolve, 15))
+    const carrying = (manager as unknown as { isCarryingAssignment: (id: string) => boolean })
+    expect(carrying.isCarryingAssignment('a3')).toBe(true)
+    expect(carrying.isCarryingAssignment('a1')).toBe(false)
+    manager.stop('a1')
   })
 })

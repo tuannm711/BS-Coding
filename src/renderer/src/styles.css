@@ -1796,6 +1796,18 @@ select.input { width: 100%; }
 .fleet-strays, .fleet-unassigned { display: flex; flex-direction: column; gap: 4px; padding: 8px; border: 1px dashed var(--hairline); border-radius: var(--radius); }
 .fleet-strays h6, .fleet-unassigned h6 { margin: 0; color: var(--text-dim); }
 .fleet-empty { padding: 16px; color: var(--text-dim); }
+
+/* Coordination: what a worker did belongs on the row. Reading it used to mean
+   opening that worker's own session. */
+.main-stack { display: contents; }
+.main-stack.hidden { display: none; }
+.coordinator-assignment-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; padding: 0; background: none; border: 0; color: inherit; cursor: pointer; text-align: left; }
+.coordinator-assignment-head:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.coordinator-tools { margin-top: 4px; color: var(--text-dim); font-size: var(--fs-xs); font-family: var(--font-mono); }
+.coordinator-note { margin: 4px 0 0; color: var(--yellow); font-size: var(--fs-xs); }
+.coordinator-assignment-detail { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--hairline); display: grid; gap: 8px; justify-items: start; }
+.coordinator-tool-list { margin: 0; padding-left: 18px; display: grid; gap: 2px; color: var(--text-dim); font-size: var(--fs-xs); }
+.coordinator-state.state-no-result { color: var(--yellow); }
 .quota-speed-control button { min-height: 28px; padding-inline: 7px; }
 .quota-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 7px; min-width: 0; }
 .quota-group { display: grid; align-content: start; gap: 6px; min-width: 0; padding: 7px; border: 1px solid var(--hairline); border-radius: var(--radius-sm); background: color-mix(in srgb, var(--bg-input) 78%, transparent); }

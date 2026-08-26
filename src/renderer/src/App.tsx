@@ -296,6 +296,14 @@ export default function App() {
     () => nativeAgents.find(agent => agent.mode === 'coordinate') ?? null,
     [nativeAgents]
   )
+  // Selects the agent in the Work view, and says only that. It cannot show the
+  // assignment's own transcript: Work is bound to a project session, while a
+  // delegated turn runs in the worker's own agent session. The board shows the
+  // detail inline instead of pretending this navigates to it.
+  const handleOpenWorker = useCallback((workerId: string) => {
+    setSelectedNativeAgentId(workerId)
+    setCoordinateOpen(false)
+  }, [])
   // Not closed when the coordinator goes away. The view now says so and offers
   // the route to Fleet, which is more use than being thrown back to the panes
   // with no explanation.
@@ -329,15 +337,20 @@ export default function App() {
           updateChecking={updateChecking}
         />
         <main className="main">
+          {/* Hidden, not unmounted. Switching to Coordination used to tear down
+              every pane — xterm instances included — and rebuild them on the way
+              back, replaying buffers each time. RightPanel already keeps its
+              views mounted for the same reason. */}
           {coordinateOpen ? (
             <CoordinatorView
               coordinatorId={coordinator?.id ?? null}
               coordinatorName={coordinator?.name ?? null}
-              onOpenWorker={workerId => { setSelectedNativeAgentId(workerId); setCoordinateOpen(false) }}
+              onOpenWorker={handleOpenWorker}
               onOpenFleet={() => { setRightOpen(true); setRightTab('fleet') }}
             />
-          ) : panes.length > 0 ? (
-            <>
+          ) : null}
+          {panes.length > 0 ? (
+            <div className={coordinateOpen ? 'main-stack hidden' : 'main-stack'}>
               <PaneGrid
                 panes={panes}
                 nativeAgents={nativeAgents}
@@ -363,8 +376,8 @@ export default function App() {
                   else void window.api.stopAgent(agentId)
                 }}
               />
-            </>
-          ) : (
+            </div>
+          ) : coordinateOpen ? null : (
             <EmptyState hasWorkspace={runtime !== null} />
           )}
         </main>

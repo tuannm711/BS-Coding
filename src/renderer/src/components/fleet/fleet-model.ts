@@ -81,5 +81,14 @@ export function buildFleet(agents: AgentConfig[], snapshot: ProviderSnapshot | n
     accounts.set(key, section)
   }
 
-  return { accounts: [...accounts.values()], unassigned }
+  // Provider, then account label. A roster is something you scan for a name,
+  // and insertion order is whatever order the agents happened to be declared in.
+  const ordered = [...accounts.values()].sort((a, b) =>
+    a.account.providerId.localeCompare(b.account.providerId)
+    || accountName(a).localeCompare(accountName(b)))
+  return { accounts: ordered, unassigned: [...unassigned].sort((a, b) => a.name.localeCompare(b.name)) }
+}
+
+function accountName(section: FleetAccount): string {
+  return section.account.profile?.email ?? section.account.profile?.name ?? section.account.label
 }

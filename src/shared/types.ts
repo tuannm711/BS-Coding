@@ -176,8 +176,15 @@ export interface CoordinationAssignment {
   task: string
   startedAt: number
   finishedAt?: number
-  state: 'running' | 'completed' | 'failed'
+  // 'no-result' is not 'failed'. A worker that ran, used tools and ended
+  // without writing a reply has done something; calling that a failure hid the
+  // one case worth reading — and reading it meant opening the worker's own
+  // session, which is what this record exists to spare.
+  state: 'running' | 'completed' | 'failed' | 'no-result'
   result?: string
+  // What the turn actually did, so the board can say "2 tools, last: skill"
+  // instead of a bare state chip.
+  toolNames?: string[]
 }
 
 export type ChatEvent = Partial<Omit<ChatEventScope, 'agentId'>> & (
