@@ -34,6 +34,7 @@ export function buildProviderSnapshot(revision: number, capabilities: ProviderCa
       ?? (account.models ?? []).map<ProviderModelRef>(id => ({ id, name: id, discoveredAt: account.lastUsedAt, capabilities: { isCodeModel: true, supportsStreaming: true, supportsTools: true } }))),
     usage: account.usage,
     refreshStages: account.refreshStages,
+    ...(account.poolErrors ? { poolErrors: account.poolErrors } : {}),
     ...(account.providerError ? { error: account.providerError } : account.lastError ? { error: { kind: 'unknown' as const, message: account.lastError, updatedAt: account.lastUsedAt } } : {}),
     updatedAt: account.lastUsedAt
   })))

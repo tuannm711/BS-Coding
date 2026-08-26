@@ -301,3 +301,22 @@ describe('reset credit button', () => {
     expect(markup).not.toContain('<button class="quota-reset-badge')
   })
 })
+
+describe('pool errors on the card', () => {
+  it('marks the exhausted pool while the healthy one stays quiet', () => {
+    const markup = renderToStaticMarkup(React.createElement(QuotaAccountCard, {
+      account: account({
+        poolErrors: { 'claude-gpt': { kind: 'quota-exhausted' as const, message: 'spent', updatedAt: 1 } }
+      }),
+      groups: [
+        { id: 'gemini', label: 'Gemini Models', modelIds: [], windows: [] },
+        { id: 'claude-gpt', label: 'Claude and GPT models', modelIds: [], windows: [] }
+      ],
+      variant: 'chat' as const
+    }))
+    // Before this the card could only say "some pool is fine". Now it can say
+    // which one is not.
+    expect(markup).toMatch(/Claude and GPT models[\s\S]*Quota exhausted/)
+    expect(markup).not.toMatch(/Gemini Models[\s\S]*Quota exhausted[\s\S]*Claude and GPT/)
+  })
+})

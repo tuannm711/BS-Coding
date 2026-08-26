@@ -114,7 +114,11 @@ export default function QuotaAccountCard({
 
       {groups.length > 0 ? <div className="quota-groups">
         {groups.map(group => <section className="quota-group" key={group.id} aria-label={group.label}>
-          <h6>{group.label}</h6>
+          <h6>{group.label}{account.poolErrors?.[group.id]
+            ? <span className="quota-pool-error" role="status">
+                {STATE_LABELS[account.poolErrors[group.id].kind === 'capacity-exhausted' ? 'capacity-exhausted' : 'quota-exhausted']}
+              </span>
+            : null}</h6>
           {group.windows.map(window => <QuotaWindow key={window.id} window={window} />)}
         </section>)}
       </div> : <div className="quota-empty">Quota not reported by provider</div>}
