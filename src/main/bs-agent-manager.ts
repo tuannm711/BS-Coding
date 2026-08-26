@@ -39,9 +39,12 @@ import type { Vault } from './vault'
 import { TraceStore } from './agent/trace-store'
 import type { TraceEventInput } from './agent/trace-store'
 import type { AgentAssignmentSetRequest, AgentAssignmentSnapshot } from '../shared/provider-state'
+import { classifyRuntimeError } from '../shared/provider-state'
 import { AssignmentStore, fileAssignmentPersistence } from './agent/assignments'
 import { SharedSessionCoordinator } from './agent/shared-session-coordinator'
 import { compileNeutralContext } from './agent/neutral-context'
+import { rankFallbackAgents, type FallbackCandidate } from '../shared/agent-fallback'
+import { poolState } from '../shared/quota-pool'
 import { looksLikeNarratedToolCall } from '../shared/narrated-tool-call'
 import { toLlmMessages } from './agent/message'
 
@@ -74,6 +77,8 @@ export interface BsAgentManagerDeps {
   onAssignmentChanged?: (assignment: AgentAssignmentSnapshot) => void
   assignmentPath?: string
   providerRuntime?: (providerId: string, accountId: string, modelId: string) => LlmClient
+  /** Which quota pool a model draws on. Supplied by the provider layer. */
+  quotaGroupForModel?: (providerId: string, modelId: string) => string | undefined
 }
 
 function unavailableProviderRuntime(providerId: string): LlmClient {
@@ -92,6 +97,9 @@ const SHARED_SESSION_RECORD_NOTE = '\n\nThis session is shared between agents. B
 export class BsAgentManager {
   private runners = new Map<string, SessionRunner>()
   private agents = new Map<string, AgentConfig>()
+  // Who is serving the running turn, and who has already been tried. Keyed by
+  // lifecycle key so a turn stays one turn across a handover.
+  private turnTargets = new Map<string, { agentId: string; tried: Set<string> }>()
   private resolved = new Map<string, ResolvedAgentConfig>()
   private controllers = new Map<string, AbortController>()
   private pendingPrompts = new Map<string, { agentId: string; tool?: string; resolve: (resp: PromptResponse | null) => void }>()
@@ -522,6 +530,7 @@ export class BsAgentManager {
       await runner.run(controller.signal)
     } finally {
       this.deps.snapshots.commitTurn(lifecycleKey)
+      this.turnTargets.delete(lifecycleKey)
       this.running.delete(lifecycleKey)
       this.controllers.delete(lifecycleKey)
       this.resolvePendingFor(agentId, null)
@@ -885,7 +894,7 @@ export class BsAgentManager {
     const cfg = loadBsConfig(this.deps.configPath)
     const resolved = this.resolveAgentConfig(cfg, agent.name, agent.model)
     if (!resolved.provider || !resolved.model) return null
-    return { provider: resolved.provider, model: resolved.model, accountId: resolved.accountId, speed: agent.speed ?? 'standard', fallback: resolved.fallback }
+    return { provider: resolved.provider, model: resolved.model, accountId: resolved.accountId, speed: agent.speed ?? 'standard' }
   }
 
   getAgentAssignmentSnapshot(agentId: string): AgentAssignmentSnapshot | null {
@@ -1317,6 +1326,12 @@ export class BsAgentManager {
       // Only a shared session compiles prior turns into records, so only it
       // needs to be told what they are. The weakest of the three defences
       // against narrated tool calls, and not relied on alone.
+      currentTarget: () => {
+        const serving = this.turnTargets.get(this.lifecycleKey(agent.id))?.agentId
+        if (!serving || serving === agent.id) return undefined
+        return this.runners.get(serving)?.target()
+      },
+      handoff: (message) => this.handoff(agent.id, message),
       systemSuffix: () => this.executionForAgent(agent.id)
         ? SHARED_SESSION_RECORD_NOTE
         : '',
@@ -1348,6 +1363,13 @@ export class BsAgentManager {
       onArtifact: (entry) => this.deps.onArtifact?.(entry),
       getItems: () => this.deps.store.get(this.activeSessionId(agent.id))?.items ?? [],
       buildMessages: (items) => {
+        // After a handover the active turn carries the previous provider's tool
+        // call ids and thoughtSignature, which the next provider refuses. The
+        // neutral compilation already strips exactly those.
+        const servingOther = this.turnTargets.get(this.lifecycleKey(agent.id))?.agentId
+        if (servingOther && servingOther !== agent.id) {
+          return compileNeutralContext(items, { toolOutputMaxChars: cfg.compaction.toolOutputMaxChars })
+        }
         const current = this.executionForAgent(agent.id)?.execution
         if (!current) return toLlmMessages(items, { toolOutputMaxChars: cfg.compaction.toolOutputMaxChars })
         const turnId = current.turnId
@@ -1642,6 +1664,67 @@ export class BsAgentManager {
       default:
         break
     }
+  }
+
+  // Called by the loop when a step failed and overflow recovery declined. Only
+  // a quota or capacity refusal is worth moving: repeating a malformed or
+  // unauthorised request elsewhere just fails again.
+  private async handoff(agentId: string, message: string): Promise<boolean> {
+    const kind = classifyRuntimeError(message).kind
+    if (kind !== 'quota-exhausted' && kind !== 'capacity-exhausted') return false
+    const key = this.lifecycleKey(agentId)
+    const state = this.turnTargets.get(key) ?? { agentId, tried: new Set([agentId]) }
+    const from = this.candidateFor(state.agentId)
+    if (!from) return false
+    const candidates = [...this.agents.values()]
+      .filter(agent => agent.kind !== 'pty' && agent.cwd === this.agents.get(agentId)?.cwd)
+      .flatMap(agent => { const c = this.candidateFor(agent.id); return c ? [c] : [] })
+    const ranked = rankFallbackAgents({ from, candidates, isPoolSpent: c => this.isPoolSpent(c) })
+      .filter(candidate => !state.tried.has(candidate.agentId))
+    const next = ranked[0]
+    if (!next) return false
+    state.agentId = next.agentId
+    state.tried.add(next.agentId)
+    this.turnTargets.set(key, state)
+    this.emit({
+      type: 'agent-fallback',
+      agentId,
+      toAgentId: next.agentId,
+      toAgentName: this.agents.get(next.agentId)?.name ?? next.agentId,
+      reason: kind === 'capacity-exhausted' ? 'Capacity exhausted' : 'Quota exhausted',
+      // Named because two agents on different models can share one pool, and
+      // without it the choice reads as arbitrary.
+      pool: this.poolOf(from)
+    })
+    return true
+  }
+
+  private candidateFor(agentId: string): FallbackCandidate | undefined {
+    // An assignment gates the agent when it has one, but an agent configured
+    // by API key has none and is still a valid candidate. The resolved config
+    // is what every path ends at.
+    const assignment = this.assignments.get(agentId)
+    if (assignment && assignment.status !== 'ready') return undefined
+    const resolved = this.resolved.get(agentId)
+    if (!resolved?.provider || !resolved.model) return undefined
+    return { agentId, providerId: resolved.provider, modelId: resolved.model, accountId: resolved.accountId }
+  }
+
+  private poolOf(candidate: FallbackCandidate): string | undefined {
+    return this.deps.quotaGroupForModel?.(candidate.providerId, candidate.modelId)
+  }
+
+  // A pool the provider already reports as spent rules out every agent drawing
+  // on it, which is not the same as ruling out one model.
+  private isPoolSpent(candidate: FallbackCandidate): boolean {
+    const pool = this.poolOf(candidate)
+    if (!pool || !candidate.accountId) return false
+    const account = this.deps.providerAccounts?.()
+      .find(connection => connection.providerId === candidate.providerId)
+      ?.accounts.find(item => item.id === candidate.accountId)
+    const group = account?.usage?.quotaGroups?.find(item => item.id === pool)
+    if (!group) return false
+    return poolState(group, account?.poolErrors) !== 'ok'
   }
 
   private emit(e: ChatEvent): void {

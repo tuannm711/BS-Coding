@@ -15,19 +15,13 @@ import { ProviderRegistry } from '../providers/registry'
 import type { ProviderAuthorizationStrategy } from '../providers/types'
 import type { LlmClient } from '../agent/llm'
 import { buildProviderSnapshot } from './snapshot'
-import { classifyProviderError, type ProviderSnapshot } from '../../shared/provider-state'
+import { classifyRuntimeError, classifyProviderError, type ProviderSnapshot } from '../../shared/provider-state'
 import { AuthSessionCoordinator } from '../providers/auth/session'
 import { calcCost, type ModelPrice } from '../agent/usage'
 import { ProviderUsageLedger } from './usage-ledger'
 import { retainLastKnownUsage, selectTrackedPeriod } from './usage'
 
-function runtimeProviderError(message: string) {
-  const statusCode = Number(message.match(/\((\d{3})\)/)?.[1]) || undefined
-  const retryAfter = Number(message.match(/retry-after[=:]\s*(\d+)/i)?.[1]) || 0
-  const error = classifyProviderError(statusCode, message)
-  if (retryAfter > 0) error.retryAt = Date.now() + retryAfter * 1000
-  return error
-}
+const runtimeProviderError = classifyRuntimeError
 
 export interface ProviderManagerDeps {
   accountsFile: string
@@ -122,6 +116,11 @@ export class ProviderManager {
       return { status: 'consumed', refreshError: String(error) }
     }
     return { status: 'consumed' }
+  }
+
+  /** Which quota pool a model draws on, for routing decisions above this layer. */
+  quotaGroupForModel(providerId: string, modelId: string): string | undefined {
+    return this.registry.get(providerId)?.quotaGroupForModel?.(modelId)
   }
 
   createRuntime(providerId: string, accountId: string, modelId: string): LlmClient {

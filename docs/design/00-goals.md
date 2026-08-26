@@ -21,9 +21,9 @@ from a wrong reading of it.
 | [The three quota models](#the-three-quota-models) | 117-131 | `ProviderQuotaWindow`, `ProviderUsageLedger` |
 | [The three groups of work](#the-three-groups-of-work) | 132-136 |  |
 | &nbsp;&nbsp;[Group B — The quota surface](#group-b-the-quota-surface) | 137-148 | `refreshProviderAccount`, `ProvidersTab.tsx`, `bankedUsed`, `bankedLimit`, `src/main/connections/usage.ts`, `ProviderUsage` |
-| &nbsp;&nbsp;[Group A — Routing](#group-a-routing) | 149-157 |  |
-| &nbsp;&nbsp;[Group C — Quota models](#group-c-quota-models) | 158-166 | `credits.balance`, `credits.has_credits`, `spend_control.individual_limit` |
-| [What this document is not](#what-this-document-is-not) | 167-172 | `0N-*.md` |
+| &nbsp;&nbsp;[Group A — Routing](#group-a-routing) | 149-161 |  |
+| &nbsp;&nbsp;[Group C — Quota models](#group-c-quota-models) | 162-170 | `credits.balance`, `credits.has_credits`, `spend_control.individual_limit` |
+| [What this document is not](#what-this-document-is-not) | 171-176 | `0N-*.md` |
 <!-- /toc -->
 
 ## The four goals
@@ -152,7 +152,11 @@ the other two, and addresses friction the owner meets daily.
   refusal is written under the pool that was refused, the pool is resolved by
   asking the adapter rather than reading a field the provider leaves empty,
   and success on one pool no longer clears another. This unblocks A2.
-- **A2. Agent fallback** — mode 1.
+- **A2. Agent fallback** — **landed.** A quota refusal hands the same turn to
+  the closest available agent: same provider and model on another account
+  first, then the same provider with another model, then another provider.
+  A candidate whose pool is already spent is dropped before ranking. One
+  turn, one snapshot, and the handover is reported in the transcript.
 - **A3. Coordinator and task exchange** — mode 4's surface.
 
 ### Group C — Quota models

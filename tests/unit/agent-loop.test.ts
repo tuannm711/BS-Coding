@@ -797,3 +797,36 @@ describe('SessionRunner', () => {
   })
 
 })
+
+describe('handing a turn to a different target', () => {
+  const text = (items: TranscriptItem[]) => items
+    .flatMap(item => item.kind === 'message' ? [item.message.text] : [])
+    .join(' ')
+
+  it('continues the turn on a new target after a handoff', async () => {
+    const second = {
+      async *stream() {
+        yield { kind: 'text', text: 'second' } as LlmStreamPart
+        yield { kind: 'finish' } as LlmStreamPart
+      }
+    }
+    let swapped = false
+    const h = makeHarness({
+      currentTarget: () => swapped ? { llm: second, model: 'm2', system: 's2' } : undefined,
+      handoff: async () => { swapped = true; return true }
+    })
+    h.llm.queue = [[{ kind: 'error', error: 'quota exhausted' }]]
+    h.runner.run()
+    await new Promise(resolve => setTimeout(resolve, 20))
+    expect(h.events.some(event => event.type === 'error')).toBe(false)
+    expect(text(h.items)).toContain('second')
+  })
+
+  it('ends the turn when no one takes over', async () => {
+    const h = makeHarness({ handoff: async () => false })
+    h.llm.queue = [[{ kind: 'error', error: 'quota exhausted' }]]
+    h.runner.run()
+    await new Promise(resolve => setTimeout(resolve, 20))
+    expect(h.events.some(event => event.type === 'error')).toBe(true)
+  })
+})

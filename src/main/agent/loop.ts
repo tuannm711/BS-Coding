@@ -23,6 +23,10 @@ export interface LoopDeps {
   turn?: number
   model: string
   system: string
+  /** Overrides llm, model and system for this step when present. */
+  currentTarget?: () => { llm: LlmClient; model: string; system: string; variantOptions?: Record<string, unknown> } | undefined
+  /** Returns true when another target took over and the turn should continue. */
+  handoff?: (message: string) => Promise<boolean>
   // Appended at stream time, so the caller can vary it per turn. The shared
   // session uses this: its prompt is decided when the turn runs, not when the
   // runner is built and cached for the agent.
@@ -63,6 +67,16 @@ const MAX_COMPACT_PER_RUN = 2
 const MAX_STEPS_PROMPT = 'Final step: wrap up and provide your final answer now. Tool calls are disabled.'
 
 export class SessionRunner {
+  /**
+   * What this runner would call with. Read by the manager to hand a turn to
+   * another agent without reassembling its system prompt — two copies of that
+   * assembly would drift, and half a turn would run under a prompt nobody
+   * intended.
+   */
+  target(): { llm: LlmClient; model: string; system: string; variantOptions?: Record<string, unknown> } {
+    return { llm: this.deps.llm, model: this.deps.model, system: this.deps.system, variantOptions: this.deps.variantOptions }
+  }
+
   private readonly maxSteps: number
   private compactedThisRun = 0
   // Provider-reported usage of the last LLM call; overflow detection trusts it
@@ -131,13 +145,16 @@ export class SessionRunner {
         })
       }
       try {
-        const stream = this.deps.llm.stream({
-          model: this.deps.model,
-          system: this.deps.system + (this.deps.systemSuffix?.() ?? ''),
+        // Resolved per step, so something above can change who answers without
+        // the loop learning what an agent is.
+        const target = this.deps.currentTarget?.()
+        const stream = (target?.llm ?? this.deps.llm).stream({
+          model: target?.model ?? this.deps.model,
+          system: (target?.system ?? this.deps.system) + (this.deps.systemSuffix?.() ?? ''),
           messages: llmMessages,
           tools: isLastStep ? [] : this.visibleToolDefs(),
           signal,
-          variantOptions: this.deps.variantOptions,
+          variantOptions: target?.variantOptions ?? this.deps.variantOptions,
           serviceTier: this.deps.serviceTier
         })
         for await (const part of stream) {
@@ -187,6 +204,12 @@ export class SessionRunner {
               overflowRetry = true
               break
             }
+            // Beside the overflow recovery that already lives here: another
+            // target may be able to carry the same turn.
+            if (await this.deps.handoff?.(message)) {
+              overflowRetry = true
+              break
+            }
             persistPartial()
             this.deps.onEvent({ type: 'error', agentId, message })
             return
@@ -201,6 +224,8 @@ export class SessionRunner {
         const message = formatLlmError(err)
         if (await this.recoverFromOverflow(message, retriedOverflow, signal)) {
           retriedOverflow = true
+          overflowRetry = true
+        } else if (await this.deps.handoff?.(message)) {
           overflowRetry = true
         } else {
           persistPartial()

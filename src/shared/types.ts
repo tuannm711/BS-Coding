@@ -49,7 +49,6 @@ export interface AgentConfig {
   speed?: AgentSpeed
   model?: string
   accountId?: string
-  fallback?: Array<{ provider: string; accountId?: string; model: string }>
   background?: boolean
 }
 
@@ -181,6 +180,7 @@ export type ChatEvent = Partial<Omit<ChatEventScope, 'agentId'>> & (
   | { type: 'compacted'; agentId: string; summary: string }
   | { type: 'compaction-failed'; agentId: string }
   | { type: 'narrated-tool-call'; agentId: string }
+  | { type: 'agent-fallback'; agentId: string; toAgentId: string; toAgentName: string; reason: string; pool?: string }
   | { type: 'usage'; agentId: string; tokens: MessageTokens; sessionCost: number; sessionTokens: { input: number; output: number } }
   | { type: 'todo-updated'; agentId: string; todos: TodoItem[] }
   | { type: 'queue-updated'; agentId: string; queue: QueuedMessage[] }
@@ -400,7 +400,6 @@ export interface AgentModelAssignment {
   accountId?: string
   model: string
   speed?: AgentSpeed
-  fallback?: Array<{ provider: string; accountId?: string; model: string }>
 }
 
 export type PermissionRule = 'allow' | 'ask' | 'deny'
@@ -437,7 +436,6 @@ export interface AgentSettings {
   provider?: string
   model?: string
   accountId?: string
-  fallback?: Array<{ provider: string; accountId?: string; model: string }>
   speed?: AgentSpeed
 }
 

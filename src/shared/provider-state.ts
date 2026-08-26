@@ -79,6 +79,18 @@ export function isAssignmentCompatible(assignment: Pick<AgentAssignmentSnapshot,
   return Boolean(snapshot.providers.some(provider => provider.id === assignment.providerId) && models.some(model => model.id === assignment.modelId))
 }
 
+// A runtime error arrives as a formatted string, not as a response object, so
+// the status code has to be read back out of it. One definition: the manager
+// that records the error and the manager that routes around it must agree on
+// what a message means.
+export function classifyRuntimeError(message: string, now = Date.now()): ProviderErrorState {
+  const statusCode = Number(message.match(/\((\d{3})\)/)?.[1]) || undefined
+  const retryAfter = Number(message.match(/retry-after[=:]\s*(\d+)/i)?.[1]) || 0
+  const error = classifyProviderError(statusCode, message, now)
+  if (retryAfter > 0) error.retryAt = now + retryAfter * 1000
+  return error
+}
+
 export function classifyProviderError(statusCode: number | undefined, message: string, now = Date.now()): ProviderErrorState {
   const normalized = message.toLowerCase()
   const capacity = normalized.includes('capacity') || normalized.includes('model_out_of_compute') || normalized.includes('out_of_compute')

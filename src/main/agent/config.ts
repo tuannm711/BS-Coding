@@ -19,7 +19,6 @@ export interface BsAgentConfig {
   provider?: string
   model?: string
   accountId?: string
-  fallback?: Array<{ provider: string; accountId?: string; model: string }>
   speed?: 'standard' | 'fast'
   systemPrompt: string
 }
@@ -62,7 +61,6 @@ export interface ResolvedAgentConfig {
   provider: string
   model: string
   accountId?: string
-  fallback?: Array<{ provider: string; accountId?: string; model: string }>
   apiKey: string | null
   baseUrl?: string
   systemPrompt: string
@@ -155,10 +153,7 @@ function normalizeProvider(raw: RawProvider): BsProviderConfig {
 
 function normalizeAgents(raw: Record<string, unknown> | undefined): Record<string, BsAgentConfig> {
   const base = DEFAULT_BS_CONFIG.agents
-  const defaults = Object.fromEntries(Object.entries(base).map(([name, agent]) => [name, {
-    ...agent,
-    fallback: agent.fallback?.map(item => ({ ...item }))
-  }]))
+  const defaults = Object.fromEntries(Object.entries(base).map(([name, agent]) => [name, { ...agent }]))
   if (!raw) return defaults
   const out: Record<string, BsAgentConfig> = {}
   for (const [name, value] of Object.entries(raw)) {
@@ -171,10 +166,6 @@ function normalizeAgents(raw: Record<string, unknown> | undefined): Record<strin
       model: typeof v.model === 'string' && !isProviderRef ? v.model : undefined,
       accountId: typeof v.accountId === 'string' ? v.accountId : undefined,
       speed: v.speed === 'fast' ? 'fast' : 'standard',
-      fallback: Array.isArray(v.fallback)
-        ? v.fallback.filter((f): f is { provider: string; accountId?: string; model: string } =>
-          typeof f === 'object' && f !== null && typeof (f as Record<string, unknown>).provider === 'string' && typeof (f as Record<string, unknown>).model === 'string')
-        : undefined,
       systemPrompt: typeof v.systemPrompt === 'string' ? v.systemPrompt : (base[name]?.systemPrompt ?? base.bs.systemPrompt)
     }
   }
@@ -329,14 +320,13 @@ export function resolveAgentConfig(
   }
   const provider = cfg.provider[providerName]
   if (!provider) {
-    return { provider: '', model: '', accountId: agent.accountId, fallback: agent.fallback, apiKey: null, systemPrompt: agent.systemPrompt }
+    return { provider: '', model: '', accountId: agent.accountId, apiKey: null, systemPrompt: agent.systemPrompt }
   }
   const model = modelName ? (provider.models.includes(modelName) ? modelName : '') : (provider.models[0] ?? '')
   return {
     provider: providerName,
     model,
     accountId: agent.accountId,
-    fallback: agent.fallback,
     apiKey: resolveApiKey(provider, env, getSecret),
     baseUrl: provider.baseUrl,
     systemPrompt: agent.systemPrompt
@@ -359,7 +349,6 @@ export function configToSettings(cfg: BsConfig): BsSettings {
       provider: a.provider,
       model: a.model,
       accountId: a.accountId,
-      fallback: a.fallback,
       speed: a.speed
     })),
     permission: cfg.permission,
@@ -404,7 +393,6 @@ export function settingsToConfig(settings: SettingsInput, base: BsConfig = DEFAU
       provider: a.provider,
       model: a.model,
       accountId: a.accountId,
-      fallback: a.fallback,
       speed: a.speed,
       systemPrompt: a.systemPrompt
     }
