@@ -1,5 +1,5 @@
 import type { ProviderAccountSnapshot, ProviderSnapshot } from '@shared/provider-state'
-import type { AgentConfig, AgentMode, ProviderQuotaGroup } from '@shared/types'
+import type { AgentConfig, AgentMode, AgentSpeed, ProviderQuotaGroup } from '@shared/types'
 import { quotaAccountState, type QuotaAccountUiState } from '../quota/quota-view'
 
 export interface FleetAgentRow {
@@ -8,6 +8,9 @@ export interface FleetAgentRow {
   mode: AgentMode
   modelId?: string
   modelLabel?: string
+  // Carried so the speed control survives the move out of the pinned quota
+  // block. Removing the block must not remove a function with it.
+  speed?: AgentSpeed
   coordinator: boolean
 }
 
@@ -32,14 +35,15 @@ export interface FleetModel {
   unassigned: FleetAgentRow[]
 }
 
-function row(agent: AgentConfig, modelId?: string, modelLabel?: string): FleetAgentRow {
+function row(agent: AgentConfig, modelId?: string, modelLabel?: string, speed?: AgentSpeed): FleetAgentRow {
   return {
     id: agent.id,
     name: agent.name,
     mode: agent.mode ?? 'build',
     coordinator: agent.mode === 'coordinate',
     ...(modelId === undefined ? {} : { modelId }),
-    ...(modelLabel === undefined ? {} : { modelLabel })
+    ...(modelLabel === undefined ? {} : { modelLabel }),
+    ...(speed === undefined ? {} : { speed })
   }
 }
 
@@ -70,7 +74,7 @@ export function buildFleet(agents: AgentConfig[], snapshot: ProviderSnapshot | n
       pools: (account.usage?.quotaGroups ?? []).map(group => ({ group, agents: [] })),
       strays: []
     }
-    const entry = row(agent, stored.modelId, account.models.find(model => model.id === stored.modelId)?.name)
+    const entry = row(agent, stored.modelId, account.models.find(model => model.id === stored.modelId)?.name, stored.speed)
     const pool = section.pools.find(item => item.group.modelIds.includes(stored.modelId))
     if (pool) pool.agents.push(entry)
     else section.strays.push(entry)

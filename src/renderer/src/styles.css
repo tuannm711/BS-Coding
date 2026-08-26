@@ -1748,6 +1748,25 @@ select.input { width: 100%; }
 .quota-agent-name { display: grid; gap: 1px; }
 .quota-agent-name strong, .quota-agent-name code { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .quota-agent-name code { font-size: var(--fs-xs); }
+
+/* Fleet — agents nested inside the quota pool they draw on, so two models
+   sharing one pool cannot read as two independent choices. */
+.fleet-panel { display: flex; flex-direction: column; min-height: 0; height: 100%; overflow-y: auto; }
+.fleet-board { display: flex; flex-direction: column; gap: 8px; padding: 8px; }
+.fleet-pool-agents { display: flex; flex-direction: column; gap: 2px; margin-top: 6px; padding-left: 10px; border-left: 1px solid var(--hairline); }
+.fleet-pool-idle { margin: 6px 0 0; padding-left: 10px; border-left: 1px solid var(--hairline); color: var(--text-faint); font-size: var(--fs-xs); }
+.fleet-agent { display: flex; align-items: center; gap: 6px; padding: 3px 4px; border-radius: var(--radius-sm); }
+.fleet-agent:hover { background: var(--bg-hover); }
+.fleet-agent.coordinator { background: var(--accent-dim); }
+.fleet-agent-name { display: grid; gap: 1px; flex: 1; min-width: 0; padding: 0; background: none; border: 0; text-align: left; color: inherit; cursor: pointer; }
+.fleet-agent-name strong, .fleet-agent-name code { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fleet-agent-name code { color: var(--text-faint); font-size: var(--fs-xs); }
+.fleet-agent-name:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+.fleet-role { flex: none; padding: 1px 6px; border-radius: 999px; background: var(--accent-dim); border: 1px solid var(--accent-border); color: var(--accent-strong); font-size: var(--fs-xs); }
+.fleet-role.plan { background: var(--bg-active); border-color: var(--hairline); color: var(--text-dim); }
+.fleet-strays, .fleet-unassigned { display: flex; flex-direction: column; gap: 4px; padding: 8px; border: 1px dashed var(--hairline); border-radius: var(--radius); }
+.fleet-strays h6, .fleet-unassigned h6 { margin: 0; color: var(--text-dim); }
+.fleet-empty { padding: 16px; color: var(--text-dim); }
 .quota-speed-control button { min-height: 28px; padding-inline: 7px; }
 .quota-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 7px; min-width: 0; }
 .quota-group { display: grid; align-content: start; gap: 6px; min-width: 0; padding: 7px; border: 1px solid var(--hairline); border-radius: var(--radius-sm); background: color-mix(in srgb, var(--bg-input) 78%, transparent); }

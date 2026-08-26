@@ -1,5 +1,6 @@
 import type { AgentModelAssignment, AgentSpeed, ProviderErrorState, ProviderQuotaGroup, ProviderTrackedUsage } from '@shared/types'
 import type { ProviderAccountSnapshot } from '@shared/provider-state'
+import type { FleetAgentRow, FleetPool } from '../fleet/fleet-model'
 import { resetCreditGate } from '@shared/reset-credit'
 import { poolState } from '@shared/quota-pool'
 import { ChevronDown, Gauge, Link2, Power, RefreshCw, Trash2, Zap } from 'lucide-react'
@@ -22,7 +23,13 @@ interface Props {
   tracked?: ProviderTrackedUsage
   session?: { input: number; output: number; estimatedCost: number }
   agents?: QuotaCardAgent[]
-  variant: 'provider' | 'chat'
+  // Fleet variant only: the agents nested inside the pool each one draws on.
+  // The flat `agents` list above a separate list of groups is what hid the
+  // fact that two models can share one pool.
+  pools?: FleetPool[]
+  strays?: FleetAgentRow[]
+  onSelectAgent?: (agentId: string) => void
+  variant: 'provider' | 'chat' | 'fleet'
   providerState?: 'ready' | 'unavailable' | 'quota-exhausted' | 'capacity-exhausted' | 'cooldown' | 'auth-error'
   expandedModels?: boolean
   refreshing?: boolean
@@ -37,10 +44,38 @@ interface Props {
 
 const resetCreditLabel = (available: number): string => `${available} reset${available === 1 ? '' : 's'}`
 
+// One agent inside the pool it draws on. The speed control is the same one the
+// chat variant carries — moving the panel must not drop a function.
+function FleetAgent({ agent, onSelect, onSpeedChange }: {
+  agent: FleetAgentRow
+  onSelect?: (agentId: string) => void
+  onSpeedChange?: (agentId: string, speed: AgentSpeed) => void
+}) {
+  return (
+    <div className={`fleet-agent${agent.coordinator ? ' coordinator' : ''}`}>
+      <button className="fleet-agent-name" type="button" onClick={() => onSelect?.(agent.id)} title={`Open ${agent.name}`}>
+        <strong>{agent.name}</strong>
+        <code title={agent.modelId}>{agent.modelLabel ?? agent.modelId ?? 'Model not assigned'}</code>
+      </button>
+      {agent.coordinator ? <span className="fleet-role">coordinates</span> : null}
+      {agent.mode === 'plan' ? <span className="fleet-role plan">plan</span> : null}
+      <span className="quota-speed-control" role="group" aria-label={`Speed for ${agent.name}`}>
+        {(['standard', 'fast'] as const).map(speed => {
+          const selected = agent.speed === speed || (!agent.speed && speed === 'standard')
+          return <button key={speed} type="button" className={selected ? 'active' : ''} aria-pressed={selected} onClick={() => onSpeedChange?.(agent.id, speed)}>
+            {speed === 'fast' ? <Zap size={12} aria-hidden="true" /> : <Gauge size={12} aria-hidden="true" />}{speed === 'fast' ? 'Fast' : 'Standard'}
+          </button>
+        })}
+      </span>
+    </div>
+  )
+}
+
 const STATE_LABELS = { ready: 'Ready', unavailable: 'Usage unavailable', 'quota-exhausted': 'Quota exhausted', 'capacity-exhausted': 'Capacity exhausted', cooldown: 'Cooldown', 'auth-error': 'Auth error' } as const
 
 export default function QuotaAccountCard({
   account, groups, providerLabel, tracked, session, agents = [], variant, providerState,
+  pools = [], strays = [], onSelectAgent,
   expandedModels = false, refreshing = false, onToggleModels, onRefresh, onReconnect, onConsumeResetCredit,
   onAccountToggle, onRemove, onSpeedChange
 }: Props) {
@@ -99,7 +134,7 @@ export default function QuotaAccountCard({
         {expandedModels ? <div className="quota-model-list">{account.models.map(model => <code key={model.id} title={model.id}>{model.name}</code>)}</div> : null}
       </div> : null}
 
-      {agents.length > 0 ? <div className="quota-agent-list">
+      {variant !== 'fleet' && agents.length > 0 ? <div className="quota-agent-list">
         {agents.map(agent => <div className="quota-agent-row" key={agent.id}>
           <span className="quota-agent-name"><strong>{agent.name}</strong><code title={agent.assignment?.model}>{agent.modelLabel ?? agent.assignment?.model ?? 'Model not assigned'}</code></span>
           <span className="quota-speed-control" role="group" aria-label={`Speed for ${agent.name}`}>
@@ -113,12 +148,32 @@ export default function QuotaAccountCard({
         </div>)}
       </div> : null}
 
-      {groups.length > 0 ? <div className="quota-groups">
+      {variant === 'fleet' ? <div className="quota-groups">
+        {pools.length === 0 ? <div className="quota-empty">Quota not reported by provider</div> : null}
+        {pools.map(pool => <section className="quota-group" key={pool.group.id} aria-label={pool.group.label}>
+          <h6>{pool.group.label}<PoolBadge group={pool.group} poolErrors={account.poolErrors} /></h6>
+          {pool.group.windows.map(window => <QuotaWindow key={window.id} window={window} />)}
+          {pool.agents.length > 0 ? <div className="fleet-pool-agents">
+            {pool.agents.map(agent => <FleetAgent
+              key={agent.id} agent={agent}
+              onSelect={onSelectAgent} onSpeedChange={onSpeedChange} />)}
+          </div> : <p className="fleet-pool-idle">No agent drawing on this pool</p>}
+        </section>)}
+      </div> : groups.length > 0 ? <div className="quota-groups">
         {groups.map(group => <section className="quota-group" key={group.id} aria-label={group.label}>
           <h6>{group.label}<PoolBadge group={group} poolErrors={account.poolErrors} /></h6>
           {group.windows.map(window => <QuotaWindow key={window.id} window={window} />)}
         </section>)}
       </div> : <div className="quota-empty">Quota not reported by provider</div>}
+
+      {variant === 'fleet' && strays.length > 0 ? <div className="fleet-strays">
+        <h6>No quota reported</h6>
+        <div className="fleet-pool-agents">
+          {strays.map(agent => <FleetAgent
+            key={agent.id} agent={agent}
+            onSelect={onSelectAgent} onSpeedChange={onSpeedChange} />)}
+        </div>
+      </div> : null}
 
       {variant === 'provider' ? <ProviderMetrics tracked={tracked} /> : <SessionMetrics session={session} tracked={tracked} />}
 
