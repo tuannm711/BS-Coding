@@ -309,6 +309,14 @@ export interface ProviderAccount {
   refreshStages?: ProviderRefreshStages
   lastError?: string
   providerError?: ProviderErrorState
+  /**
+   * Quota errors, keyed by the pool that was refused. Separate from
+   * providerError because an exhausted pool is a fact about one family of
+   * models, while an expired token is a fact about the account. Folding them
+   * together lets a second exhausted pool overwrite the first, and routing
+   * needs to know about both.
+   */
+  poolErrors?: Record<string, ProviderErrorState>
   usage?: ProviderUsage
 }
 

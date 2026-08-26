@@ -164,7 +164,7 @@ export class ProviderManager {
                   retry = 'runtime-context'
                   break
                 }
-                manager.recordRuntimeError(accountId, error)
+                manager.recordRuntimeError(accountId, error, providerId, modelId)
                 if (error.kind === 'runtime-entity-not-found') {
                   yield {
                     ...part,
@@ -185,12 +185,12 @@ export class ProviderManager {
               yield part
             }
           } catch (error) {
-            manager.recordRuntimeError(accountId, runtimeProviderError(String(error)))
+            manager.recordRuntimeError(accountId, runtimeProviderError(String(error)), providerId, modelId)
             throw error
           }
           if (!retry) {
             if (!hadError) {
-              manager.clearRuntimeError(accountId)
+              manager.clearRuntimeError(accountId, providerId, modelId)
               if (completed) manager.recordRuntimeUsage(providerId, accountId, modelId, completedTokens)
             }
             return
@@ -212,7 +212,7 @@ export class ProviderManager {
             manager.emitAccountsChanged()
           } catch (error) {
             const message = `[bs] [runtime-entity-not-found] Unable to recover provider=${providerId}; account=${currentAccount.label}; model=${modelId}. Refresh or reconnect this account, then retry. ${String(error)}`
-            manager.recordRuntimeError(accountId, runtimeProviderError(message))
+            manager.recordRuntimeError(accountId, runtimeProviderError(message), providerId, modelId)
             yield { kind: 'error', error: message }
             return
           }
@@ -256,17 +256,34 @@ export class ProviderManager {
     this.emitUsage(usage)
   }
 
-  private recordRuntimeError(accountId: string, error: ReturnType<typeof classifyProviderError>): void {
+  private recordRuntimeError(accountId: string, error: ReturnType<typeof classifyProviderError>, providerId?: string, modelId?: string): void {
     const current = this.store.get(accountId)
     if (!current) return
-    this.store.upsert({ ...current, lastError: error.message, providerError: error })
+    const pool = providerId && modelId ? this.poolFor(providerId, modelId, current) : undefined
+    // Only quota and capacity are facts about one pool. Everything else —
+    // auth, unavailable — is still a statement about the whole account.
+    const scoped = pool && (error.kind === 'quota-exhausted' || error.kind === 'capacity-exhausted')
+    this.store.upsert(scoped && pool
+      ? { ...current, poolErrors: { ...current.poolErrors, [pool]: error } }
+      : { ...current, lastError: error.message, providerError: error })
     this.emitAccountsChanged()
   }
 
-  private clearRuntimeError(accountId: string): void {
+  private clearRuntimeError(accountId: string, providerId?: string, modelId?: string): void {
     const current = this.store.get(accountId)
-    if (!current?.providerError && !current?.lastError) return
+    if (!current) return
+    // Success on one pool says nothing about another. Clearing them all
+    // would make the next turn retry a pool that is still exhausted.
+    const pool = providerId && modelId ? this.poolFor(providerId, modelId, current) : undefined
+    const hadPool = Boolean(pool && current.poolErrors?.[pool])
+    if (!current.providerError && !current.lastError && !hadPool) return
     const { providerError: _providerError, lastError: _lastError, ...cleared } = current
+    if (hadPool && pool) {
+      const remaining = { ...current.poolErrors }
+      delete remaining[pool]
+      if (Object.keys(remaining).length > 0) cleared.poolErrors = remaining
+      else delete cleared.poolErrors
+    }
     this.store.upsert(cleared)
     this.emitAccountsChanged()
   }
