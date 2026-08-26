@@ -70,7 +70,7 @@ export function rankFallbackAgents(input: {
 `isPoolSpent` is supplied by the caller because the answer needs the adapter,
 which `src/shared` must not reach.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```ts
 import { describe, expect, it } from 'vitest'
@@ -127,7 +127,7 @@ describe('rankFallbackAgents', () => {
 })
 ```
 
-- [ ] **Step 2: Run to confirm failure**
+- [x] **Step 2: Run to confirm failure**
 
 ```bash
 npx vitest run tests/unit/agent-fallback-rank.test.ts
@@ -135,7 +135,7 @@ npx vitest run tests/unit/agent-fallback-rank.test.ts
 
 Expected: the module does not resolve.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 ```ts
 // Ranked by how close a candidate is to the agent it replaces, not by how much
@@ -161,7 +161,7 @@ export function rankFallbackAgents(input: {
 }
 ```
 
-- [ ] **Step 4: Verify and commit**
+- [x] **Step 4: Verify and commit**
 
 ```bash
 npm test && npm run typecheck
@@ -187,7 +187,7 @@ Expected: **1111**. Commit as `feat: rank fallback agents by closeness to the on
   handoff?: (message: string) => Promise<boolean>
 ```
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Using the harness already in `tests/unit/agent-loop.test.ts`:
 
@@ -216,11 +216,11 @@ Using the harness already in `tests/unit/agent-loop.test.ts`:
 Read the harness first; `makeHarness` may not accept extra deps yet, in which
 case widen it rather than building a second harness beside it.
 
-- [ ] **Step 2: Run to confirm failure**
+- [x] **Step 2: Run to confirm failure**
 
 Expected: the turn ends with an error in both cases.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Add the two fields to `LoopDeps`. Where the stream is opened, resolve the target
 once per step:
@@ -249,7 +249,7 @@ In both error paths, after `recoverFromOverflow` declines and before
 
 Follow the existing `overflowRetry` pattern for continuing the outer loop.
 
-- [ ] **Step 4: Verify and commit**
+- [x] **Step 4: Verify and commit**
 
 Expected: **1113**. Commit as `feat: let a turn continue on a different target`.
 
@@ -264,7 +264,7 @@ call, and something above answers.
 - Modify: `src/main/bs-agent-manager.ts`
 - Test: `tests/unit/bs-agent-manager.test.ts`
 
-- [ ] **Step 1: Extract the target from `runnerFor`**
+- [x] **Step 1: Extract the target from `runnerFor`**
 
 `runnerFor` computes `llm`, `model`, `system` (from `resolved.systemPrompt`,
 `modeNote`, `instructions`, `skillListText`) and `variantOptions`. Lift that into
@@ -277,7 +277,7 @@ and have `runnerFor` call it, so one definition serves both. Do not duplicate th
 system-prompt assembly: two copies would drift, and the second half of a turn
 would be run under a prompt the first half was not.
 
-- [ ] **Step 2: Write the failing tests**
+- [x] **Step 2: Write the failing tests**
 
 ```ts
   it('continues a turn on another agent when quota is refused', async () => {
@@ -305,7 +305,7 @@ would be run under a prompt the first half was not.
 The harness registers two native agents already (`BS_AGENT`, `PTY_AGENT`); a
 second *native* agent may need adding for a candidate to exist.
 
-- [ ] **Step 3: Implement the selection**
+- [x] **Step 3: Implement the selection**
 
 Per running turn, keep the agent currently serving and the ids already tried:
 
@@ -328,7 +328,7 @@ Per running turn, keep the agent currently serving and the ids already tried:
 `currentTarget` returns `targetFor(current.agentId)` when the serving agent is
 not the one the turn started with.
 
-- [ ] **Step 4: Recompile the active turn neutrally after a handover**
+- [x] **Step 4: Recompile the active turn neutrally after a handover**
 
 `buildMessages` compiles prior turns neutrally and the active turn through
 `toLlmMessages`. After a handover the active turn carries the previous
@@ -336,7 +336,7 @@ provider's tool call ids and `thoughtSignature`, which the next provider
 refuses. When the serving agent has changed, compile the active turn through
 `compileNeutralContext` as well.
 
-- [ ] **Step 5: Verify and commit**
+- [x] **Step 5: Verify and commit**
 
 Expected: **1115**. Commit as `feat: hand a refused turn to the closest available agent`.
 
@@ -348,26 +348,26 @@ Expected: **1115**. Commit as `feat: hand a refused turn to the closest availabl
 - Modify: `src/shared/types.ts`, `src/renderer/src/components/chat/ChatPanel.tsx`
 - Test: `tests/unit/ipc-contract.test.ts`
 
-- [ ] **Step 1: Add the event**
+- [x] **Step 1: Add the event**
 
 ```ts
   | { type: 'agent-fallback'; agentId: string; toAgentId: string; toAgentName: string; reason: string; pool?: string }
 ```
 
-- [ ] **Step 2: Render it**
+- [x] **Step 2: Render it**
 
 Reuse the `notice` feed item added in v1.1.6. The text names both agents and the
 pool, because two agents on different models can share one pool —
 `anti-claude-opus` and `anti-claude-sonnet` do — and without the pool the reason
 reads as arbitrary.
 
-- [ ] **Step 3: Check the contract test**
+- [x] **Step 3: Check the contract test**
 
 ```bash
 npx vitest run tests/unit/ipc-contract.test.ts
 ```
 
-- [ ] **Step 4: Verify and commit**
+- [x] **Step 4: Verify and commit**
 
 Expected: **1115**, unchanged. Commit as `feat: report a fallback in the transcript`.
 
@@ -375,23 +375,23 @@ Expected: **1115**, unchanged. Commit as `feat: report a fallback in the transcr
 
 ### Task 5: Documentation, verify, report
 
-- [ ] **Step 1: Remove the dead fallback fields**
+- [x] **Step 1: Remove the dead fallback fields**
 
 `fallback` on `AgentConfig`, `AgentSettings` and `AgentModelAssignment`. Nothing
 reads them and nothing will.
 
-- [ ] **Step 2: Mark A2 landed**
+- [x] **Step 2: Mark A2 landed**
 
 In `docs/design/00-goals.md`, mark A2 and note A3 is next. Describe the ranking
 in `docs/design/03-providers.md` so it is findable without reading the spec.
 
-- [ ] **Step 3: Regenerate the tables of contents**
+- [x] **Step 3: Regenerate the tables of contents**
 
 ```bash
 npm run docs:toc
 ```
 
-- [ ] **Step 4: Full verification**
+- [x] **Step 4: Full verification**
 
 ```bash
 npm test && npm run typecheck
@@ -399,13 +399,13 @@ npm test && npm run typecheck
 
 Check the exit status of each, chained with `&&`.
 
-- [ ] **Step 5: Run the app**
+- [x] **Step 5: Run the app**
 
 This is the one that cannot be faked: send a turn on `anti-claude-sonnet`, whose
 `claude-gpt` pool is genuinely spent. The turn should hand over to
 `anti-gemini-flash` — **not** to `anti-claude-opus`, which shares the dead pool —
 and finish, with a notice naming both agents and the pool.
 
-- [ ] **Step 6: Report and stop**
+- [x] **Step 6: Report and stop**
 
 Do not merge, tag, or push. Report all five tasks and wait.

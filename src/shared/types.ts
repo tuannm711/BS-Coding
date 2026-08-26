@@ -49,7 +49,6 @@ export interface AgentConfig {
   speed?: AgentSpeed
   model?: string
   accountId?: string
-  fallback?: Array<{ provider: string; accountId?: string; model: string }>
   background?: boolean
 }
 
@@ -401,7 +400,6 @@ export interface AgentModelAssignment {
   accountId?: string
   model: string
   speed?: AgentSpeed
-  fallback?: Array<{ provider: string; accountId?: string; model: string }>
 }
 
 export type PermissionRule = 'allow' | 'ask' | 'deny'
@@ -438,7 +436,6 @@ export interface AgentSettings {
   provider?: string
   model?: string
   accountId?: string
-  fallback?: Array<{ provider: string; accountId?: string; model: string }>
   speed?: AgentSpeed
 }
 

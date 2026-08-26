@@ -8,11 +8,12 @@ presentation.
 <!-- toc -->
 | Section | Lines | Names |
 | --- | --- | --- |
-| [Pieces](#pieces) | 18-36 | `src/main/providers/types.ts`, `ProviderAdapter`, `src/main/providers/registry.ts`, `src/main/providers/adapters/openai.ts`, `src/main/providers/adapters/antigravity.ts`, `src/main/providers/adapters/github-copilot.ts` |
-| [Data flow](#data-flow) | 37-59 | `ProviderManager.connect`, `ProviderAuthorizationStrategy`, `MainApp.startUsagePoll`, `ProviderManager.refreshUsage`, `adapter.refreshCredentials`, `adapter.fetchUsage` |
-| [Types that carry it](#types-that-carry-it) | 60-80 | `ProviderAdapter`, `refreshAccount`, `listModels`, `createRuntime`, `refreshCredentials`, `recoverRuntimeContext` |
-| [Design decisions](#design-decisions) | 81-125 | `ProviderUsage.status`, `'near-limit'`, `docs/technical-debt.md`, `primaryUsedPercent`, `providerError`, `hasRemainingQuota` |
-| [Known limits](#known-limits) | 126-136 | `openai.ts`, `antigravity.ts`, `fetchUsage`, `poolErrors` |
+| [Pieces](#pieces) | 19-37 | `src/main/providers/types.ts`, `ProviderAdapter`, `src/main/providers/registry.ts`, `src/main/providers/adapters/openai.ts`, `src/main/providers/adapters/antigravity.ts`, `src/main/providers/adapters/github-copilot.ts` |
+| [Data flow](#data-flow) | 38-60 | `ProviderManager.connect`, `ProviderAuthorizationStrategy`, `MainApp.startUsagePoll`, `ProviderManager.refreshUsage`, `adapter.refreshCredentials`, `adapter.fetchUsage` |
+| [Types that carry it](#types-that-carry-it) | 61-81 | `ProviderAdapter`, `refreshAccount`, `listModels`, `createRuntime`, `refreshCredentials`, `recoverRuntimeContext` |
+| [Design decisions](#design-decisions) | 82-126 | `ProviderUsage.status`, `'near-limit'`, `docs/technical-debt.md`, `primaryUsedPercent`, `providerError`, `hasRemainingQuota` |
+| [Choosing a replacement when a pool is refused](#choosing-a-replacement-when-a-pool-is-refused) | 127-144 | `rankFallbackAgents`, `src/shared/agent-fallback.ts`, `poolState`, `SessionRunner`, `currentTarget` |
+| [Known limits](#known-limits) | 145-155 | `openai.ts`, `antigravity.ts`, `fetchUsage`, `poolErrors` |
 <!-- /toc -->
 
 ## Pieces
@@ -122,6 +123,24 @@ from the tier id — debt item 3.
 **Secrets never leave the main process.** The vault encrypts with Electron
 `safeStorage`, which is DPAPI on Windows, so the file cannot be decrypted by
 another process even as the same user. The renderer receives masked values only.
+
+## Choosing a replacement when a pool is refused
+
+A quota or capacity refusal does not end the turn while another agent can carry
+it. `rankFallbackAgents` in `src/shared/agent-fallback.ts` orders the project's
+other ready agents by how close each is to the one refused: same provider and
+model on another account, then the same provider with another model, then
+another provider. Inside a tier the declaration order stands, because the
+trigger is exhaustion and draining one account before starting the next matches
+what is happening.
+
+Remaining quota never reorders that list. It only removes a candidate whose pool
+`poolState` already reports as spent — which matters because two agents on
+different models can draw on one pool, so a spent pool rules out both.
+
+The swap happens inside one turn. `SessionRunner` asks `currentTarget` who to
+call at each step and `handoff` whether anyone will take over, so the loop never
+learns what an agent is, and the turn keeps one id and one snapshot.
 
 ## Known limits
 

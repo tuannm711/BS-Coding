@@ -894,7 +894,7 @@ export class BsAgentManager {
     const cfg = loadBsConfig(this.deps.configPath)
     const resolved = this.resolveAgentConfig(cfg, agent.name, agent.model)
     if (!resolved.provider || !resolved.model) return null
-    return { provider: resolved.provider, model: resolved.model, accountId: resolved.accountId, speed: agent.speed ?? 'standard', fallback: resolved.fallback }
+    return { provider: resolved.provider, model: resolved.model, accountId: resolved.accountId, speed: agent.speed ?? 'standard' }
   }
 
   getAgentAssignmentSnapshot(agentId: string): AgentAssignmentSnapshot | null {
