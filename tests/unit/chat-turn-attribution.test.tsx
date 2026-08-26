@@ -1,7 +1,7 @@
 import React from 'react'
 import { describe, expect, it } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { TurnAttributionBadge } from '../../src/renderer/src/components/chat/ChatPanel'
+import { TurnAttributionBadge } from '../../src/renderer/src/components/chat/FeedRow'
 import ContextFooter from '../../src/renderer/src/components/chat/ContextFooter'
 
 describe('immutable chat turn attribution', () => {
