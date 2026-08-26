@@ -15,15 +15,6 @@ const RECORD_HEADER = [
   'To use a tool, call it through the tool interface.]'
 ].join(' ')
 
-// The shape this module emits, and the shape it used to emit into the assistant
-// role which models learned to reproduce. Both are anchored to a line start and
-// require the line that follows, so prose mentioning a tool does not trip them.
-const NARRATED = /^(?:\[Tool [^\]\n]+ \u00b7 (?:completed|failed)\]\s*\r?\nInput:|\[Session log[^\]\n]*\]\s*\r?\n- )/m
-
-export function looksLikeNarratedToolCall(text: string): boolean {
-  return NARRATED.test(text)
-}
-
 export function compileNeutralContext(
   items: ChatTranscriptItem[],
   options: NeutralContextOptions
@@ -113,3 +104,4 @@ function safeJson(value: unknown): string {
     return '[unserializable input]'
   }
 }
+

@@ -11,6 +11,7 @@ import AgentPicker from './AgentPicker'
 import VariantPicker from './VariantPicker'
 import ContextFooter from './ContextFooter'
 import { FeedRow, feedItemKey, type FeedItem } from './FeedRow'
+import { withNarrationNotices } from './transcript-notices'
 import { acceptChatEvent } from './chat-event-scope'
 import { useChatScroll } from './useChatScroll'
 
@@ -128,14 +129,14 @@ function ChatPanel({ agentId, agents, onAgentChange, projectPath, sessionId, onS
 
   const loadTranscript = useCallback(() => {
     void window.api.listSessionTranscript(projectPath, sessionId).then(items => {
-      setItems(items.map(it => it.kind === 'message'
+      setItems(withNarrationNotices(items.map(it => it.kind === 'message'
         ? {
             kind: 'message', id: it.message.id, role: it.message.role,
             text: it.message.displayText ?? it.message.text,
             reasoning: it.message.reasoning, images: it.message.images, execution: it.message.execution
           }
         : { kind: 'tool', id: it.tool.id, call: { ...it.tool } }
-      ))
+      )))
       // Mức chiếm dụng context = token của assistant message cuối cùng có output,
       // giống cách opencode chọn (subagent-footer.tsx:35).
       let used: number | null = null
