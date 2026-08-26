@@ -10,6 +10,7 @@ export interface CoordinatorBoardProps {
   onSend: (text: string) => void
   onStop: () => void
   onOpenWorker: (workerId: string) => void
+  onOpenFleet?: () => void
 }
 
 // Presentational half, so every state can be asserted with renderToStaticMarkup
@@ -19,15 +20,19 @@ export interface CoordinatorBoardProps {
 // editing. Those belong to the chat frame this surface exists to be separate
 // from — to read the detail, open the worker's session.
 export function CoordinatorBoard({
-  coordinatorName, messages, assignments, running, onSend, onStop, onOpenWorker
+  coordinatorName, messages, assignments, running, onSend, onStop, onOpenWorker, onOpenFleet
 }: CoordinatorBoardProps) {
   const [draft, setDraft] = useState('')
 
   if (!coordinatorName) {
+    // An empty screen is an invitation to act. One route, to the one place the
+    // role is given — a picker here would be a second control doing the same
+    // job, which is how the project ended up with two coordinators.
     return (
       <div className="coordinator-empty">
-        <p>No agent is coordinating.</p>
-        <p className="settings-hint">Put an agent in Coordinate mode to assign work from here.</p>
+        <p>No agent is coordinating yet.</p>
+        <p className="settings-hint">Pick one in Fleet, then give it something to organise here.</p>
+        {onOpenFleet ? <button className="btn small" type="button" onClick={onOpenFleet}>Open Fleet</button> : null}
       </div>
     )
   }
@@ -98,11 +103,12 @@ export function CoordinatorBoard({
 }
 
 export default function CoordinatorView({
-  coordinatorId, coordinatorName, onOpenWorker
+  coordinatorId, coordinatorName, onOpenWorker, onOpenFleet
 }: {
   coordinatorId: string | null
   coordinatorName: string | null
   onOpenWorker: (workerId: string) => void
+  onOpenFleet?: () => void
 }) {
   const [assignments, setAssignments] = useState<CoordinationAssignment[]>([])
   const [messages, setMessages] = useState<ChatMessage[]>([])
@@ -135,6 +141,7 @@ export default function CoordinatorView({
       onSend={text => { if (coordinatorId) void window.api.sendChat(coordinatorId, text) }}
       onStop={() => { if (coordinatorId) void window.api.stopAgent(coordinatorId) }}
       onOpenWorker={onOpenWorker}
+      onOpenFleet={onOpenFleet}
     />
   )
 }

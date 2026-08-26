@@ -1119,12 +1119,16 @@ select.input { width: 100%; }
 .diff-sign { flex: 0 0 auto; }
 
 /* Mode bar */
+/* Two buttons now, not three: Coordinate moved to Fleet, where the project's
+   own settings live. No flex-wrap — the row fits, and wrapping would hide the
+   next thing crowded into it rather than showing it. */
 .chat-mode { display: flex; align-items: center; gap: 6px; }
+.title-bar-views { display: flex; gap: 2px; padding: 2px; border-radius: var(--radius); background: var(--bg-raised); }
+.title-bar-views .titlebar-btn.active { background: var(--accent); color: #ffffff; }
 .chat-mode-label { font-size: var(--fs-base); font-weight: var(--fw-semibold); text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-strong); font-family: var(--font-display); }
 .chat-mode .btn.active { background: var(--bg-active); border-color: var(--accent-dim); }
 .chat-mode .btn.mode-build.active { background: var(--accent); color: #ffffff; border-color: transparent; }
 .chat-mode .btn.mode-plan.active { background: var(--orange); color: #0b0e13; border-color: transparent; }
-.chat-mode .btn.mode-coordinate.active { background: var(--accent); color: #0b0e13; border-color: transparent; }
 .chat-mode-tools { margin-left: auto; display: flex; align-items: center; gap: 6px; min-width: 0; }
 .model-picker { position: relative; display: inline-flex; }
 .model-trigger {
@@ -1764,6 +1768,12 @@ select.input { width: 100%; }
 .fleet-agent-name:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
 .fleet-role { flex: none; padding: 1px 6px; border-radius: 999px; background: var(--accent-dim); border: 1px solid var(--accent-border); color: var(--accent-strong); font-size: var(--fs-xs); }
 .fleet-role.plan { background: var(--bg-active); border-color: var(--hairline); color: var(--text-dim); }
+/* Hidden until the row is under the pointer or focused: the roster is read far
+   more often than the role is changed, and a button on every row would read as
+   the panel's main action. */
+.fleet-make-coordinator { flex: none; opacity: 0; }
+.fleet-agent:hover .fleet-make-coordinator,
+.fleet-make-coordinator:focus-visible { opacity: 1; }
 .fleet-strays, .fleet-unassigned { display: flex; flex-direction: column; gap: 4px; padding: 8px; border: 1px dashed var(--hairline); border-radius: var(--radius); }
 .fleet-strays h6, .fleet-unassigned h6 { margin: 0; color: var(--text-dim); }
 .fleet-empty { padding: 16px; color: var(--text-dim); }

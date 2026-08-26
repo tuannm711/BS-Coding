@@ -28,6 +28,8 @@ interface Props {
   // fact that two models can share one pool.
   pools?: FleetPool[]
   strays?: FleetAgentRow[]
+  coordinatorName?: string
+  onSetCoordinator?: (agentId: string) => void
   onSelectAgent?: (agentId: string) => void
   variant: 'provider' | 'chat' | 'fleet'
   providerState?: 'ready' | 'unavailable' | 'quota-exhausted' | 'capacity-exhausted' | 'cooldown' | 'auth-error'
@@ -46,10 +48,12 @@ const resetCreditLabel = (available: number): string => `${available} reset${ava
 
 // One agent inside the pool it draws on. The speed control is the same one the
 // chat variant carries — moving the panel must not drop a function.
-function FleetAgent({ agent, onSelect, onSpeedChange }: {
+function FleetAgent({ agent, coordinatorName, onSelect, onSpeedChange, onSetCoordinator }: {
   agent: FleetAgentRow
+  coordinatorName?: string
   onSelect?: (agentId: string) => void
   onSpeedChange?: (agentId: string, speed: AgentSpeed) => void
+  onSetCoordinator?: (agentId: string) => void
 }) {
   return (
     <div className={`fleet-agent${agent.coordinator ? ' coordinator' : ''}`}>
@@ -59,6 +63,15 @@ function FleetAgent({ agent, onSelect, onSpeedChange }: {
       </button>
       {agent.coordinator ? <span className="fleet-role">coordinates</span> : null}
       {agent.mode === 'plan' ? <span className="fleet-role plan">plan</span> : null}
+      {/* The one place the role is given. It names who loses it, because the
+          role is exclusive and taking it demotes another agent silently
+          otherwise. */}
+      {!agent.coordinator && onSetCoordinator ? <button
+        className="btn small fleet-make-coordinator"
+        type="button"
+        title={coordinatorName ? `Take coordination from ${coordinatorName}` : 'Make this agent the coordinator'}
+        onClick={() => onSetCoordinator(agent.id)}
+      >{coordinatorName ? `Take from ${coordinatorName}` : 'Coordinate'}</button> : null}
       <span className="quota-speed-control" role="group" aria-label={`Speed for ${agent.name}`}>
         {(['standard', 'fast'] as const).map(speed => {
           const selected = agent.speed === speed || (!agent.speed && speed === 'standard')
@@ -75,7 +88,7 @@ const STATE_LABELS = { ready: 'Ready', unavailable: 'Usage unavailable', 'quota-
 
 export default function QuotaAccountCard({
   account, groups, providerLabel, tracked, session, agents = [], variant, providerState,
-  pools = [], strays = [], onSelectAgent,
+  pools = [], strays = [], onSelectAgent, onSetCoordinator, coordinatorName,
   expandedModels = false, refreshing = false, onToggleModels, onRefresh, onReconnect, onConsumeResetCredit,
   onAccountToggle, onRemove, onSpeedChange
 }: Props) {
@@ -156,7 +169,8 @@ export default function QuotaAccountCard({
           {pool.agents.length > 0 ? <div className="fleet-pool-agents">
             {pool.agents.map(agent => <FleetAgent
               key={agent.id} agent={agent}
-              onSelect={onSelectAgent} onSpeedChange={onSpeedChange} />)}
+              onSelect={onSelectAgent} onSpeedChange={onSpeedChange}
+              onSetCoordinator={onSetCoordinator} coordinatorName={coordinatorName} />)}
           </div> : <p className="fleet-pool-idle">No agent drawing on this pool</p>}
         </section>)}
       </div> : groups.length > 0 ? <div className="quota-groups">
@@ -171,7 +185,8 @@ export default function QuotaAccountCard({
         <div className="fleet-pool-agents">
           {strays.map(agent => <FleetAgent
             key={agent.id} agent={agent}
-            onSelect={onSelectAgent} onSpeedChange={onSpeedChange} />)}
+            onSelect={onSelectAgent} onSpeedChange={onSpeedChange}
+              onSetCoordinator={onSetCoordinator} coordinatorName={coordinatorName} />)}
         </div>
       </div> : null}
 

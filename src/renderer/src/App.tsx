@@ -289,14 +289,17 @@ export default function App() {
   const nativeAgents = useMemo(() => runtime?.workspace.agents.filter(agent => agent.kind === 'native') ?? [], [runtime?.workspace.agents])
   const effectiveNativeAgentId = resolveSelectedNativeAgent(nativeAgents, selectedNativeAgentId)
   const panes = useMemo(() => projectVisiblePanes(allPanes, effectiveNativeAgentId), [allPanes, effectiveNativeAgentId])
+  // find, not filter, because at most one match is possible: setMode enforces
+  // one coordinator per project. The invariant lives in the manager, not here —
+  // when it lived nowhere, this line silently picked one of two.
   const coordinator = useMemo(
     () => nativeAgents.find(agent => agent.mode === 'coordinate') ?? null,
     [nativeAgents]
   )
+  // Not closed when the coordinator goes away. The view now says so and offers
+  // the route to Fleet, which is more use than being thrown back to the panes
+  // with no explanation.
   const [coordinateOpen, setCoordinateOpen] = useState(false)
-  // A coordinator can be switched out of coordinate mode while its view is
-  // open; the view would then have nothing to show and no way back.
-  useEffect(() => { if (!coordinator) setCoordinateOpen(false) }, [coordinator])
 
   useEffect(() => {
     setSelectedNativeAgentId(current => resolveSelectedNativeAgent(nativeAgents, current))
@@ -326,11 +329,12 @@ export default function App() {
           updateChecking={updateChecking}
         />
         <main className="main">
-          {coordinateOpen && coordinator ? (
+          {coordinateOpen ? (
             <CoordinatorView
-              coordinatorId={coordinator.id}
-              coordinatorName={coordinator.name}
+              coordinatorId={coordinator?.id ?? null}
+              coordinatorName={coordinator?.name ?? null}
               onOpenWorker={workerId => { setSelectedNativeAgentId(workerId); setCoordinateOpen(false) }}
+              onOpenFleet={() => { setRightOpen(true); setRightTab('fleet') }}
             />
           ) : panes.length > 0 ? (
             <>
@@ -374,6 +378,7 @@ export default function App() {
             artifacts={artifacts[runtime?.workspace.projectPath ?? ''] ?? []}
             agents={nativeAgents}
             onSelectAgent={setSelectedNativeAgentId}
+            onSetCoordinator={agentId => { void window.api.setAgentMode(agentId, 'coordinate') }}
             onTabChange={setRightTab}
             onWidthChange={setRightWidth}
             onClearArtifacts={() => {

@@ -12,6 +12,7 @@ export interface FleetBoardProps {
   providerLabel: (providerId: string) => string | undefined
   refreshingId: string | null
   onSelectAgent: (agentId: string) => void
+  onSetCoordinator: (agentId: string) => void
   onSpeedChange: (agentId: string, speed: AgentSpeed) => void
   onRefresh: (providerId: string, accountId: string) => void
   onConsumeResetCredit: (account: { id: string; providerId: string; label: string; available: number }) => void
@@ -20,7 +21,7 @@ export interface FleetBoardProps {
 // Presentational half, so every state can be asserted with renderToStaticMarkup
 // the way CoordinatorBoard and StatsView are.
 export function FleetBoard({
-  fleet, providerLabel, refreshingId, onSelectAgent, onSpeedChange, onRefresh, onConsumeResetCredit
+  fleet, providerLabel, refreshingId, onSelectAgent, onSetCoordinator, onSpeedChange, onRefresh, onConsumeResetCredit
 }: FleetBoardProps) {
   if (fleet.accounts.length === 0 && fleet.unassigned.length === 0) {
     return (
@@ -30,6 +31,12 @@ export function FleetBoard({
       </div>
     )
   }
+
+  // Named on the button that would take the role, so the demotion is visible
+  // before it happens rather than discovered afterwards.
+  const coordinatorName = fleet.accounts
+    .flatMap(section => [...section.pools.flatMap(pool => pool.agents), ...section.strays])
+    .find(agent => agent.coordinator)?.name
 
   return (
     <div className="fleet-board">
@@ -46,6 +53,8 @@ export function FleetBoard({
           tracked={section.account.usage?.tracked}
           refreshing={refreshingId === section.account.id}
           onSelectAgent={onSelectAgent}
+          onSetCoordinator={onSetCoordinator}
+          coordinatorName={coordinatorName}
           onSpeedChange={onSpeedChange}
           onRefresh={() => onRefresh(section.account.providerId, section.account.id)}
           onConsumeResetCredit={section.account.usage?.resetCredits
@@ -75,9 +84,10 @@ export function FleetBoard({
   )
 }
 
-export default function FleetPanel({ agents, onSelectAgent }: {
+export default function FleetPanel({ agents, onSelectAgent, onSetCoordinator }: {
   agents: AgentConfig[]
   onSelectAgent: (agentId: string) => void
+  onSetCoordinator: (agentId: string) => void
 }) {
   const [snapshot, setSnapshot] = useState<ProviderSnapshot | null>(null)
   const [refreshingId, setRefreshingId] = useState<string | null>(null)
@@ -110,6 +120,7 @@ export default function FleetPanel({ agents, onSelectAgent }: {
         refreshingId={refreshingId}
         providerLabel={providerId => snapshot?.providers.find(provider => provider.id === providerId)?.displayName}
         onSelectAgent={onSelectAgent}
+        onSetCoordinator={onSetCoordinator}
         onSpeedChange={(agentId, speed) => {
           setSnapshot(previous => previous ? { ...previous, assignments: previous.assignments.map(assignment => assignment.agentId === agentId ? { ...assignment, speed } : assignment) } : previous)
           void window.api.setAgentSpeed(agentId, speed)

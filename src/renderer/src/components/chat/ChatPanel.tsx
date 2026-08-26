@@ -602,9 +602,12 @@ if (e.type === 'usage') {
     if (e.key !== 'Tab') return
     if (pendingPrompt && pendingPrompt.promptType === 'permission') return
     e.preventDefault()
-    // Tab cycles all three rather than toggling two: a mode reachable only by
-    // mouse is a mode that gets forgotten.
-    const order: AgentMode[] = ['build', 'plan', 'coordinate']
+    // Build and Plan only. Coordinate is given in Fleet, and a shortcut that
+    // also granted it would be the second control the single place exists to
+    // avoid. A coordinator is left alone rather than cycled to build: losing a
+    // project-wide role to a stray keypress is not a thing Tab should do.
+    if (currentMode === 'coordinate') return
+    const order: AgentMode[] = ['build', 'plan']
     switchMode(order[(order.indexOf(currentMode) + 1) % order.length])
   }, [pendingPrompt, currentMode, switchMode])
 
@@ -862,14 +865,12 @@ if (e.type === 'usage') {
           >
             Plan
           </button>
-          <button
-            className={`btn small mode-coordinate ${currentMode === 'coordinate' ? 'active' : ''}`}
-            onClick={() => switchMode('coordinate')}
-          >
-            Coordinate
-          </button>
+          {/* Coordinate is not here. Build and Plan are what this agent is
+              doing; who coordinates the project is a property of the project,
+              and it is given in the Fleet panel. Mixing the two scopes in one
+              row is what let a project end up with two coordinators. */}
           {currentMode === 'plan' && <span className="chat-mode-hint">read-only — edits denied</span>}
-          {currentMode === 'coordinate' && <span className="chat-mode-hint">assigns work to other agents — cannot edit</span>}
+          {currentMode === 'coordinate' && <span className="chat-mode-hint">coordinating — set in Fleet</span>}
           <div className="chat-mode-tools">
             <AgentPicker
               agents={agents}

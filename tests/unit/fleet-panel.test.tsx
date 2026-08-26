@@ -24,6 +24,7 @@ const board = (fleet: FleetModel) =>
     providerLabel: () => 'Antigravity',
     refreshingId: null,
     onSelectAgent: () => {},
+    onSetCoordinator: () => {},
     onSpeedChange: () => {},
     onRefresh: () => {},
     onConsumeResetCredit: () => {}
@@ -53,6 +54,21 @@ describe('FleetBoard', () => {
 
   it('marks the coordinator', () => {
     expect(board(withPools([pool('codex', [row({ coordinator: true, mode: 'coordinate' })])]))).toContain('coordinates')
+  })
+
+  it('offers the role, and names who would lose it', () => {
+    // Exclusive, so taking the role demotes someone. Saying whose keeps that
+    // from happening silently.
+    const markup = board(withPools([pool('codex', [
+      row({ coordinator: true, mode: 'coordinate' }),
+      row({ id: 'a2', name: 'anti-claude-sonnet' })
+    ])]))
+    expect(markup).toContain('Take from anti-claude-opus')
+  })
+
+  it('does not offer the role to the agent that already holds it', () => {
+    const markup = board(withPools([pool('codex', [row({ coordinator: true, mode: 'coordinate' })])]))
+    expect(markup).not.toContain('Take from')
   })
 
   it('shows an agent whose model no pool claims', () => {

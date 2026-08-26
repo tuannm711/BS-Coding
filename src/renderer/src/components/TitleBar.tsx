@@ -52,14 +52,26 @@ export default function TitleBar({ panelOpen, onTogglePanel, coordinateOpen, coo
 
       </div>
       <div className="title-bar-right">
-                <button
-          className={`titlebar-btn${coordinateOpen ? ' active' : ''}`}
-          type="button"
-          disabled={!coordinatorName}
-          title={coordinatorName ? `Coordination — ${coordinatorName}` : 'No agent is in Coordinate mode'}
-          aria-label="Coordination"
-          onClick={onToggleCoordinate}
-        >Coordinate</button>
+        {/* Two views of one project, not a button that is dead until something
+            else has been set up elsewhere. Coordination stays reachable with no
+            coordinator, because that view is where you go to find out why. */}
+        <div className="title-bar-views" role="tablist" aria-label="View">
+          <button
+            className={`titlebar-btn${coordinateOpen ? '' : ' active'}`}
+            type="button"
+            role="tab"
+            aria-selected={!coordinateOpen}
+            onClick={() => { if (coordinateOpen) onToggleCoordinate() }}
+          >Work</button>
+          <button
+            className={`titlebar-btn${coordinateOpen ? ' active' : ''}`}
+            type="button"
+            role="tab"
+            aria-selected={coordinateOpen}
+            title={coordinatorName ? `Coordination — ${coordinatorName}` : 'No agent is coordinating yet'}
+            onClick={() => { if (!coordinateOpen) onToggleCoordinate() }}
+          >Coordination</button>
+        </div>
         <button
           className="title-bar-btn title-bar-panel-toggle"
           aria-label={panelOpen ? 'Hide Panel' : 'Show Panel'}

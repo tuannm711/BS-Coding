@@ -16,6 +16,14 @@ const board = (props: Partial<React.ComponentProps<typeof CoordinatorBoard>> = {
   }))
 
 describe('CoordinatorBoard', () => {
+  it('routes an empty board to Fleet rather than offering a second picker', () => {
+    // One place gives the role. A picker here would be a second control doing
+    // the same job, which is how the project ended up with two coordinators.
+    const markup = board({ coordinatorName: null, onOpenFleet: () => {} })
+    expect(markup).toContain('Open Fleet')
+    expect(markup).not.toContain('<select')
+  })
+
   it('lists an assignment with its worker, task and state', () => {
     const markup = board({ assignments: [assignment()] })
     expect(markup).toContain('anti-gemini-flash')

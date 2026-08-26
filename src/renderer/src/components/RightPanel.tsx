@@ -14,6 +14,7 @@ interface Props {
   artifacts: ArtifactEntry[]
   agents: AgentConfig[]
   onSelectAgent: (agentId: string) => void
+  onSetCoordinator: (agentId: string) => void
   onTabChange: (tab: RightPanelTab) => void
   onWidthChange: (width: number) => void
   onClearArtifacts: () => void
@@ -28,7 +29,7 @@ function ArtifactIcon() {
 }
 
 export default function RightPanel({
-  root, tab, width, artifacts, agents, onSelectAgent, onTabChange, onWidthChange, onClearArtifacts
+  root, tab, width, artifacts, agents, onSelectAgent, onSetCoordinator, onTabChange, onWidthChange, onClearArtifacts
 }: Props) {
   const dragRef = useRef<{ startX: number; startWidth: number } | null>(null)
 
@@ -64,7 +65,7 @@ export default function RightPanel({
           <RightPanelArtifacts root={root} artifacts={artifacts} onClear={onClearArtifacts} />
         </div>
         <div className={`right-panel-view${tab === 'fleet' ? '' : ' hidden'}`}>
-          <FleetPanel agents={agents} onSelectAgent={onSelectAgent} />
+          <FleetPanel agents={agents} onSelectAgent={onSelectAgent} onSetCoordinator={onSetCoordinator} />
         </div>
         </div>
         <div className="right-panel-tabs" role="tablist" aria-label="Right panel tabs">
