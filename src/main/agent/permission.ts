@@ -34,8 +34,25 @@ export function isWriteBashCommand(command: string): boolean {
   return WRITE_REDIRECT.test(command) || WRITE_TOKENS.test(command) || WRITE_APIS.test(command)
 }
 
+// A coordinator assigns work; it does not do it. bash and git are denied
+// outright rather than asked about, because running commands and committing
+// are the work. That is deliberately stricter than plan mode, and it is the
+// first thing to loosen if reviewing proves impossible without `git diff` —
+// with evidence, not in advance.
+export const COORDINATE_RULES: Record<string, PermissionRule> = {
+  ...PLAN_RULES,
+  bash: 'deny',
+  todowrite: 'allow',
+  delegate: 'allow'
+}
+
+// delegate belongs to a coordinator alone; every other mode denies it.
+const DEFAULT_RULES: Record<string, PermissionRule> = { delegate: 'deny' }
+
 export function rulesForMode(mode: AgentMode): Record<string, PermissionRule> {
-  return mode === 'plan' ? PLAN_RULES : {}
+  if (mode === 'plan') return { ...PLAN_RULES, ...DEFAULT_RULES }
+  if (mode === 'coordinate') return COORDINATE_RULES
+  return DEFAULT_RULES
 }
 
 export function matchPattern(pattern: string, toolName: string): boolean {

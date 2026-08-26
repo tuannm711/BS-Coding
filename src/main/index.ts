@@ -31,7 +31,7 @@ import { CommandStore } from './agent/commands'
 import { FileWatcher } from './file-watcher'
 import { ArtifactStore } from './artifact-store'
 import { isPathInside, listDir, shouldIgnore } from './dir-lister'
-import type { DirEntry } from '../shared/types'
+import type { AgentMode, DirEntry } from '../shared/types'
 import { LspManager } from './agent/lsp/manager'
 import { ModelsCatalog } from './models-catalog'
 import { APP_USER_MODEL_ID, getWindowChromeOptions, resolveWindowIconPath } from './window-chrome'
@@ -562,7 +562,7 @@ class MainApp {
     return this.activeProject === projectPath
   }
 
-  setAgentMode(agentId: string, mode: 'build' | 'plan'): void {
+  setAgentMode(agentId: string, mode: AgentMode): void {
     this.bsAgent.setMode(agentId, mode)
     const ws = this.findWorkspaceByAgent(agentId)
     if (ws) {
@@ -797,7 +797,7 @@ function registerIpcHandlers(): void {
     await mainApp.removeWorkspaceAgent(projectPath, agentId)
   })
 
-  ipcMain.handle(Channels.AgentSetMode, (_e, agentId: string, mode: 'build' | 'plan') =>
+  ipcMain.handle(Channels.AgentSetMode, (_e, agentId: string, mode: AgentMode) =>
     mainApp.setAgentMode(agentId, mode))
   ipcMain.handle(Channels.AgentSetVariant, (_e, agentId: string, variant: string | null) =>
     mainApp.setAgentVariant(agentId, variant))

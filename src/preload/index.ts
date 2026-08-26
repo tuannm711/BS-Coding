@@ -1,7 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { Channels } from '../shared/ipc'
 import type { ArtifactsChangedEvent } from '../shared/ipc'
-import type { ChatEvent, Command, ContextChangedEvent, FileViewerPayload, ImageAttachment, BsSettings, NewAgentInput, PromptResponse, ProviderConnection, ProviderUsage, Template, TraceEvent, UpdaterStatusEvent, WorkspaceRuntime } from '../shared/types'
+import type { AgentMode, ChatEvent, Command, ContextChangedEvent, FileViewerPayload, ImageAttachment, BsSettings, NewAgentInput, PromptResponse, ProviderConnection, ProviderUsage, Template, TraceEvent, UpdaterStatusEvent, WorkspaceRuntime } from '../shared/types'
 import type { AgentApi, AgentConfigEvent, AgentStateEvent, BrowserInstallGuideEvent, GitStatusEvent, PtyDataEvent, TerminalExitEvent, WindowMaximizedChangeEvent } from '../shared/ipc'
 import type { BrowserStatusInfo } from '../shared/browser-types'
 import type { RemoteStatus } from '../shared/remote-types'
@@ -53,7 +53,7 @@ const api: AgentApi = {
     ipcRenderer.invoke(Channels.AgentAdd, projectPath, input),
   removeAgent: (projectPath: string, agentId: string) =>
     ipcRenderer.invoke(Channels.AgentRemove, projectPath, agentId),
-  setAgentMode: (agentId: string, mode: 'build' | 'plan') =>
+  setAgentMode: (agentId: string, mode: AgentMode) =>
     ipcRenderer.invoke(Channels.AgentSetMode, agentId, mode),
   setAgentVariant: (agentId: string, variant: string | null) =>
     ipcRenderer.invoke(Channels.AgentSetVariant, agentId, variant),

@@ -602,7 +602,10 @@ if (e.type === 'usage') {
     if (e.key !== 'Tab') return
     if (pendingPrompt && pendingPrompt.promptType === 'permission') return
     e.preventDefault()
-    switchMode(currentMode === 'build' ? 'plan' : 'build')
+    // Tab cycles all three rather than toggling two: a mode reachable only by
+    // mouse is a mode that gets forgotten.
+    const order: AgentMode[] = ['build', 'plan', 'coordinate']
+    switchMode(order[(order.indexOf(currentMode) + 1) % order.length])
   }, [pendingPrompt, currentMode, switchMode])
 
   const permissionActions = [
@@ -859,7 +862,14 @@ if (e.type === 'usage') {
           >
             Plan
           </button>
+          <button
+            className={`btn small mode-coordinate ${currentMode === 'coordinate' ? 'active' : ''}`}
+            onClick={() => switchMode('coordinate')}
+          >
+            Coordinate
+          </button>
           {currentMode === 'plan' && <span className="chat-mode-hint">read-only — edits denied</span>}
+          {currentMode === 'coordinate' && <span className="chat-mode-hint">assigns work to other agents — cannot edit</span>}
           <div className="chat-mode-tools">
             <AgentPicker
               agents={agents}

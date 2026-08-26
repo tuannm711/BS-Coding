@@ -1,5 +1,5 @@
 import type {
-  AgentConfig, AgentModelAssignment, AgentState, ArtifactEntry, CatalogProviderSummary, ChatEvent, ChatMessage, ChatTranscriptItem, Command,
+  AgentConfig, AgentMode, AgentModelAssignment, AgentState, ArtifactEntry, CatalogProviderSummary, ChatEvent, ChatMessage, ChatTranscriptItem, Command,
   ContextChangedEvent, ContextInfo, DirEntry, FileContentResult, FileSuggestion, FileViewerPayload,
   GitStatus, ImageAttachment, McpServerStatus, BsSettings, ModelRef, NewAgentInput, PromptResponse,
   ProjectSessionSummary, ProviderAccount, ProviderConnection, ProviderUsage, SessionSummary, StatsSummary, Template, TerminalInfo, TodoItem, TraceEvent, TraceSummary, UpdaterStatusEvent, UsageSummary, WorkspaceRuntime, WorkspaceSummary
@@ -205,7 +205,7 @@ export interface AgentApi {
   closeTerminal(id: string): Promise<void>
   addAgent(projectPath: string, input: NewAgentInput): Promise<WorkspaceRuntime>
   removeAgent(projectPath: string, agentId: string): Promise<void>
-  setAgentMode(agentId: string, mode: 'build' | 'plan'): Promise<void>
+  setAgentMode(agentId: string, mode: AgentMode): Promise<void>
   setAgentVariant(agentId: string, variant: string | null): Promise<void>
   getAgentVariants(agentId: string): Promise<string[]>
   setAgentModel(agentId: string, provider: string, model: string): Promise<void>

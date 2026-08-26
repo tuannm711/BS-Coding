@@ -1059,3 +1059,18 @@ describe('agent fallback', () => {
     expect(events.some(event => event.type === 'error')).toBe(true)
   })
 })
+
+describe('delegation keeps conversations separate', () => {
+  it('runs the assigned turn in the target agent session, not the coordinator one', async () => {
+    const { manager } = await makeManager({
+      secondAgent: true,
+      partsQueue: [[{ kind: 'text', text: 'worker done' }, { kind: 'finish' }]]
+    })
+    const before = manager.listMessages('a1').length
+    // This is what the delegate tool does underneath: a normal turn on the
+    // target agent, in that agent's own session.
+    await manager.send('a3', 'do the thing')
+    expect(manager.listMessages('a3').some(message => message.text.includes('worker done'))).toBe(true)
+    expect(manager.listMessages('a1')).toHaveLength(before)
+  })
+})

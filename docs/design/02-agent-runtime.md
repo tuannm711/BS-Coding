@@ -8,11 +8,12 @@ this document assumes an `LlmClient` already exists.
 <!-- toc -->
 | Section | Lines | Names |
 | --- | --- | --- |
-| [Pieces](#pieces) | 18-37 | `src/main/bs-agent-manager.ts`, `BsAgentManager`, `src/main/agent/loop.ts`, `SessionRunner`, `src/main/agent/llm.ts`, `LlmClient` |
-| [Data flow](#data-flow) | 38-66 | `BsAgentManager`, `SessionRunner`, `LoopDeps`, `toLlmMessages(getItems())`, `LlmClient`, `text-delta` |
-| [Types that carry it](#types-that-carry-it) | 67-81 | `LoopDeps`, `src/main/agent/loop.ts`, `getItems`, `appendMessage`, `appendTool`, `tests/unit/agent-loop.test.ts` |
-| [Design decisions](#design-decisions) | 82-115 | `LoopDeps`, `createLlm`, `LlmClient`, `src/main/agent/AGENTS.md`, `takeSteers`, `tools/` |
-| [Known limits](#known-limits) | 116-128 | `MAX_COMPACT_PER_RUN`, `compactIfOverThreshold`, `undoTurn`, `pushTurn`, `turnId` |
+| [Pieces](#pieces) | 19-38 | `src/main/bs-agent-manager.ts`, `BsAgentManager`, `src/main/agent/loop.ts`, `SessionRunner`, `src/main/agent/llm.ts`, `LlmClient` |
+| [Data flow](#data-flow) | 39-67 | `BsAgentManager`, `SessionRunner`, `LoopDeps`, `toLlmMessages(getItems())`, `LlmClient`, `text-delta` |
+| [Types that carry it](#types-that-carry-it) | 68-82 | `LoopDeps`, `src/main/agent/loop.ts`, `getItems`, `appendMessage`, `appendTool`, `tests/unit/agent-loop.test.ts` |
+| [Design decisions](#design-decisions) | 83-116 | `LoopDeps`, `createLlm`, `LlmClient`, `src/main/agent/AGENTS.md`, `takeSteers`, `tools/` |
+| [Two ways to hand work off](#two-ways-to-hand-work-off) | 117-140 | `SessionRunner`, `SUBAGENT_CONFIGS`, `COORDINATE_RULES`, `visibleToolDefs`, `decidePermission` |
+| [Known limits](#known-limits) | 141-153 | `MAX_COMPACT_PER_RUN`, `compactIfOverThreshold`, `undoTurn`, `pushTurn`, `turnId` |
 <!-- /toc -->
 
 ## Pieces
@@ -112,6 +113,30 @@ until the step budget ran out.
 the same `Map<string, ToolDefinition>` the built-ins use, so the loop cannot tell
 them apart. LSP surfaces both as an explicit tool and as diagnostics returned
 after an edit.
+
+## Two ways to hand work off
+
+They look alike and are not.
+
+The **`task` tool** runs an anonymous subagent: a fresh `SessionRunner` with a
+fixed prompt from `SUBAGENT_CONFIGS`, a restricted tool list and an in-memory
+transcript that is discarded. It exists to parallelise work inside one agent's
+turn.
+
+The **`delegate` tool** assigns work to one of the user's own agents. That agent
+runs a normal turn in its own persisted session, with its own provider, account
+and history, and its final message comes back as the tool output. Nothing is
+shared between the two conversations — the task text is all the worker sees.
+
+`delegate` is offered only in `coordinate` mode, where `COORDINATE_RULES` denies
+every working tool. The restriction is enforced by `visibleToolDefs`, which
+drops anything `decidePermission` denies, so a coordinator is never shown an
+edit tool to decline. Asking a model not to write is not the same as removing
+write.
+
+Concurrency needs no scheduler: `send` awaits a whole turn and `running` is
+keyed per agent, so two assignments to different agents run at once and two to
+the same agent queue.
 
 ## Known limits
 
