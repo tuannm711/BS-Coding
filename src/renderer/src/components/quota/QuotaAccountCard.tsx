@@ -61,6 +61,12 @@ export default function QuotaAccountCard({
           <span className={`quota-account-status ${active ? 'active' : 'inactive'}`}>{active ? 'Active' : account.status}</span>
           {planName ? <span className="quota-plan-badge">{planName}</span> : null}
           {providerState ? <span className={`quota-plan-badge quota-state-${providerState}`} role="status">{STATE_LABELS[providerState]}</span> : null}
+          {/* A statement of fact, not a control: spending a credit is not
+              implemented, and a button would promise otherwise. */}
+          {usage?.resetCredits ? <span className="quota-reset-badge" role="status">
+            {usage.resetCredits.available} reset{usage.resetCredits.available === 1 ? '' : 's'}
+            {usage.resetCredits.applicable === 0 && usage.resetCredits.available > 0 ? ' · not usable now' : ''}
+          </span> : null}
         </div>
       </header>
 

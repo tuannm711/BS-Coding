@@ -225,3 +225,27 @@ describe('quota card actions', () => {
     for (const label of ['Refresh', 'Reconnect', 'Remove']) expect(markup).toContain(label)
   })
 })
+
+describe('reset credits', () => {
+  const withCredits = (resetCredits?: { available: number; applicable: number }) =>
+    renderToStaticMarkup(React.createElement(QuotaAccountCard, {
+      account: account({ usage: { accountId: 'account-1', refreshedAt: 1, source: 'provider', status: 'ok', resetCredits } }),
+      groups: [], variant: 'chat'
+    }))
+
+  it('shows a reset credit that can be used', () => {
+    expect(withCredits({ available: 2, applicable: 2 })).toContain('2 resets')
+  })
+
+  it('says a held reset credit cannot be used right now', () => {
+    const markup = withCredits({ available: 1, applicable: 0 })
+    expect(markup).toContain('1 reset')
+    expect(markup).toContain('not usable now')
+  })
+
+  it('shows nothing when the provider does not report reset credits', () => {
+    // Rendering '0 resets' would say the account has none left, which is a
+    // different claim from the provider having no such concept.
+    expect(withCredits(undefined)).not.toContain('reset')
+  })
+})
