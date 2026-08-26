@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { AgentModelAssignment, ProviderQuotaGroup, ProviderUsage } from '@shared/types'
 import { shouldAcceptSnapshot, type AgentAssignmentSnapshot, type ProviderAccountSnapshot, type ProviderSnapshot } from '@shared/provider-state'
 import QuotaAccountCard from './quota/QuotaAccountCard'
+import ResetCreditDialog from './quota/ResetCreditDialog'
 import { chatQuotaGroups, quotaAccountState, type QuotaAccountUiState } from './quota/quota-view'
 
 export interface QuotaAgent {
@@ -63,6 +64,9 @@ export default function RightPanelQuota({ agents }: { agents: QuotaAgent[] }) {
   const [snapshot, setSnapshot] = useState<ProviderSnapshot | null>(null)
   const [telemetry, setTelemetry] = useState<Record<string, SessionTelemetry>>({})
   const [refreshingId, setRefreshingId] = useState<string | null>(null)
+  const [resetTarget, setResetTarget] = useState<{ id: string; providerId: string; label: string; available: number } | null>(null)
+  const [resetBusy, setResetBusy] = useState(false)
+  const [resetNote, setResetNote] = useState<string | null>(null)
   const snapshotRevision = useRef(0)
   const agentKey = agents.map(agent => agent.id).join('|')
 
@@ -116,9 +120,34 @@ export default function RightPanelQuota({ agents }: { agents: QuotaAgent[] }) {
             void window.api.refreshProviderAccount(account.providerId, account.id)
               .then(applySnapshot)
               .finally(() => setRefreshingId(null))
-          }} />
+          }} onConsumeResetCredit={account.usage?.resetCredits
+            ? () => setResetTarget({ id: account.id, providerId: account.providerId, label: account.label, available: account.usage!.resetCredits!.available })
+            : undefined} />
         })}
       </div>
+      {resetNote ? <div className="right-panel-quota-note" role="status">{resetNote}</div> : null}
+      {resetTarget ? <ResetCreditDialog
+        accountLabel={resetTarget.label}
+        available={resetTarget.available}
+        busy={resetBusy}
+        onClose={() => setResetTarget(null)}
+        onConfirm={() => {
+          setResetBusy(true)
+          void window.api.consumeResetCredit(resetTarget.providerId, resetTarget.id)
+            .then(result => {
+              // 'consumed' with a refreshError is not a failure: the credit is
+              // gone, and telling the user to retry would spend another.
+              if (result.status === 'consumed') {
+                setResetNote(result.refreshError
+                  ? `Credit spent. Quota could not be re-read: ${result.refreshError}`
+                  : 'Quota reset.')
+              } else if (result.status === 'refused') setResetNote(result.reason)
+              else setResetNote(`Reset failed: ${result.error}`)
+              setResetTarget(null)
+            })
+            .finally(() => setResetBusy(false))
+        }}
+      /> : null}
     </section>
   )
 }
