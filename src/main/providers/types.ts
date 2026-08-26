@@ -48,6 +48,8 @@ export interface ProviderAdapter {
   createRuntime(account: ProviderAccount, secret: ProviderSecrets, model: ProviderModel): LlmClient
   recoverRuntimeContext?(account: ProviderAccount, secret: ProviderSecrets, failure: { code: 'runtime-entity-not-found'; modelId: string }): Promise<{ secret: ProviderSecrets; models: ProviderModel[] }>
   fetchUsage?(account: ProviderAccount, secret: ProviderSecrets): Promise<ProviderUsage>
+  /** Spend one provider-side quota reset. Irreversible. */
+  consumeResetCredit?(account: ProviderAccount, secret: ProviderSecrets): Promise<void>
 }
 
 export type ProviderAuthMethod = AuthMethodDescriptor
