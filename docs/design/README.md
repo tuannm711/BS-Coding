@@ -6,16 +6,20 @@ purpose is to drive many accounts across many providers inside one coding
 session. For the product view — features, screenshots, how to install — read
 `README.md` at the repository root; this directory is the technical reference.
 
+**Start with [Goals](00-goals.md).** These documents describe how the code
+behaves; that one describes what it is trying to become, and is what a proposal
+should be checked against.
+
 <!-- toc -->
 | Section | Lines | Names |
 | --- | --- | --- |
-| [How the domains relate](#how-the-domains-relate) | 21-37 | `LlmClient` |
-| [The documents](#the-documents) | 38-54 |  |
-| [Finding a name](#finding-a-name) | 55-215 | `.cmd`, `.exe`, `.github/workflows/build.yml`, `.ico`, `'near-limit'`, `/bin/bash` |
-| [What is here and what is history](#what-is-here-and-what-is-history) | 216-225 | `docs/design/`, `docs/superpowers/`, `docs/evidence/` |
-| [Current work](#current-work) | 226-237 | `tests/`, `statusReason`, `docs/superpowers/specs/2026-08-25-narrated-tool-calls-design.md` |
-| [Next work](#next-work) | 238-246 |  |
-| [Debt](#debt) | 247-253 | `docs/technical-debt.md` |
+| [How the domains relate](#how-the-domains-relate) | 25-41 | `LlmClient` |
+| [The documents](#the-documents) | 42-59 |  |
+| [Finding a name](#finding-a-name) | 60-232 | `.cmd`, `.exe`, `.github/workflows/build.yml`, `.ico`, `'near-limit'`, `/bin/bash` |
+| [What is here and what is history](#what-is-here-and-what-is-history) | 233-242 | `docs/design/`, `docs/superpowers/`, `docs/evidence/` |
+| [Current work](#current-work) | 243-254 | `tests/`, `statusReason`, `docs/superpowers/specs/2026-08-25-narrated-tool-calls-design.md` |
+| [Next work](#next-work) | 255-268 |  |
+| [Debt](#debt) | 269-275 | `docs/technical-debt.md` |
 <!-- /toc -->
 
 ## How the domains relate
@@ -39,6 +43,7 @@ share one conversation without interleaving.
 
 | # | Document | Subject |
 |---|---|---|
+| 00 | [Goals](00-goals.md) | What the product is for, the two execution modes, the vocabulary, the work groups |
 | 01 | [Process model](01-process-model.md) | The three processes, the IPC contract, the build projects |
 | 02 | [Agent runtime](02-agent-runtime.md) | The turn loop, tools, permissions, compaction, MCP and LSP |
 | 03 | [Providers](03-providers.md) | Adapters, OAuth and the vault, the quota model, account selection |
@@ -66,6 +71,7 @@ Generated from every domain document: which one introduces a name, and where.
 | `'near-limit'` | [03-providers.md#design-decisions](03-providers.md#design-decisions) | 81 |
 | `/bin/bash` | [04-terminal-panes.md#known-limits](04-terminal-panes.md#known-limits) | 91 |
 | `$SHELL` | [04-terminal-panes.md#known-limits](04-terminal-panes.md#known-limits) | 91 |
+| `0N-*.md` | [00-goals.md#what-this-document-is-not](00-goals.md#what-this-document-is-not) | 164 |
 | `adapter.fetchUsage` | [03-providers.md#data-flow](03-providers.md#data-flow) | 37 |
 | `adapter.refreshCredentials` | [03-providers.md#data-flow](03-providers.md#data-flow) | 37 |
 | `AgentApi` | [01-process-model.md#pieces](01-process-model.md#pieces) | 18 |
@@ -77,6 +83,8 @@ Generated from every domain document: which one introduces a name, and where.
 | `appendTool` | [02-agent-runtime.md#types-that-carry-it](02-agent-runtime.md#types-that-carry-it) | 67 |
 | `appId` | [07-build-release.md#types-that-carry-it](07-build-release.md#types-that-carry-it) | 46 |
 | `ArtifactStore` | [05-sessions.md#known-limits](05-sessions.md#known-limits) | 100 |
+| `bankedLimit` | [00-goals.md#group-b-the-quota-surface](00-goals.md#group-b-the-quota-surface) | 137 |
+| `bankedUsed` | [00-goals.md#group-b-the-quota-surface](00-goals.md#group-b-the-quota-surface) | 137 |
 | `BsAgentManager` | [02-agent-runtime.md#pieces](02-agent-runtime.md#pieces) | 18 |
 | `buffersRef` | [06-ui-shell.md#data-flow](06-ui-shell.md#data-flow) | 32 |
 | `build/icons/32x32.png` | [07-build-release.md#design-decisions](07-build-release.md#design-decisions) | 58 |
@@ -87,6 +95,9 @@ Generated from every domain document: which one introduces a name, and where.
 | `ChatEvent` | [06-ui-shell.md#types-that-carry-it](06-ui-shell.md#types-that-carry-it) | 51 |
 | `ChatPanel` | [06-ui-shell.md#data-flow](06-ui-shell.md#data-flow) | 32 |
 | `ChatTranscriptItem[]` | [05-sessions.md#types-that-carry-it](05-sessions.md#types-that-carry-it) | 50 |
+| `claude-gpt` | [00-goals.md#what-an-agent-is-for](00-goals.md#what-an-agent-is-for) | 51 |
+| `claude-opus` | [00-goals.md#what-an-agent-is-for](00-goals.md#what-an-agent-is-for) | 51 |
+| `claude-sonnet` | [00-goals.md#what-an-agent-is-for](00-goals.md#what-an-agent-is-for) | 51 |
 | `cmd.exe` | [04-terminal-panes.md#design-decisions](04-terminal-panes.md#design-decisions) | 59 |
 | `com.bs.coding` | [07-build-release.md#types-that-carry-it](07-build-release.md#types-that-carry-it) | 46 |
 | `compactIfOverThreshold` | [02-agent-runtime.md#known-limits](02-agent-runtime.md#known-limits) | 116 |
@@ -94,7 +105,7 @@ Generated from every domain document: which one introduces a name, and where.
 | `contextBridge` | [01-process-model.md#pieces](01-process-model.md#pieces) | 18 |
 | `createLlm` | [02-agent-runtime.md#design-decisions](02-agent-runtime.md#design-decisions) | 82 |
 | `createRuntime` | [03-providers.md#types-that-carry-it](03-providers.md#types-that-carry-it) | 60 |
-| `docs/technical-debt.md` | [03-providers.md#design-decisions](03-providers.md#design-decisions) | 81 |
+| `docs/technical-debt.md` | [00-goals.md#the-four-goals](00-goals.md#the-four-goals) | 29 |
 | `electron-builder.ts` | [07-build-release.md#pieces](07-build-release.md#pieces) | 17 |
 | `electron-builder` | [07-build-release.md#data-flow](07-build-release.md#data-flow) | 29 |
 | `electron.vite.config.ts` | [07-build-release.md#pieces](07-build-release.md#pieces) | 17 |
@@ -127,7 +138,11 @@ Generated from every domain document: which one introduces a name, and where.
 | `providerError` | [03-providers.md#design-decisions](03-providers.md#design-decisions) | 81 |
 | `ProviderManager.connect` | [03-providers.md#data-flow](03-providers.md#data-flow) | 37 |
 | `ProviderManager.refreshUsage` | [03-providers.md#data-flow](03-providers.md#data-flow) | 37 |
+| `ProviderQuotaWindow` | [00-goals.md#the-three-quota-models](00-goals.md#the-three-quota-models) | 117 |
+| `ProvidersTab.tsx` | [00-goals.md#group-b-the-quota-surface](00-goals.md#group-b-the-quota-surface) | 137 |
 | `ProviderUsage.status` | [03-providers.md#design-decisions](03-providers.md#design-decisions) | 81 |
+| `ProviderUsage` | [00-goals.md#group-b-the-quota-surface](00-goals.md#group-b-the-quota-surface) | 137 |
+| `ProviderUsageLedger` | [00-goals.md#the-three-quota-models](00-goals.md#the-three-quota-models) | 117 |
 | `PtyDataEvent` | [01-process-model.md#types-that-carry-it](01-process-model.md#types-that-carry-it) | 54 |
 | `PtyManager` | [04-terminal-panes.md#pieces](04-terminal-panes.md#pieces) | 18 |
 | `PtySession` | [04-terminal-panes.md#types-that-carry-it](04-terminal-panes.md#types-that-carry-it) | 47 |
@@ -136,6 +151,7 @@ Generated from every domain document: which one introduces a name, and where.
 | `recoverRuntimeContext` | [03-providers.md#types-that-carry-it](03-providers.md#types-that-carry-it) | 60 |
 | `refreshAccount` | [03-providers.md#types-that-carry-it](03-providers.md#types-that-carry-it) | 60 |
 | `refreshCredentials` | [03-providers.md#types-that-carry-it](03-providers.md#types-that-carry-it) | 60 |
+| `refreshProviderAccount` | [00-goals.md#group-b-the-quota-surface](00-goals.md#group-b-the-quota-surface) | 137 |
 | `registerIpcHandlers` | [01-process-model.md#data-flow](01-process-model.md#data-flow) | 33 |
 | `registerTerminal` | [06-ui-shell.md#data-flow](06-ui-shell.md#data-flow) | 32 |
 | `release/` | [07-build-release.md#data-flow](07-build-release.md#data-flow) | 29 |
@@ -164,6 +180,7 @@ Generated from every domain document: which one introduces a name, and where.
 | `src/main/agent/shared-session-coordinator.ts` | [05-sessions.md#pieces](05-sessions.md#pieces) | 17 |
 | `src/main/agent/snapshot.ts` | [05-sessions.md#pieces](05-sessions.md#pieces) | 17 |
 | `src/main/bs-agent-manager.ts` | [02-agent-runtime.md#pieces](02-agent-runtime.md#pieces) | 18 |
+| `src/main/connections/usage.ts` | [00-goals.md#group-b-the-quota-surface](00-goals.md#group-b-the-quota-surface) | 137 |
 | `src/main/index.ts` | [01-process-model.md#pieces](01-process-model.md#pieces) | 18 |
 | `src/main/providers/adapters/antigravity.ts` | [03-providers.md#pieces](03-providers.md#pieces) | 18 |
 | `src/main/providers/adapters/github-copilot.ts` | [03-providers.md#pieces](03-providers.md#pieces) | 18 |
@@ -237,12 +254,17 @@ measurements that showed it was three providers, not a Gemini incompatibility.
 
 ## Next work
 
-1. **Strengthen multi-account routing.** The stated goal is many accounts across
-   many providers in one session, which works but not well enough yet. Quota
-   accuracy landed in v1.1.4; account selection itself has not been examined.
-2. **The orchestrator agent.** Task assignment per agent, with a coordinator that
-   takes a command and directs a project. A new surface, deliberately separate
-   from the chat frame, and dependent on routing being trustworthy first.
+Three groups, recorded in [Goals](00-goals.md) with the reasoning behind each.
+Group B is in progress.
+
+1. **Group B — the quota surface.** A refresh control on the quota card, banked
+   usage shown at all, and a banked reset action for ChatGPT accounts. Small,
+   independent of the other two, and the friction met daily.
+2. **Group A — routing.** Record quota exhaustion against the pool rather than
+   the account, then agent fallback, then the coordinator surface. A1 is a
+   prerequisite for A2 and A3.
+3. **Group C — quota models.** The balance model for top-up providers, and
+   labelled estimates for providers that report nothing.
 
 ## Debt
 
