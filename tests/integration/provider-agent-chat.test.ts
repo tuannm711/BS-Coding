@@ -8,7 +8,7 @@ import { ProviderRegistry } from '../../src/main/providers/registry'
 import { createAntigravityAdapter } from '../../src/main/providers/adapters/antigravity'
 import { BsAgentManager } from '../../src/main/bs-agent-manager'
 import { SessionStore, type StoredSession } from '../../src/main/agent/session'
-import { SnapshotStore, type SnapshotEntry } from '../../src/main/agent/snapshot'
+import { SnapshotStore, type SnapshotTurn } from '../../src/main/agent/snapshot'
 import { SavedPermissions, type SavedPermission } from '../../src/main/agent/saved-permissions'
 import { TruncationStore } from '../../src/main/agent/truncation'
 import { CommandStore } from '../../src/main/agent/commands'
@@ -31,7 +31,7 @@ function createBsManager(dir: string, providers: ProviderManager, events: ChatEv
     configPath: path.join(dir, 'bs.json'),
     assignmentPath: path.join(dir, 'assignments.json'),
     store: new SessionStore(memoryStore<StoredSession>()),
-    snapshots: new SnapshotStore(memoryStore<SnapshotEntry>()),
+    snapshots: new SnapshotStore(memoryStore<SnapshotTurn>()),
     savedPermissions: new SavedPermissions(memoryStore<SavedPermission>()),
     truncation: new TruncationStore(path.join(dir, 'truncation')),
     commands: new CommandStore(path.join(dir, 'commands.json')),

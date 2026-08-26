@@ -83,7 +83,7 @@ this by reading `process.resourcesPath` when packaged and `build/icons` when not
 **The OAuth client secret ships in the asar and cannot be removed.** Google
 rejects a refresh without `client_secret` even when PKCE is used — measured, with
 `400 invalid_request: client_secret is missing.` It therefore has to be in the
-binary. See debt item 7 in `docs/technical-debt.md` for the full position.
+binary. See debt item 5 in `docs/technical-debt.md` for the full position.
 
 **Publishing is tag-driven, never branch-driven.** Pushing `master` runs nothing.
 Only `refs/tags/v*` reaches the `publish` job, so ordinary merges cannot release

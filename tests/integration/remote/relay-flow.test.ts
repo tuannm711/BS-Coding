@@ -94,6 +94,8 @@ async function fakeMobile(port: number, auth: string): Promise<FakeMobile> {
   })
   ws.send(JSON.stringify({ type: 'hello', role: 'mobile', deviceId: 'phone-1', auth }))
   const pair = await waitForMsg(ws, (m) => m.type === 'pair-result')
+  // waitForMsg narrows at runtime only; say so to the compiler as well.
+  if (pair.type !== 'pair-result') throw new Error(`expected pair-result, got ${pair.type}`)
   const recv: unknown[] = []
   ws.on('message', (raw) => recv.push(JSON.parse(String(raw))))
   const mobile: FakeMobile = {

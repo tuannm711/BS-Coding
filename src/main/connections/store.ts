@@ -119,7 +119,7 @@ export class ProviderAccountStore {
     if (!existsSync(this.file)) return { version: 1, connections: [] }
     try {
       const parsed = JSON.parse(readFileSync(this.file, 'utf-8')) as Partial<StoredProviderAccounts>
-      if (parsed.version === 1 && Array.isArray(parsed.connections)) return parsed as StoredProviderAccounts
+      if (parsed.version === 1 && Array.isArray(parsed.connections)) return withStatusReason(parsed as StoredProviderAccounts)
     } catch { /* corrupted state is replaced with an empty store */ }
     return { version: 1, connections: [] }
   }
@@ -130,4 +130,22 @@ export class ProviderAccountStore {
     writeFileSync(temp, JSON.stringify(state, null, 2))
     renameSync(temp, this.file)
   }
+}
+
+// Written as unavailableReason before v1.1.7. Accepted on read so a stored
+// account keeps its reason; only the new key is ever written back. The cast
+// names a key that deliberately no longer exists on the type — it describes
+// legacy data rather than silencing an error.
+function withStatusReason(state: StoredProviderAccounts): StoredProviderAccounts {
+  for (const connection of state.connections) {
+    for (const account of connection.accounts) {
+      const usage = account.usage as (ProviderUsage & { unavailableReason?: string }) | undefined
+      if (!usage) continue
+      if (usage.statusReason === undefined && usage.unavailableReason !== undefined) {
+        usage.statusReason = usage.unavailableReason
+      }
+      delete usage.unavailableReason
+    }
+  }
+  return state
 }

@@ -7,13 +7,14 @@ import { SessionStore } from '../../src/main/agent/session'
 import type { StoredSession } from '../../src/main/agent/session'
 import type { JsonStore } from '../../src/main/json-store'
 import { SnapshotStore } from '../../src/main/agent/snapshot'
-import type { SnapshotEntry } from '../../src/main/agent/snapshot'
+import type { SnapshotTurn } from '../../src/main/agent/snapshot'
 import { TruncationStore } from '../../src/main/agent/truncation'
 import { SavedPermissions } from '../../src/main/agent/saved-permissions'
 import type { SavedPermission } from '../../src/main/agent/saved-permissions'
 import { createDefaultTools } from '../../src/main/agent/tools/registry'
 import type { TraceStore } from '../../src/main/agent/trace-store'
 import type { TraceEvent } from '../../src/shared/types'
+import type { TraceEventInput } from '../../src/main/agent/trace-store'
 import type { AgentConfig } from '../../src/shared/types'
 
 const BS_AGENT: AgentConfig = {
@@ -29,8 +30,13 @@ function makeTrace(): FakeTrace & Pick<TraceStore, 'append' | 'delete' | 'flush'
   const trace: FakeTrace = { appends: [], deleted: [] }
   return {
     ...trace,
-    append(sessionId: string, event: Omit<TraceEvent, 'seq' | 'ts'>): void {
-      trace.appends.push({ sessionId, ...event })
+    append(sessionId: string, event: TraceEventInput): TraceEvent {
+      // sessionId last: an event carrying its own must not be overwritten.
+      // TraceEvent is a discriminated union and TypeScript does not distribute
+      // over a spread, so it cannot see that seq and ts complete the member.
+      const full = { ...event, sessionId, seq: trace.appends.length, ts: 0 } as TraceEvent
+      trace.appends.push({ ...full, sessionId })
+      return full
     },
     delete(sessionId: string): void {
       trace.deleted.push(sessionId)
@@ -52,7 +58,7 @@ async function makeManager(opts: { trace?: boolean } = {}) {
     save: (next) => sessions.splice(0, sessions.length, ...next)
   }
   const store = new SessionStore(json)
-  const snapshotEntries: SnapshotEntry[] = []
+  const snapshotEntries: SnapshotTurn[] = []
   const snapshots = new SnapshotStore({
     load: () => snapshotEntries,
     save: (next) => snapshotEntries.splice(0, snapshotEntries.length, ...next)

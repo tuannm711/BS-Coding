@@ -6,7 +6,7 @@ import type { ModelMessage } from 'ai'
 import type { JsonStore } from '../../src/main/json-store'
 import { BsAgentManager } from '../../src/main/bs-agent-manager'
 import { SessionStore, type StoredSession } from '../../src/main/agent/session'
-import { SnapshotStore, type SnapshotEntry } from '../../src/main/agent/snapshot'
+import { SnapshotStore, type SnapshotTurn } from '../../src/main/agent/snapshot'
 import { SavedPermissions, type SavedPermission } from '../../src/main/agent/saved-permissions'
 import { TruncationStore } from '../../src/main/agent/truncation'
 import { CommandStore } from '../../src/main/agent/commands'
@@ -40,14 +40,14 @@ describe('shared session Agent switching', () => {
       }
     })
     const connections: ProviderConnection[] = [
-      { providerId: 'openai', models: ['gpt-code'], accounts: [{ id: 'openai-account', label: 'OpenAI Pro', authMode: 'oauth', status: 'active', models: ['gpt-code'] }] },
-      { providerId: 'antigravity', models: ['gemini-code'], accounts: [{ id: 'anti-account', label: 'Antigravity Pro', authMode: 'oauth', status: 'active', models: ['gemini-code'] }] }
+      { providerId: 'openai', activeAccountId: 'openai-account', accounts: [{ id: 'openai-account', providerId: 'openai', label: 'OpenAI Pro', authMode: 'oauth', status: 'active', models: ['gpt-code'], createdAt: 1, lastUsedAt: 1 }] },
+      { providerId: 'antigravity', activeAccountId: 'anti-account', accounts: [{ id: 'anti-account', providerId: 'antigravity', label: 'Antigravity Pro', authMode: 'oauth', status: 'active', models: ['gemini-code'], createdAt: 1, lastUsedAt: 1 }] }
     ]
     const manager = new BsAgentManager({
       configPath,
       assignmentPath: path.join(dir, 'assignments.json'),
       store: new SessionStore(memoryStore<StoredSession>()),
-      snapshots: new SnapshotStore(memoryStore<SnapshotEntry>()),
+      snapshots: new SnapshotStore(memoryStore<SnapshotTurn>()),
       savedPermissions: new SavedPermissions(memoryStore<SavedPermission>()),
       truncation: new TruncationStore(path.join(dir, 'truncation')),
       commands: new CommandStore(path.join(dir, 'commands.json')),

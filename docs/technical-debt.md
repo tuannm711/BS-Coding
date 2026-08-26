@@ -7,58 +7,25 @@ purpose — none of it is a forgotten TODO.
 Add an entry when you decide *not* to do something you found. Remove it when the
 work lands, naming the commit.
 
-Last reviewed: 2026-08-26 (v1.1.6, after the narrated tool call fix)
+Last reviewed: 2026-08-26 (v1.1.7, after the debt pass)
 
 ## Index
 
 | # | Item | Area | Severity |
 |---|---|---|---|
-| 1 | [Test files are typechecked by nothing](#1-test-files-are-typechecked-by-nothing) | Build | High |
-| 2 | [Quota reasons carry no group scope](#2-quota-reasons-carry-no-group-scope) | Providers | Medium |
-| 3 | [No designed quota-health signal for routing](#3-no-designed-quota-health-signal-for-routing) | Providers | Medium |
-| 4 | [`unavailableReason` is a misleading name](#4-unavailablereason-is-a-misleading-name) | Providers | Low |
-| 5 | [Only two providers report usage](#5-only-two-providers-report-usage) | Providers | Medium |
-| 6 | [Antigravity reports no subscription term](#6-antigravity-reports-no-subscription-term) | Providers | Won't fix |
-| 7 | [Google OAuth client secret is public](#7-google-oauth-client-secret-is-public) | Security | Accepted |
-| 8 | [Tray artwork is not platform-specific](#8-tray-artwork-is-not-platform-specific) | Desktop | Low |
-| 9 | [opencode feature gaps](#9-opencode-feature-gaps) | Product | Medium |
-| 10 | [The test runner crashes intermittently](#10-the-test-runner-crashes-intermittently) | Build | Medium |
-| 11 | [No guard checks whether a design sentence is true](#11-no-guard-checks-whether-a-design-sentence-is-true) | Docs | Medium |
-| 12 | [The narrated-call notice is never rendered in a test](#12-the-narrated-call-notice-is-never-rendered-in-a-test) | Renderer | Low |
-| 13 | [Narration is detected only as it is written](#13-narration-is-detected-only-as-it-is-written) | Agent | Low |
+| 1 | [Quota reasons carry no group scope](#1-quota-reasons-carry-no-group-scope) | Providers | Medium |
+| 2 | [No designed quota-health signal for routing](#2-no-designed-quota-health-signal-for-routing) | Providers | Medium |
+| 3 | [Only two providers report usage](#3-only-two-providers-report-usage) | Providers | Medium |
+| 4 | [Antigravity reports no subscription term](#4-antigravity-reports-no-subscription-term) | Providers | Won't fix |
+| 5 | [Google OAuth client secret is public](#5-google-oauth-client-secret-is-public) | Security | Accepted |
+| 6 | [Tray artwork is not platform-specific](#6-tray-artwork-is-not-platform-specific) | Desktop | Low |
+| 7 | [opencode feature gaps](#7-opencode-feature-gaps) | Product | Medium |
+| 8 | [The test runner crashes intermittently](#8-the-test-runner-crashes-intermittently) | Build | Medium |
+| 9 | [No guard checks whether a design sentence is true](#9-no-guard-checks-whether-a-design-sentence-is-true) | Docs | Medium |
 
 ---
 
-## 1. Test files are typechecked by nothing
-
-**Found:** 2026-08-25, while narrowing `ProviderUsage.status`.
-
-No tsconfig includes `tests/`:
-
-| Project | include |
-|---|---|
-| `tsconfig.node.json` | `src/main`, `src/preload`, `src/shared` |
-| `tsconfig.web.json` | `src/renderer/src`, `src/shared` |
-| `tsconfig.extension.json` | `src/browser-extension` |
-
-**Why it matters, concretely.** When `'near-limit'` was removed from the
-`ProviderUsage.status` union, `npm run typecheck` reported every producer in
-`src/` and passed clean — while `tests/unit/quota-snapshot.test.tsx` still built
-a fixture with `status: 'near-limit'`. The suite stayed green because vitest does
-not typecheck. A grep caught it; the compiler could not.
-
-The same session found a second instance: `connections-oauth.test.ts` asserted
-`decodeJwtProfile` reads an `account_id` claim. The real claim key is
-`chatgpt_account_id`, so the test passed for years against a function that never
-worked. A typechecked fixture would not have caught that one — but it shows how
-far test-encoded assumptions can drift when nothing checks them.
-
-**To close:** add a `tsconfig.test.json` covering `tests/` with the same strictness
-and path aliases, and add it to the `typecheck` script chain. Expect an initial
-crop of errors in existing fixtures; each one is a fixture that has drifted from
-the type it claims to model.
-
-## 2. Quota reasons carry no group scope
+## 1. Quota reasons carry no group scope
 
 **Found:** 2026-08-25, fixing the false "Quota exhausted" badge.
 
@@ -83,7 +50,8 @@ it can only say "some group is fine", never "which group is not".
 consumers — which is why it was deferred. Do it when the orchestrator needs to
 route around a specific family rather than a whole account.
 
-## 3. No designed quota-health signal for routing
+
+## 2. No designed quota-health signal for routing
 
 **Found:** 2026-08-25, removing the dead `'near-limit'` status.
 
@@ -103,21 +71,8 @@ per account, and what the router should do at each level — then add it
 deliberately. See `docs/superpowers/specs/2026-08-25-dead-usage-status-design.md`
 for what was removed and why.
 
-## 4. `unavailableReason` is a misleading name
 
-**Found:** 2026-08-25.
-
-After the status narrowing, a 429 produces `status: 'ok'` together with
-`unavailableReason: 'Quota exhausted'`. The pairing reads as a contradiction. It
-is not a regression — `'near-limit'` and `unavailableReason` already coexisted on
-that path — but the field is really "why the last refresh degraded", not "why
-usage is unavailable".
-
-**To close:** rename to `statusReason` across `ProviderUsage`, every adapter that
-sets it, and both renderer consumers. Mechanical, wide, and worth doing alongside
-item 2 rather than on its own.
-
-## 5. Only two providers report usage
+## 3. Only two providers report usage
 
 **Found:** 2026-08-25, while answering whether subscription expiry could be shown
 for providers other than Antigravity.
@@ -135,7 +90,8 @@ see.
 through its own API. `openai-compatible` covers arbitrary endpoints and likely
 cannot report usage in general.
 
-## 6. Antigravity reports no subscription term
+
+## 4. Antigravity reports no subscription term
 
 **Found:** 2026-08-25. **Status: won't fix — recorded so it is not re-investigated.**
 
@@ -151,7 +107,8 @@ ChatGPT accounts do show a term. It comes from the `id_token` claim
 **To close:** nothing, unless Google adds the field. Do not synthesise a term
 from `g1-pro-tier`.
 
-## 7. Google OAuth client secret is public
+
+## 5. Google OAuth client secret is public
 
 **Found:** 2026-08-25, via GitHub secret scanning. **Status: accepted by the owner.**
 
@@ -175,7 +132,8 @@ client, which would break the Antigravity provider for every user, and that
 using a first-party client this way likely conflicts with Google's API terms.
 Both are product decisions, not engineering ones.
 
-## 8. Tray artwork is not platform-specific
+
+## 6. Tray artwork is not platform-specific
 
 **Found:** 2026-08-25, fixing the stale tray icon.
 
@@ -191,7 +149,8 @@ variant — glyph only, transparent background — would render better on all th
 `TrayManager.iconPath()`. `scripts/build-windows-icon.mjs` already regenerates the
 shared asset and would need to learn the variants.
 
-## 9. opencode feature gaps — closed
+
+## 7. opencode feature gaps — closed
 
 **Found:** catalogued 2026-08-05. **Re-measured and closed 2026-08-25** — see
 `docs/superpowers/audits/2026-08-25-opencode-gap-audit.md`, which supersedes the
@@ -220,7 +179,8 @@ summary was written from a note rather than the code and was wrong twice, in the
 same direction both times — claiming something absent that was partly present.
 Re-measure before planning from any summary, including this one.
 
-## 10. The test runner crashes intermittently
+
+## 8. The test runner crashes intermittently
 
 **Found:** 2026-08-25, twice while writing the design documentation.
 
@@ -241,7 +201,8 @@ a red run in this session.
 rather than re-running, and check whether vitest's `pool` or `poolOptions`
 settings avoid it. Do not chase it without a captured instance.
 
-## 11. No guard checks whether a design sentence is true
+
+## 9. No guard checks whether a design sentence is true
 
 **Found:** 2026-08-25, by the opencode gap audit.
 
@@ -253,7 +214,7 @@ Two false statements reached `docs/design/` on the day it was written.
 `02-agent-runtime.md` said compaction does not prune old tool output;
 `pruneToolOutputs` exists and its own comment says it mirrors opencode's
 `compaction.prune`. `05-sessions.md` said there is no redo history; `pushTurn`
-is the redo path. Both sentences were written by citing debt item 9 rather than
+is the redo path. Both sentences were written by citing debt item 7 (opencode feature gaps) rather than
 reading the code — the exact failure the design documents exist to prevent.
 
 **Why it matters.** The guards are good enough to make the mechanical parts
@@ -267,43 +228,3 @@ behaviour described is still absent, which is precisely the case for
 auto-continue. Until something better exists, Known limits sections are reviewed
 by reading the code, and the audit that finds a drift records it here.
 
-## 12. The narrated-call notice is never rendered in a test
-
-**Found:** 2026-08-26, while implementing the narrated tool call fix.
-
-`ChatPanel.tsx` renders `.chat-notice` when a `narrated-tool-call` event
-arrives. Nothing exercises that branch. The detector has unit tests and the
-event has a contract test, but the row itself has only ever existed as source.
-
-Testing it means rendering `ChatPanel`, which needs `window.api`; the suite
-runs with `environment: 'node'` and the component fetches on mount. The
-existing renderer tests avoid this by extracting a pure view function, which
-`ChatPanel` is too large to do incidentally.
-
-**Why it matters.** The notice exists to make a silent failure visible. If it
-renders wrong, the failure it was built to expose stays silent, and the fix
-that suppresses narration makes the bug rarer and so harder to notice.
-
-**To close:** extract the feed row rendering into a pure function taking a
-`FeedItem`, the way `formatStatsRows` was extracted from `StatsTab`, and
-assert against `renderToStaticMarkup`.
-
-## 13. Narration is detected only as it is written
-
-**Found:** 2026-08-26, while implementing the narrated tool call fix.
-
-`looksLikeNarratedToolCall` runs in the manager's `appendMessage`, so a
-narrated call raises its notice as the message is stored. Reopening a session
-that already contains one shows nothing: `listSessionTranscript` returns stored
-items and never re-examines their text.
-
-The 17 narrated messages found in the affected session are therefore invisible
-in the app, which is how they went unnoticed in the first place.
-
-**Why it matters.** Small. New narration is flagged, and the point of the fix
-is that there should be little of it. But a user reviewing an old session still
-has to spot it by eye, which is the problem this work started from.
-
-**To close:** run the detector over assistant messages as the transcript loads
-and mark those items, rather than emitting an event. It was left out because it
-changes `ChatTranscriptItem` for a case the fix is meant to eliminate.

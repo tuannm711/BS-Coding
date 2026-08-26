@@ -205,7 +205,7 @@ export class ProviderManager {
     }, period)
     const usage: ProviderUsage = account.usage
       ? { ...account.usage, accountId, tracked }
-      : { accountId, tracked, refreshedAt: now, source: 'internal', status: 'unavailable', unavailableReason: 'Provider quota has not been refreshed' }
+      : { accountId, tracked, refreshedAt: now, source: 'internal', status: 'unavailable', statusReason: 'Provider quota has not been refreshed' }
     this.store.upsert({ ...account, usage })
     this.emitUsage(usage)
   }
@@ -433,7 +433,7 @@ export class ProviderManager {
         const current = this.store.get(account.id)
         if (!current) continue
         if (next.status === 'unavailable' && current.usage?.quotaGroups?.length) {
-          next = retainLastKnownUsage(current.usage, next.unavailableReason ?? 'Provider usage unavailable', next.refreshedAt)
+          next = retainLastKnownUsage(current.usage, next.statusReason ?? 'Provider usage unavailable', next.refreshedAt)
         } else if (next.status !== 'unavailable') {
           const { refreshError: _refreshError, ...fresh } = next
           const period = selectTrackedPeriod(next, current.createdAt || next.refreshedAt)
@@ -458,8 +458,8 @@ export class ProviderManager {
     const metadata = { accountLabel: account.profile?.email ?? account.label, accountType: account.authMode === 'oauth' ? 'oauth' as const : account.authMode === 'api-key' ? 'api-key' as const : 'session' as const }
     const adapter = this.registry.get(providerId)
     const secret = this.store.getSecret(account.id)
-    if (!adapter?.fetchUsage || !secret) return account.usage ?? { accountId: account.id, ...metadata, refreshedAt: Date.now(), source: 'unavailable', status: 'unavailable', unavailableReason: 'Provider quota adapter unavailable' }
-    if (account.usage?.resetAt && account.usage.resetAt > Date.now() && /quota exhausted|capacity exhausted/i.test(account.usage.unavailableReason ?? '')) return account.usage
+    if (!adapter?.fetchUsage || !secret) return account.usage ?? { accountId: account.id, ...metadata, refreshedAt: Date.now(), source: 'unavailable', status: 'unavailable', statusReason: 'Provider quota adapter unavailable' }
+    if (account.usage?.resetAt && account.usage.resetAt > Date.now() && /quota exhausted|capacity exhausted/i.test(account.usage.statusReason ?? '')) return account.usage
     try {
       const readySecret = adapter.refreshCredentials ? await adapter.refreshCredentials(account, secret) : secret
       const usage = await adapter.fetchUsage(account, readySecret)
@@ -467,7 +467,7 @@ export class ProviderManager {
       if (current) this.store.upsert(current, readySecret)
       return usage
     } catch (error) {
-      return { accountId: account.id, ...metadata, refreshedAt: Date.now(), source: 'unavailable', status: 'unavailable', unavailableReason: String(error) }
+      return { accountId: account.id, ...metadata, refreshedAt: Date.now(), source: 'unavailable', status: 'unavailable', statusReason: String(error) }
     }
   }
 

@@ -265,7 +265,9 @@ test('settings agent list immediately reconciles the active workspace', async ()
       await expect(agentMenu.locator('.agent-picker-item', { hasText: 'reviewer' })).toBeVisible()
       expect(await agentMenu.evaluate(element => {
         const rect = element.getBoundingClientRect()
-        return rect.left >= 0 && rect.top >= 0 && rect.right <= window.innerWidth && rect.bottom <= window.innerHeight
+        // globalThis, not window: in this file `window` is the Electron Page,
+        // and inside evaluate the runtime value is the browser's own global.
+        return rect.left >= 0 && rect.top >= 0 && rect.right <= globalThis.innerWidth && rect.bottom <= globalThis.innerHeight
       })).toBe(true)
       await window.keyboard.press('ArrowDown')
       await window.keyboard.press('Enter')

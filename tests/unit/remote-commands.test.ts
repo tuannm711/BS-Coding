@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import type { Command } from '../../src/shared/types'
 import { dispatchRemoteCommand, type RemoteCommandContext } from '../../src/main/remote/remote-commands'
 import type { RemoteCommandName } from '../../src/shared/remote-types'
 
@@ -24,7 +25,7 @@ function makeCtx(overrides: Partial<RemoteCommandContext> = {}) {
     send: vi.fn(async () => {}),
     respondPrompt: vi.fn(),
     runCommand: vi.fn(async () => {}),
-    listCommands: vi.fn(() => []),
+    listCommands: vi.fn((): Command[] => []),
     isRunning: vi.fn(),
     isBackground: vi.fn()
     ,listProjectSessions: vi.fn()
@@ -191,7 +192,7 @@ describe('dispatchRemoteCommand', () => {
   it('chat:send routes a known slash command to runCommand, not send', async () => {
     const { ctx, bsAgent } = makeCtx()
     bsAgent.listAgents.mockReturnValue([agent('a1', 'One')])
-    bsAgent.listCommands.mockReturnValue([{ name: 'help', type: 'prompt', args: [] }])
+    bsAgent.listCommands.mockReturnValue([{ name: 'help', description: 'Help', template: 'help', type: 'prompt' as const }])
     const res = await dispatchRemoteCommand('chat:send', { agentId: 'a1', text: '/help xyz' }, ctx)
     expect(res).toEqual({ ok: true, result: { queued: true } })
     expect(bsAgent.runCommand).toHaveBeenCalledWith('a1', 'help', 'xyz')
@@ -201,7 +202,7 @@ describe('dispatchRemoteCommand', () => {
   it('chat:send falls back to send for an unknown slash command', async () => {
     const { ctx, bsAgent } = makeCtx()
     bsAgent.listAgents.mockReturnValue([agent('a1', 'One')])
-    bsAgent.listCommands.mockReturnValue([{ name: 'help', type: 'prompt', args: [] }])
+    bsAgent.listCommands.mockReturnValue([{ name: 'help', description: 'Help', template: 'help', type: 'prompt' as const }])
     const res = await dispatchRemoteCommand('chat:send', { agentId: 'a1', text: '/nope hi' }, ctx)
     expect(res.ok).toBe(true)
     expect(bsAgent.send).toHaveBeenCalledWith('a1', '/nope hi')

@@ -26,7 +26,7 @@ describe('Antigravity OAuth', () => {
     expect(tokens.accessToken).toBe('a')
     expect(tokens.refreshToken).toBe('r')
     expect(new URLSearchParams(body).get('code_verifier')).toBe('verifier-1')
-    await expect(exchangeAntigravityCode('bad', 'verifier-1', async () => new Response('secret error body', { status: 400 }) as typeof fetch)).rejects.toThrow('400')
+    await expect(exchangeAntigravityCode('bad', 'verifier-1', (async () => new Response('secret error body', { status: 400 })) as unknown as typeof fetch)).rejects.toThrow('400')
   })
 
   it('normalizes an Antigravity OAuth account through its adapter strategy', async () => {

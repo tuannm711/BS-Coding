@@ -12,7 +12,7 @@ afterEach(() => {
 describe('websearch tool', () => {
   it('returns a formatted result list', async () => {
     process.env.TAVILY_API_KEY = 'tavily-key'
-    const fetchMock = vi.fn(async () => ({
+    const fetchMock = vi.fn(async (_url: string | URL | Request, _init?: RequestInit) => ({
       ok: true,
       status: 200,
       json: async () => ({
@@ -25,7 +25,9 @@ describe('websearch tool', () => {
     const r = await websearchTool.run({ query: 'bs coding' }, ctx)
     expect(r.output).toContain('1. First Result')
     expect(r.output).toContain('https://example.com/1')
-    const body = JSON.parse(fetchMock.mock.calls[0][1].body as string)
+    const init = fetchMock.mock.calls[0][1]
+    if (!init?.body) throw new Error('fetch was called without a body')
+    const body = JSON.parse(init.body as string)
     expect(body.api_key).toBe('tavily-key')
     expect(body.query).toBe('bs coding')
   })

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { z } from 'zod'
 import { normalizeToolInput, toLlmMessages, toToolDefinition } from '../../src/main/agent/message'
-import type { ChatMessage, ToolCallData } from '../../src/shared/types'
+import type { ChatMessage, ChatTranscriptItem, ToolCallData } from '../../src/shared/types'
 import type { ToolDefinition } from '../../src/main/agent/tools/types'
 
 function msg(role: ChatMessage['role'], text: string): ChatMessage {
@@ -66,6 +66,10 @@ describe('toLlmMessages', () => {
   })
 
   it('replays string tool inputs as parsed objects (no double-encoding)', () => {
+    // A string input is normalised at the provider boundary (llm.ts) before it
+    // is ever stored, so ToolCallData.input is correctly typed as an object.
+    // Transcripts written by older versions can still hold one, which is what
+    // toLlmMessages defends against and what this fixture models.
     const items = [
       { kind: 'message' as const, message: msg('user', 'read a file') },
       { kind: 'message' as const, message: msg('assistant', '') },
@@ -73,7 +77,7 @@ describe('toLlmMessages', () => {
       { kind: 'tool' as const, tool: { ...toolCall('bash', {}, 'tc2'), input: '{"co' } },
       { kind: 'tool' as const, tool: { ...toolCall('bash', {}, 'tc3'), input: '' } }
     ]
-    const llm = toLlmMessages(items)
+    const llm = toLlmMessages(items as unknown as ChatTranscriptItem[])
     const assistant = llm[1] as { role: 'assistant'; content: Array<{ type: string; input: unknown }> }
     expect(assistant.content.filter(c => c.type === 'tool-call').map(c => c.input)).toEqual([
       { file_path: 'a.ts' },
@@ -129,13 +133,13 @@ describe('toLlmMessages', () => {
     ]
     const llm = toLlmMessages(items)
     expect(llm).toHaveLength(5)
-    expect((llm[1] as { content: { toolCallId: string }[] }).content
+    expect((llm[1] as { content: { type: string; toolCallId: string }[] }).content
       .filter(p => p.type === 'tool-call').map(p => p.toolCallId))
       .toEqual(['t1', 't2'])
   })
 
   it('emits image parts for user message with images', () => {
-    const items: TranscriptItem[] = [{
+    const items: ChatTranscriptItem[] = [{
       kind: 'message',
       message: {
         id: '1', role: 'user', text: 'fix this', createdAt: 0,

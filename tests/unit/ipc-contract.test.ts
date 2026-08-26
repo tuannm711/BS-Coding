@@ -1,8 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import { Channels } from '../../src/shared/ipc'
-import type { AgentApi, BrowserStatusEvent, PtyDataEvent, AgentStateEvent, GitStatusEvent, ChatEvent } from '../../src/shared/ipc'
+import type { AgentApi, BrowserStatusEvent, PtyDataEvent, AgentStateEvent, GitStatusEvent } from '../../src/shared/ipc'
 import type { BrowserStatusInfo } from '../../src/shared/browser-types'
-import type { AgentConfig, ChatMessage, BsSettings } from '../../src/shared/types'
+import type { AgentConfig, ChatEvent, ChatMessage, BsSettings } from '../../src/shared/types'
+import type { ProviderSnapshot } from '../../src/shared/provider-state'
+import { configToSettings, DEFAULT_BS_CONFIG } from '../../src/main/agent/config'
+
+// A stub standing in for the real API must return what the real API returns,
+// or the contract it claims to check is looser than the contract itself.
+const settings = (): BsSettings => configToSettings(DEFAULT_BS_CONFIG)
+const emptySnapshot: ProviderSnapshot = { revision: 0, providers: [], accounts: [], assignments: [], updatedAt: 0 }
 
 describe('IPC contract', () => {
   it('defines all channels used by the preload api', () => {
@@ -35,6 +42,35 @@ describe('IPC contract', () => {
       'traceList', 'traceRead', 'traceDelete', 'onTraceEvent'
     ]
     const api: AgentApi = {
+      // Added to AgentApi after this stub was written. The suite claims to check
+      // the API surface and had been 24 members behind without saying so.
+      openFile: async () => {},
+      getFileContent: async () => ({ path: '', ext: '', content: '' }),
+      openFileInEditor: async () => {},
+      showFileInFolder: async () => {},
+      listDir: async () => [],
+      listArtifacts: async () => [],
+      clearArtifacts: async () => {},
+      onArtifactsChanged: () => () => {},
+      setAgentProfile: async () => {},
+      setAgentAccount: async () => {},
+      getAgentAssignment: async () => null,
+      listProviderAccounts: async () => [],
+      setProviderAccountEnabled: async () => {},
+      switchProviderAccount: async () => {},
+      removeProviderAccount: async () => {},
+      refreshProviderUsage: async () => [],
+      onProviderAccountsChanged: () => () => {},
+      onProviderUsage: () => () => {},
+      onAgentAssignmentChanged: () => () => {},
+      getProviderSnapshot: async () => emptySnapshot,
+      onProviderSnapshotChanged: () => () => {},
+      refreshProviderAccount: async () => emptySnapshot,
+      getAgentAssignmentSnapshot: async () => null,
+      setAgentAssignmentSnapshot: async (request) => ({
+        agentId: request.agentId, providerId: request.providerId ?? '',
+        modelId: request.modelId ?? '', speed: 'standard', revision: 0
+      }),
       listWorkspaces: async () => [],
       addWorkspace: async () => null,
       removeWorkspace: async () => {},
@@ -63,8 +99,8 @@ describe('IPC contract', () => {
       openProviderAuthorization: async () => {},
       cancelProviderAuthorization: async () => undefined,
       onProviderAuthorizationChanged: () => () => {},
-      connectProvider: async () => ({ providers: [], defaultProvider: '' }),
-      disconnectProvider: async () => ({ providers: [], defaultProvider: '' }),
+      connectProvider: async () => settings(),
+      disconnectProvider: async () => settings(),
       listTemplates: async () => [],
       saveTemplate: async (t) => t,
       removeTemplate: async () => {},
@@ -242,6 +278,7 @@ describe('IPC contract', () => {
     const g: GitStatusEvent = { projectPath: '/p', git: { branch: 'main', dirtyCount: 0 } }
     expect(d.data).toBe('x')
     expect(s.agentId).toBe('a1')
+    if (!g.git) throw new Error('expected a git status')
     expect(g.git.branch).toBe('main')
     expect(gNull.git).toBeNull()
   })
@@ -270,7 +307,8 @@ describe('IPC contract', () => {
 
   it('types settings payloads without runtime error', () => {
     const s: BsSettings = {
-      providers: [{ id: 'deepseek', apiKey: 'k', baseUrl: 'https://api.deepseek.com/v1', model: 'deepseek-chat' }],
+      ...settings(),
+      providers: [{ id: 'deepseek', apiKey: 'k', baseUrl: 'https://api.deepseek.com/v1', models: ['deepseek-chat'] }],
       defaultProvider: 'deepseek'
     }
     expect(s.providers[0].id).toBe('deepseek')

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { mkdtempSync, readFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { ProviderAccountStore } from '../../src/main/connections/store'
@@ -35,5 +35,25 @@ describe('ProviderAccountStore', () => {
     expect(store.get(account.id)?.status).toBe('disabled')
     store.setEnabled(account.id, true)
     expect(store.list('openai')[0].activeAccountId).toBe(account.id)
+  })
+
+  it('reads a reason stored under the old key', () => {
+    // unavailableReason was the name before v1.1.7 and is present in real
+    // accounts.json files. Accepted on read; only statusReason is written back.
+    const dir = mkdtempSync(path.join(tmpdir(), 'bs-accounts-'))
+    const file = path.join(dir, 'accounts.json')
+    writeFileSync(file, JSON.stringify({
+      version: 1,
+      connections: [{
+        providerId: 'antigravity', activeAccountId: 'a1',
+        accounts: [{
+          id: 'a1', providerId: 'antigravity', label: 'a@example.com',
+          authMode: 'oauth', status: 'active', models: [], createdAt: 1, lastUsedAt: 1,
+          usage: { accountId: 'a1', refreshedAt: 1, source: 'unavailable', status: 'unavailable', unavailableReason: 'Quota exhausted' }
+        }]
+      }]
+    }))
+    const store = new ProviderAccountStore(file, fakeVault() as never)
+    expect(store.get('a1')?.usage?.statusReason).toBe('Quota exhausted')
   })
 })

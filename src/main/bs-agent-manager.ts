@@ -41,7 +41,8 @@ import type { TraceEventInput } from './agent/trace-store'
 import type { AgentAssignmentSetRequest, AgentAssignmentSnapshot } from '../shared/provider-state'
 import { AssignmentStore, fileAssignmentPersistence } from './agent/assignments'
 import { SharedSessionCoordinator } from './agent/shared-session-coordinator'
-import { compileNeutralContext, looksLikeNarratedToolCall } from './agent/neutral-context'
+import { compileNeutralContext } from './agent/neutral-context'
+import { looksLikeNarratedToolCall } from '../shared/narrated-tool-call'
 import { toLlmMessages } from './agent/message'
 
 export interface BsAgentManagerDeps {
@@ -1651,12 +1652,12 @@ export class BsAgentManager {
     }
     if (e.type === 'error') context.execution.status = 'failed'
     if (e.type === 'done') context.execution.status = e.reason === 'stopped' ? 'stopped' : 'completed'
-    const scoped = {
+    const scoped: ChatEvent = {
       ...e,
       projectPath: context.projectPath,
       sessionId: context.sessionId,
       turnId: context.execution.turnId
-    } as unknown as ChatEvent
+    }
     this.onEvent(scoped)
   }
 

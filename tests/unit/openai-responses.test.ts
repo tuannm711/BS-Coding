@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { ModelMessage } from 'ai'
 import { OpenAIResponsesClient, toResponsesInput } from '../../src/main/agent/openai-responses'
+import type { ResponsesState } from '../../src/main/agent/openai-responses'
 import { decodeProviderResponse } from '../../src/main/agent/provider-stream'
 import { bashTool } from '../../src/main/agent/tools/bash'
 import { readTool } from '../../src/main/agent/tools/read'
@@ -15,19 +16,21 @@ import {
 
 describe('OpenAIResponsesClient', () => {
   it('sends Responses payload and stores continuation id', async () => {
-    const fetchImpl = vi.fn(async () => new Response(JSON.stringify({ id: 'resp-1', output: [{ type: 'message', content: [{ type: 'output_text', text: 'ok' }] }], usage: { input_tokens: 10, output_tokens: 2, total_tokens: 12 } }), { status: 200, headers: { 'content-type': 'application/json' } })) as unknown as typeof fetch
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => new Response(JSON.stringify({ id: 'resp-1', output: [{ type: 'message', content: [{ type: 'output_text', text: 'ok' }] }], usage: { input_tokens: 10, output_tokens: 2, total_tokens: 12 } }), { status: 200, headers: { 'content-type': 'application/json' } }))
+    const fetchImpl = fetchMock as unknown as typeof fetch
     const client = new OpenAIResponsesClient({ apiKey: 'sk-test', fetchImpl })
     const parts = []
     for await (const part of client.stream({ model: 'gpt-5.2-codex', system: 'sys', messages: [{ role: 'user', content: [{ type: 'text', text: 'hi' }] }], tools: [] })) parts.push(part)
-    expect(fetchImpl).toHaveBeenCalledWith('https://api.openai.com/v1/responses', expect.objectContaining({ method: 'POST' }))
-    expect(JSON.parse(String(fetchImpl.mock.calls[0]?.[1] && (fetchImpl.mock.calls[0]?.[1] as RequestInit).body))).toMatchObject({ store: false })
+    expect(fetchMock).toHaveBeenCalledWith('https://api.openai.com/v1/responses', expect.objectContaining({ method: 'POST' }))
+    expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toMatchObject({ store: false })
     expect(parts).toContainEqual({ kind: 'text', text: 'ok' })
     expect(client.state.previousResponseId).toBe('resp-1')
   })
 
   it('stores opaque compaction output and clears continuation', async () => {
-    const fetchImpl = vi.fn(async () => new Response(JSON.stringify({ output: [{ type: 'compaction', encrypted_content: 'opaque' }] }), { status: 200 })) as unknown as typeof fetch
-    const state = { previousResponseId: 'old' }
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => new Response(JSON.stringify({ output: [{ type: 'compaction', encrypted_content: 'opaque' }] }), { status: 200 }))
+    const fetchImpl = fetchMock as unknown as typeof fetch
+    const state: ResponsesState = { previousResponseId: 'old' }
     const client = new OpenAIResponsesClient({ apiKey: 'sk-test', state, fetchImpl })
     expect(await client.compact([{ role: 'user', content: 'history' }], 'gpt-5.2-codex')).toBe(true)
     expect(state.previousResponseId).toBeUndefined()
@@ -35,7 +38,8 @@ describe('OpenAIResponsesClient', () => {
   })
 
   it('supports ChatGPT Codex backend headers for OAuth sessions', async () => {
-    const fetchImpl = vi.fn(async () => new Response(JSON.stringify({ output: [] }), { status: 200 })) as unknown as typeof fetch
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => new Response(JSON.stringify({ output: [] }), { status: 200 }))
+    const fetchImpl = fetchMock as unknown as typeof fetch
     const client = new OpenAIResponsesClient({
       apiKey: 'oauth-token',
       baseUrl: 'https://chatgpt.com/backend-api/codex',
@@ -43,16 +47,17 @@ describe('OpenAIResponsesClient', () => {
       fetchImpl
     })
     for await (const _part of client.stream({ model: 'gpt-5.5', system: 'sys', messages: [], tools: [] })) { /* consume */ }
-    expect(fetchImpl).toHaveBeenCalledWith('https://chatgpt.com/backend-api/codex/responses', expect.objectContaining({
+    expect(fetchMock).toHaveBeenCalledWith('https://chatgpt.com/backend-api/codex/responses', expect.objectContaining({
       headers: expect.objectContaining({ authorization: 'Bearer oauth-token', 'ChatGPT-Account-ID': 'acct-1', originator: 'codex_vscode' })
     }))
   })
 
   it('sends priority service tier for Fast Codex turns', async () => {
-    const fetchImpl = vi.fn(async () => new Response(JSON.stringify({ output: [] }), { status: 200 })) as unknown as typeof fetch
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => new Response(JSON.stringify({ output: [] }), { status: 200 }))
+    const fetchImpl = fetchMock as unknown as typeof fetch
     const client = new OpenAIResponsesClient({ apiKey: 'oauth-token', fetchImpl })
     for await (const _part of client.stream({ model: 'gpt-5.6-sol', system: 'sys', messages: [], tools: [], serviceTier: 'priority' })) { /* consume */ }
-    expect(JSON.parse(String(fetchImpl.mock.calls[0]?.[1] && (fetchImpl.mock.calls[0]?.[1] as RequestInit).body))).toMatchObject({ service_tier: 'priority' })
+    expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toMatchObject({ service_tier: 'priority' })
   })
 
   it('sends required JSON Schema parameters for native tools', async () => {
@@ -93,7 +98,8 @@ describe('OpenAIResponsesClient', () => {
       })}\n\n`,
       `data: ${JSON.stringify({ type: 'response.completed', response: { id: 'response-tools' } })}\n\n`
     ]
-    const fetchImpl = vi.fn(async () => chunkedResponse(events)) as unknown as typeof fetch
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => chunkedResponse(events))
+    const fetchImpl = fetchMock as unknown as typeof fetch
     const client = new OpenAIResponsesClient({ apiKey: 'fixture-token', fetchImpl })
     const parts = []
 
@@ -143,7 +149,8 @@ describe('OpenAIResponsesClient', () => {
   })
 
   it('decodes a mislabeled SSE response without throwing a raw SyntaxError', async () => {
-    const fetchImpl = vi.fn(async () => new Response(MISLABELED_SSE, { status: 200, headers: { 'content-type': 'text/plain' } })) as unknown as typeof fetch
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => new Response(MISLABELED_SSE, { status: 200, headers: { 'content-type': 'text/plain' } }))
+    const fetchImpl = fetchMock as unknown as typeof fetch
     const client = new OpenAIResponsesClient({ apiKey: 'fixture-token', fetchImpl })
     const parts = []
     for await (const part of client.stream({ model: 'gpt-5.6-codex', system: 'sys', messages: [], tools: [] })) parts.push(part)

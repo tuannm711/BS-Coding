@@ -375,7 +375,15 @@ export function configToSettings(cfg: BsConfig): BsSettings {
   }
 }
 
-export function settingsToConfig(settings: BsSettings, base: BsConfig = DEFAULT_BS_CONFIG): BsConfig {
+/**
+ * What settingsToConfig actually accepts. Every field but these two is read
+ * through a fallback to `base`, so a caller may omit it — which is the whole
+ * point of passing a base config. Declaring the parameter as a full BsSettings
+ * said otherwise and was contradicted by the function's own body.
+ */
+export type SettingsInput = Pick<BsSettings, 'providers' | 'defaultProvider'> & Partial<BsSettings>
+
+export function settingsToConfig(settings: SettingsInput, base: BsConfig = DEFAULT_BS_CONFIG): BsConfig {
   const providers: Record<string, BsProviderConfig> = {}
   for (const p of settings.providers) {
     const models = (p.models ?? []).filter(m => typeof m === 'string' && m.trim() !== '')

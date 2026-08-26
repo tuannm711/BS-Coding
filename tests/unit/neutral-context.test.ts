@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { compileNeutralContext, looksLikeNarratedToolCall } from '../../src/main/agent/neutral-context'
+import { compileNeutralContext } from '../../src/main/agent/neutral-context'
+import { looksLikeNarratedToolCall } from '../../src/shared/narrated-tool-call'
 import type { ChatTranscriptItem, TurnExecutionSnapshot } from '../../src/shared/types'
 
 const execution = (status: TurnExecutionSnapshot['status']): TurnExecutionSnapshot => ({

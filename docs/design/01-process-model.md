@@ -12,7 +12,7 @@ touch, how a message crosses, and how the build keeps the split honest. What run
 | [Data flow](#data-flow) | 33-53 | `window.api`, `registerIpcHandlers`, `ipcRenderer.on`, `onX`, `AgentApi`, `Event*` |
 | [Types that carry it](#types-that-carry-it) | 54-69 | `src/shared/ipc.ts`, `Channels`, `AgentApi`, `window.api`, `PtyDataEvent`, `AgentStateEvent` |
 | [Design decisions](#design-decisions) | 70-98 | `src/shared`, `src/shared/AGENTS.md`, `Channels`, `AgentApi`, `registerIpcHandlers`, `tests/unit/ipc-contract.test.ts` |
-| [Known limits](#known-limits) | 99-107 | `tests/`, `docs/technical-debt.md` |
+| [Known limits](#known-limits) | 99-107 | `tests/`, `tsconfig.test.json`, `tests/unit/design-docs.test.ts` |
 <!-- /toc -->
 
 ## Pieces
@@ -98,9 +98,9 @@ exit code, alert. Without that filter every pty byte would trigger a state push.
 
 ## Known limits
 
-`tests/` is included in no tsconfig project, so test files are never
-typechecked — debt item 1 in `docs/technical-debt.md`. A fixture can drift from
-the type it claims to model and the suite will stay green.
+`tests/` is typechecked by `tsconfig.test.json`, the fifth project in the
+`typecheck` script, since v1.1.7. A guard in `tests/unit/design-docs.test.ts`
+fails if it falls out of that chain.
 
 The renderer talks only to the main process. There is no direct renderer-to-
 renderer channel, and no second window, so nothing needs one yet.
