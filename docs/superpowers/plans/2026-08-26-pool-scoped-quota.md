@@ -53,7 +53,7 @@ lookup resolves nothing. Fixtures use these ids rather than invented ones.
 **Interfaces:**
 - Produces: `ProviderAdapter.quotaGroupForModel?(modelId: string): string | undefined`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```ts
 import { describe, expect, it } from 'vitest'
@@ -83,11 +83,11 @@ describe('quotaGroupForModel', () => {
 Read both adapter files first for the real factory names; correct the test to
 match the files rather than the files to match the test.
 
-- [ ] **Step 2: Run to confirm failure**
+- [x] **Step 2: Run to confirm failure**
 
 Expected: `quotaGroupForModel` is not a function.
 
-- [ ] **Step 3: Declare and implement**
+- [x] **Step 3: Declare and implement**
 
 In `src/main/providers/types.ts`:
 
@@ -109,7 +109,7 @@ In `openai.ts`:
     quotaGroupForModel: () => 'openai-base',
 ```
 
-- [ ] **Step 4: Use it where the pool is resolved**
+- [x] **Step 4: Use it where the pool is resolved**
 
 In `manager.ts`, `recordRuntimeUsage` currently reads
 
@@ -136,7 +136,7 @@ Replace with a single private helper used by this and by Task 2:
 The old lookup stays as the fallback so a provider that does not implement the
 method behaves as before.
 
-- [ ] **Step 5: Test the ledger attribution**
+- [x] **Step 5: Test the ledger attribution**
 
 Add to `tests/unit/provider-quota-pool.test.ts` a case driving
 `recordRuntimeUsage` through a manager whose Antigravity adapter declares the
@@ -147,7 +147,7 @@ Build the manager the way `tests/unit/connections-reset-credit.test.ts` does:
 seed `accounts.json` on disk and pass a fake vault, rather than reaching through
 a private field.
 
-- [ ] **Step 6: Verify and commit**
+- [x] **Step 6: Verify and commit**
 
 ```bash
 npm test && npm run typecheck
@@ -170,7 +170,7 @@ provider leaves empty.
 **Interfaces:**
 - Produces: `ProviderAccount.poolErrors?: Record<string, ProviderErrorState>`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```ts
   it('records a quota error under the pool that was refused', async () => {
@@ -211,11 +211,11 @@ whose runtime yields an error part, which is the real path
 `recordRuntimeError` sits on. Do not call the private method directly: the point
 of the test is that the model id reaches it.
 
-- [ ] **Step 2: Run to confirm failure**
+- [x] **Step 2: Run to confirm failure**
 
 Expected: `poolErrors` does not exist.
 
-- [ ] **Step 3: Add the field**
+- [x] **Step 3: Add the field**
 
 In `src/shared/types.ts`, beside `providerError`:
 
@@ -230,7 +230,7 @@ In `src/shared/types.ts`, beside `providerError`:
   poolErrors?: Record<string, ProviderErrorState>
 ```
 
-- [ ] **Step 4: Route quota errors to the pool**
+- [x] **Step 4: Route quota errors to the pool**
 
 `recordRuntimeError` currently takes `(accountId, error)`. Give it the model:
 
@@ -253,7 +253,7 @@ where both are already in scope.
 Only quota and capacity errors are scoped. Everything else is still a statement
 about the account.
 
-- [ ] **Step 5: Clear per pool**
+- [x] **Step 5: Clear per pool**
 
 `clearRuntimeError` is called on a successful turn at `manager.ts:158`, where
 `modelId` is in scope. Give it the same two arguments and have it remove that
@@ -274,7 +274,7 @@ pool's entry, plus the account-wide error as today:
   }
 ```
 
-- [ ] **Step 6: Verify and commit**
+- [x] **Step 6: Verify and commit**
 
 Expected: **1098**. Commit as `feat: record a quota refusal against the pool that was refused`.
 
@@ -288,7 +288,7 @@ Expected: **1098**. Commit as `feat: record a quota refusal against the pool tha
   `src/renderer/src/styles.css`
 - Test: `tests/unit/quota-snapshot.test.tsx`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```tsx
   it('marks the exhausted pool while the healthy one stays quiet', () => {
@@ -309,17 +309,17 @@ Expected: **1098**. Commit as `feat: record a quota refusal against the pool tha
   })
 ```
 
-- [ ] **Step 2: Run to confirm failure**
+- [x] **Step 2: Run to confirm failure**
 
 Expected: `poolErrors` is not a property of `ProviderAccountSnapshot`.
 
-- [ ] **Step 3: Carry it to the renderer**
+- [x] **Step 3: Carry it to the renderer**
 
 Add `poolErrors?: Record<string, ProviderErrorState>` to
 `ProviderAccountSnapshot` in `src/shared/provider-state.ts`, and map it in
 `buildProviderSnapshot` beside the existing `error` mapping.
 
-- [ ] **Step 4: Render it**
+- [x] **Step 4: Render it**
 
 In the group section at `QuotaAccountCard.tsx:116`, beside the label:
 
@@ -332,7 +332,7 @@ In the group section at `QuotaAccountCard.tsx:116`, beside the label:
 Add `.quota-pool-error` to `styles.css` reusing the existing
 `.quota-state-quota-exhausted` colour rather than a new token.
 
-- [ ] **Step 5: Verify and commit**
+- [x] **Step 5: Verify and commit**
 
 ```bash
 npm test && npm run typecheck && npm run build
@@ -348,29 +348,29 @@ Expected: **1099**. Commit as `feat: name the exhausted quota pool on the card`.
 - Modify: `docs/technical-debt.md`, `docs/design/03-providers.md`,
   `docs/design/00-goals.md`
 
-- [ ] **Step 1: Close item 1**
+- [x] **Step 1: Close item 1**
 
 Remove it, renumber the survivors, repoint the index anchors and the two
 citations in `03-providers.md` (lines 97 and 131, both "debt item 1").
 
-- [ ] **Step 2: Correct the design document**
+- [x] **Step 2: Correct the design document**
 
 `03-providers.md` says the account-level reason "can only say some group is fine,
 never which group is not". That is no longer true. Rewrite the sentence rather
 than deleting it — the limitation is what this work removed, and the document
 should say so.
 
-- [ ] **Step 3: Mark A1 done in the goals**
+- [x] **Step 3: Mark A1 done in the goals**
 
 In `00-goals.md`, group A, mark A1 as landed and note that A2 is now unblocked.
 
-- [ ] **Step 4: Regenerate the tables of contents**
+- [x] **Step 4: Regenerate the tables of contents**
 
 ```bash
 npm run docs:toc
 ```
 
-- [ ] **Step 5: Full verification**
+- [x] **Step 5: Full verification**
 
 ```bash
 npm test && npm run typecheck
@@ -378,12 +378,12 @@ npm test && npm run typecheck
 
 Check the exit status of each, chained with `&&`.
 
-- [ ] **Step 6: Run the app**
+- [x] **Step 6: Run the app**
 
 Open a project with the Antigravity account selected. The card should show
 `claude-gpt` exhausted and `gemini` healthy **at the same time** — the state that
 could not be expressed before. Confirm an OpenAI card is unchanged.
 
-- [ ] **Step 7: Report and stop**
+- [x] **Step 7: Report and stop**
 
 Do not merge, tag, or push. Report all four tasks and wait.

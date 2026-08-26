@@ -21,7 +21,7 @@ from a wrong reading of it.
 | [The three quota models](#the-three-quota-models) | 117-131 | `ProviderQuotaWindow`, `ProviderUsageLedger` |
 | [The three groups of work](#the-three-groups-of-work) | 132-136 |  |
 | &nbsp;&nbsp;[Group B — The quota surface](#group-b-the-quota-surface) | 137-148 | `refreshProviderAccount`, `ProvidersTab.tsx`, `bankedUsed`, `bankedLimit`, `src/main/connections/usage.ts`, `ProviderUsage` |
-| &nbsp;&nbsp;[Group A — Routing](#group-a-routing) | 149-157 | `docs/technical-debt.md` |
+| &nbsp;&nbsp;[Group A — Routing](#group-a-routing) | 149-157 |  |
 | &nbsp;&nbsp;[Group C — Quota models](#group-c-quota-models) | 158-166 | `credits.balance`, `credits.has_credits`, `spend_control.individual_limit` |
 | [What this document is not](#what-this-document-is-not) | 167-172 | `0N-*.md` |
 <!-- /toc -->
@@ -148,10 +148,10 @@ the other two, and addresses friction the owner meets daily.
 
 ### Group A — Routing
 
-- **A1. Record quota exhaustion against the pool**, not the account. Today a 429
-  from one quota family is stored account-wide, so a healthy pool on the same
-  account looks dead. This is `docs/technical-debt.md` item 1, unblocked: it was
-  deferred until routing needed it, and mode 1 now needs it.
+- **A1. Record quota exhaustion against the pool** — **landed v1.2.0.** A quota
+  refusal is written under the pool that was refused, the pool is resolved by
+  asking the adapter rather than reading a field the provider leaves empty,
+  and success on one pool no longer clears another. This unblocks A2.
 - **A2. Agent fallback** — mode 1.
 - **A3. Coordinator and task exchange** — mode 4's surface.
 
@@ -160,7 +160,7 @@ the other two, and addresses friction the owner meets daily.
 - **C1. The balance model**, for top-up providers. A real response is already
   available: the ChatGPT usage endpoint returns `credits.balance`,
   `credits.has_credits` and `spend_control.individual_limit`, none of them
-  parsed. Measured 2026-08-26; recorded as debt item 10. This corrects an
+  parsed. Measured 2026-08-26; recorded as debt item 9. This corrects an
   earlier assumption here that the work had to wait for a DeepSeek account.
 - **C2. Estimates for silent providers**, from the ledger, labelled as estimates.
 

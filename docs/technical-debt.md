@@ -7,54 +7,26 @@ purpose — none of it is a forgotten TODO.
 Add an entry when you decide *not* to do something you found. Remove it when the
 work lands, naming the commit.
 
-Last reviewed: 2026-08-26 (after the reset credit action)
+Last reviewed: 2026-08-26 (after pool-scoped quota state)
 
 ## Index
 
 | # | Item | Area | Severity |
 |---|---|---|---|
-| 1 | [Quota reasons carry no group scope](#1-quota-reasons-carry-no-group-scope) | Providers | Medium |
-| 2 | [No designed quota-health signal for routing](#2-no-designed-quota-health-signal-for-routing) | Providers | Medium |
-| 3 | [Only two providers report usage](#3-only-two-providers-report-usage) | Providers | Medium |
-| 4 | [Antigravity reports no subscription term](#4-antigravity-reports-no-subscription-term) | Providers | Won't fix |
-| 5 | [Google OAuth client secret is public](#5-google-oauth-client-secret-is-public) | Security | Accepted |
-| 6 | [Tray artwork is not platform-specific](#6-tray-artwork-is-not-platform-specific) | Desktop | Low |
-| 7 | [opencode feature gaps](#7-opencode-feature-gaps) | Product | Medium |
-| 8 | [The test runner crashes intermittently](#8-the-test-runner-crashes-intermittently) | Build | Medium |
-| 9 | [No guard checks whether a design sentence is true](#9-no-guard-checks-whether-a-design-sentence-is-true) | Docs | Medium |
-| 10 | [The balance quota model is unparsed](#10-the-balance-quota-model-is-unparsed) | Providers | Medium |
-| 11 | [A process-killing test times out under full-suite load](#11-a-process-killing-test-times-out-under-full-suite-load) | Build | Low |
+| 1 | [No designed quota-health signal for routing](#1-no-designed-quota-health-signal-for-routing) | Providers | Medium |
+| 2 | [Only two providers report usage](#2-only-two-providers-report-usage) | Providers | Medium |
+| 3 | [Antigravity reports no subscription term](#3-antigravity-reports-no-subscription-term) | Providers | Won't fix |
+| 4 | [Google OAuth client secret is public](#4-google-oauth-client-secret-is-public) | Security | Accepted |
+| 5 | [Tray artwork is not platform-specific](#5-tray-artwork-is-not-platform-specific) | Desktop | Low |
+| 6 | [opencode feature gaps](#6-opencode-feature-gaps) | Product | Medium |
+| 7 | [The test runner crashes intermittently](#7-the-test-runner-crashes-intermittently) | Build | Medium |
+| 8 | [No guard checks whether a design sentence is true](#8-no-guard-checks-whether-a-design-sentence-is-true) | Docs | Medium |
+| 9 | [The balance quota model is unparsed](#9-the-balance-quota-model-is-unparsed) | Providers | Medium |
+| 10 | [A process-killing test times out under full-suite load](#10-a-process-killing-test-times-out-under-full-suite-load) | Build | Low |
 
 ---
 
-## 1. Quota reasons carry no group scope
-
-**Found:** 2026-08-25, fixing the false "Quota exhausted" badge.
-
-A 429 from one quota family is stored at account level. The message names the
-model it was refused for — `"model": "claude-sonnet-4-6"` — but nothing parses
-that, so `unavailableReason` and `providerError` speak for the whole account.
-
-Three separate defects came from this single shape:
-
-| Symptom | Fixed in |
-|---|---|
-| `primaryUsedPercent` pinned by a hidden helper model | v1.1.2 |
-| Account-level reason printed over a healthy group | v1.1.4 |
-| `providerError` badge reading "Quota exhausted" at 93.92% left | v1.1.4 |
-
-All three were fixed at the display layer, by suppressing account-level warnings
-while any window still has quota. That is correct for today and does not scale:
-it can only say "some group is fine", never "which group is not".
-
-**To close:** carry the responsible group id on the reason. This changes
-`ProviderUsage`, every adapter that produces a reason, and both renderer
-consumers — which is why it was deferred. Do it when the orchestrator needs to
-route around a specific family rather than a whole account.
-
-
-
-## 2. No designed quota-health signal for routing
+## 1. No designed quota-health signal for routing
 
 **Found:** 2026-08-25, removing the dead `'near-limit'` status.
 
@@ -76,7 +48,8 @@ for what was removed and why.
 
 
 
-## 3. Only two providers report usage
+
+## 2. Only two providers report usage
 
 **Found:** 2026-08-25, while answering whether subscription expiry could be shown
 for providers other than Antigravity.
@@ -96,7 +69,8 @@ cannot report usage in general.
 
 
 
-## 4. Antigravity reports no subscription term
+
+## 3. Antigravity reports no subscription term
 
 **Found:** 2026-08-25. **Status: won't fix — recorded so it is not re-investigated.**
 
@@ -114,7 +88,8 @@ from `g1-pro-tier`.
 
 
 
-## 5. Google OAuth client secret is public
+
+## 4. Google OAuth client secret is public
 
 **Found:** 2026-08-25, via GitHub secret scanning. **Status: accepted by the owner.**
 
@@ -140,7 +115,8 @@ Both are product decisions, not engineering ones.
 
 
 
-## 6. Tray artwork is not platform-specific
+
+## 5. Tray artwork is not platform-specific
 
 **Found:** 2026-08-25, fixing the stale tray icon.
 
@@ -158,7 +134,8 @@ shared asset and would need to learn the variants.
 
 
 
-## 7. opencode feature gaps — closed
+
+## 6. opencode feature gaps — closed
 
 **Found:** catalogued 2026-08-05. **Re-measured and closed 2026-08-25** — see
 `docs/superpowers/audits/2026-08-25-opencode-gap-audit.md`, which supersedes the
@@ -189,7 +166,8 @@ Re-measure before planning from any summary, including this one.
 
 
 
-## 8. The test runner crashes intermittently
+
+## 7. The test runner crashes intermittently
 
 **Found:** 2026-08-25, twice while writing the design documentation.
 
@@ -212,7 +190,8 @@ settings avoid it. Do not chase it without a captured instance.
 
 
 
-## 9. No guard checks whether a design sentence is true
+
+## 8. No guard checks whether a design sentence is true
 
 **Found:** 2026-08-25, by the opencode gap audit.
 
@@ -239,7 +218,8 @@ auto-continue. Until something better exists, Known limits sections are reviewed
 by reading the code, and the audit that finds a drift records it here.
 
 
-## 10. The balance quota model is unparsed
+
+## 9. The balance quota model is unparsed
 
 **Found:** 2026-08-26, in the same captured response.
 
@@ -262,7 +242,8 @@ currently zero.
 whether a top-up provider such as DeepSeek maps onto the same shape or needs
 its own. Group C in `docs/design/00-goals.md`.
 
-## 11. A process-killing test times out under full-suite load
+
+## 10. A process-killing test times out under full-suite load
 
 **Found:** 2026-08-26, during the reset credit work.
 
