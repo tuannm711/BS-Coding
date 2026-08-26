@@ -7,7 +7,7 @@ purpose — none of it is a forgotten TODO.
 Add an entry when you decide *not* to do something you found. Remove it when the
 work lands, naming the commit.
 
-Last reviewed: 2026-08-26 (after pool-scoped quota state)
+Last reviewed: 2026-08-26 (after the coordinator task exchange)
 
 ## Index
 
@@ -23,6 +23,8 @@ Last reviewed: 2026-08-26 (after pool-scoped quota state)
 | 8 | [No guard checks whether a design sentence is true](#8-no-guard-checks-whether-a-design-sentence-is-true) | Docs | Medium |
 | 9 | [The balance quota model is unparsed](#9-the-balance-quota-model-is-unparsed) | Providers | Medium |
 | 10 | [A process-killing test times out under full-suite load](#10-a-process-killing-test-times-out-under-full-suite-load) | Build | Low |
+| 11 | [A fan-out cannot be cancelled](#11-a-fan-out-cannot-be-cancelled) | Agent | Medium |
+| 12 | [A coordinator can spend every worker's quota](#12-a-coordinator-can-spend-every-workers-quota) | Agent | Low |
 
 ---
 
@@ -266,3 +268,37 @@ touched.
 **To close:** decide whether the 20s budget is right for a Windows spawn-and-
 kill under parallel load, or whether this test should run in its own pool.
 Do not simply raise the number without knowing which.
+
+## 11. A fan-out cannot be cancelled
+
+**Found:** 2026-08-26, specifying the coordinator task exchange.
+
+A coordinator that assigns work to several agents starts a turn on each. Those
+are separate turns on separate agents, and Stop is per agent, so stopping the
+coordinator leaves every worker running. Nothing gathers them.
+
+**Why it matters.** The bigger the plan, the more there is to stop and the less
+the one Stop button does. A user who realises the plan is wrong has to stop each
+worker by hand, and may not know which ones were started.
+
+**To close:** record which agents a coordinating turn started, and have Stop on
+the coordinator stop them too. The record has a natural home beside `turnTargets`
+in `BsAgentManager`, which already tracks per-turn state and clears it in the
+same `finally`.
+
+## 12. A coordinator can spend every worker's quota
+
+**Found:** 2026-08-26, in the same spec.
+
+A plan that fans out to five agents runs five turns against five quota pools.
+Nothing limits how many an agent may assign, or how often.
+
+**Why it matters.** Less than it sounds, which is why it is Low: the quota cards
+make the spend visible, and A2's fallback means an exhausted pool is routed
+around rather than hit repeatedly. But an agent deciding how much of the user's
+quota to spend is a new thing in this product.
+
+**Deliberately not capped.** An arbitrary limit would be a number nobody chose,
+which is the mistake debt item 1 recorded when three disagreeing thresholds were
+removed. **To close:** decide what the limit is *for* — a per-turn budget, a
+count, a confirmation above some size — before picking a number.

@@ -40,7 +40,7 @@ target agent's own session and returns its final message.
 - Produces: `AgentMode = 'build' | 'plan' | 'coordinate'` and
   `COORDINATE_RULES`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```ts
   it('hides every working tool from a coordinator', () => {
@@ -71,11 +71,11 @@ target agent's own session and returns its final message.
 Read `tests/unit/agent-permission.test.ts` first for its existing helpers; if the
 file does not exist, create it following the closest neighbour.
 
-- [ ] **Step 2: Run to confirm failure**
+- [x] **Step 2: Run to confirm failure**
 
 Expected: `'coordinate'` is not assignable to `AgentMode`.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `src/shared/types.ts`:
 
@@ -108,7 +108,7 @@ export function rulesForMode(mode: AgentMode): Record<string, PermissionRule> {
 }
 ```
 
-- [ ] **Step 4: Verify and commit**
+- [x] **Step 4: Verify and commit**
 
 ```bash
 npm test && npm run typecheck
@@ -140,7 +140,7 @@ export function createDelegateTool(opts: {
 
 The manager supplies both. The tool itself knows nothing about sessions.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```ts
 import { describe, expect, it, vi } from 'vitest'
@@ -186,11 +186,11 @@ describe('delegate', () => {
 })
 ```
 
-- [ ] **Step 2: Run to confirm failure**
+- [x] **Step 2: Run to confirm failure**
 
 Expected: the module does not resolve.
 
-- [ ] **Step 3: Implement the tool**
+- [x] **Step 3: Implement the tool**
 
 Follow `src/main/agent/tools/task.ts` for the `ToolDefinition` shape and its zod
 schema. The description must say the task has to stand alone: the worker sees
@@ -199,7 +199,7 @@ the string and its own history, nothing the coordinator knows.
 Self-delegation is refused by the manager rather than the tool, because the tool
 does not know who is calling it — `listWorkers` simply excludes the caller.
 
-- [ ] **Step 4: Wire it in the manager**
+- [x] **Step 4: Wire it in the manager**
 
 In `runnerFor`, beside `taskTool`:
 
@@ -224,7 +224,7 @@ In `runnerFor`, beside `taskTool`:
 so two delegations to different agents run at once and two to the same one
 queue. No scheduler is added.
 
-- [ ] **Step 5: Add the manager tests**
+- [x] **Step 5: Add the manager tests**
 
 In `tests/unit/bs-agent-manager.test.ts`, using the `secondAgent` option added
 for A2:
@@ -243,7 +243,7 @@ reached from outside, assert instead that `listMessages('a3')` grows after a
 `send` and that `listMessages('a1')` does not. The claim being tested is that
 the conversations stay separate.
 
-- [ ] **Step 6: Verify and commit**
+- [x] **Step 6: Verify and commit**
 
 Expected: **1124**. Commit as `feat: let a coordinator delegate a task to another agent`.
 
@@ -257,7 +257,7 @@ Expected: **1124**. Commit as `feat: let a coordinator delegate a task to anothe
 - Test: `tests/unit/quota-snapshot.test.tsx` is the wrong home; add to whichever
   renderer test file covers ChatPanel's controls, or create one.
 
-- [ ] **Step 1: Add the control**
+- [x] **Step 1: Add the control**
 
 `ChatPanel.tsx:857` renders a plan toggle and a hint at line 862. Add a
 coordinate toggle beside it with its own hint — that the agent will assign work
@@ -267,7 +267,7 @@ The existing `switchMode(currentMode === 'build' ? 'plan' : 'build')` at line 60
 toggles between two modes and cannot express three. Replace it with an explicit
 `switchMode(mode)` per control rather than widening the toggle.
 
-- [ ] **Step 2: Verify and commit**
+- [x] **Step 2: Verify and commit**
 
 ```bash
 npm test && npm run typecheck && npm run build
@@ -279,26 +279,26 @@ Expected: **1124**. Commit as `feat: offer coordinate mode in the chat controls`
 
 ### Task 4: Documentation, verify, report
 
-- [ ] **Step 1: Record what A3a covers and what it does not**
+- [x] **Step 1: Record what A3a covers and what it does not**
 
 In `docs/design/00-goals.md`, mark A3a landed and state that A3b — the separate
 surface goal 4 asks for — remains. Describe the exchange in
 `docs/design/02-agent-runtime.md` beside the subagent section, since the two are
 now neighbours with different purposes.
 
-- [ ] **Step 2: Record the risks that were not solved**
+- [x] **Step 2: Record the risks that were not solved**
 
 Add debt entries for the two named in the spec and left open: a fan-out cannot
 be cancelled, and a coordinator can spend every worker's quota without a limit.
 State the unblocking condition for each rather than a vague intention.
 
-- [ ] **Step 3: Regenerate the tables of contents**
+- [x] **Step 3: Regenerate the tables of contents**
 
 ```bash
 npm run docs:toc
 ```
 
-- [ ] **Step 4: Full verification**
+- [x] **Step 4: Full verification**
 
 ```bash
 npm test && npm run typecheck
@@ -306,14 +306,14 @@ npm test && npm run typecheck
 
 Check the exit status of each, chained with `&&`.
 
-- [ ] **Step 5: Run the app**
+- [x] **Step 5: Run the app**
 
 Put one agent in coordinate mode and ask it to have another agent make a small
 change. Confirm three things by eye: the coordinator has no write tools, the
 work appears in the **worker's** session, and the coordinator reads the result
 back.
 
-- [ ] **Step 6: Report and stop**
+- [x] **Step 6: Report and stop**
 
 Do not merge, tag, or push. Report all four tasks, and say plainly that A3b is
 not done — goal 4 asks for a separate surface and this is not it.
