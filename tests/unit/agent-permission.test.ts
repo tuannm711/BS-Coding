@@ -117,3 +117,30 @@ describe('plan mode bash write guard', () => {
     expect(decidePermission('build', {}, noSaved, 'bash', { command: "echo 'x' > f.txt" })).toBe('ask')
   })
 })
+
+describe('decidePermission (coordinate mode)', () => {
+  it('hides every working tool from a coordinator', () => {
+    // Enforced, not requested: visibleToolDefs drops a denied tool, so the
+    // model is never shown an option it may not take.
+    for (const tool of ['write', 'edit', 'apply-patch', 'revert', 'bash', 'git', 'task']) {
+      expect(decidePermission('coordinate', {}, noSaved, tool)).toBe('deny')
+    }
+  })
+
+  it('leaves a coordinator able to look, plan and assign', () => {
+    for (const tool of ['read', 'glob', 'grep', 'todowrite', 'delegate']) {
+      expect(decidePermission('coordinate', {}, noSaved, tool)).toBe('allow')
+    }
+  })
+
+  it('offers delegate in no other mode', () => {
+    expect(decidePermission('build', {}, noSaved, 'delegate')).toBe('deny')
+    expect(decidePermission('plan', {}, noSaved, 'delegate')).toBe('deny')
+  })
+
+  it('does not let a saved allow reopen a denied tool', () => {
+    // The guard plan mode already has: an always-allow saved in build mode
+    // must not bypass this one either.
+    expect(decidePermission('coordinate', {}, () => true, 'bash')).toBe('deny')
+  })
+})

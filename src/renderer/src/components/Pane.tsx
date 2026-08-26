@@ -5,7 +5,7 @@ import XtermHost from './XtermHost'
 import PaneHeader from './PaneHeader'
 import ChatPanel from './chat/ChatPanel'
 import TracePanel from './trace/TracePanel'
-import type { AgentConfig } from '@shared/types'
+import type { AgentMode, AgentConfig } from '@shared/types'
 
 interface Props {
   pane: PaneModel
@@ -51,7 +51,7 @@ export default function Pane({
   }, [id, native])
   const handleInject = useCallback((text: string) => void window.api.injectPrompt(id, text), [id])
   const handleOpenLog = useCallback(() => void window.api.openLog(id), [id])
-  const handleModeChange = useCallback((m: 'build' | 'plan') => void window.api.setAgentMode(id, m), [id])
+  const handleModeChange = useCallback((m: AgentMode) => void window.api.setAgentMode(id, m), [id])
   const handleVariantChange = useCallback((v: string | undefined) => void window.api.setAgentVariant(id, v ?? null), [id])
   const handleToggleBackground = useCallback(() => {
     void window.api.setAgentBackground(id, !background)

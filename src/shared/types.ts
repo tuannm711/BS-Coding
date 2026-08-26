@@ -3,7 +3,7 @@ import type { ProviderModel, ProviderModelCapabilities } from './providers'
 export type AgentStatus = 'spawning' | 'running' | 'idle' | 'exited' | 'stopped' | 'error'
 export type AlertLevel = 'normal' | 'attention' | 'error'
 export type AgentKind = 'pty' | 'native'
-export type AgentMode = 'build' | 'plan'
+export type AgentMode = 'build' | 'plan' | 'coordinate'
 export type ModelVariant = string
 export type AgentSpeed = 'standard' | 'fast'
 export type ChatRole = 'user' | 'assistant'
