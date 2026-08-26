@@ -93,6 +93,62 @@ it. **What should be done** is the coordinator's. A worker that hits a wall
 stops and reports; it does not redesign its way around it, because the
 coordinator holds the context that would make that judgement sound.
 
+## 4. What a coordinator may reach, and why
+
+Three choices were made when coordinate mode shipped and never put to the
+owner. Reviewed here; one of them was wrong.
+
+### git: denied outright was too blunt
+
+`git` was denied because committing is doing the work. That is true, and it
+threw away `git diff` with it — while reviewing results is the coordinator's
+stated job.
+
+The mechanism to separate them already exists. `decidePermission` receives the
+tool's **input**, not just its name, and plan mode already uses that to deny a
+writing bash command while allowing a reading one:
+
+```ts
+if (mode === 'plan' && toolName === 'bash') {
+  const command = typeof input?.command === 'string' ? input.command : ''
+  if (command && isWriteBashCommand(command)) return 'deny'
+}
+```
+
+The `git` tool takes an `args` string and runs the argv directly. So a
+coordinator gets git through an allowlist of read-only subcommands — `diff`,
+`status`, `log`, `show`, `blame`, `ls-files`, `rev-parse`, `describe`,
+`shortlog` — and nothing else. `commit`, `push`, `stash`, `checkout` and
+`reset` stay impossible.
+
+**One trap must be closed with it.** `git diff --output=<file>` writes a file.
+Argv runs without a shell so `>` redirection is unavailable, but that flag is
+real, so any argument containing `--output` is refused regardless of
+subcommand.
+
+### read, glob and grep: kept, and the reason is on the record
+
+A coordinator could be denied these and told to have a worker investigate and
+report. That works mechanically and is rejected.
+
+`docs/technical-debt.md` item 6 records what happens when design is written
+from a summary instead of from the code: two statements reached
+`docs/design/` that were false, both wrong in the same direction. Its closing
+line is *"Re-measure before planning from any summary, including this one."*
+
+A worker's report **is** a summary. Requiring a coordinator to write a spec and
+a plan from summaries rebuilds the exact trap this project already recorded.
+
+The cost is real and is accepted: reading fills the coordinator's own context.
+The alternative is that every spec it writes is a guess.
+
+### task: stays denied, confirmed
+
+An anonymous subagent is work done outside the exchange — invisible to the
+coordination view, unrecorded as an assignment, and running under a fixed
+prompt rather than one of the user's agents. A coordinator assigns through
+`delegate` or not at all.
+
 ## Verification
 
 1. A quota refusal on a build agent never selects a plan-mode or coordinate-mode
@@ -106,9 +162,18 @@ coordinator holds the context that would make that judgement sound.
    the case `modeNote` would get wrong.
 6. A non-coordinator's system text gains none of this.
 7. A delegated task reaches the worker with the framing attached.
-8. `npm test` and `npm run typecheck` pass.
+8. A coordinator may run `git diff`, `git status` and `git log`, and may not
+   run `git commit`, `git push`, `git stash` or `git checkout`.
+9. `git diff --output=x` is refused, because argv runs without a shell but
+   that flag writes a file anyway.
+10. `npm test` and `npm run typecheck` pass.
 
 ## Risks
+
+**The git allowlist is a list, and lists go stale.** A read-only subcommand
+nobody thought of is refused, which is the safe direction, and a writing one
+that slips in is not — so the list only grows with evidence that a specific
+subcommand is needed and safe.
 
 **The roster grows with the project.** Seven agents is a few lines; fifty would
 be a wall of text in every request. Not solved here, and not capped either: a
