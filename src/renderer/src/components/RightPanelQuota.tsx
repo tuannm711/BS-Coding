@@ -62,6 +62,7 @@ export function quotaSelectedAgentLabel(rows: QuotaRow[]): string {
 export default function RightPanelQuota({ agents }: { agents: QuotaAgent[] }) {
   const [snapshot, setSnapshot] = useState<ProviderSnapshot | null>(null)
   const [telemetry, setTelemetry] = useState<Record<string, SessionTelemetry>>({})
+  const [refreshingId, setRefreshingId] = useState<string | null>(null)
   const snapshotRevision = useRef(0)
   const agentKey = agents.map(agent => agent.id).join('|')
 
@@ -108,6 +109,13 @@ export default function RightPanelQuota({ agents }: { agents: QuotaAgent[] }) {
           return <QuotaAccountCard key={row.key} account={account} groups={row.groups} agents={row.agents} session={session} tracked={account.usage?.tracked} variant="chat" providerLabel={providerLabel} providerState={row.state} onSpeedChange={(agentId, speed) => {
             setSnapshot(previous => previous ? { ...previous, assignments: previous.assignments.map(assignment => assignment.agentId === agentId ? { ...assignment, speed } : assignment) } : previous)
             void window.api.setAgentSpeed(agentId, speed)
+          }} refreshing={refreshingId === account.id} onRefresh={() => {
+            setRefreshingId(account.id)
+            // finally, not then: a failed refresh must not leave the button
+            // disabled until the app is restarted.
+            void window.api.refreshProviderAccount(account.providerId, account.id)
+              .then(next => setSnapshot(next))
+              .finally(() => setRefreshingId(null))
           }} />
         })}
       </div>

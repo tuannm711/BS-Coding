@@ -201,3 +201,27 @@ describe('snapshot-driven quota cards', () => {
     expect(quotaAccountState(account({ error }), 10)).toBe('quota-exhausted')
   })
 })
+
+describe('quota card actions', () => {
+  const card = (variant: 'chat' | 'provider') => renderToStaticMarkup(React.createElement(QuotaAccountCard, {
+    account: account(), groups: [], variant, onRefresh: () => {}
+  }))
+
+  it('offers a refresh control on the chat card', () => {
+    expect(card('chat')).toContain('Refresh')
+  })
+
+  it('keeps account management off the chat card', () => {
+    // The chat frame is not where accounts are managed, and a destructive
+    // control does not belong beside a running conversation.
+    const markup = card('chat')
+    expect(markup).not.toContain('Reconnect')
+    expect(markup).not.toContain('Remove')
+    expect(markup).not.toContain('Deactivate')
+  })
+
+  it('still offers every provider control on the provider card', () => {
+    const markup = card('provider')
+    for (const label of ['Refresh', 'Reconnect', 'Remove']) expect(markup).toContain(label)
+  })
+})

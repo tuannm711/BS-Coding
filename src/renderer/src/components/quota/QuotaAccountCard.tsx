@@ -109,6 +109,12 @@ export default function QuotaAccountCard({
         <button className={`btn small ${active ? 'danger' : ''}`} type="button" disabled={refreshing} onClick={onAccountToggle}><Power size={13} aria-hidden="true" />{active ? 'Deactivate' : 'Activate'}</button>
         <button className="btn small danger" type="button" disabled={refreshing} onClick={onRemove}><Trash2 size={13} aria-hidden="true" />Remove</button>
       </footer> : null}
+
+      {variant === 'chat' && onRefresh ? <footer className="quota-card-actions">
+        <button className="btn small" type="button" disabled={refreshing} onClick={onRefresh}>
+          <RefreshCw size={13} aria-hidden="true" />{refreshing ? 'Refreshing…' : 'Refresh'}
+        </button>
+      </footer> : null}
     </section>
   )
 }
