@@ -202,14 +202,46 @@ wants exactly what it does now. A sibling — `sendAwaited(agentId, text)` —
 resolves when the message's own turn has run, whether it ran inline or came off
 the queue. `runAssignment` is its only caller.
 
-**Every exit must resolve the hook**, or a coordinator waits forever:
+**Every exit must resolve the hook**, or a coordinator waits forever. There are
+five, not the two the happy path suggests:
 
-- the queue is full and the message is refused
-- the agent is removed while its message is queued
-- `stop` clears the queue
+| Exit | Outcome |
+|---|---|
+| `drainQueue` runs the message's turn | resolved after that turn |
+| `send` runs it inline (agent was idle) | resolved after that turn |
+| queue full — the message is refused | resolved, no turn ran |
+| `removeQueued` — the user deleted it | resolved, no turn ran |
+| the agent is removed (`queues.delete`) | resolved, no turn ran |
 
 A hook that is never called is indistinguishable, from the coordinator's side,
 from a worker that is thinking.
+
+### A delegated task must not be absorbed as steering
+
+There is a sixth path, and it is not a leak — it is a design fault found while
+writing this:
+
+```ts
+takeSteers: () => {
+  const q = this.queues.get(agent.id)
+  if (!q || q.length === 0) return []
+  this.queues.delete(agent.id)
+  ...
+```
+
+A running turn **drains the queue into itself** as steering. So a task
+delegated to a busy worker is not run as its own turn at all — it is injected
+mid-turn into whatever unrelated work that worker was already doing.
+
+The assignment then has no turn of its own to await and no output of its own to
+report. Its result would be whatever the other work produced.
+
+**A delegated message is not steerable.** `QueuedMessage` gains a flag, and
+`takeSteers` leaves flagged messages in the queue to run as their own turn.
+
+Steering an agent mid-thought is a thing a *person* does, watching it work. A
+coordinator is not watching; it is waiting for a result it will act on. The two
+are different acts and the queue should stop treating them as one.
 
 ### The result is read from the session, not from the turn
 
@@ -251,9 +283,10 @@ Correctness:
    finishes.
 9. An assignment whose turn errors is `failed`, even when the worker's
    transcript already holds an assistant message from an earlier turn.
-10. `stop` on a coordinator resolves the hooks of queued worker messages rather
-    than leaving assignments running forever.
-11. A refused message (queue full) resolves its hook.
+10. A refused message (queue full) resolves its hook, and so does one deleted
+    with `removeQueued`, and so does one whose agent is removed.
+11. A delegated message left in the queue is **not** returned by `takeSteers`,
+    and runs as its own turn afterwards; an ordinary queued message still is.
 12. `npm test` and `npm run typecheck` pass.
 
 ## Risks
