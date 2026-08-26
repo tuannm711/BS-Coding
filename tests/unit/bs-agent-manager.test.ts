@@ -1182,6 +1182,54 @@ describe('coordination assignments', () => {
     expect(events.some(event => event.type === 'assignment-started')).toBe(true)
     expect(events.some(event => event.type === 'assignment-finished')).toBe(true)
   })
+
+  it('does not report an earlier answer when its own turn produced nothing', async () => {
+    // The worker already answered once. Reading the last assistant message in
+    // the session returns that answer and calls the assignment completed.
+    const { manager } = await makeManager({
+      secondAgent: true,
+      partsQueue: [
+        [{ kind: 'text', text: 'an earlier answer' }, { kind: 'finish' }],
+        [{ kind: 'error', error: 'boom' }]
+      ]
+    })
+    await manager.send('a3', 'unrelated earlier work')
+    manager.setMode('a1', 'coordinate')
+    await delegate(manager, 'a1', 'helper', 'the real task')
+    const assignment = manager.listAssignments('a1')[0]
+    expect(assignment.state).toBe('failed')
+    expect(assignment.result ?? '').not.toContain('an earlier answer')
+  })
+
+  it('reports only what its own turn produced', async () => {
+    const { manager } = await makeManager({
+      secondAgent: true,
+      partsQueue: [
+        [{ kind: 'text', text: 'an earlier answer' }, { kind: 'finish' }],
+        [{ kind: 'text', text: 'the assigned result' }, { kind: 'finish' }]
+      ]
+    })
+    await manager.send('a3', 'unrelated earlier work')
+    manager.setMode('a1', 'coordinate')
+    await delegate(manager, 'a1', 'helper', 'the real task')
+    const assignment = manager.listAssignments('a1')[0]
+    expect(assignment.state).toBe('completed')
+    expect(assignment.result).toContain('the assigned result')
+    expect(assignment.result).not.toContain('an earlier answer')
+  })
+
+  it('keeps an assignment running until a busy worker reaches its turn', async () => {
+    // The case the owner saw as silence: the worker was busy, so send resolved
+    // on acceptance and the assignment closed before any work began.
+    const { manager } = await makeManager({ secondAgent: true, hangUntilAbort: true })
+    manager.setMode('a1', 'coordinate')
+    void manager.send('a3', 'worker is already busy')
+    await new Promise(resolve => setTimeout(resolve, 15))
+    void delegate(manager, 'a1', 'helper', 'queued behind it')
+    await new Promise(resolve => setTimeout(resolve, 15))
+    expect(manager.listAssignments('a1')[0].state).toBe('running')
+    manager.stop('a3')
+  })
 })
 
 describe('stopping a fan-out', () => {

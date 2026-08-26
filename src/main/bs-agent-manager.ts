@@ -1765,19 +1765,27 @@ export class BsAgentManager {
     list.push(assignment)
     this.assignmentsByCoordinator.set(coordinatorId, list)
     this.emit({ type: 'assignment-started', agentId: coordinatorId, assignment })
-    // send awaits the whole turn, and running already serialises per agent: two
-    // assignments to different agents run at once, two to the same one queue.
     // One sentence, because this lands in the worker's own transcript where the
     // user will read it. It asks for a report on failure rather than a redesign:
     // the coordinator holds the context that judgement would need.
     const framed = `${task}\n\n[Assigned by ${coordinator?.name ?? 'the coordinator'}. Carry this out as specified; if you cannot, stop and report back rather than changing the approach.]`
-    await this.send(target.id, framed)
-    const last = [...this.listMessages(target.id)].reverse().find(message => message.role === 'assistant')
+    // A boundary rather than ChatMessage.turnId: that field comes from
+    // executionForAgent(...)?.execution.turnId and is absent unless the agent
+    // is in a shared execution, so keying on it would work under test and fail
+    // in ordinary use. sendAwaited, not send, because send resolves the moment
+    // a busy worker accepts the message into its queue.
+    const before = this.listMessages(target.id).length
+    await this.sendAwaited(target.id, framed)
+    const produced = this.listMessages(target.id).slice(before)
+      .filter(message => message.role === 'assistant')
+      .map(message => message.text)
+      .filter(text => text.trim().length > 0)
+      .join('\n')
     assignment.finishedAt = Date.now()
-    assignment.state = last?.text ? 'completed' : 'failed'
-    assignment.result = last?.text
+    assignment.state = produced ? 'completed' : 'failed'
+    assignment.result = produced || undefined
     this.emit({ type: 'assignment-finished', agentId: coordinatorId, assignment })
-    return last?.text ? { output: last.text } : { error: `[bs] ${name} produced no result` }
+    return produced ? { output: produced } : { error: `[bs] ${name} produced no result` }
   }
 
   // Computed per call, not baked into the runner: runners are cached per agent,
