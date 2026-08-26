@@ -40,6 +40,7 @@ export interface ProviderAccountSnapshot {
   models: ProviderModelRef[]
   usage?: ProviderUsage
   error?: ProviderErrorState
+  poolErrors?: Record<string, ProviderErrorState>
   refreshStages?: ProviderRefreshStages
   updatedAt: number
 }

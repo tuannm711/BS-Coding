@@ -1,6 +1,7 @@
-import type { AgentModelAssignment, AgentSpeed, ProviderQuotaGroup, ProviderTrackedUsage } from '@shared/types'
+import type { AgentModelAssignment, AgentSpeed, ProviderErrorState, ProviderQuotaGroup, ProviderTrackedUsage } from '@shared/types'
 import type { ProviderAccountSnapshot } from '@shared/provider-state'
 import { resetCreditGate } from '@shared/reset-credit'
+import { poolState } from '@shared/quota-pool'
 import { ChevronDown, Gauge, Link2, Power, RefreshCw, Trash2, Zap } from 'lucide-react'
 import { accountWarning, formatAge, formatCountdown, formatCount, formatExpiry, formatInstant, formatMoney, formatPercent, formatProviderAccountType, quotaWindowState } from './quota-view'
 
@@ -114,7 +115,7 @@ export default function QuotaAccountCard({
 
       {groups.length > 0 ? <div className="quota-groups">
         {groups.map(group => <section className="quota-group" key={group.id} aria-label={group.label}>
-          <h6>{group.label}</h6>
+          <h6>{group.label}<PoolBadge group={group} poolErrors={account.poolErrors} /></h6>
           {group.windows.map(window => <QuotaWindow key={window.id} window={window} />)}
         </section>)}
       </div> : <div className="quota-empty">Quota not reported by provider</div>}
@@ -135,6 +136,12 @@ export default function QuotaAccountCard({
       </footer> : null}
     </section>
   )
+}
+
+function PoolBadge({ group, poolErrors }: { group: ProviderQuotaGroup; poolErrors?: Record<string, ProviderErrorState> }) {
+  const state = poolState(group, poolErrors)
+  if (state === 'ok') return null
+  return <span className="quota-pool-error" role="status">{STATE_LABELS[state]}</span>
 }
 
 function QuotaWindow({ window }: { window: ProviderQuotaGroup['windows'][number] }) {

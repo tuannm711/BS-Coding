@@ -164,7 +164,7 @@ export class ProviderManager {
                   retry = 'runtime-context'
                   break
                 }
-                manager.recordRuntimeError(accountId, error)
+                manager.recordRuntimeError(accountId, error, providerId, modelId)
                 if (error.kind === 'runtime-entity-not-found') {
                   yield {
                     ...part,
@@ -185,12 +185,12 @@ export class ProviderManager {
               yield part
             }
           } catch (error) {
-            manager.recordRuntimeError(accountId, runtimeProviderError(String(error)))
+            manager.recordRuntimeError(accountId, runtimeProviderError(String(error)), providerId, modelId)
             throw error
           }
           if (!retry) {
             if (!hadError) {
-              manager.clearRuntimeError(accountId)
+              manager.clearRuntimeError(accountId, providerId, modelId)
               if (completed) manager.recordRuntimeUsage(providerId, accountId, modelId, completedTokens)
             }
             return
@@ -212,7 +212,7 @@ export class ProviderManager {
             manager.emitAccountsChanged()
           } catch (error) {
             const message = `[bs] [runtime-entity-not-found] Unable to recover provider=${providerId}; account=${currentAccount.label}; model=${modelId}. Refresh or reconnect this account, then retry. ${String(error)}`
-            manager.recordRuntimeError(accountId, runtimeProviderError(message))
+            manager.recordRuntimeError(accountId, runtimeProviderError(message), providerId, modelId)
             yield { kind: 'error', error: message }
             return
           }
@@ -221,14 +221,25 @@ export class ProviderManager {
     }
   }
 
+  // The provider knows this; quotaGroups[].modelIds does not — Antigravity
+  // leaves it empty, which is why every Antigravity ledger row written before
+  // this carries no pool at all. The old lookup stays as the fallback so a
+  // provider that does not answer behaves as it did.
+  private poolFor(providerId: string, modelId: string, account: ProviderAccount): string | undefined {
+    const declared = this.registry.get(providerId)?.quotaGroupForModel?.(modelId)
+    if (declared) return declared
+    const groups = account.usage?.quotaGroups
+    return groups?.find(group => group.modelIds.includes(modelId))?.id
+      ?? (groups?.length === 1 ? groups[0].id : undefined)
+  }
+
   private recordRuntimeUsage(providerId: string, accountId: string, modelId: string, tokens: { input: number; output: number; cacheRead: number; cacheWrite: number }): void {
     const ledger = this.deps.usageLedger
     const account = this.store.get(accountId)
     if (!ledger || !account) return
     const now = Date.now()
     const period = selectTrackedPeriod(account.usage, account.createdAt || now)
-    const groupId = account.usage?.quotaGroups?.find(group => group.modelIds.includes(modelId))?.id
-      ?? (account.usage?.quotaGroups?.length === 1 ? account.usage.quotaGroups[0].id : undefined)
+    const groupId = this.poolFor(providerId, modelId, account)
     const tracked = ledger.record({
       providerId,
       accountId,
@@ -245,17 +256,34 @@ export class ProviderManager {
     this.emitUsage(usage)
   }
 
-  private recordRuntimeError(accountId: string, error: ReturnType<typeof classifyProviderError>): void {
+  private recordRuntimeError(accountId: string, error: ReturnType<typeof classifyProviderError>, providerId?: string, modelId?: string): void {
     const current = this.store.get(accountId)
     if (!current) return
-    this.store.upsert({ ...current, lastError: error.message, providerError: error })
+    const pool = providerId && modelId ? this.poolFor(providerId, modelId, current) : undefined
+    // Only quota and capacity are facts about one pool. Everything else —
+    // auth, unavailable — is still a statement about the whole account.
+    const scoped = pool && (error.kind === 'quota-exhausted' || error.kind === 'capacity-exhausted')
+    this.store.upsert(scoped && pool
+      ? { ...current, poolErrors: { ...current.poolErrors, [pool]: error } }
+      : { ...current, lastError: error.message, providerError: error })
     this.emitAccountsChanged()
   }
 
-  private clearRuntimeError(accountId: string): void {
+  private clearRuntimeError(accountId: string, providerId?: string, modelId?: string): void {
     const current = this.store.get(accountId)
-    if (!current?.providerError && !current?.lastError) return
+    if (!current) return
+    // Success on one pool says nothing about another. Clearing them all
+    // would make the next turn retry a pool that is still exhausted.
+    const pool = providerId && modelId ? this.poolFor(providerId, modelId, current) : undefined
+    const hadPool = Boolean(pool && current.poolErrors?.[pool])
+    if (!current.providerError && !current.lastError && !hadPool) return
     const { providerError: _providerError, lastError: _lastError, ...cleared } = current
+    if (hadPool && pool) {
+      const remaining = { ...current.poolErrors }
+      delete remaining[pool]
+      if (Object.keys(remaining).length > 0) cleared.poolErrors = remaining
+      else delete cleared.poolErrors
+    }
     this.store.upsert(cleared)
     this.emitAccountsChanged()
   }

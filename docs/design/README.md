@@ -15,11 +15,11 @@ should be checked against.
 | --- | --- | --- |
 | [How the domains relate](#how-the-domains-relate) | 25-41 | `LlmClient` |
 | [The documents](#the-documents) | 42-59 |  |
-| [Finding a name](#finding-a-name) | 60-235 | `.cmd`, `.exe`, `.github/workflows/build.yml`, `.ico`, `'near-limit'`, `/bin/bash` |
-| [What is here and what is history](#what-is-here-and-what-is-history) | 236-245 | `docs/design/`, `docs/superpowers/`, `docs/evidence/` |
-| [Current work](#current-work) | 246-257 | `tests/`, `statusReason`, `docs/superpowers/specs/2026-08-25-narrated-tool-calls-design.md` |
-| [Next work](#next-work) | 258-271 |  |
-| [Debt](#debt) | 272-278 | `docs/technical-debt.md` |
+| [Finding a name](#finding-a-name) | 60-236 | `.cmd`, `.exe`, `.github/workflows/build.yml`, `.ico`, `'near-limit'`, `/bin/bash` |
+| [What is here and what is history](#what-is-here-and-what-is-history) | 237-246 | `docs/design/`, `docs/superpowers/`, `docs/evidence/` |
+| [Current work](#current-work) | 247-258 | `tests/`, `statusReason`, `docs/superpowers/specs/2026-08-25-narrated-tool-calls-design.md` |
+| [Next work](#next-work) | 259-272 |  |
+| [Debt](#debt) | 273-279 | `docs/technical-debt.md` |
 <!-- /toc -->
 
 ## How the domains relate
@@ -76,7 +76,7 @@ Generated from every domain document: which one introduces a name, and where.
 | `adapter.refreshCredentials` | [03-providers.md#data-flow](03-providers.md#data-flow) | 37 |
 | `AgentApi` | [01-process-model.md#pieces](01-process-model.md#pieces) | 18 |
 | `AgentStateEvent` | [01-process-model.md#types-that-carry-it](01-process-model.md#types-that-carry-it) | 54 |
-| `antigravity.ts` | [03-providers.md#known-limits](03-providers.md#known-limits) | 124 |
+| `antigravity.ts` | [03-providers.md#known-limits](03-providers.md#known-limits) | 126 |
 | `app.setAppUserModelId` | [06-ui-shell.md#design-decisions](06-ui-shell.md#design-decisions) | 61 |
 | `App.tsx` | [06-ui-shell.md#data-flow](06-ui-shell.md#data-flow) | 32 |
 | `appendMessage` | [02-agent-runtime.md#types-that-carry-it](02-agent-runtime.md#types-that-carry-it) | 67 |
@@ -113,7 +113,7 @@ Generated from every domain document: which one introduces a name, and where.
 | `electron.vite.config.ts` | [07-build-release.md#pieces](07-build-release.md#pieces) | 17 |
 | `Event*` | [01-process-model.md#data-flow](01-process-model.md#data-flow) | 33 |
 | `extraResources` | [07-build-release.md#design-decisions](07-build-release.md#design-decisions) | 58 |
-| `fetchUsage` | [03-providers.md#known-limits](03-providers.md#known-limits) | 124 |
+| `fetchUsage` | [03-providers.md#known-limits](03-providers.md#known-limits) | 126 |
 | `getItems` | [02-agent-runtime.md#types-that-carry-it](02-agent-runtime.md#types-that-carry-it) | 67 |
 | `getWindowChromeOptions` | [06-ui-shell.md#design-decisions](06-ui-shell.md#design-decisions) | 61 |
 | `GITHUB_ACTIONS` | [07-build-release.md#design-decisions](07-build-release.md#design-decisions) | 58 |
@@ -129,9 +129,10 @@ Generated from every domain document: which one introduces a name, and where.
 | `MAX_COMPACT_PER_RUN` | [02-agent-runtime.md#known-limits](02-agent-runtime.md#known-limits) | 116 |
 | `onExit` | [04-terminal-panes.md#design-decisions](04-terminal-panes.md#design-decisions) | 59 |
 | `onX` | [01-process-model.md#data-flow](01-process-model.md#data-flow) | 33 |
-| `openai.ts` | [03-providers.md#known-limits](03-providers.md#known-limits) | 124 |
+| `openai.ts` | [03-providers.md#known-limits](03-providers.md#known-limits) | 126 |
 | `out/` | [07-build-release.md#pieces](07-build-release.md#pieces) | 17 |
 | `PaneModel` | [06-ui-shell.md#pieces](06-ui-shell.md#pieces) | 18 |
+| `poolErrors` | [03-providers.md#known-limits](03-providers.md#known-limits) | 126 |
 | `primaryUsedPercent` | [03-providers.md#design-decisions](03-providers.md#design-decisions) | 81 |
 | `proc.onData` | [04-terminal-panes.md#data-flow](04-terminal-panes.md#data-flow) | 29 |
 | `productName` | [07-build-release.md#types-that-carry-it](07-build-release.md#types-that-carry-it) | 46 |

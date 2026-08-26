@@ -301,3 +301,43 @@ describe('reset credit button', () => {
     expect(markup).not.toContain('<button class="quota-reset-badge')
   })
 })
+
+describe('pool errors on the card', () => {
+  it('marks the exhausted pool while the healthy one stays quiet', () => {
+    const markup = renderToStaticMarkup(React.createElement(QuotaAccountCard, {
+      account: account({
+        poolErrors: { 'claude-gpt': { kind: 'quota-exhausted' as const, message: 'spent', updatedAt: 1 } }
+      }),
+      groups: [
+        { id: 'gemini', label: 'Gemini Models', modelIds: [], windows: [] },
+        { id: 'claude-gpt', label: 'Claude and GPT models', modelIds: [], windows: [] }
+      ],
+      variant: 'chat' as const
+    }))
+    // Before this the card could only say "some pool is fine". Now it can say
+    // which one is not.
+    expect(markup).toMatch(/Claude and GPT models[\s\S]*Quota exhausted/)
+    expect(markup).not.toMatch(/Gemini Models[\s\S]*Quota exhausted[\s\S]*Claude and GPT/)
+  })
+})
+
+describe('pool exhaustion from the numbers alone', () => {
+  const win = (id: string, remainingPercent: number) => ({
+    id, label: 'w', kind: 'weekly' as const, remainingPercent, usageKnown: true, source: 'provider' as const
+  })
+
+  it('marks a spent pool without waiting for a refusal', () => {
+    // The owner's real account: claude-gpt weekly at 0 while gemini sits at
+    // 93.74. Requiring a 429 first would mean spending a request to learn what
+    // the provider has already reported.
+    const markup = renderToStaticMarkup(React.createElement(QuotaAccountCard, {
+      account: account(), variant: 'chat' as const,
+      groups: [
+        { id: 'gemini', label: 'Gemini Models', modelIds: [], windows: [win('gemini-weekly', 93.74), win('gemini-5h', 100)] },
+        { id: 'claude-gpt', label: 'Claude and GPT models', modelIds: [], windows: [win('3p-weekly', 0), win('3p-5h', 100)] }
+      ]
+    }))
+    expect(markup).toMatch(/Claude and GPT models[\s\S]*Quota exhausted/)
+    expect(markup).not.toMatch(/Gemini Models[\s\S]*Quota exhausted[\s\S]*Claude and GPT/)
+  })
+})
