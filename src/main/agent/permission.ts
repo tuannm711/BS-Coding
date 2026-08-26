@@ -65,6 +65,23 @@ function anyRule(rules: Record<string, PermissionRule>, toolName: string, effect
   return Object.keys(rules).some(p => matchPattern(p, toolName) && rules[p] === effect)
 }
 
+// A coordinator reviews results, so it reads history; committing is doing the
+// work, so it cannot. Only subcommands known to read are allowed — an unknown
+// one is refused, which is the safe direction. The list grows only with
+// evidence that a specific subcommand is both needed and safe.
+const READ_ONLY_GIT = new Set([
+  'diff', 'status', 'log', 'show', 'blame', 'ls-files', 'rev-parse', 'describe', 'shortlog'
+])
+
+export function isReadOnlyGit(args: string | undefined): boolean {
+  if (!args) return false
+  // --output=<file> writes a file even from `diff`, and argv runs without a
+  // shell so this is the only redirection available to it.
+  if (args.includes('--output')) return false
+  const [subcommand] = args.trim().split(/\s+/)
+  return READ_ONLY_GIT.has(subcommand)
+}
+
 export function decidePermission(
   mode: AgentMode,
   configRules: Record<string, PermissionRule>,
@@ -72,6 +89,10 @@ export function decidePermission(
   toolName: string,
   input?: Record<string, unknown>
 ): PermissionDecision {
+  // A coordinator gets the reading half of git and nothing else.
+  if (mode === 'coordinate' && toolName === 'git') {
+    return isReadOnlyGit(typeof input?.args === 'string' ? input.args : undefined) ? 'allow' : 'deny'
+  }
   // Plan mode is read-only: a write-style bash command is denied, not asked.
   if (mode === 'plan' && toolName === 'bash') {
     const command = typeof input?.command === 'string' ? input.command : ''
