@@ -122,6 +122,9 @@ export class BsAgentManager {
   private redoStacks = new Map<string, Array<{ items: ChatTranscriptItem[]; turn?: SnapshotTurn; agentId: string; turnId: string }>>()
   private backgrounds = new Map<string, boolean>()
   private queues = new Map<string, QueuedMessage[]>()
+  // Kept beside the queue, never inside it: emitQueue sends the array itself
+  // over IPC, and a function field would fail structured clone.
+  private queueHooks = new Map<string, () => void>()
   private onEvent: (e: ChatEvent) => void = () => {}
   private turnCounters = new Map<string, number>()
   private toolStartTs = new Map<string, number>()
@@ -269,6 +272,7 @@ export class BsAgentManager {
     this.assignments.remove(agentId)
     this.activeSessions.delete(agentId)
     this.backgrounds.delete(agentId)
+    for (const queued of this.queues.get(agentId) ?? []) this.settleQueued(queued.id)
     this.queues.delete(agentId)
     this.coordinator.reconcileAgents([...this.agents.values()])
   }
@@ -344,6 +348,9 @@ export class BsAgentManager {
     if (next.length !== q.length) {
       if (next.length === 0) this.queues.delete(agentId)
       else this.queues.set(agentId, next)
+      // A caller awaiting this message will never get a turn now, so release
+      // it here rather than leaving it indistinguishable from a slow worker.
+      this.settleQueued(id)
       this.emitQueue(agentId)
     }
     // If the message was already injected into the running turn, drop it from
@@ -454,6 +461,38 @@ export class BsAgentManager {
     this.emit({ type: 'queue-updated', agentId: state.agentId, queue: state.queue })
   }
 
+  private settleQueued(id: string): void {
+    const hook = this.queueHooks.get(id)
+    if (!hook) return
+    this.queueHooks.delete(id)
+    hook()
+  }
+
+  // send() resolves when the message is accepted, which is what every other
+  // caller wants. A coordinator needs the opposite — resolution when the work
+  // is done — because it reports the result as an assignment. Same queue,
+  // different promise.
+  async sendAwaited(agentId: string, text: string, images?: ImageAttachment[], displayText?: string): Promise<void> {
+    const agent = this.agents.get(agentId)
+    if (!agent) return
+    if (!this.running.has(agentId)) {
+      await this.runTurn(agentId, text, images, displayText)
+      await this.drainQueue(agentId)
+      return
+    }
+    const q = this.queues.get(agentId) ?? []
+    if (q.length >= this.MAX_QUEUE) {
+      this.emit({ type: 'error', agentId, message: '[bs] Hàng đợi đã đầy (tối đa 5 tin). Hãy chờ turn hiện tại xong hoặc xóa tin đang chờ.' })
+      return
+    }
+    const id = randomUUID()
+    const settled = new Promise<void>(resolve => this.queueHooks.set(id, resolve))
+    q.push({ id, text, images, displayText, assigned: true })
+    this.queues.set(agentId, q)
+    this.emitQueue(agentId)
+    await settled
+  }
+
   async send(agentId: string, text: string, images?: ImageAttachment[], displayText?: string): Promise<void> {
     const agent = this.agents.get(agentId)
     if (!agent) return
@@ -481,6 +520,7 @@ export class BsAgentManager {
     else this.queues.set(agentId, q)
     this.emitQueue(agentId)
     await this.runTurn(agentId, next.text, next.images, next.displayText)
+    this.settleQueued(next.id)
     await this.drainQueue(agentId)
   }
 

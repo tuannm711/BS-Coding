@@ -438,6 +438,69 @@ describe('BsAgentManager', () => {
     await sendPromise
   })
 
+  it('does not resolve an awaited send while the message is still queued', async () => {
+    // The whole bug behind a silent worker: send resolves on acceptance, so a
+    // caller could not tell "queued" from "finished".
+    const { manager } = await makeManager({ hangUntilAbort: true })
+    const first = manager.send('a1', 'first')
+    await new Promise(r => setTimeout(r, 20))
+    let settled = false
+    const second = manager.sendAwaited('a1', 'second').then(() => { settled = true })
+    await new Promise(r => setTimeout(r, 20))
+    expect(manager.listQueued('a1')).toHaveLength(1)
+    expect(settled).toBe(false)
+    for (const m of manager.listQueued('a1')) manager.removeQueued('a1', m.id)
+    manager.stop('a1')
+    await Promise.all([first, second])
+  })
+
+  it('resolves an awaited send that runs inline', async () => {
+    const { manager } = await makeManager({
+      partsQueue: [[{ kind: 'text', text: 'done' }, { kind: 'finish' }]]
+    })
+    await manager.sendAwaited('a1', 'go')
+    expect(manager.listMessages('a1').some(m => m.role === 'assistant')).toBe(true)
+  })
+
+  it('resolves an awaited send that the queue refuses', async () => {
+    // A refusal that never resolved would hang the coordinator exactly as a
+    // silent worker does.
+    const { manager } = await makeManager({ hangUntilAbort: true })
+    const first = manager.send('a1', 'first')
+    await new Promise(r => setTimeout(r, 20))
+    for (let i = 0; i < 5; i++) await manager.send('a1', `msg ${i}`)
+    await manager.sendAwaited('a1', 'refused')
+    for (const m of manager.listQueued('a1')) manager.removeQueued('a1', m.id)
+    manager.stop('a1')
+    await first
+  })
+
+  it('resolves an awaited send whose queued message is deleted', async () => {
+    const { manager } = await makeManager({ hangUntilAbort: true })
+    const first = manager.send('a1', 'first')
+    await new Promise(r => setTimeout(r, 20))
+    let settled = false
+    const pending = manager.sendAwaited('a1', 'doomed').then(() => { settled = true })
+    await new Promise(r => setTimeout(r, 20))
+    for (const m of manager.listQueued('a1')) manager.removeQueued('a1', m.id)
+    await pending
+    expect(settled).toBe(true)
+    manager.stop('a1')
+    await first
+  })
+
+  it('resolves an awaited send whose agent is removed', async () => {
+    const { manager } = await makeManager({ hangUntilAbort: true })
+    const first = manager.send('a1', 'first')
+    await new Promise(r => setTimeout(r, 20))
+    const pending = manager.sendAwaited('a1', 'orphan')
+    await new Promise(r => setTimeout(r, 20))
+    manager.removeAgent('a1')
+    await pending
+    manager.stop('a1')
+    await first
+  })
+
   it('respondPrompt allow lets a permission-ask tool run', async () => {
     const { manager: m2, events: evts } = await makeManager({
       partsQueue: [

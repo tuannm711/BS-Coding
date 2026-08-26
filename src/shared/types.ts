@@ -225,6 +225,11 @@ export interface QueuedMessage {
   text: string
   displayText?: string
   images?: ImageAttachment[]
+  // Delegated by a coordinator. Steering is something a person does while
+  // watching an agent work; a coordinator is not watching, it is waiting for a
+  // result it will act on, so this runs as its own turn rather than being
+  // folded into whatever the worker is already doing.
+  assigned?: boolean
 }
 
 export type SessionQueuedMessage = QueuedMessage & { agentId: string }
