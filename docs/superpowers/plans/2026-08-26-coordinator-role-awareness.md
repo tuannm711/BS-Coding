@@ -31,7 +31,7 @@ each delegated task.
 - Modify: `src/main/bs-agent-manager.ts`
 - Test: `tests/unit/bs-agent-manager.test.ts`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```ts
   it('does not hand a build turn to an agent in another mode', async () => {
@@ -73,7 +73,7 @@ each delegated task.
   })
 ```
 
-- [ ] **Step 2: Run to confirm failure**
+- [x] **Step 2: Run to confirm failure**
 
 ```bash
 npx vitest run tests/unit/bs-agent-manager.test.ts
@@ -81,7 +81,7 @@ npx vitest run tests/unit/bs-agent-manager.test.ts
 
 Expected: the first and third fail — a candidate in another mode is chosen.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `handoff`, where candidates are gathered:
 
@@ -96,7 +96,7 @@ In `handoff`, where candidates are gathered:
       .flatMap(agent => { const c = this.candidateFor(agent.id); return c ? [c] : [] })
 ```
 
-- [ ] **Step 4: Verify and commit**
+- [x] **Step 4: Verify and commit**
 
 ```bash
 npm test && npm run typecheck
@@ -119,7 +119,7 @@ back to one in plan mode.
 - Produces: a private `coordinatorNote(agentId): string`, composed into the
   existing `systemSuffix`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 The harness records `llmSystems` per turn, so the note can be asserted through
 what the model was actually sent.
@@ -169,11 +169,11 @@ The last one is the reason this lives in `systemSuffix`. If it passes with the
 note in `modeNote`, the test is wrong, not the design — check that `setMode`
 does not rebuild the runner before believing it.
 
-- [ ] **Step 2: Run to confirm failure**
+- [x] **Step 2: Run to confirm failure**
 
 Expected: the first, third and fourth fail — no note is produced.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 ```ts
   // Computed per call, not baked into the runner: runners are cached per agent,
@@ -218,7 +218,7 @@ Compose it into the existing suffix rather than replacing it:
         this.coordinatorNote(agent.id),
 ```
 
-- [ ] **Step 4: Verify and commit**
+- [x] **Step 4: Verify and commit**
 
 Expected: **1142**. Commit as `feat: tell a coordinator its role and its roster`.
 
@@ -230,7 +230,7 @@ Expected: **1142**. Commit as `feat: tell a coordinator its role and its roster`
 - Modify: `src/main/bs-agent-manager.ts`
 - Test: `tests/unit/bs-agent-manager.test.ts`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
   it('frames a delegated task for the worker', async () => {
@@ -246,11 +246,11 @@ Expected: **1142**. Commit as `feat: tell a coordinator its role and its roster`
   })
 ```
 
-- [ ] **Step 2: Run to confirm failure**
+- [x] **Step 2: Run to confirm failure**
 
 Expected: the message is the bare task.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `runAssignment`, before `send`:
 
@@ -262,7 +262,7 @@ In `runAssignment`, before `send`:
     await this.send(target.id, framed)
 ```
 
-- [ ] **Step 4: Verify and commit**
+- [x] **Step 4: Verify and commit**
 
 Expected: **1143**. Commit as `feat: frame a delegated task as work to carry out`.
 
@@ -274,7 +274,7 @@ Expected: **1143**. Commit as `feat: frame a delegated task as work to carry out
 - Modify: `src/main/agent/permission.ts`
 - Test: `tests/unit/agent-permission.test.ts`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```ts
   it('lets a coordinator read history but not change it', () => {
@@ -307,12 +307,12 @@ Expected: **1143**. Commit as `feat: frame a delegated task as work to carry out
 The last case is deliberate: plan mode denies git entirely today and this work
 does not change that. Only the coordinator gets the reading half.
 
-- [ ] **Step 2: Run to confirm failure**
+- [x] **Step 2: Run to confirm failure**
 
 Expected: every coordinate case returns `deny` — the rule set denies `git`
 outright.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `permission.ts`, beside the plan-mode bash guard that already reads tool
 input:
@@ -347,7 +347,7 @@ Remove `git` from the deny list inherited into `COORDINATE_RULES` is **not**
 needed — the branch above runs first and settles it either way. Leave the
 inherited `git: 'deny'` as the fallback for a call with no readable args.
 
-- [ ] **Step 4: Verify and commit**
+- [x] **Step 4: Verify and commit**
 
 ```bash
 npm test && npm run typecheck
@@ -362,7 +362,7 @@ while reviewing results is the coordinator's stated job.
 
 ### Task 5: Documentation, verify, report
 
-- [ ] **Step 1: Record it**
+- [x] **Step 1: Record it**
 
 In `docs/design/02-agent-runtime.md`, beside the delegation section: the
 coordinator's note, why it is computed per call, and the division of labour —
@@ -375,18 +375,18 @@ In `docs/design/02-agent-runtime.md` also record the coordinator's tool reach:
 read-only git through the input-aware permission branch, why read/glob/grep are
 kept, and that `task` is denied so nothing is assigned outside the exchange.
 
-- [ ] **Step 2: Correct the stale Next work**
+- [x] **Step 2: Correct the stale Next work**
 
 `docs/design/README.md` still says "Group B is in progress" and lists group A as
 future. Both are done.
 
-- [ ] **Step 3: Regenerate the tables of contents**
+- [x] **Step 3: Regenerate the tables of contents**
 
 ```bash
 npm run docs:toc
 ```
 
-- [ ] **Step 4: Full verification**
+- [x] **Step 4: Full verification**
 
 ```bash
 npm test && npm run typecheck
@@ -394,12 +394,12 @@ npm test && npm run typecheck
 
 Check the exit status of each, chained with `&&`.
 
-- [ ] **Step 5: Run the app**
+- [x] **Step 5: Run the app**
 
 Open the coordination view and give the coordinator a task that needs a file
 changed. It should assign without being told to, and name a worker that exists.
 Check the worker's session for the framing.
 
-- [ ] **Step 6: Report and stop**
+- [x] **Step 6: Report and stop**
 
 Do not merge, tag, or push. Report all four tasks and wait.
