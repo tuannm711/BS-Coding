@@ -1,4 +1,4 @@
-import type {
+import type { CoordinationAssignment,
   AgentConfig, AgentMode, AgentModelAssignment, AgentState, ArtifactEntry, CatalogProviderSummary, ChatEvent, ChatMessage, ChatTranscriptItem, Command,
   ContextChangedEvent, ContextInfo, DirEntry, FileContentResult, FileSuggestion, FileViewerPayload,
   GitStatus, ImageAttachment, McpServerStatus, BsSettings, ModelRef, NewAgentInput, PromptResponse,
@@ -161,6 +161,7 @@ export const Channels = {
   ProviderSnapshotGet: 'provider:snapshot-get',
   ProviderAccountRefresh: 'provider:account-refresh',
   ProviderResetCreditConsume: 'provider:reset-credit-consume',
+  AgentListAssignments: 'agent:list-assignments',
   EventProviderSnapshotChanged: 'provider:snapshot-changed',
   AgentAssignmentGetSnapshot: 'agent:assignment-get-snapshot',
   AgentAssignmentSetSnapshot: 'agent:assignment-set-snapshot',
@@ -258,6 +259,7 @@ export interface AgentApi {
   checkForUpdates(): Promise<void>
   installUpdate(): Promise<void>
   sendChat(agentId: string, text: string, images?: ImageAttachment[]): Promise<void>
+  listAssignments(agentId: string): Promise<CoordinationAssignment[]>
   stopChat(agentId: string): Promise<void>
   listProjectSessions(projectPath: string): Promise<ProjectSessionSummary[]>
   createProjectSession(projectPath: string, agentId?: string): Promise<ProjectSessionSummary>

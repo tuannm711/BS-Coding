@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { writeFileSync } from 'node:fs'
-import type { ChatEvent, ChatMessage, ChatTranscriptItem, ContextInfo, FileSuggestion, ImageAttachment, McpServerStatus, BsSettings, MessageTokens, ModelUsage, NotificationsSettings, ProjectSessionSummary, PromptResponse, QueuedMessage, ResolvedTurnExecutionSnapshot, StatsSummary, TodoItem, TraceEvent, UsageSummary, ProviderConnection } from '../shared/types'
+import type { CoordinationAssignment, ChatEvent, ChatMessage, ChatTranscriptItem, ContextInfo, FileSuggestion, ImageAttachment, McpServerStatus, BsSettings, MessageTokens, ModelUsage, NotificationsSettings, ProjectSessionSummary, PromptResponse, QueuedMessage, ResolvedTurnExecutionSnapshot, StatsSummary, TodoItem, TraceEvent, UsageSummary, ProviderConnection } from '../shared/types'
 import type { AgentConfig, AgentMode, ArtifactEntry, CatalogProviderSummary, Command, ModelRef, SubagentType } from '../shared/types'
 import {
   configToSettings, loadBsConfig, resolveAgentConfig, settingsToConfig, writeBsConfig,
@@ -101,6 +101,10 @@ export class BsAgentManager {
   // Who is serving the running turn, and who has already been tried. Keyed by
   // lifecycle key so a turn stays one turn across a handover.
   private turnTargets = new Map<string, { agentId: string; tried: Set<string> }>()
+  // In memory on purpose. A finished assignment is reconstructible from the
+  // coordinator's transcript and the workers' sessions are already persisted;
+  // a second stored copy is how two copies come to disagree.
+  private assignmentsByCoordinator = new Map<string, CoordinationAssignment[]>()
   private resolved = new Map<string, ResolvedAgentConfig>()
   private controllers = new Map<string, AbortController>()
   private pendingPrompts = new Map<string, { agentId: string; tool?: string; resolve: (resp: PromptResponse | null) => void }>()
@@ -651,6 +655,13 @@ export class BsAgentManager {
     this.controllers.delete(key)
     this.running.delete(key)
     this.resolvePendingFor(agentId, null)
+    // Stop used to be per agent, so stopping a coordinator left every worker
+    // it started running with nothing to gather them. The cascade follows
+    // assignments, not agents: a worker busy with its own conversation is not
+    // part of this fan-out. One level deep, because delegation is.
+    for (const assignment of this.assignmentsByCoordinator.get(agentId) ?? []) {
+      if (assignment.state === 'running') this.stop(assignment.workerId)
+    }
   }
 
   // User-facing stop: aborts the active turn, keeps the queue, and immediately
@@ -1306,16 +1317,7 @@ export class BsAgentManager {
       listWorkers: () => [...this.agents.values()]
         .filter(other => other.kind !== 'pty' && other.cwd === agent.cwd && other.id !== agent.id)
         .map(other => ({ name: other.name, coordinating: (this.modes.get(other.id) ?? 'build') === 'coordinate' })),
-      run: async (name, task) => {
-        const target = [...this.agents.values()].find(other => other.name === name && other.cwd === agent.cwd)
-        if (!target) return { error: `[bs] No agent named ${name}` }
-        // send awaits the whole turn, and running already serialises per
-        // agent: two assignments to different agents run at once, two to the
-        // same one queue. No scheduler is added.
-        await this.send(target.id, task)
-        const last = [...this.listMessages(target.id)].reverse().find(message => message.role === 'assistant')
-        return last?.text ? { output: last.text } : { error: `[bs] ${name} produced no result` }
-      }
+      run: (name, task) => this.runAssignment(agent.id, name, task)
     })
 
     const runnerTools = new Map<string, ToolDefinition>([...this.tools])
@@ -1690,6 +1692,47 @@ export class BsAgentManager {
   // Called by the loop when a step failed and overflow recovery declined. Only
   // a quota or capacity refusal is worth moving: repeating a malformed or
   // unauthorised request elsewhere just fails again.
+  /** Every assignment this coordinator has made, running ones first written. */
+  listAssignments(coordinatorId: string): CoordinationAssignment[] {
+    return this.assignmentsByCoordinator.get(coordinatorId) ?? []
+  }
+
+  // The delegate tool's run half. The record is written before the worker
+  // starts, not after it finishes: a view of work in flight needs the row to
+  // exist while the work is in flight.
+  private async runAssignment(coordinatorId: string, name: string, task: string): Promise<{ output: string } | { error: string }> {
+    const coordinator = this.agents.get(coordinatorId)
+    // Excluding the caller here as well as in listWorkers: agent names are not
+    // unique, so a coordinator sharing a name with a worker would otherwise
+    // resolve to itself and assign its own turn to itself.
+    const target = [...this.agents.values()]
+      .find(other => other.id !== coordinatorId && other.name === name && other.cwd === coordinator?.cwd)
+    if (!target) return { error: `[bs] No agent named ${name}` }
+    const assignment: CoordinationAssignment = {
+      id: randomUUID(),
+      coordinatorId,
+      turnId: this.executionForAgent(coordinatorId)?.execution.turnId,
+      workerId: target.id,
+      workerName: target.name,
+      task,
+      startedAt: Date.now(),
+      state: 'running'
+    }
+    const list = this.assignmentsByCoordinator.get(coordinatorId) ?? []
+    list.push(assignment)
+    this.assignmentsByCoordinator.set(coordinatorId, list)
+    this.emit({ type: 'assignment-started', agentId: coordinatorId, assignment })
+    // send awaits the whole turn, and running already serialises per agent: two
+    // assignments to different agents run at once, two to the same one queue.
+    await this.send(target.id, task)
+    const last = [...this.listMessages(target.id)].reverse().find(message => message.role === 'assistant')
+    assignment.finishedAt = Date.now()
+    assignment.state = last?.text ? 'completed' : 'failed'
+    assignment.result = last?.text
+    this.emit({ type: 'assignment-finished', agentId: coordinatorId, assignment })
+    return last?.text ? { output: last.text } : { error: `[bs] ${name} produced no result` }
+  }
+
   private async handoff(agentId: string, message: string): Promise<boolean> {
     const kind = classifyRuntimeError(message).kind
     if (kind !== 'quota-exhausted' && kind !== 'capacity-exhausted') return false

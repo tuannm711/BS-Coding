@@ -21,9 +21,9 @@ from a wrong reading of it.
 | [The three quota models](#the-three-quota-models) | 117-131 | `ProviderQuotaWindow`, `ProviderUsageLedger` |
 | [The three groups of work](#the-three-groups-of-work) | 132-136 |  |
 | &nbsp;&nbsp;[Group B — The quota surface](#group-b-the-quota-surface) | 137-148 | `refreshProviderAccount`, `ProvidersTab.tsx`, `bankedUsed`, `bankedLimit`, `src/main/connections/usage.ts`, `ProviderUsage` |
-| &nbsp;&nbsp;[Group A — Routing](#group-a-routing) | 149-166 |  |
-| &nbsp;&nbsp;[Group C — Quota models](#group-c-quota-models) | 167-175 | `credits.balance`, `credits.has_credits`, `spend_control.individual_limit` |
-| [What this document is not](#what-this-document-is-not) | 176-181 | `0N-*.md` |
+| &nbsp;&nbsp;[Group A — Routing](#group-a-routing) | 149-167 |  |
+| &nbsp;&nbsp;[Group C — Quota models](#group-c-quota-models) | 168-176 | `credits.balance`, `credits.has_credits`, `spend_control.individual_limit` |
+| [What this document is not](#what-this-document-is-not) | 177-182 | `0N-*.md` |
 <!-- /toc -->
 
 ## The four goals
@@ -160,9 +160,10 @@ the other two, and addresses friction the owner meets daily.
 - **A3a. The task exchange** — **landed.** An agent in `coordinate` mode can
   assign work to another of the user's agents and read the result back, and
   cannot do the work itself. Visible in the existing chat as tool calls.
-- **A3b. The separate surface** — **not done.** Goal 4 asks for a frame apart
-  from the chat, and A3a is not it. The exchange now exists for one to be
-  built around.
+- **A3b. The separate surface** — **landed.** A top-level coordination view:
+  give the coordinator a command, watch its assignments as they run, open a
+  worker's session from its row, and stop the whole fan-out. Group A is
+  complete.
 
 ### Group C — Quota models
 

@@ -11,6 +11,7 @@ import BackgroundPanel from './components/BackgroundPanel'
 import EmptyState from './components/EmptyState'
 import StatusBar from './components/StatusBar'
 import TitleBar from './components/TitleBar'
+import CoordinatorView from './components/coordinator/CoordinatorView'
 import RightPanel from './components/RightPanel'
 import SettingsDialog from './components/settings/SettingsDialog'
 import BrowserDialog from './components/BrowserDialog'
@@ -284,6 +285,14 @@ export default function App() {
   const nativeAgents = useMemo(() => runtime?.workspace.agents.filter(agent => agent.kind === 'native') ?? [], [runtime?.workspace.agents])
   const effectiveNativeAgentId = resolveSelectedNativeAgent(nativeAgents, selectedNativeAgentId)
   const panes = useMemo(() => projectVisiblePanes(allPanes, effectiveNativeAgentId), [allPanes, effectiveNativeAgentId])
+  const coordinator = useMemo(
+    () => nativeAgents.find(agent => agent.mode === 'coordinate') ?? null,
+    [nativeAgents]
+  )
+  const [coordinateOpen, setCoordinateOpen] = useState(false)
+  // A coordinator can be switched out of coordinate mode while its view is
+  // open; the view would then have nothing to show and no way back.
+  useEffect(() => { if (!coordinator) setCoordinateOpen(false) }, [coordinator])
 
   useEffect(() => {
     setSelectedNativeAgentId(current => resolveSelectedNativeAgent(nativeAgents, current))
@@ -291,7 +300,13 @@ export default function App() {
 
   return (
     <div className="app">
-      <TitleBar panelOpen={rightOpen} onTogglePanel={() => setRightOpen(v => !v)} />
+      <TitleBar
+        panelOpen={rightOpen}
+        onTogglePanel={() => setRightOpen(v => !v)}
+        coordinateOpen={coordinateOpen}
+        coordinatorName={coordinator?.name ?? null}
+        onToggleCoordinate={() => setCoordinateOpen(v => !v)}
+      />
       <div className="app-body">
         <Sidebar
           workspaces={workspaces}
@@ -307,7 +322,13 @@ export default function App() {
           updateChecking={updateChecking}
         />
         <main className="main">
-          {panes.length > 0 ? (
+          {coordinateOpen && coordinator ? (
+            <CoordinatorView
+              coordinatorId={coordinator.id}
+              coordinatorName={coordinator.name}
+              onOpenWorker={workerId => { setSelectedNativeAgentId(workerId); setCoordinateOpen(false) }}
+            />
+          ) : panes.length > 0 ? (
             <>
               <PaneGrid
                 panes={panes}
