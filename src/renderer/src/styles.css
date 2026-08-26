@@ -1885,3 +1885,24 @@ select.input { width: 100%; }
 .stats-table td { padding: 4px 6px; border-bottom: 1px solid var(--hairline); color: var(--text-strong); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .stats-table td code { color: var(--text-faint); font-family: var(--font-mono); }
 .stats-table tr:last-child td { border-bottom: none; }
+
+/* Coordination view: a board, deliberately not a chat frame. */
+.coordinator-board { display: grid; grid-template-columns: minmax(320px, 1fr) 1.4fr; gap: 12px; height: 100%; padding: 12px; overflow: hidden; }
+.coordinator-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 6px; color: var(--text-faint); }
+.coordinator-side, .coordinator-work { display: flex; flex-direction: column; min-height: 0; border: 1px solid var(--hairline); border-radius: var(--radius-lg); background: var(--bg-panel); padding: 10px; gap: 8px; }
+.coordinator-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.coordinator-messages { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
+.coordinator-message { padding: 6px 10px; border-radius: var(--radius); background: var(--bg-bubble); white-space: pre-wrap; word-break: break-word; font-size: var(--fs-md); }
+.coordinator-message.user { background: rgba(77, 163, 255, 0.14); }
+.coordinator-input { display: flex; gap: 6px; align-items: flex-end; }
+.coordinator-input textarea { flex: 1; min-height: 54px; resize: vertical; background: var(--bg-input); color: var(--text); border: 1px solid var(--hairline); border-radius: var(--radius); padding: 6px 8px; font: inherit; }
+.coordinator-work { overflow-y: auto; }
+.coordinator-assignment { border: 1px solid var(--hairline); border-left-width: 3px; border-radius: var(--radius); padding: 8px 10px; margin-bottom: 8px; cursor: pointer; }
+.coordinator-assignment:hover { border-color: var(--accent-border); }
+.coordinator-assignment.state-running { border-left-color: var(--yellow); }
+.coordinator-assignment.state-completed { border-left-color: var(--green); }
+.coordinator-assignment.state-failed { border-left-color: var(--red); }
+.coordinator-assignment-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.coordinator-state { font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-faint); }
+.coordinator-task { color: var(--text-faint); font-size: var(--fs-sm); margin-top: 4px; white-space: pre-wrap; }
+.coordinator-result { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--hairline); font-size: var(--fs-sm); white-space: pre-wrap; }

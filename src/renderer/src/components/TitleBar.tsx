@@ -24,10 +24,13 @@ function PanelIcon({ open }: { open: boolean }) {
 
 interface Props {
   panelOpen: boolean
+  coordinateOpen: boolean
+  coordinatorName: string | null
+  onToggleCoordinate: () => void
   onTogglePanel: () => void
 }
 
-export default function TitleBar({ panelOpen, onTogglePanel }: Props) {
+export default function TitleBar({ panelOpen, onTogglePanel, coordinateOpen, coordinatorName, onToggleCoordinate }: Props) {
   const platform = window.api.platform
   const showCustomControls = platform === 'linux'
   const [maximized, setMaximized] = useState(false)
@@ -49,6 +52,14 @@ export default function TitleBar({ panelOpen, onTogglePanel }: Props) {
 
       </div>
       <div className="title-bar-right">
+                <button
+          className={`titlebar-btn${coordinateOpen ? ' active' : ''}`}
+          type="button"
+          disabled={!coordinatorName}
+          title={coordinatorName ? `Coordination — ${coordinatorName}` : 'No agent is in Coordinate mode'}
+          aria-label="Coordination"
+          onClick={onToggleCoordinate}
+        >Coordinate</button>
         <button
           className="title-bar-btn title-bar-panel-toggle"
           aria-label={panelOpen ? 'Hide Panel' : 'Show Panel'}
