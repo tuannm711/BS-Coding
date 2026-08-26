@@ -46,6 +46,7 @@ import { createDelegateTool } from './agent/tools/delegate'
 import { compileNeutralContext } from './agent/neutral-context'
 import { rankFallbackAgents, type FallbackCandidate } from '../shared/agent-fallback'
 import { poolState } from '../shared/quota-pool'
+import { partitionSteers } from '../shared/queue-steer'
 import { looksLikeNarratedToolCall } from '../shared/narrated-tool-call'
 import { toLlmMessages } from './agent/message'
 
@@ -1463,9 +1464,11 @@ export class BsAgentManager {
       takeSteers: () => {
         const q = this.queues.get(agent.id)
         if (!q || q.length === 0) return []
-        this.queues.delete(agent.id)
+        const { steers, keep } = partitionSteers(q)
+        if (keep.length === 0) this.queues.delete(agent.id)
+        else this.queues.set(agent.id, keep)
         this.emitQueue(agent.id)
-        return q
+        return steers
       },
       setTodos: (todos) => {
         this.deps.store.setTodos(this.activeSessionId(agent.id), todos)
