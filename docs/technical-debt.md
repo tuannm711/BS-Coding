@@ -24,6 +24,8 @@ Last reviewed: 2026-08-26 (after the coordinator surface)
 | 9 | [The balance quota model is unparsed](#9-the-balance-quota-model-is-unparsed) | Providers | Medium |
 | 10 | [A process-killing test times out under full-suite load](#10-a-process-killing-test-times-out-under-full-suite-load) | Build | Low |
 | 11 | [A coordinator can spend every worker's quota](#11-a-coordinator-can-spend-every-workers-quota) | Agent | Low |
+| 12 | [Agent bindings live in app settings](#12-agent-bindings-live-in-app-settings) | UI | Medium |
+| 13 | [Fleet shows no session tokens or cost](#13-fleet-shows-no-session-tokens-or-cost) | UI | Low |
 
 ---
 
@@ -294,3 +296,43 @@ quota to spend is a new thing in this product.
 which is the mistake debt item 1 recorded when three disagreeing thresholds were
 removed. **To close:** decide what the limit is *for* — a per-turn budget, a
 count, a confirmation above some size — before picking a number.
+
+---
+
+## 12. Agent bindings live in app settings
+
+**Found:** 2026-08-26, while moving the fleet panel into place.
+
+`Settings → Agents` binds a provider, account and model to each agent. Those are
+properties of the **project** — which agents exist, what each one runs — sitting
+in an **app**-scoped dialog beside MCP servers and update preferences.
+
+The fleet panel is now the project surface: it lists every agent, what it runs
+and which pool it draws on, and it is where the coordinator role is given. The
+binding belongs there too, next to what it produces.
+
+**Why it matters.** Two places answer "what does this agent run", and the one a
+person reaches for — the roster they are already reading — is not the one that
+can change it. That is the same split that put Coordinate in the chat mode row.
+
+**Deliberately deferred.** Moving the binding means moving the account picker,
+the model picker and their validation with it, which is its own piece of work
+rather than a tail on this one. **To close:** move the per-agent binding into
+the fleet row, and leave Settings holding only what is genuinely app-wide.
+
+## 13. Fleet shows no session tokens or cost
+
+**Found:** 2026-08-26, the same day.
+
+The pinned quota block passed per-agent telemetry — session tokens and estimated
+cost — into the account card, gathered from `chat` events. The fleet panel does
+not subscribe to those events, so its cards render without the session metrics
+the chat variant showed.
+
+**Why it matters.** Low. The numbers are still in the Usage tab, and the quota
+bars — the thing the panel exists for — are unaffected. But a reading that used
+to be one glance away now is not.
+
+**To close:** carry telemetry into `buildFleet` the way `buildQuotaRows` carries
+it, or decide the panel is about quota rather than spend and say so in the
+design doc instead.

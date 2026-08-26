@@ -8,12 +8,13 @@ panel, settings and the tray. The terminal inside a pane is in
 <!-- toc -->
 | Section | Lines | Names |
 | --- | --- | --- |
-| [Pieces](#pieces) | 19-32 | `src/renderer/src/App.tsx`, `PaneModel`, `src/renderer/src/components/TitleBar.tsx`, `src/renderer/src/components/Sidebar.tsx`, `src/renderer/src/components/RightPanel.tsx`, `src/renderer/src/components/chat/` |
-| [Data flow](#data-flow) | 33-51 | `App.tsx`, `PaneModel`, `XtermHost`, `buffersRef`, `registerTerminal`, `ChatPanel` |
-| [Types that carry it](#types-that-carry-it) | 52-61 | `PaneModel`, `ChatEvent`, `src/shared/types.ts`, `QuotaAccountUiState`, `src/renderer/src/components/quota/quota-view.ts` |
-| [Design decisions](#design-decisions) | 62-96 | `getWindowChromeOptions`, `titleBarOverlay`, `tests/unit/window-chrome.test.ts`, `src/renderer/AGENTS.md`, `MainApp`, `app.setAppUserModelId` |
-| [The coordination view](#the-coordination-view) | 97-120 | `src/renderer/src/components/coordinator/CoordinatorView.tsx`, `App.tsx`, `RightPanel`, `CoordinatorBoard`, `CoordinatorView`, `StatsView` |
-| [Known limits](#known-limits) | 121-127 | `docs/technical-debt.md` |
+| [Pieces](#pieces) | 20-34 | `src/renderer/src/App.tsx`, `PaneModel`, `src/renderer/src/components/TitleBar.tsx`, `src/renderer/src/components/Sidebar.tsx`, `src/renderer/src/components/RightPanel.tsx`, `src/renderer/src/components/fleet/` |
+| [Data flow](#data-flow) | 35-53 | `App.tsx`, `PaneModel`, `XtermHost`, `buffersRef`, `registerTerminal`, `ChatPanel` |
+| [Types that carry it](#types-that-carry-it) | 54-63 | `PaneModel`, `ChatEvent`, `src/shared/types.ts`, `QuotaAccountUiState`, `src/renderer/src/components/quota/quota-view.ts` |
+| [Design decisions](#design-decisions) | 64-98 | `getWindowChromeOptions`, `titleBarOverlay`, `tests/unit/window-chrome.test.ts`, `src/renderer/AGENTS.md`, `MainApp`, `app.setAppUserModelId` |
+| [The coordination view](#the-coordination-view) | 99-137 | `src/renderer/src/components/coordinator/CoordinatorView.tsx`, `App.tsx`, `setMode`, `RightPanel`, `CoordinatorBoard`, `CoordinatorView` |
+| [The fleet panel](#the-fleet-panel) | 138-168 | `RightPanel`, `buildFleet`, `ProviderQuotaGroup`, `modelIds`, `anti-claude-opus`, `anti-claude-sonnet` |
+| [Known limits](#known-limits) | 169-175 | `docs/technical-debt.md` |
 <!-- /toc -->
 
 ## Pieces
@@ -23,7 +24,8 @@ panel, settings and the tray. The terminal inside a pane is in
 | `src/renderer/src/App.tsx` | State centre: workspaces, templates, the open runtime, and `PaneModel` per pane |
 | `src/renderer/src/components/TitleBar.tsx` | Custom title bar where the native one is hidden |
 | `src/renderer/src/components/Sidebar.tsx` | Projects and agents |
-| `src/renderer/src/components/RightPanel.tsx` | Tab host for tree, artifacts and quota |
+| `src/renderer/src/components/RightPanel.tsx` | Tab host for files, artifacts and fleet |
+| `src/renderer/src/components/fleet/` | `buildFleet` and the panel that renders it |
 | `src/renderer/src/components/chat/` | The native agent's chat surface, 20 files |
 | `src/renderer/src/components/settings/` | Settings dialog and its twelve tabs |
 | `src/renderer/src/components/trace/` | Trace inspector, timeline and subagent tree |
@@ -98,13 +100,28 @@ prevents.
 
 `src/renderer/src/components/coordinator/CoordinatorView.tsx` is a **top-level
 view**, not a panel: `App.tsx` renders either the workspace panes or the board
-inside `<main>`, switched from a title-bar control that is disabled when no
-agent is in coordinate mode.
+inside `<main>`, switched from a **Work / Coordination** control in the title
+bar.
 
-A third tab in `RightPanel` was rejected — it is a narrow column beside the
-panes and would still sit inside the chat frame, which is the thing goal 4 asks
-to leave. A second window was rejected too: a second lifecycle, state synced
-over IPC and close/reopen handling, for a separation nothing has asked for.
+**That control is always enabled**, including when no agent is coordinating.
+It shipped disabled in that case, which was backwards: the view is where you
+would go to find out why there is no coordinator, and it could not be reached
+until one existed. With none, the board says so and offers one route — to
+Fleet. Deliberately one: a picker on the board as well would be a second
+control doing the same job, which is how a project came to have two
+coordinators in the first place.
+
+**The role is exclusive per project and given in Fleet.** `setMode` returns any
+other coordinating agent in the same `cwd` to build, so `App.tsx` resolving the
+coordinator with `find` is sound — the invariant lives in the manager, not in
+the view. When it lived nowhere, that `find` silently picked one of two.
+
+Putting **the board itself** in a `RightPanel` tab was rejected — it is a narrow
+column beside the panes and would still sit inside the chat frame, which is the
+thing goal 4 asks to leave. That is not contradicted by the fleet tab below:
+Fleet is a roster you read while working, and the board is a surface you work
+*in*. A second window was rejected too: a second lifecycle, state synced over
+IPC and close/reopen handling, for a separation nothing has asked for.
 
 The board shows the coordinator's messages, an input, and one row per
 assignment with its worker, task, state and result. A row opens that worker's
@@ -117,6 +134,37 @@ test asserts their absence rather than trusting the boundary to hold.
 `CoordinatorBoard` is split from `CoordinatorView` the way `StatsView` is split
 from `StatsTab`: the presentational half takes props and can be rendered under
 `environment: 'node'`.
+
+## The fleet panel
+
+Controls belong at their scope. The product has three — app (providers, MCP,
+permissions, updates), project (which agents, who coordinates, files,
+artifacts), and agent or session (the conversation, its mode, its speed) — and
+the shell had been mixing them wherever there was room.
+
+`RightPanel` is the project surface, and it now has three equal tabs: **Files ·
+Artifacts · Fleet**. The pinned *Session models* block above the tabs is gone;
+quota is not a file view and was stapled to the top of one.
+
+**Fleet groups by pool, not by agent.** `buildFleet` puts each agent inside the
+`ProviderQuotaGroup` whose `modelIds` claim its model:
+
+```
+account → quota group (the pool) → the agents drawing on it
+```
+
+`anti-claude-opus` and `anti-claude-sonnet` are different models drawing on one
+pool. Listed flat they read as alternatives — pick the other when the first is
+spent — when exhausting one exhausts both. The account card already knew both
+halves and rendered them apart; its `fleet` variant nests them.
+
+Two kinds of agent are kept rather than dropped: a **stray**, configured for an
+account but running a model no reported pool claims, and an **unassigned**
+agent with no ready assignment at all. A roster that hides an agent is the
+fault this panel exists to fix.
+
+Fleet is also where the coordinator role is given, on the agent row, labelled
+with who would lose it.
 
 ## Known limits
 
