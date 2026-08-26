@@ -1203,3 +1203,44 @@ describe('fallback stays in the same mode', () => {
     expect(events.some(event => event.type === 'agent-fallback')).toBe(false)
   })
 })
+
+describe('the coordinator knows its role and its workers', () => {
+  it('tells a coordinator who its workers are and what they run', async () => {
+    const { manager, llmSystems } = await makeManager({ secondAgent: true })
+    manager.setMode('a1', 'coordinate')
+    await manager.send('a1', 'go')
+    const system = llmSystems[0]
+    expect(system).toContain('coordinator')
+    expect(system).toContain('helper')
+    expect(system).toContain('test-model')
+  })
+
+  it('leaves a non-coordinator alone', async () => {
+    const { manager, llmSystems } = await makeManager({ secondAgent: true })
+    await manager.send('a1', 'go')
+    expect(llmSystems[0]).not.toContain('coordinator')
+  })
+
+  it('does not offer a coordinator another coordinator as a worker', async () => {
+    const { manager, llmSystems } = await makeManager({ secondAgent: true })
+    manager.setMode('a1', 'coordinate')
+    manager.setMode('a3', 'coordinate')
+    await manager.send('a1', 'go')
+    expect(llmSystems[0]).not.toContain('helper')
+  })
+
+  it('reflects a mode changed after the runner was built', async () => {
+    // The case modeNote would get wrong: runners are cached per agent, so a
+    // roster baked in at build time goes stale the moment anything changes.
+    const { manager, llmSystems } = await makeManager({
+      secondAgent: true,
+      partsQueue: [[{ kind: 'text', text: 'a' }, { kind: 'finish' }], [{ kind: 'text', text: 'b' }, { kind: 'finish' }]]
+    })
+    manager.setMode('a1', 'coordinate')
+    await manager.send('a1', 'first')
+    manager.setMode('a3', 'coordinate')
+    await manager.send('a1', 'second')
+    expect(llmSystems[0]).toContain('helper')
+    expect(llmSystems[1]).not.toContain('helper')
+  })
+})

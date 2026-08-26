@@ -1355,9 +1355,9 @@ export class BsAgentManager {
         return this.runners.get(serving)?.target()
       },
       handoff: (message) => this.handoff(agent.id, message),
-      systemSuffix: () => this.executionForAgent(agent.id)
-        ? SHARED_SESSION_RECORD_NOTE
-        : '',
+      systemSuffix: () =>
+        (this.executionForAgent(agent.id) ? SHARED_SESSION_RECORD_NOTE : '') +
+        this.coordinatorNote(agent.id),
       systemInstructionPaths: new Set(instructionFiles.map(f => f.path)),
       cwd: agent.cwd,
       llm: llmClient,
@@ -1731,6 +1731,39 @@ export class BsAgentManager {
     assignment.result = last?.text
     this.emit({ type: 'assignment-finished', agentId: coordinatorId, assignment })
     return last?.text ? { output: last.text } : { error: `[bs] ${name} produced no result` }
+  }
+
+  // Computed per call, not baked into the runner: runners are cached per agent,
+  // so a roster fixed at build time goes stale as soon as an agent is added or
+  // changes mode.
+  private coordinatorNote(agentId: string): string {
+    if ((this.modes.get(agentId) ?? 'build') !== 'coordinate') return ''
+    const agent = this.agents.get(agentId)
+    const workers = [...this.agents.values()]
+      .filter(other => other.kind !== 'pty' && other.cwd === agent?.cwd && other.id !== agentId)
+      .filter(other => (this.modes.get(other.id) ?? 'build') !== 'coordinate')
+      .map(other => {
+        const resolved = this.resolved.get(other.id)
+        return `  ${other.name}${resolved?.model ? ` — ${resolved.provider}/${resolved.model}` : ''}`
+      })
+    return [
+      '',
+      '',
+      'You are the coordinator for this project. You do not do the work yourself:',
+      'your write, edit and command tools are removed, not merely discouraged.',
+      '',
+      'For coding work you do the analysis, the design, the spec and the plan, then',
+      'assign the execution. Assign by default — when a request needs files written',
+      'or commands run, give it to a worker rather than waiting to be asked to.',
+      '',
+      workers.length > 0 ? 'Workers available now:' : 'No workers are available in this project.',
+      ...workers,
+      '',
+      'Each worker has its own conversation and sees only the task text you send it,',
+      'so write each task so it stands on its own: name the files, the change and how',
+      'to check it. A worker that cannot carry out what you gave it will report back',
+      'rather than redesign it, so the judgement has to be in the task.'
+    ].join('\n')
   }
 
   private async handoff(agentId: string, message: string): Promise<boolean> {
