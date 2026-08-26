@@ -166,6 +166,20 @@ export type ProjectSessionSummary = Omit<SessionSummary, 'agentId'> & {
  * a project turn. Declaring it here is what lets the renderer read those
  * fields; they used to be carried across the boundary by a pair of casts.
  */
+/** One task a coordinator assigned, while it runs and after it finishes. */
+export interface CoordinationAssignment {
+  id: string
+  coordinatorId: string
+  turnId?: string
+  workerId: string
+  workerName: string
+  task: string
+  startedAt: number
+  finishedAt?: number
+  state: 'running' | 'completed' | 'failed'
+  result?: string
+}
+
 export type ChatEvent = Partial<Omit<ChatEventScope, 'agentId'>> & (
   | { type: 'text-delta'; agentId: string; delta: string }
   | { type: 'reasoning-delta'; agentId: string; delta: string }
@@ -181,6 +195,8 @@ export type ChatEvent = Partial<Omit<ChatEventScope, 'agentId'>> & (
   | { type: 'compaction-failed'; agentId: string }
   | { type: 'narrated-tool-call'; agentId: string }
   | { type: 'agent-fallback'; agentId: string; toAgentId: string; toAgentName: string; reason: string; pool?: string }
+  | { type: 'assignment-started'; agentId: string; assignment: CoordinationAssignment }
+  | { type: 'assignment-finished'; agentId: string; assignment: CoordinationAssignment }
   | { type: 'usage'; agentId: string; tokens: MessageTokens; sessionCost: number; sessionTokens: { input: number; output: number } }
   | { type: 'todo-updated'; agentId: string; todos: TodoItem[] }
   | { type: 'queue-updated'; agentId: string; queue: QueuedMessage[] }

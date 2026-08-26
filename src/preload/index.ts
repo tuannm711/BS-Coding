@@ -111,6 +111,7 @@ const api: AgentApi = {
   installUpdate: () => ipcRenderer.invoke(Channels.UpdaterInstall),
   sendChat: (agentId: string, text: string, images?: ImageAttachment[]) =>
     ipcRenderer.invoke(Channels.ChatSendLegacy, agentId, text, images),
+  listAssignments: (agentId: string) => ipcRenderer.invoke(Channels.AgentListAssignments, agentId),
   stopChat: (agentId: string) => ipcRenderer.invoke(Channels.ChatStopLegacy, agentId),
   listProjectSessions: (projectPath: string) => ipcRenderer.invoke(Channels.ProjectSessionList, projectPath),
   createProjectSession: (projectPath: string, agentId?: string) => ipcRenderer.invoke(Channels.ProjectSessionCreate, projectPath, agentId),

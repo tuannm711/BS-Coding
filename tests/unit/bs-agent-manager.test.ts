@@ -1074,3 +1074,49 @@ describe('delegation keeps conversations separate', () => {
     expect(manager.listMessages('a1')).toHaveLength(before)
   })
 })
+
+describe('coordination assignments', () => {
+  // runAssignment is private and its only production caller is the delegate
+  // tool's closure. Casting here rather than adding a method to production
+  // whose only caller would be this test.
+  const delegate = (manager: BsAgentManager, from: string, to: string, task: string) =>
+    (manager as unknown as { runAssignment: (c: string, n: string, t: string) => Promise<unknown> })
+      .runAssignment(from, to, task)
+
+  it('records an assignment while the worker runs, not after', async () => {
+    const { manager } = await makeManager({
+      secondAgent: true,
+      partsQueue: [[{ kind: 'text', text: 'worker done' }, { kind: 'finish' }]]
+    })
+    manager.setMode('a1', 'coordinate')
+    const running = delegate(manager, 'a1', 'bs', 'do the thing')
+    // Asserted before the await: the view exists to show work in flight, and a
+    // record written only on completion would never show anything running.
+    expect(manager.listAssignments('a1')[0]?.state).toBe('running')
+    await running
+    const done = manager.listAssignments('a1')[0]
+    expect(done.state).toBe('completed')
+    expect(done.result).toContain('worker done')
+  })
+
+  it('marks a failed assignment failed', async () => {
+    const { manager } = await makeManager({
+      secondAgent: true,
+      partsQueue: [[{ kind: 'error', error: 'boom' }]]
+    })
+    manager.setMode('a1', 'coordinate')
+    await delegate(manager, 'a1', 'bs', 'x')
+    expect(manager.listAssignments('a1')[0].state).toBe('failed')
+  })
+
+  it('emits both edges', async () => {
+    const { manager, events } = await makeManager({
+      secondAgent: true,
+      partsQueue: [[{ kind: 'text', text: 'ok' }, { kind: 'finish' }]]
+    })
+    manager.setMode('a1', 'coordinate')
+    await delegate(manager, 'a1', 'bs', 'x')
+    expect(events.some(event => event.type === 'assignment-started')).toBe(true)
+    expect(events.some(event => event.type === 'assignment-finished')).toBe(true)
+  })
+})
