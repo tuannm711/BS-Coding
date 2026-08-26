@@ -55,7 +55,7 @@ export interface CoordinationAssignment {
 
 plus two `ChatEvent` members and `listAssignments(coordinatorId): Promise<CoordinationAssignment[]>`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```ts
   it('records an assignment while the worker runs, not after', async () => {
@@ -103,11 +103,11 @@ reach it the way other manager internals are reached in this file. If that is
 not possible without a cast, add the cast in the test and say why in a comment;
 do not add a method to production whose only caller is a test.
 
-- [ ] **Step 2: Run to confirm failure**
+- [x] **Step 2: Run to confirm failure**
 
 Expected: `listAssignments` is not a function.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `src/shared/types.ts`, the interface above and:
 
@@ -128,13 +128,13 @@ In the manager, beside `turnTargets`:
 The `run` callback given to `createDelegateTool` writes the record before
 `await this.send(...)` and closes it after, emitting on both edges.
 
-- [ ] **Step 4: Add the channel**
+- [x] **Step 4: Add the channel**
 
 `Channels.AgentListAssignments`, the `AgentApi` member, the preload
 implementation and the main handler. Add the stub to `ipc-contract.test.ts` in
 the same commit — that suite went 24 members behind once.
 
-- [ ] **Step 5: Verify and commit**
+- [x] **Step 5: Verify and commit**
 
 ```bash
 npm test && npm run typecheck
@@ -150,7 +150,7 @@ Expected: **1128**. Commit as `feat: record an assignment while its worker runs`
 - Modify: `src/main/bs-agent-manager.ts`, `docs/technical-debt.md`
 - Test: `tests/unit/bs-agent-manager.test.ts`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```ts
   it('stops the workers a coordinating turn started', async () => {
@@ -176,11 +176,11 @@ Expected: **1128**. Commit as `feat: record an assignment while its worker runs`
   })
 ```
 
-- [ ] **Step 2: Run to confirm failure**
+- [x] **Step 2: Run to confirm failure**
 
 Expected: the first fails — the worker keeps running.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `stop(agentId)`, after aborting the agent's own turn, abort every worker with
 a `running` assignment under that coordinator:
@@ -196,11 +196,11 @@ a `running` assignment under that coordinator:
 One level deep, because delegation is: a worker cannot itself be coordinating,
 so there is no tree to walk and no guard against recursion needed.
 
-- [ ] **Step 4: Close debt item 11**
+- [x] **Step 4: Close debt item 11**
 
 Remove it, renumber the survivors, repoint the index anchors and any citation.
 
-- [ ] **Step 5: Verify and commit**
+- [x] **Step 5: Verify and commit**
 
 Expected: **1130**. Commit as `feat: stop the workers a coordinator started`.
 
@@ -219,7 +219,7 @@ Expected: **1130**. Commit as `feat: stop the workers a coordinator started`.
 - Consumes: `listAssignments`, the two events, `sendChat`, `stopAgent`,
   `listMessages`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Render the presentational half with `renderToStaticMarkup`, the way
 `StatsView` and `FeedRow` are tested. Split the component so the fetching half
@@ -264,11 +264,11 @@ and the rendering half are separate, as `StatsTab`/`StatsView` already are.
   })
 ```
 
-- [ ] **Step 2: Run to confirm failure**
+- [x] **Step 2: Run to confirm failure**
 
 Expected: the module does not resolve.
 
-- [ ] **Step 3: Implement the board**
+- [x] **Step 3: Implement the board**
 
 `CoordinatorBoard` is presentational: the coordinator's name and recent
 messages, an input, a Stop, and one row per assignment with worker, task, state
@@ -278,7 +278,7 @@ and result. A row calls `onOpenWorker`.
 events, and wires the handlers to `sendChat`, `stopAgent` and selecting that
 agent in the workspace view.
 
-- [ ] **Step 4: Switch to it from the shell**
+- [x] **Step 4: Switch to it from the shell**
 
 `App.tsx` gains `view: 'workspace' | 'coordinate'` and renders one or the other
 inside `<main>`. `TitleBar` gains a control, enabled only when
@@ -288,7 +288,7 @@ disabled with a title saying why when it does not.
 Opening a worker switches back to the workspace view with that agent selected,
 which `setSelectedNativeAgentId` already does.
 
-- [ ] **Step 5: Verify and commit**
+- [x] **Step 5: Verify and commit**
 
 ```bash
 npm test && npm run typecheck && npm run build
@@ -300,19 +300,19 @@ Expected: **1134**. Commit as `feat: a surface for the coordinator outside the c
 
 ### Task 4: Documentation, verify, report
 
-- [ ] **Step 1: Record it**
+- [x] **Step 1: Record it**
 
 Describe the surface in `docs/design/06-ui-shell.md` — including that it is a
 top-level view rather than a panel, and why. Mark A3b landed in
 `docs/design/00-goals.md`, which completes group A.
 
-- [ ] **Step 2: Regenerate the tables of contents**
+- [x] **Step 2: Regenerate the tables of contents**
 
 ```bash
 npm run docs:toc
 ```
 
-- [ ] **Step 3: Full verification**
+- [x] **Step 3: Full verification**
 
 ```bash
 npm test && npm run typecheck
@@ -320,12 +320,12 @@ npm test && npm run typecheck
 
 Check the exit status of each, chained with `&&`.
 
-- [ ] **Step 4: Run the app**
+- [x] **Step 4: Run the app**
 
 Give a coordinator a command that fans out to two agents. Watch both rows
 appear as **running**, open one worker's session from its row, come back, and
 stop the fan-out mid-flight. Confirm the workers actually stopped.
 
-- [ ] **Step 5: Report and stop**
+- [x] **Step 5: Report and stop**
 
 Do not merge, tag, or push. Report all four tasks and wait for the final gate.

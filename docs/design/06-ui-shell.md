@@ -8,11 +8,12 @@ panel, settings and the tray. The terminal inside a pane is in
 <!-- toc -->
 | Section | Lines | Names |
 | --- | --- | --- |
-| [Pieces](#pieces) | 18-31 | `src/renderer/src/App.tsx`, `PaneModel`, `src/renderer/src/components/TitleBar.tsx`, `src/renderer/src/components/Sidebar.tsx`, `src/renderer/src/components/RightPanel.tsx`, `src/renderer/src/components/chat/` |
-| [Data flow](#data-flow) | 32-50 | `App.tsx`, `PaneModel`, `XtermHost`, `buffersRef`, `registerTerminal`, `ChatPanel` |
-| [Types that carry it](#types-that-carry-it) | 51-60 | `PaneModel`, `ChatEvent`, `src/shared/types.ts`, `QuotaAccountUiState`, `src/renderer/src/components/quota/quota-view.ts` |
-| [Design decisions](#design-decisions) | 61-95 | `getWindowChromeOptions`, `titleBarOverlay`, `tests/unit/window-chrome.test.ts`, `src/renderer/AGENTS.md`, `MainApp`, `app.setAppUserModelId` |
-| [Known limits](#known-limits) | 96-102 | `docs/technical-debt.md` |
+| [Pieces](#pieces) | 19-32 | `src/renderer/src/App.tsx`, `PaneModel`, `src/renderer/src/components/TitleBar.tsx`, `src/renderer/src/components/Sidebar.tsx`, `src/renderer/src/components/RightPanel.tsx`, `src/renderer/src/components/chat/` |
+| [Data flow](#data-flow) | 33-51 | `App.tsx`, `PaneModel`, `XtermHost`, `buffersRef`, `registerTerminal`, `ChatPanel` |
+| [Types that carry it](#types-that-carry-it) | 52-61 | `PaneModel`, `ChatEvent`, `src/shared/types.ts`, `QuotaAccountUiState`, `src/renderer/src/components/quota/quota-view.ts` |
+| [Design decisions](#design-decisions) | 62-96 | `getWindowChromeOptions`, `titleBarOverlay`, `tests/unit/window-chrome.test.ts`, `src/renderer/AGENTS.md`, `MainApp`, `app.setAppUserModelId` |
+| [The coordination view](#the-coordination-view) | 97-120 | `src/renderer/src/components/coordinator/CoordinatorView.tsx`, `App.tsx`, `RightPanel`, `CoordinatorBoard`, `CoordinatorView`, `StatsView` |
+| [Known limits](#known-limits) | 121-127 | `docs/technical-debt.md` |
 <!-- /toc -->
 
 ## Pieces
@@ -92,6 +93,30 @@ button a process-derived identity that does not match the pinned shortcut.
 `scripts/build-windows-icon.mjs`, with a test that fails if the two diverge. It
 was allowed to drift a full rebrand behind once, which is what the test now
 prevents.
+
+## The coordination view
+
+`src/renderer/src/components/coordinator/CoordinatorView.tsx` is a **top-level
+view**, not a panel: `App.tsx` renders either the workspace panes or the board
+inside `<main>`, switched from a title-bar control that is disabled when no
+agent is in coordinate mode.
+
+A third tab in `RightPanel` was rejected — it is a narrow column beside the
+panes and would still sit inside the chat frame, which is the thing goal 4 asks
+to leave. A second window was rejected too: a second lifecycle, state synced
+over IPC and close/reopen handling, for a separation nothing has asked for.
+
+The board shows the coordinator's messages, an input, and one row per
+assignment with its worker, task, state and result. A row opens that worker's
+own session, because the full exchange is already there.
+
+**What it does not show is the design.** No tool cards, no streaming detail, no
+editing. Those belong to the chat frame this exists to be separate from, and a
+test asserts their absence rather than trusting the boundary to hold.
+
+`CoordinatorBoard` is split from `CoordinatorView` the way `StatsView` is split
+from `StatsTab`: the presentational half takes props and can be rendered under
+`environment: 'node'`.
 
 ## Known limits
 
