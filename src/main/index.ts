@@ -161,6 +161,7 @@ class MainApp {
     lsp: new LspManager(),
     providerAccounts: () => this.providerManager.list(),
     providerRuntime: (providerId, accountId, modelId) => this.providerManager.createRuntime(providerId, accountId, modelId),
+    quotaGroupForModel: (providerId, modelId) => this.providerManager.quotaGroupForModel(providerId, modelId),
     assignmentPath: path.join(app.getPath('userData'), 'assignments.json'),
     onAssignmentChanged: (assignment) => {
       this.providerManager.markSnapshotChanged()

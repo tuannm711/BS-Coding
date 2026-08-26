@@ -23,6 +23,11 @@ import type { AgentAssignmentSnapshot } from '../../src/shared/provider-state'
 const BS_AGENT: AgentConfig = {
   id: 'a1', name: 'bs', templateId: 'bs', cwd: '/proj', kind: 'native'
 }
+// A second native agent, so a fallback candidate exists. Opt-in, because most
+// tests here count agents.
+const SECOND_AGENT: AgentConfig = {
+  id: 'a3', name: 'bs', templateId: 'bs', cwd: '/proj', kind: 'native'
+}
 const PTY_AGENT: AgentConfig = {
   id: 'a2', name: 'opencode', templateId: 'opencode', cwd: '/proj'
 }
@@ -37,6 +42,7 @@ async function makeManager(opts: StubLlmOptions & {
   catalog?: ModelsCatalog
   providerAccounts?: ProviderConnection[]
   providerRuntime?: (providerId: string, accountId: string, modelId: string) => LlmClient
+  secondAgent?: boolean
 } = {}) {
   const cfgDir = mkdtempSync(path.join(tmpdir(), 'bs-mgr-cfg-'))
   const defaultCfg = path.join(cfgDir, 'bs.json')
@@ -120,7 +126,9 @@ async function makeManager(opts: StubLlmOptions & {
     onAssignmentChanged: assignment => assignmentEvents.push(assignment)
   })
   manager.setOnEvent(e => events.push(e))
-  await manager.init([{ ...BS_AGENT }, { ...PTY_AGENT }])
+  await manager.init(opts.secondAgent
+    ? [{ ...BS_AGENT }, { ...SECOND_AGENT }, { ...PTY_AGENT }]
+    : [{ ...BS_AGENT }, { ...PTY_AGENT }])
   return { manager, store, events, assignmentEvents, createLlm, savedPermissions, llmCalls, llmSystems, llmVariants, llmModels }
 }
 
@@ -1014,5 +1022,40 @@ describe('BsAgentManager', () => {
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }
+  })
+})
+
+describe('agent fallback', () => {
+  it('continues a turn on another agent when quota is refused', async () => {
+    const { manager, events } = await makeManager({
+      secondAgent: true,
+      partsQueue: [
+        [{ kind: 'error', error: '[bs] [request-failed] Antigravity request failed (429): Individual quota reached' }],
+        [{ kind: 'text', text: 'carried on' }, { kind: 'finish' }]
+      ]
+    })
+    await manager.send('a1', 'go')
+    expect(events.some(event => event.type === 'agent-fallback')).toBe(true)
+    expect(events.filter(event => event.type === 'error')).toEqual([])
+  })
+
+  it('does not hand over an auth failure', async () => {
+    // Falling back on a malformed or unauthorised request just repeats it
+    // somewhere else.
+    const { manager, events } = await makeManager({
+      secondAgent: true,
+      partsQueue: [[{ kind: 'error', error: '[bs] [request-failed] request failed (401): Unauthorized' }]]
+    })
+    await manager.send('a1', 'go')
+    expect(events.some(event => event.type === 'agent-fallback')).toBe(false)
+    expect(events.some(event => event.type === 'error')).toBe(true)
+  })
+
+  it('ends the turn when there is no one to hand to', async () => {
+    const { manager, events } = await makeManager({
+      partsQueue: [[{ kind: 'error', error: '[bs] [request-failed] request failed (429): quota' }]]
+    })
+    await manager.send('a1', 'go')
+    expect(events.some(event => event.type === 'error')).toBe(true)
   })
 })

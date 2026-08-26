@@ -67,6 +67,16 @@ const MAX_COMPACT_PER_RUN = 2
 const MAX_STEPS_PROMPT = 'Final step: wrap up and provide your final answer now. Tool calls are disabled.'
 
 export class SessionRunner {
+  /**
+   * What this runner would call with. Read by the manager to hand a turn to
+   * another agent without reassembling its system prompt — two copies of that
+   * assembly would drift, and half a turn would run under a prompt nobody
+   * intended.
+   */
+  target(): { llm: LlmClient; model: string; system: string; variantOptions?: Record<string, unknown> } {
+    return { llm: this.deps.llm, model: this.deps.model, system: this.deps.system, variantOptions: this.deps.variantOptions }
+  }
+
   private readonly maxSteps: number
   private compactedThisRun = 0
   // Provider-reported usage of the last LLM call; overflow detection trusts it
