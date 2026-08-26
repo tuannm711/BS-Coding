@@ -114,7 +114,7 @@ export default function RightPanelQuota({ agents }: { agents: QuotaAgent[] }) {
             // finally, not then: a failed refresh must not leave the button
             // disabled until the app is restarted.
             void window.api.refreshProviderAccount(account.providerId, account.id)
-              .then(next => setSnapshot(next))
+              .then(applySnapshot)
               .finally(() => setRefreshingId(null))
           }} />
         })}

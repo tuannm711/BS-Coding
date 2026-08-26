@@ -249,3 +249,19 @@ describe('reset credits', () => {
     expect(withCredits(undefined)).not.toContain('reset')
   })
 })
+
+describe('snapshot shape the panel depends on', () => {
+  it('drops every row when a snapshot carries no assignments', () => {
+    // Not a wish, a warning. buildQuotaRows keys on a ready assignment, so any
+    // channel handing the renderer a snapshot built without them blanks the
+    // panel. ProviderAccountRefresh did exactly that until 2026-08-26: it
+    // returned ConnectionsManager.getSnapshot(), whose assignments are always
+    // empty, instead of MainApp.providerSnapshot(), which merges them in.
+    const rows = buildQuotaRows(
+      [{ id: 'agent-1', name: 'bs' }],
+      { revision: 1, updatedAt: 1, providers: [], accounts: [account()], assignments: [] },
+      {}
+    )
+    expect(rows).toEqual([])
+  })
+})

@@ -1693,11 +1693,10 @@ select.input { width: 100%; }
 .quota-account-identity strong, .quota-account-identity span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .quota-account-identity > div > span, .quota-account-subline, .quota-window-reset, .quota-metric span { color: var(--text-faint); font-size: var(--fs-sm); }
 .quota-plan-badge { border: 1px solid var(--accent-border); border-radius: 999px; padding: 2px 7px; color: var(--accent); font-size: var(--fs-sm); white-space: nowrap; }
-.quota-reset-badge {
-  font-size: var(--fs-xs); color: var(--text-faint);
-  border: 1px solid var(--hairline); border-radius: 999px;
-  padding: 0 6px; white-space: nowrap;
-}
+/* Shape comes from .quota-plan-badge so it sits level with the plan and state
+   badges; only the colour differs, since this states a fact rather than a
+   status the account is in. */
+.quota-reset-badge { border-color: var(--hairline); color: var(--text); }
 .quota-refresh { flex: 0 0 auto; }
 .quota-account-subline { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 .quota-account-error { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 8px; border: 1px solid color-mix(in srgb, var(--danger) 45%, transparent); border-radius: 6px; color: var(--danger); font-size: var(--fs-sm); }
