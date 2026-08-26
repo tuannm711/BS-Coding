@@ -1163,3 +1163,43 @@ describe('stopping a fan-out', () => {
     expect(manager.isRunning('a3')).toBe(true)
   })
 })
+
+describe('fallback stays in the same mode', () => {
+  it('does not hand a build turn to an agent in another mode', async () => {
+    // Not a coordinate special case: a plan-mode agent is denied every write
+    // tool, so it could never carry a build turn either. This has been wrong
+    // since plan mode existed.
+    const { manager, events } = await makeManager({
+      secondAgent: true,
+      partsQueue: [[{ kind: 'error', error: '[bs] [request-failed] (429): quota' }]]
+    })
+    manager.setMode('a3', 'plan')
+    await manager.send('a1', 'go')
+    expect(events.some(event => event.type === 'agent-fallback')).toBe(false)
+    expect(events.some(event => event.type === 'error')).toBe(true)
+  })
+
+  it('still hands over to an agent in the same mode', async () => {
+    const { manager, events } = await makeManager({
+      secondAgent: true,
+      partsQueue: [
+        [{ kind: 'error', error: '[bs] [request-failed] (429): quota' }],
+        [{ kind: 'text', text: 'carried on' }, { kind: 'finish' }]
+      ]
+    })
+    await manager.send('a1', 'go')
+    expect(events.some(event => event.type === 'agent-fallback')).toBe(true)
+  })
+
+  it('does not hand a coordinator turn to a worker', async () => {
+    // A worker has no delegate tool, so it would do the work rather than
+    // assign it — the opposite of what the turn was for.
+    const { manager, events } = await makeManager({
+      secondAgent: true,
+      partsQueue: [[{ kind: 'error', error: '[bs] [request-failed] (429): quota' }]]
+    })
+    manager.setMode('a1', 'coordinate')
+    await manager.send('a1', 'go')
+    expect(events.some(event => event.type === 'agent-fallback')).toBe(false)
+  })
+})
