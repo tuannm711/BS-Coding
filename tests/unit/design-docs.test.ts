@@ -146,4 +146,12 @@ describe('repository guards', () => {
     const pkg = JSON.parse(readFileSync('package.json', 'utf8')) as { scripts: Record<string, string> }
     expect(pkg.scripts.typecheck).toContain('tsconfig.test.json')
   })
+
+  it('has release notes for the current version', () => {
+    // The publish job reads this file by tag name. Failing here means a
+    // version was bumped without notes, and catches it before a ten-minute
+    // build ends in a failed publish.
+    const pkg = JSON.parse(readFileSync('package.json', 'utf8')) as { version: string }
+    expect(existsSync(path.join('docs', 'release-notes', `v${pkg.version}.md`))).toBe(true)
+  })
 })
