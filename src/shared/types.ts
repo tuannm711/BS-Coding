@@ -372,7 +372,8 @@ export interface ProviderUsage {
   refreshedAt: number
   source: 'provider' | 'internal' | 'unavailable'
   status: 'ok' | 'unavailable'
-  unavailableReason?: string
+  /** Why the last refresh degraded — not why usage is unavailable. */
+  statusReason?: string
 }
 
 export interface ProviderConnection {

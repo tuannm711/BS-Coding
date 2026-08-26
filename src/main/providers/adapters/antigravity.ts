@@ -187,13 +187,13 @@ export function createAntigravityAdapter(): ProviderAdapter {
       return { secret: readySecret, models }
     },
     async fetchUsage(account, secret) {
-      if (!secret.accessToken) return { accountId: account.id, refreshedAt: Date.now(), source: 'unavailable', status: 'unavailable', unavailableReason: 'OAuth access token unavailable' }
+      if (!secret.accessToken) return { accountId: account.id, refreshedAt: Date.now(), source: 'unavailable', status: 'unavailable', statusReason: 'OAuth access token unavailable' }
       const result = await fetchQuotaPayload(secret)
       const metadata = { accountLabel: account.profile?.email ?? account.label, accountType: 'oauth' as const, planName: secret.planName ?? account.profile?.planName }
       if (!result.response.ok) {
         const retryAfter = Number(result.response.headers.get('retry-after') ?? 0)
         const error = classifyProviderError(result.response.status, result.raw)
-        const unavailableReason = error.kind === 'quota-exhausted'
+        const statusReason = error.kind === 'quota-exhausted'
           ? 'Quota exhausted'
           : error.kind === 'capacity-exhausted'
             ? 'Model capacity exhausted'
@@ -206,7 +206,7 @@ export function createAntigravityAdapter(): ProviderAdapter {
           refreshedAt: Date.now(),
           source: 'provider',
           status: result.response.status === 429 ? 'ok' : 'unavailable',
-          unavailableReason,
+          statusReason,
           ...(retryAfter > 0 ? { resetAt: Date.now() + retryAfter * 1000 } : {})
         }
       }

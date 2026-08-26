@@ -81,7 +81,7 @@ describe('Antigravity model and usage parsing', () => {
   })
 
   it('distinguishes exhausted quota from unavailable usage', () => {
-    expect(parseAntigravityUsage('a1', { models: { m: { quotaInfo: { remainingFraction: 0 } } } }).unavailableReason).toBe('Quota exhausted')
+    expect(parseAntigravityUsage('a1', { models: { m: { quotaInfo: { remainingFraction: 0 } } } }).statusReason).toBe('Quota exhausted')
     expect(parseAntigravityUsage('a1', { models: {} }).status).toBe('unavailable')
   })
 })

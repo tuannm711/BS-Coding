@@ -70,18 +70,18 @@ describe('quota card view model', () => {
   })
 
   it('hides an exhaustion warning while some group still has quota', () => {
-    expect(accountWarning({ ...groupedUsage, unavailableReason: 'Quota exhausted' })).toBeUndefined()
-    expect(accountWarning({ ...groupedUsage, unavailableReason: 'Model capacity exhausted' })).toBeUndefined()
+    expect(accountWarning({ ...groupedUsage, statusReason: 'Quota exhausted' })).toBeUndefined()
+    expect(accountWarning({ ...groupedUsage, statusReason: 'Model capacity exhausted' })).toBeUndefined()
   })
 
   it('keeps an exhaustion warning when every group is drained', () => {
-    const drained: ProviderUsage = { ...groupedUsage, unavailableReason: 'Quota exhausted', quotaGroups: groupedUsage.quotaGroups!.map(group => ({ ...group, windows: group.windows.map(window => ({ ...window, remainingPercent: 0 })) })) }
+    const drained: ProviderUsage = { ...groupedUsage, statusReason: 'Quota exhausted', quotaGroups: groupedUsage.quotaGroups!.map(group => ({ ...group, windows: group.windows.map(window => ({ ...window, remainingPercent: 0 })) })) }
     expect(accountWarning(drained)).toBe('Quota exhausted')
   })
 
   it('never hides a refresh error or a non-exhaustion reason', () => {
-    expect(accountWarning({ ...groupedUsage, refreshError: 'boom', unavailableReason: 'Quota exhausted' })).toBe('boom')
-    expect(accountWarning({ ...groupedUsage, unavailableReason: 'Authentication expired' })).toBe('Authentication expired')
+    expect(accountWarning({ ...groupedUsage, refreshError: 'boom', statusReason: 'Quota exhausted' })).toBe('boom')
+    expect(accountWarning({ ...groupedUsage, statusReason: 'Authentication expired' })).toBe('Authentication expired')
   })
 
   it('states a subscription term with the exact instant it ends', () => {

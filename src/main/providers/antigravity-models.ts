@@ -103,7 +103,7 @@ export function parseAntigravityQuotaSummary(accountId: string, payload: unknown
     } satisfies ProviderQuotaGroup]
   })
   const known = quotaGroups.flatMap(group => group.windows).flatMap(window => window.remainingPercent === undefined ? [] : [window.remainingPercent])
-  if (known.length === 0) return { accountId, ...metadata, quotaGroups, refreshedAt: now, source: 'unavailable', status: 'unavailable', unavailableReason: 'No quota data returned by Cloud Code' }
+  if (known.length === 0) return { accountId, ...metadata, quotaGroups, refreshedAt: now, source: 'unavailable', status: 'unavailable', statusReason: 'No quota data returned by Cloud Code' }
   const remaining = Math.min(...known)
   const resetAt = earliestReset(quotaGroups.flatMap(group => group.windows).map(window => window.resetAt))
   return {
@@ -115,7 +115,7 @@ export function parseAntigravityQuotaSummary(accountId: string, payload: unknown
     status: 'ok',
     primaryUsedPercent: 100 - remaining,
     ...(resetAt === undefined ? {} : { resetAt }),
-    ...(remaining === 0 ? { unavailableReason: 'Quota exhausted' } : {})
+    ...(remaining === 0 ? { statusReason: 'Quota exhausted' } : {})
   }
 }
 
@@ -129,7 +129,7 @@ export function parseAntigravityUsage(accountId: string, payload: unknown, metad
   const allQuotas = entries.map(([, model]) => model.quotaInfo).filter((quota): quota is NonNullable<CloudCodeModel['quotaInfo']> => quota?.remainingFraction !== undefined)
   const groupedQuotas = classified.flatMap(item => item.quota?.remainingFraction === undefined ? [] : [item.quota])
   const quotas = groupedQuotas.length > 0 ? groupedQuotas : allQuotas
-  if (quotas.length === 0) return { accountId, ...metadata, refreshedAt: now, source: 'unavailable', status: 'unavailable', unavailableReason: 'No quota data returned by Cloud Code' }
+  if (quotas.length === 0) return { accountId, ...metadata, refreshedAt: now, source: 'unavailable', status: 'unavailable', statusReason: 'No quota data returned by Cloud Code' }
   const remaining = Math.max(0, Math.min(1, Math.min(...quotas.map(quota => quota.remainingFraction ?? 0))))
   const resetAt = earliestReset(quotas.map(quota => parseReset(quota.resetTime)))
   const modelQuotas = Object.fromEntries(entries.flatMap(([key, model]) => {
@@ -155,7 +155,7 @@ export function parseAntigravityUsage(accountId: string, payload: unknown, metad
     }
     return [{ id: groupId, label: groupId === 'gemini' ? 'Gemini Models' : 'Claude and GPT models', modelIds: members.map(item => item.modelId), windows: [window] } satisfies ProviderQuotaGroup]
   })
-  return { accountId, ...metadata, refreshedAt: now, source: 'provider', status: 'ok', primaryUsedPercent: 100 - fractionPercent(remaining), ...(resetAt === undefined ? {} : { resetAt }), modelQuotas, quotaGroups, ...(remaining === 0 ? { unavailableReason: 'Quota exhausted' } : {}) }
+  return { accountId, ...metadata, refreshedAt: now, source: 'provider', status: 'ok', primaryUsedPercent: 100 - fractionPercent(remaining), ...(resetAt === undefined ? {} : { resetAt }), modelQuotas, quotaGroups, ...(remaining === 0 ? { statusReason: 'Quota exhausted' } : {}) }
 }
 
 function quotaGroupsFrom(payload: unknown): CloudCodeQuotaGroup[] {

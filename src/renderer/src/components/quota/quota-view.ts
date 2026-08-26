@@ -45,7 +45,7 @@ export function hasRemainingQuota(usage?: ProviderUsage): boolean {
 
 export function accountWarning(usage?: ProviderUsage): string | undefined {
   if (usage?.refreshError) return usage.refreshError
-  const reason = usage?.unavailableReason
+  const reason = usage?.statusReason
   if (!reason) return undefined
   if (/quota exhausted|capacity exhausted/i.test(reason) && hasRemainingQuota(usage)) return undefined
   return reason
@@ -152,11 +152,11 @@ export type QuotaAccountUiState = 'ready' | 'unavailable' | 'quota-exhausted' | 
 export function quotaAccountState(account: ProviderAccountSnapshot | undefined, now = Date.now()): QuotaAccountUiState {
   if (!account) return 'unavailable'
   if (account.error?.retryAt && account.error.retryAt > now) return 'cooldown'
-  if (account.usage?.resetAt && account.usage.resetAt > now && /quota exhausted|capacity exhausted/i.test(account.usage.unavailableReason ?? '') && !hasRemainingQuota(account.usage)) return 'cooldown'
+  if (account.usage?.resetAt && account.usage.resetAt > now && /quota exhausted|capacity exhausted/i.test(account.usage.statusReason ?? '') && !hasRemainingQuota(account.usage)) return 'cooldown'
   const exhausted = !hasRemainingQuota(account.usage)
-  if (exhausted && (account.error?.kind === 'quota-exhausted' || account.usage?.unavailableReason?.toLowerCase().includes('quota exhausted'))) return 'quota-exhausted'
-  if (exhausted && (account.error?.kind === 'capacity-exhausted' || account.usage?.unavailableReason?.toLowerCase().includes('capacity exhausted'))) return 'capacity-exhausted'
-  if (account.error?.kind === 'auth' || account.usage?.unavailableReason?.toLowerCase().includes('authentication')) return 'auth-error'
+  if (exhausted && (account.error?.kind === 'quota-exhausted' || account.usage?.statusReason?.toLowerCase().includes('quota exhausted'))) return 'quota-exhausted'
+  if (exhausted && (account.error?.kind === 'capacity-exhausted' || account.usage?.statusReason?.toLowerCase().includes('capacity exhausted'))) return 'capacity-exhausted'
+  if (account.error?.kind === 'auth' || account.usage?.statusReason?.toLowerCase().includes('authentication')) return 'auth-error'
   if (!account.usage || account.usage.status === 'unavailable') return 'unavailable'
   return 'ready'
 }

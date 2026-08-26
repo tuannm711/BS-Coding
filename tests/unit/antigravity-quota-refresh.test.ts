@@ -13,7 +13,7 @@ describe('Antigravity quota accuracy', () => {
     expect(usage.primaryUsedPercent).toBe(20)
     expect(usage.status).toBe('ok')
     expect(usage.resetAt).toBe(Date.parse('2026-08-23T13:00:00Z'))
-    expect(usage.unavailableReason).toBeUndefined()
+    expect(usage.statusReason).toBeUndefined()
   })
 
   it('keeps the headline percentage consistent with the quota group window', () => {
@@ -24,7 +24,7 @@ describe('Antigravity quota accuracy', () => {
   })
 
   it('still falls back to every model when none map to a known quota group', () => {
-    expect(parseAntigravityUsage('a1', { models: { m: { quotaInfo: { remainingFraction: 0 } } } }).unavailableReason).toBe('Quota exhausted')
+    expect(parseAntigravityUsage('a1', { models: { m: { quotaInfo: { remainingFraction: 0 } } } }).statusReason).toBe('Quota exhausted')
     expect(parseAntigravityUsage('a1', { models: { m: { quotaInfo: { remainingFraction: 0.5 } } } }).primaryUsedPercent).toBe(50)
   })
 })
@@ -79,6 +79,6 @@ describe('Antigravity quota auto-refresh on expired credentials', () => {
     const usage = await createAntigravityAdapter().fetchUsage!(account, { accessToken: 'expired' } as never)
 
     expect(usage.status).toBe('unavailable')
-    expect(usage.unavailableReason).toBe('Authentication expired')
+    expect(usage.statusReason).toBe('Authentication expired')
   })
 })

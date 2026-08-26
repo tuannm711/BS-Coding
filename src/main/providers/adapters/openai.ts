@@ -97,7 +97,7 @@ export function createOpenAiAdapter(options: OpenAiAdapterOptions = {}): Provide
     },
     async fetchUsage(account, secret) {
       if (account.authMode !== 'oauth' || !secret.accessToken) {
-        return account.usage ?? { accountId: account.id, accountLabel: account.profile?.email ?? account.label, accountType: account.authMode === 'api-key' ? 'api-key' : 'oauth', refreshedAt: Date.now(), source: 'unavailable', status: 'unavailable', unavailableReason: 'OpenAI API quota is unavailable for this connection method' }
+        return account.usage ?? { accountId: account.id, accountLabel: account.profile?.email ?? account.label, accountType: account.authMode === 'api-key' ? 'api-key' : 'oauth', refreshedAt: Date.now(), source: 'unavailable', status: 'unavailable', statusReason: 'OpenAI API quota is unavailable for this connection method' }
       }
       // The stored id_token carries the account id and the subscription window,
       // so neither depends on an HTTP call that a Codex bearer may be refused.
@@ -119,7 +119,7 @@ export function createOpenAiAdapter(options: OpenAiAdapterOptions = {}): Provide
           const body = await response.text()
           if (!response.ok) { lastStatus = response.status; continue }
           let parsed: unknown
-          try { parsed = JSON.parse(body) } catch { return { accountId: account.id, refreshedAt: Date.now(), source: 'unavailable', status: 'unavailable', unavailableReason: 'Quota response was not valid JSON' } }
+          try { parsed = JSON.parse(body) } catch { return { accountId: account.id, refreshedAt: Date.now(), source: 'unavailable', status: 'unavailable', statusReason: 'Quota response was not valid JSON' } }
           const normalized = normalizeOpenAICodexUsage(account.id, parsed)
           normalized.accountLabel = account.profile?.email ?? account.label
           normalized.accountType = 'oauth'
@@ -135,7 +135,7 @@ export function createOpenAiAdapter(options: OpenAiAdapterOptions = {}): Provide
         }
         break
       }
-      return { accountId: account.id, accountLabel: account.profile?.email ?? account.label, accountType: 'oauth', refreshedAt: Date.now(), source: 'unavailable', status: 'unavailable', unavailableReason: `Quota request failed (${lastStatus || 'network error'})` }
+      return { accountId: account.id, accountLabel: account.profile?.email ?? account.label, accountType: 'oauth', refreshedAt: Date.now(), source: 'unavailable', status: 'unavailable', statusReason: `Quota request failed (${lastStatus || 'network error'})` }
     }
   }
 }
