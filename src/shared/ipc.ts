@@ -4,6 +4,7 @@ import type {
   GitStatus, ImageAttachment, McpServerStatus, BsSettings, ModelRef, NewAgentInput, PromptResponse,
   ProjectSessionSummary, ProviderAccount, ProviderConnection, ProviderUsage, SessionSummary, StatsSummary, Template, TerminalInfo, TodoItem, TraceEvent, TraceSummary, UpdaterStatusEvent, UsageSummary, WorkspaceRuntime, WorkspaceSummary
 } from './types'
+import type { ConsumeResetCreditResult } from './reset-credit'
 import type { BrowserStatusInfo, PairingInfo } from './browser-types'
 import type { AgentAssignmentSetRequest, AgentAssignmentSnapshot } from './provider-state'
 import type { ProviderSnapshot } from './provider-state'
@@ -159,6 +160,7 @@ export const Channels = {
   EventProviderUsage: 'provider:usage',
   ProviderSnapshotGet: 'provider:snapshot-get',
   ProviderAccountRefresh: 'provider:account-refresh',
+  ProviderResetCreditConsume: 'provider:reset-credit-consume',
   EventProviderSnapshotChanged: 'provider:snapshot-changed',
   AgentAssignmentGetSnapshot: 'agent:assignment-get-snapshot',
   AgentAssignmentSetSnapshot: 'agent:assignment-set-snapshot',
@@ -236,6 +238,7 @@ export interface AgentApi {
   onProviderSnapshotChanged(cb: (e: ProviderSnapshot) => void): () => void
   onProviderAuthorizationChanged(cb: (e: ProviderAuthorizationSession) => void): () => void
   refreshProviderAccount(providerId: string, accountId: string): Promise<ProviderSnapshot>
+  consumeResetCredit(providerId: string, accountId: string): Promise<ConsumeResetCreditResult>
   getAgentAssignmentSnapshot(agentId: string): Promise<AgentAssignmentSnapshot | null>
   setAgentAssignmentSnapshot(request: AgentAssignmentSetRequest): Promise<AgentAssignmentSnapshot>
   listTemplates(): Promise<Template[]>

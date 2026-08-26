@@ -100,6 +100,7 @@ describe('IPC contract', () => {
       cancelProviderAuthorization: async () => undefined,
       onProviderAuthorizationChanged: () => () => {},
       connectProvider: async () => settings(),
+      consumeResetCredit: async () => ({ status: 'consumed' as const }),
       disconnectProvider: async () => settings(),
       listTemplates: async () => [],
       saveTemplate: async (t) => t,

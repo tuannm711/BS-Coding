@@ -186,6 +186,7 @@ const api: AgentApi = {
   onProviderSnapshotChanged: (cb: (e: ProviderSnapshot) => void) => subscribe(Channels.EventProviderSnapshotChanged, cb),
   onProviderAuthorizationChanged: (cb: (e: ProviderAuthorizationSession) => void) => subscribe(Channels.EventProviderAuthorizationChanged, cb),
   refreshProviderAccount: (providerId: string, accountId: string) => ipcRenderer.invoke(Channels.ProviderAccountRefresh, providerId, accountId),
+  consumeResetCredit: (providerId: string, accountId: string) => ipcRenderer.invoke(Channels.ProviderResetCreditConsume, providerId, accountId),
   getAgentAssignmentSnapshot: (agentId: string) => ipcRenderer.invoke(Channels.AgentAssignmentGetSnapshot, agentId),
   setAgentAssignmentSnapshot: (request: AgentAssignmentSetRequest) => ipcRenderer.invoke(Channels.AgentAssignmentSetSnapshot, request),
   getBrowserStatus: () => ipcRenderer.invoke(Channels.BrowserGetStatus),

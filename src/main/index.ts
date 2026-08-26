@@ -844,6 +844,8 @@ function registerIpcHandlers(): void {
     await mainApp.providerManager.refreshAccount(providerId, accountId)
     return mainApp.providerSnapshot()
   })
+  ipcMain.handle(Channels.ProviderResetCreditConsume, (_e, providerId: string, accountId: string) =>
+    mainApp.providerManager.consumeResetCredit(providerId, accountId))
   ipcMain.handle(Channels.AgentAssignmentGetSnapshot, (_e, agentId: string) => mainApp.bsAgent.getAgentAssignmentSnapshot(agentId))
   ipcMain.handle(Channels.AgentAssignmentSetSnapshot, (_e, request) => mainApp.bsAgent.setAgentAssignmentSnapshot(request))
   ipcMain.handle(Channels.ProviderAccountEnable, (_e, accountId: string) => mainApp.providerManager.setEnabled(accountId, true))

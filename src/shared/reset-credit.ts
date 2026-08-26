@@ -24,3 +24,8 @@ export function resetCreditGate(usage: ProviderUsage | undefined): ResetCreditGa
   }
   return { allowed: true }
 }
+
+export type ConsumeResetCreditResult =
+  | { status: 'refused'; reason: string }
+  | { status: 'failed'; error: string }
+  | { status: 'consumed'; refreshError?: string }
