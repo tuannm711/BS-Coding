@@ -1244,3 +1244,23 @@ describe('the coordinator knows its role and its workers', () => {
     expect(llmSystems[1]).not.toContain('helper')
   })
 })
+
+describe('the delegated task is framed', () => {
+  const delegate = (manager: BsAgentManager, from: string, to: string, task: string) =>
+    (manager as unknown as { runAssignment: (c: string, n: string, t: string) => Promise<unknown> })
+      .runAssignment(from, to, task)
+
+  it('asks the worker to carry it out and report rather than redesign', async () => {
+    const { manager } = await makeManager({
+      secondAgent: true,
+      partsQueue: [[{ kind: 'text', text: 'done' }, { kind: 'finish' }]]
+    })
+    manager.setMode('a1', 'coordinate')
+    await delegate(manager, 'a1', 'helper', 'change the readme heading')
+    const sent = manager.listMessages('a3').find(message => message.role === 'user')
+    expect(sent?.text).toContain('change the readme heading')
+    // Reporting a failure is part of the job; redesigning around it is not,
+    // because the coordinator holds the context that judgement would need.
+    expect(sent?.text).toContain('report back')
+  })
+})
