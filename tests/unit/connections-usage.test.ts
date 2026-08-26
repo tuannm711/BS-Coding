@@ -140,4 +140,23 @@ describe('provider usage normalization', () => {
       refreshedAt: 1_700_000_100_000
     })
   })
+
+  it('reads ChatGPT reset credits', () => {
+    const usage = normalizeOpenAICodexUsage('a1', {
+      plan_type: 'plus',
+      rate_limit: { primary_window: { used_percent: 0, reset_at: 1787740292 } },
+      rate_limit_reset_credits: { available_count: 1, applicable_available_count: 0 }
+    })
+    expect(usage.resetCredits).toEqual({ available: 1, applicable: 0 })
+  })
+
+  it('leaves reset credits undefined when the provider does not report them', () => {
+    // Absent and zero are different: a provider without the concept must not
+    // render as "0 resets".
+    const usage = normalizeOpenAICodexUsage('a1', {
+      plan_type: 'plus',
+      rate_limit: { primary_window: { used_percent: 0, reset_at: 1787740292 } }
+    })
+    expect(usage.resetCredits).toBeUndefined()
+  })
 })

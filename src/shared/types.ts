@@ -354,8 +354,13 @@ export interface ProviderUsage {
   requestLimit?: number
   tokensUsed?: number
   tokenLimit?: number
-  bankedUsed?: number
-  bankedLimit?: number
+  /**
+   * ChatGPT rate-limit reset credits. `applicable` is lower than `available`
+   * when a credit is held but cannot be spent right now — observed when the
+   * window it would reset had no usage. Absent when the provider has no such
+   * concept; do not default it to zero.
+   */
+  resetCredits?: { available: number; applicable: number }
   primaryUsedPercent?: number
   secondaryUsedPercent?: number
   modelQuotas?: Record<string, { remainingPercent: number; resetAt?: number }>
