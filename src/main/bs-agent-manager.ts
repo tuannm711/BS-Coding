@@ -42,6 +42,7 @@ import type { AgentAssignmentSetRequest, AgentAssignmentSnapshot } from '../shar
 import { classifyRuntimeError } from '../shared/provider-state'
 import { AssignmentStore, fileAssignmentPersistence } from './agent/assignments'
 import { SharedSessionCoordinator } from './agent/shared-session-coordinator'
+import { createDelegateTool } from './agent/tools/delegate'
 import { compileNeutralContext } from './agent/neutral-context'
 import { rankFallbackAgents, type FallbackCandidate } from '../shared/agent-fallback'
 import { poolState } from '../shared/quota-pool'
@@ -1298,9 +1299,29 @@ export class BsAgentManager {
         })
       }
     })
+
+    const delegateTool = createDelegateTool({
+      // The caller is excluded here, so the tool never has to know who it is
+      // and delegating to yourself is impossible rather than checked.
+      listWorkers: () => [...this.agents.values()]
+        .filter(other => other.kind !== 'pty' && other.cwd === agent.cwd && other.id !== agent.id)
+        .map(other => ({ name: other.name, coordinating: (this.modes.get(other.id) ?? 'build') === 'coordinate' })),
+      run: async (name, task) => {
+        const target = [...this.agents.values()].find(other => other.name === name && other.cwd === agent.cwd)
+        if (!target) return { error: `[bs] No agent named ${name}` }
+        // send awaits the whole turn, and running already serialises per
+        // agent: two assignments to different agents run at once, two to the
+        // same one queue. No scheduler is added.
+        await this.send(target.id, task)
+        const last = [...this.listMessages(target.id)].reverse().find(message => message.role === 'assistant')
+        return last?.text ? { output: last.text } : { error: `[bs] ${name} produced no result` }
+      }
+    })
+
     const runnerTools = new Map<string, ToolDefinition>([...this.tools])
     runnerTools.set('task', taskTool)
     runnerTools.set('revert', revertTool)
+    runnerTools.set('delegate', delegateTool)
     if (cfg.lsp.enabled && this.deps.lsp) runnerTools.set('lsp', createLspTool(this.deps.lsp))
     const mode = agent.mode ?? 'build'
     this.modes.set(agent.id, mode)
