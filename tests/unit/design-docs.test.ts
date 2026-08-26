@@ -29,6 +29,7 @@ describe('design doc toc generator', () => {
     const applied = applyToc(doc)
     const lines = applied.split('\n')
     const range = /\| \d+-(\d+) \|/.exec(applied)
+    if (!range) throw new Error('no line range in the generated table of contents')
     expect(Number(range[1])).toBe(lines.length)
   })
 
@@ -135,5 +136,14 @@ describe.skipIf(designFiles.length === 0)('design docs stay honest', () => {
     const raw = readFileSync(path.join(designDir, name), 'utf8')
     const missing = collectCitedPaths(raw).filter(cited => !existsSync(path.resolve(cited)))
     expect(missing).toEqual([])
+  })
+})
+
+describe('repository guards', () => {
+  it('typechecks the test suite as part of npm run typecheck', () => {
+    // Without this the config can silently fall out of the chain and every
+    // fixture is free to drift from its type again.
+    const pkg = JSON.parse(readFileSync('package.json', 'utf8')) as { scripts: Record<string, string> }
+    expect(pkg.scripts.typecheck).toContain('tsconfig.test.json')
   })
 })

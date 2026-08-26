@@ -3,7 +3,7 @@ import { RemoteManager } from '../../src/main/remote/remote-manager'
 import { RemotePairing } from '../../src/main/remote/remote-pairing'
 import type { RemoteCommandContext } from '../../src/main/remote/remote-commands'
 import type { RemoteSettings } from '../../src/main/remote/remote-settings'
-import type { RemoteSettingsStore } from '../../src/main/remote/remote-settings'
+import { RemoteSettingsStore } from '../../src/main/remote/remote-settings'
 import type { RelayClientDeps, RelayStatus } from '../../src/main/remote/remote-relay-client'
 import type { ChatEvent } from '../../src/shared/types'
 
@@ -14,12 +14,13 @@ function makeStore(initial?: Partial<RemoteSettings>): RemoteSettingsStore {
     deviceId: 'dev-1',
     ...initial
   }
-  return {
-    load: () => current,
-    save: (s: RemoteSettings) => {
-      current = s
-    }
-  }
+  // The real class, not a look-alike: it has a private field, so an object
+  // literal can never satisfy it however closely it matches.
+  const values: RemoteSettings[] = [current]
+  return new RemoteSettingsStore({
+    load: () => values,
+    save: (next) => { values.splice(0, values.length, ...next) }
+  })
 }
 
 function makeContext(): RemoteCommandContext {
@@ -32,7 +33,17 @@ function makeContext(): RemoteCommandContext {
       renameSession: vi.fn(),
       send: vi.fn(),
       isRunning: vi.fn(),
-      isBackground: vi.fn()
+      isBackground: vi.fn(),
+      listMessages: vi.fn(),
+      respondPrompt: vi.fn(),
+      runCommand: vi.fn(),
+      listCommands: vi.fn(),
+      listProjectSessions: vi.fn(),
+      createProjectSession: vi.fn(),
+      switchProjectSession: vi.fn(),
+      selectProjectSessionAgent: vi.fn(),
+      listSessionTranscript: vi.fn(),
+      sendInSession: vi.fn()
     },
     workspaceStore: { list: vi.fn() },
     isEnabled: vi.fn(() => true)

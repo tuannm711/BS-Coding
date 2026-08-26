@@ -7,7 +7,6 @@ export interface ActiveChatScope {
 }
 
 export function acceptChatEvent(active: ActiveChatScope, event: ChatEvent): boolean {
-  const scoped = event as ChatEvent & Partial<ActiveChatScope>
-  if (scoped.projectPath !== active.projectPath || scoped.sessionId !== active.sessionId) return false
-  return !active.turnId || !scoped.turnId || scoped.turnId === active.turnId
+  if (event.projectPath !== active.projectPath || event.sessionId !== active.sessionId) return false
+  return !active.turnId || !event.turnId || event.turnId === active.turnId
 }

@@ -162,7 +162,12 @@ export type ProjectSessionSummary = Omit<SessionSummary, 'agentId'> & {
   lastAgentId?: string
 }
 
-export type ChatEvent =
+/**
+ * BsAgentManager.emit stamps the session scope onto every event raised during
+ * a project turn. Declaring it here is what lets the renderer read those
+ * fields; they used to be carried across the boundary by a pair of casts.
+ */
+export type ChatEvent = Partial<Omit<ChatEventScope, 'agentId'>> & (
   | { type: 'text-delta'; agentId: string; delta: string }
   | { type: 'reasoning-delta'; agentId: string; delta: string }
   | { type: 'tool-start'; agentId: string; call: ToolCallData }
@@ -188,6 +193,7 @@ export type ChatEvent =
   | { type: 'user-message'; agentId: string; message: ChatMessage }
   | { type: 'message-removed'; agentId: string; messageId: string }
   | { type: 'session-created'; agentId: string }
+)
 
 export interface ChatEventScope {
   projectPath: string

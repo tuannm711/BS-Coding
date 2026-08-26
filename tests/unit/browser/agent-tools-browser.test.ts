@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { ZodType } from 'zod'
 import { createBrowserTools, type BrowserBridgeLike, type BrowserLauncherLike } from '../../../src/main/agent/tools/browser'
 import type { ToolContext } from '../../../src/main/agent/tools/types'
 import type { BrowserCommandName } from '../../../src/shared/browser-types'
@@ -197,6 +198,8 @@ describe('browser tools', () => {
   it('zod schema rejects invalid input', async () => {
     const tools = createBrowserTools(fakeBridge(), fakeLauncher())
     const nav = tools.find(t => t.name === 'browser_navigate')!
+    // ToolSchema is a zod type or a plain JSON schema; only the first parses.
+    if (!(nav.schema instanceof ZodType)) throw new Error('browser_navigate has no zod schema')
     const out = await nav.schema.safeParse({ url: 123 })
     expect(out.success).toBe(false)
   })

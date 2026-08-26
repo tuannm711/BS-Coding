@@ -367,7 +367,7 @@ describe('SessionRunner', () => {
 
   it('reports token usage in the done event', async () => {
     const h = makeHarness()
-    h.llm.queue = [[textParts('hi'), { kind: 'finish', tokens: { input: 3, output: 4, total: 7 } }]]
+    h.llm.queue = [[{ kind: 'text', text: 'hi' }, { kind: 'finish', tokens: { input: 3, output: 4, total: 7 } }]]
     h.runner.run()
     await new Promise(r => setTimeout(r, 20))
     const done = h.events.find(e => e.type === 'done') as Extract<ChatEvent, { type: 'done' }>
@@ -409,7 +409,7 @@ describe('SessionRunner', () => {
   it('asks the user through the question tool and feeds the answer back', async () => {
     const h = makeHarness({
       tools: new Map([['question', stubTool('question', async (_i, ctx) => {
-        const answer = await ctx.ask('confirm?')
+        const answer = await ctx.ask({ question: 'confirm?' })
         return answer ? { output: `got: ${answer}` } : { error: 'no answer' }
       })]])
     })
@@ -466,7 +466,7 @@ describe('SessionRunner', () => {
   it('keeps a plan read across multiple paged chunks in context', async () => {
     // A 48KB plan read in 20KB chunks (read tool caps output) must not lose the
     // earlier chunks, otherwise the model re-reads chunk 1 forever.
-    const planChunks = {
+    const planChunks: Record<string, string> = {
       0: 'CHUNK_A_' + 'a'.repeat(19000),
       1: 'CHUNK_B_' + 'b'.repeat(19000),
       2: 'CHUNK_C_' + 'c'.repeat(19000)

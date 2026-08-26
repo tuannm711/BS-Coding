@@ -1651,12 +1651,12 @@ export class BsAgentManager {
     }
     if (e.type === 'error') context.execution.status = 'failed'
     if (e.type === 'done') context.execution.status = e.reason === 'stopped' ? 'stopped' : 'completed'
-    const scoped = {
+    const scoped: ChatEvent = {
       ...e,
       projectPath: context.projectPath,
       sessionId: context.sessionId,
       turnId: context.execution.turnId
-    } as unknown as ChatEvent
+    }
     this.onEvent(scoped)
   }
 

@@ -1,4 +1,5 @@
 import type { ProviderAdapter } from '../types'
+import type { ProviderSecrets } from '../../connections/types'
 import type { ProviderConnectRequest } from '../../../shared/providers'
 import { createLlm } from '../../agent/llm'
 import { normalizeProviderImport } from '../auth/import-normalizer'
@@ -10,7 +11,10 @@ import {
 
 const COPILOT_BASE_URL = 'https://api.githubcopilot.com'
 
-export function copilotRuntimeCredential(secret: { apiKey?: string; accessToken?: string }): string {
+// Takes the whole secret, which is what createRuntime hands it. Naming only the
+// two fields it reads made a caller passing a full ProviderSecrets a type error
+// even though that is the only way it is ever called.
+export function copilotRuntimeCredential(secret: ProviderSecrets): string {
   const token = secret.apiKey ?? secret.accessToken
   if (!token) throw new Error('[bs] GitHub Copilot runtime token unavailable')
   return token

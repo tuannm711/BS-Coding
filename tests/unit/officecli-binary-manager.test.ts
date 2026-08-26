@@ -48,7 +48,7 @@ function makeFetch(handlers: Record<string, (url: string) => FetchedResponse>) {
   return async (url: string): Promise<FetchedResponse> => {
     const h = handlers[url]
     if (!h) throw new Error(`unexpected fetch: ${url}`)
-    return h()
+    return h(url)
   }
 }
 
