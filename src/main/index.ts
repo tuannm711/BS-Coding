@@ -837,7 +837,13 @@ function registerIpcHandlers(): void {
   })
 
   ipcMain.handle(Channels.ProviderSnapshotGet, () => mainApp.providerSnapshot())
-  ipcMain.handle(Channels.ProviderAccountRefresh, (_e, providerId: string, accountId: string) => mainApp.providerManager.refreshAccount(providerId, accountId))
+  // providerSnapshot() is the only builder that merges agent assignments in.
+  // refreshAccount returns the manager's own snapshot, whose assignments are
+  // always empty, and a renderer that reads them would blank its list.
+  ipcMain.handle(Channels.ProviderAccountRefresh, async (_e, providerId: string, accountId: string) => {
+    await mainApp.providerManager.refreshAccount(providerId, accountId)
+    return mainApp.providerSnapshot()
+  })
   ipcMain.handle(Channels.AgentAssignmentGetSnapshot, (_e, agentId: string) => mainApp.bsAgent.getAgentAssignmentSnapshot(agentId))
   ipcMain.handle(Channels.AgentAssignmentSetSnapshot, (_e, request) => mainApp.bsAgent.setAgentAssignmentSnapshot(request))
   ipcMain.handle(Channels.ProviderAccountEnable, (_e, accountId: string) => mainApp.providerManager.setEnabled(accountId, true))

@@ -61,6 +61,12 @@ export default function QuotaAccountCard({
           <span className={`quota-account-status ${active ? 'active' : 'inactive'}`}>{active ? 'Active' : account.status}</span>
           {planName ? <span className="quota-plan-badge">{planName}</span> : null}
           {providerState ? <span className={`quota-plan-badge quota-state-${providerState}`} role="status">{STATE_LABELS[providerState]}</span> : null}
+          {/* A statement of fact, not a control: spending a credit is not
+              implemented, and a button would promise otherwise. */}
+          {usage?.resetCredits ? <span className="quota-plan-badge quota-reset-badge" role="status">
+            {usage.resetCredits.available} reset{usage.resetCredits.available === 1 ? '' : 's'}
+            {usage.resetCredits.applicable === 0 && usage.resetCredits.available > 0 ? ' · not usable now' : ''}
+          </span> : null}
         </div>
       </header>
 
@@ -108,6 +114,12 @@ export default function QuotaAccountCard({
         <button className="btn small" type="button" disabled={refreshing} onClick={onReconnect}><Link2 size={13} aria-hidden="true" />Reconnect</button>
         <button className={`btn small ${active ? 'danger' : ''}`} type="button" disabled={refreshing} onClick={onAccountToggle}><Power size={13} aria-hidden="true" />{active ? 'Deactivate' : 'Activate'}</button>
         <button className="btn small danger" type="button" disabled={refreshing} onClick={onRemove}><Trash2 size={13} aria-hidden="true" />Remove</button>
+      </footer> : null}
+
+      {variant === 'chat' && onRefresh ? <footer className="quota-card-actions">
+        <button className="btn small" type="button" disabled={refreshing} onClick={onRefresh}>
+          <RefreshCw size={13} aria-hidden="true" />{refreshing ? 'Refreshing…' : 'Refresh'}
+        </button>
       </footer> : null}
     </section>
   )

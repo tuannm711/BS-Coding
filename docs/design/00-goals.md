@@ -22,8 +22,8 @@ from a wrong reading of it.
 | [The three groups of work](#the-three-groups-of-work) | 132-136 |  |
 | &nbsp;&nbsp;[Group B — The quota surface](#group-b-the-quota-surface) | 137-148 | `refreshProviderAccount`, `ProvidersTab.tsx`, `bankedUsed`, `bankedLimit`, `src/main/connections/usage.ts`, `ProviderUsage` |
 | &nbsp;&nbsp;[Group A — Routing](#group-a-routing) | 149-157 | `docs/technical-debt.md` |
-| &nbsp;&nbsp;[Group C — Quota models](#group-c-quota-models) | 158-163 |  |
-| [What this document is not](#what-this-document-is-not) | 164-169 | `0N-*.md` |
+| &nbsp;&nbsp;[Group C — Quota models](#group-c-quota-models) | 158-166 | `credits.balance`, `credits.has_credits`, `spend_control.individual_limit` |
+| [What this document is not](#what-this-document-is-not) | 167-172 | `0N-*.md` |
 <!-- /toc -->
 
 ## The four goals
@@ -157,8 +157,11 @@ the other two, and addresses friction the owner meets daily.
 
 ### Group C — Quota models
 
-- **C1. The balance model**, for top-up providers. Should be designed against a
-  real account's response rather than a guess at its shape.
+- **C1. The balance model**, for top-up providers. A real response is already
+  available: the ChatGPT usage endpoint returns `credits.balance`,
+  `credits.has_credits` and `spend_control.individual_limit`, none of them
+  parsed. Measured 2026-08-26; recorded as debt item 11. This corrects an
+  earlier assumption here that the work had to wait for a DeepSeek account.
 - **C2. Estimates for silent providers**, from the ledger, labelled as estimates.
 
 ## What this document is not

@@ -201,3 +201,67 @@ describe('snapshot-driven quota cards', () => {
     expect(quotaAccountState(account({ error }), 10)).toBe('quota-exhausted')
   })
 })
+
+describe('quota card actions', () => {
+  const card = (variant: 'chat' | 'provider') => renderToStaticMarkup(React.createElement(QuotaAccountCard, {
+    account: account(), groups: [], variant, onRefresh: () => {}
+  }))
+
+  it('offers a refresh control on the chat card', () => {
+    expect(card('chat')).toContain('Refresh')
+  })
+
+  it('keeps account management off the chat card', () => {
+    // The chat frame is not where accounts are managed, and a destructive
+    // control does not belong beside a running conversation.
+    const markup = card('chat')
+    expect(markup).not.toContain('Reconnect')
+    expect(markup).not.toContain('Remove')
+    expect(markup).not.toContain('Deactivate')
+  })
+
+  it('still offers every provider control on the provider card', () => {
+    const markup = card('provider')
+    for (const label of ['Refresh', 'Reconnect', 'Remove']) expect(markup).toContain(label)
+  })
+})
+
+describe('reset credits', () => {
+  const withCredits = (resetCredits?: { available: number; applicable: number }) =>
+    renderToStaticMarkup(React.createElement(QuotaAccountCard, {
+      account: account({ usage: { accountId: 'account-1', refreshedAt: 1, source: 'provider', status: 'ok', resetCredits } }),
+      groups: [], variant: 'chat'
+    }))
+
+  it('shows a reset credit that can be used', () => {
+    expect(withCredits({ available: 2, applicable: 2 })).toContain('2 resets')
+  })
+
+  it('says a held reset credit cannot be used right now', () => {
+    const markup = withCredits({ available: 1, applicable: 0 })
+    expect(markup).toContain('1 reset')
+    expect(markup).toContain('not usable now')
+  })
+
+  it('shows nothing when the provider does not report reset credits', () => {
+    // Rendering '0 resets' would say the account has none left, which is a
+    // different claim from the provider having no such concept.
+    expect(withCredits(undefined)).not.toContain('reset')
+  })
+})
+
+describe('snapshot shape the panel depends on', () => {
+  it('drops every row when a snapshot carries no assignments', () => {
+    // Not a wish, a warning. buildQuotaRows keys on a ready assignment, so any
+    // channel handing the renderer a snapshot built without them blanks the
+    // panel. ProviderAccountRefresh did exactly that until 2026-08-26: it
+    // returned ConnectionsManager.getSnapshot(), whose assignments are always
+    // empty, instead of MainApp.providerSnapshot(), which merges them in.
+    const rows = buildQuotaRows(
+      [{ id: 'agent-1', name: 'bs' }],
+      { revision: 1, updatedAt: 1, providers: [], accounts: [account()], assignments: [] },
+      {}
+    )
+    expect(rows).toEqual([])
+  })
+})

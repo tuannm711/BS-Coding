@@ -15,11 +15,11 @@ should be checked against.
 | --- | --- | --- |
 | [How the domains relate](#how-the-domains-relate) | 25-41 | `LlmClient` |
 | [The documents](#the-documents) | 42-59 |  |
-| [Finding a name](#finding-a-name) | 60-232 | `.cmd`, `.exe`, `.github/workflows/build.yml`, `.ico`, `'near-limit'`, `/bin/bash` |
-| [What is here and what is history](#what-is-here-and-what-is-history) | 233-242 | `docs/design/`, `docs/superpowers/`, `docs/evidence/` |
-| [Current work](#current-work) | 243-254 | `tests/`, `statusReason`, `docs/superpowers/specs/2026-08-25-narrated-tool-calls-design.md` |
-| [Next work](#next-work) | 255-268 |  |
-| [Debt](#debt) | 269-275 | `docs/technical-debt.md` |
+| [Finding a name](#finding-a-name) | 60-235 | `.cmd`, `.exe`, `.github/workflows/build.yml`, `.ico`, `'near-limit'`, `/bin/bash` |
+| [What is here and what is history](#what-is-here-and-what-is-history) | 236-245 | `docs/design/`, `docs/superpowers/`, `docs/evidence/` |
+| [Current work](#current-work) | 246-257 | `tests/`, `statusReason`, `docs/superpowers/specs/2026-08-25-narrated-tool-calls-design.md` |
+| [Next work](#next-work) | 258-271 |  |
+| [Debt](#debt) | 272-278 | `docs/technical-debt.md` |
 <!-- /toc -->
 
 ## How the domains relate
@@ -71,7 +71,7 @@ Generated from every domain document: which one introduces a name, and where.
 | `'near-limit'` | [03-providers.md#design-decisions](03-providers.md#design-decisions) | 81 |
 | `/bin/bash` | [04-terminal-panes.md#known-limits](04-terminal-panes.md#known-limits) | 91 |
 | `$SHELL` | [04-terminal-panes.md#known-limits](04-terminal-panes.md#known-limits) | 91 |
-| `0N-*.md` | [00-goals.md#what-this-document-is-not](00-goals.md#what-this-document-is-not) | 164 |
+| `0N-*.md` | [00-goals.md#what-this-document-is-not](00-goals.md#what-this-document-is-not) | 167 |
 | `adapter.fetchUsage` | [03-providers.md#data-flow](03-providers.md#data-flow) | 37 |
 | `adapter.refreshCredentials` | [03-providers.md#data-flow](03-providers.md#data-flow) | 37 |
 | `AgentApi` | [01-process-model.md#pieces](01-process-model.md#pieces) | 18 |
@@ -105,6 +105,8 @@ Generated from every domain document: which one introduces a name, and where.
 | `contextBridge` | [01-process-model.md#pieces](01-process-model.md#pieces) | 18 |
 | `createLlm` | [02-agent-runtime.md#design-decisions](02-agent-runtime.md#design-decisions) | 82 |
 | `createRuntime` | [03-providers.md#types-that-carry-it](03-providers.md#types-that-carry-it) | 60 |
+| `credits.balance` | [00-goals.md#group-c-quota-models](00-goals.md#group-c-quota-models) | 158 |
+| `credits.has_credits` | [00-goals.md#group-c-quota-models](00-goals.md#group-c-quota-models) | 158 |
 | `docs/technical-debt.md` | [00-goals.md#the-four-goals](00-goals.md#the-four-goals) | 29 |
 | `electron-builder.ts` | [07-build-release.md#pieces](07-build-release.md#pieces) | 17 |
 | `electron-builder` | [07-build-release.md#data-flow](07-build-release.md#data-flow) | 29 |
@@ -173,6 +175,7 @@ Generated from every domain document: which one introduces a name, and where.
 | `SnapshotStore.snapshot` | [05-sessions.md#data-flow](05-sessions.md#data-flow) | 29 |
 | `SnapshotTurn` | [05-sessions.md#types-that-carry-it](05-sessions.md#types-that-carry-it) | 50 |
 | `SpawnCommand` | [04-terminal-panes.md#types-that-carry-it](04-terminal-panes.md#types-that-carry-it) | 47 |
+| `spend_control.individual_limit` | [00-goals.md#group-c-quota-models](00-goals.md#group-c-quota-models) | 158 |
 | `src/main/agent/AGENTS.md` | [02-agent-runtime.md#design-decisions](02-agent-runtime.md#design-decisions) | 82 |
 | `src/main/agent/llm.ts` | [02-agent-runtime.md#pieces](02-agent-runtime.md#pieces) | 18 |
 | `src/main/agent/loop.ts` | [02-agent-runtime.md#pieces](02-agent-runtime.md#pieces) | 18 |

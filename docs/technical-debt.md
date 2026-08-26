@@ -7,7 +7,7 @@ purpose — none of it is a forgotten TODO.
 Add an entry when you decide *not* to do something you found. Remove it when the
 work lands, naming the commit.
 
-Last reviewed: 2026-08-26 (v1.1.7, after the debt pass)
+Last reviewed: 2026-08-26 (after the quota surface work)
 
 ## Index
 
@@ -22,6 +22,8 @@ Last reviewed: 2026-08-26 (v1.1.7, after the debt pass)
 | 7 | [opencode feature gaps](#7-opencode-feature-gaps) | Product | Medium |
 | 8 | [The test runner crashes intermittently](#8-the-test-runner-crashes-intermittently) | Build | Medium |
 | 9 | [No guard checks whether a design sentence is true](#9-no-guard-checks-whether-a-design-sentence-is-true) | Docs | Medium |
+| 10 | [Spending a reset credit is not implemented](#10-spending-a-reset-credit-is-not-implemented) | Providers | Medium |
+| 11 | [The balance quota model is unparsed](#11-the-balance-quota-model-is-unparsed) | Providers | Medium |
 
 ---
 
@@ -228,3 +230,44 @@ behaviour described is still absent, which is precisely the case for
 auto-continue. Until something better exists, Known limits sections are reviewed
 by reading the code, and the audit that finds a drift records it here.
 
+## 10. Spending a reset credit is not implemented
+
+**Found:** 2026-08-26, while adding the reset-credit badge.
+
+`ProviderUsage.resetCredits` now carries `available` and `applicable`, read
+from `rate_limit_reset_credits` on the ChatGPT usage response, and the quota
+card shows them. Nothing spends one. The cockpit tool can, so a POST endpoint
+exists; the usage response does not reveal it.
+
+It was not guessed. A wrong POST could consume the credit the owner still
+holds, and they asked for it to be left alone.
+
+**Why it matters.** The badge shows something a user will want to act on and
+cannot. That is the accepted cost of shipping the read half, but it is a cost.
+
+**To close:** obtain the endpoint by watching cockpit's own network traffic
+while its Resets control is used, or by reading its source. Then a button
+replaces the badge, enabled only while `applicable` is above zero.
+
+## 11. The balance quota model is unparsed
+
+**Found:** 2026-08-26, in the same captured response.
+
+The ChatGPT usage endpoint returns `credits.has_credits`, `credits.unlimited`,
+`credits.balance`, `credits.approx_local_messages`,
+`credits.approx_cloud_messages` and `spend_control.individual_limit`. None is
+parsed. This is the **balance** model named in `docs/design/00-goals.md`:
+credit that depletes and is topped up by hand rather than refilling on a
+schedule.
+
+`ProviderQuotaWindow` cannot express it. Every field on it is built around a
+reset time, and a balance has none.
+
+**Why it matters.** It was assumed this model could not be designed until a
+DeepSeek account existed to measure. That assumption was wrong — the shape is
+already returned by a provider in daily use, on an account whose balance is
+currently zero.
+
+**To close:** design the balance model against this response, then decide
+whether a top-up provider such as DeepSeek maps onto the same shape or needs
+its own. Group C in `docs/design/00-goals.md`.

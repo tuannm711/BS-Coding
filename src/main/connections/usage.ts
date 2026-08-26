@@ -62,7 +62,7 @@ export function normalizeOpenAICodexUsage(accountId: string, raw: unknown, now =
     subscription_expires_at?: number | string
     primary_window?: WindowUsage
     secondary_window?: WindowUsage
-    banked?: { used?: number; limit?: number }
+    rate_limit_reset_credits?: { available_count?: number; applicable_available_count?: number }
     rate_limit?: { primary_window?: WindowUsage; secondary_window?: WindowUsage }
     rate_limits?: { primary?: WindowUsage; secondary?: WindowUsage }
     additional_rate_limits?: AdditionalRateLimit[]
@@ -101,8 +101,12 @@ export function normalizeOpenAICodexUsage(accountId: string, raw: unknown, now =
     tokenLimit: value.limit?.tokens ?? primary?.limit,
     resetAt,
     secondaryResetAt,
-    bankedUsed: value.banked?.used,
-    bankedLimit: value.banked?.limit,
+    resetCredits: value.rate_limit_reset_credits?.available_count === undefined
+      ? undefined
+      : {
+          available: value.rate_limit_reset_credits.available_count,
+          applicable: value.rate_limit_reset_credits.applicable_available_count ?? 0
+        },
     primaryUsedPercent: primary?.used_percent,
     secondaryUsedPercent: secondary?.used_percent,
     subscriptionExpiresAt: normalizeResetAt(value.subscription_expires_at, now),
