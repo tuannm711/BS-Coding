@@ -56,7 +56,7 @@ from it rather than invented.
 - Produces: `ProviderUsage.resetCredits?: { available: number; applicable: number }`.
   `bankedUsed` and `bankedLimit` no longer exist.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Add to `tests/unit/connections-usage.test.ts`:
 
@@ -81,7 +81,7 @@ Add to `tests/unit/connections-usage.test.ts`:
   })
 ```
 
-- [ ] **Step 2: Run to confirm failure**
+- [x] **Step 2: Run to confirm failure**
 
 ```bash
 npx vitest run tests/unit/connections-usage.test.ts
@@ -90,7 +90,7 @@ npx vitest run tests/unit/connections-usage.test.ts
 Expected: both fail — `resetCredits` is undefined in the first, and the property
 does not exist on the type.
 
-- [ ] **Step 3: Add the field, remove the dead one**
+- [x] **Step 3: Add the field, remove the dead one**
 
 In `src/shared/types.ts`, replace
 
@@ -130,7 +130,7 @@ and replace the two `banked` lines in the `normalizeUsage` call with
 
 Remove `banked?: { used?: number; limit?: number }` from that same response type.
 
-- [ ] **Step 4: Confirm the dead field is gone**
+- [x] **Step 4: Confirm the dead field is gone**
 
 ```bash
 grep -rn "bankedUsed\|bankedLimit\|banked?" src/ tests/
@@ -138,7 +138,7 @@ grep -rn "bankedUsed\|bankedLimit\|banked?" src/ tests/
 
 Expected: no output.
 
-- [ ] **Step 5: Verify and commit**
+- [x] **Step 5: Verify and commit**
 
 ```bash
 npm test && npm run typecheck
@@ -162,7 +162,7 @@ shape the endpoint has never returned, so nothing that read it ever worked.
 - Consumes: `QuotaAccountCard`'s existing `onRefresh` and `refreshing` props.
 - Produces: nothing new; the chat variant renders a footer.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Add to `tests/unit/quota-snapshot.test.tsx`:
 
@@ -193,11 +193,11 @@ Add to `tests/unit/quota-snapshot.test.tsx`:
   })
 ```
 
-- [ ] **Step 2: Run to confirm failure**
+- [x] **Step 2: Run to confirm failure**
 
 Expected: the first fails — the chat variant renders no footer today.
 
-- [ ] **Step 3: Give the chat variant its own footer**
+- [x] **Step 3: Give the chat variant its own footer**
 
 In `QuotaAccountCard.tsx`, the footer at line 106 is gated on
 `variant === 'provider'`. Keep that block unchanged and add beside it:
@@ -213,7 +213,7 @@ In `QuotaAccountCard.tsx`, the footer at line 106 is gated on
 Guarding on `onRefresh` keeps the footer out when no handler was passed, so a
 caller that has nothing to do does not render a dead button.
 
-- [ ] **Step 4: Wire the panel**
+- [x] **Step 4: Wire the panel**
 
 In `RightPanelQuota.tsx`, add state beside the existing snapshot state:
 
@@ -237,7 +237,7 @@ and pass to `QuotaAccountCard` in the `rows.map`:
 already holds, so the result replaces the state directly. `finally` clears the
 flag on failure too, or the button stays disabled forever after one error.
 
-- [ ] **Step 5: Verify and commit**
+- [x] **Step 5: Verify and commit**
 
 ```bash
 npm test && npm run typecheck
@@ -261,7 +261,7 @@ looking.
 **Interfaces:**
 - Consumes: `ProviderUsage.resetCredits` from Task 1.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```tsx
   const withCredits = (resetCredits?: { available: number; applicable: number }) =>
@@ -290,11 +290,11 @@ The third case is the point of the `undefined` handling in Task 1. If it renders
 "0 resets", a provider without the concept is being described as having none
 left, which is a different claim.
 
-- [ ] **Step 2: Run to confirm failure**
+- [x] **Step 2: Run to confirm failure**
 
 Expected: all three fail — nothing renders `resetCredits` today.
 
-- [ ] **Step 3: Render the badge**
+- [x] **Step 3: Render the badge**
 
 In `QuotaAccountCard.tsx`, beside the plan badge in `quota-account-badges`:
 
@@ -312,7 +312,7 @@ Add `.quota-reset-badge` to `styles.css` beside `.quota-plan-badge`, reusing the
 same shape and the existing `--text-faint` token so it reads as information
 rather than as an action.
 
-- [ ] **Step 4: Verify and commit**
+- [x] **Step 4: Verify and commit**
 
 ```bash
 npm test && npm run typecheck
@@ -330,7 +330,7 @@ credit is not known, and guessing one risks spending the owner's.
 **Files:**
 - Modify: `docs/technical-debt.md`
 
-- [ ] **Step 1: Add the reset action as debt**
+- [x] **Step 1: Add the reset action as debt**
 
 A new entry: spending a reset credit is not implemented because the usage
 response does not reveal the POST endpoint. State the unblocking condition
@@ -338,7 +338,7 @@ explicitly — the endpoint, from watching cockpit's network traffic or reading
 its source — the way item 1 stated its condition and was unblocked by it
 arriving.
 
-- [ ] **Step 2: Add the balance model as debt**
+- [x] **Step 2: Add the balance model as debt**
 
 The same response carries `credits.has_credits`, `credits.unlimited`,
 `credits.balance`, `credits.approx_local_messages`, `credits.approx_cloud_messages`
@@ -350,13 +350,13 @@ it should wait for a DeepSeek account.
 Update `docs/design/00-goals.md` where it says C1 should be designed against a
 real account's response: one is available now.
 
-- [ ] **Step 3: Regenerate the tables of contents**
+- [x] **Step 3: Regenerate the tables of contents**
 
 ```bash
 npm run docs:toc
 ```
 
-- [ ] **Step 4: Full verification**
+- [x] **Step 4: Full verification**
 
 ```bash
 npm test && npm run typecheck
@@ -364,13 +364,13 @@ npm test && npm run typecheck
 
 Check the exit status of each, chained with `&&`, not a grep of the output.
 
-- [ ] **Step 5: Run the app**
+- [x] **Step 5: Run the app**
 
 Open a project with a ChatGPT agent selected. Confirm the chat quota card shows
 a Refresh button, that pressing it updates the numbers without opening Settings,
 and that the account holding a credit shows "1 reset · not usable now". Confirm
 an Antigravity card shows no reset badge at all.
 
-- [ ] **Step 6: Report and stop**
+- [x] **Step 6: Report and stop**
 
 Do not merge, tag, or push. Report all four tasks and wait for the final gate.
