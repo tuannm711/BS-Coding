@@ -63,7 +63,7 @@ lose their reason.
 - Produces: `tsconfig.test.json` at the repo root, not yet referenced by any npm
   script.
 
-- [ ] **Step 1: Create the config**
+- [x] **Step 1: Create the config**
 
 ```json
 {
@@ -90,7 +90,7 @@ lose their reason.
 already a dev dependency and covers `tests/e2e` rather than excluding it.
 `allowJs` lets the two `scripts/*.mjs` imports resolve.
 
-- [ ] **Step 2: Record the starting count**
+- [x] **Step 2: Record the starting count**
 
 ```bash
 npx tsc --noEmit -p tsconfig.test.json 2>&1 | grep -c "error TS"
@@ -99,7 +99,7 @@ npx tsc --noEmit -p tsconfig.test.json 2>&1 | grep -c "error TS"
 Expected: **77**. A number near 284 means `env.d.ts` is missing from `include`.
 Save the full output; later steps quote from it.
 
-- [ ] **Step 3: Fix the `SnapshotEntry` imports**
+- [x] **Step 3: Fix the `SnapshotEntry` imports**
 
 Seven sites import a type that does not exist. `src/main/agent/snapshot.ts`
 exports `SnapshotTurn`. In each of `tests/unit/agent-snapshot.test.ts`,
@@ -123,7 +123,7 @@ and change each use `memoryStore<SnapshotEntry>()` to `memoryStore<SnapshotTurn>
 Read `snapshot.ts` first and confirm `SnapshotTurn` is what `SnapshotStore` is
 constructed over; do not assume the compiler's "Did you mean" is right.
 
-- [ ] **Step 4: Add a complete-settings helper and use it**
+- [x] **Step 4: Add a complete-settings helper and use it**
 
 Twelve errors are one cause: `BsSettings` fixtures carrying only `providers` and
 `defaultProvider` while the type requires eight more fields. `configToSettings`
@@ -162,7 +162,7 @@ now carries `DEFAULT_BS_CONFIG`'s agents, which can take a different branch in
 `settingsToConfig`. If any assertion changes, stop and report that case
 specifically rather than adjusting the expectation.
 
-- [ ] **Step 5: Fix the `ProviderAccount` fixtures**
+- [x] **Step 5: Fix the `ProviderAccount` fixtures**
 
 Three sites build an account without `providerId`, `createdAt` and `lastUsedAt`,
 in `tests/integration/shared-session-agent-switch.test.ts` (two) and
@@ -179,14 +179,14 @@ accounts: [{
 Use the connection's own `providerId` for each, and constant timestamps so the
 fixtures stay deterministic.
 
-- [ ] **Step 6: Fix the `chatTransport` fixtures**
+- [x] **Step 6: Fix the `chatTransport` fixtures**
 
 `tests/unit/provider-snapshot.test.ts` lines 33 and 42 build a provider summary
 missing the required `chatTransport`. Read the field's type in
 `src/shared/types.ts` and supply the value the real `antigravity` provider
 declares in `src/main/providers/`, not an invented one.
 
-- [ ] **Step 7: Re-count**
+- [x] **Step 7: Re-count**
 
 ```bash
 npx tsc --noEmit -p tsconfig.test.json 2>&1 | grep -c "error TS"
@@ -195,7 +195,7 @@ npx tsc --noEmit -p tsconfig.test.json 2>&1 | grep -c "error TS"
 Expected: roughly **50** remaining. The exact number is not the gate; the gate is
 that no error fixed in this task reappears.
 
-- [ ] **Step 8: Verify and commit**
+- [x] **Step 8: Verify and commit**
 
 ```bash
 npm test && npm run typecheck
@@ -221,7 +221,7 @@ vitest erases types without checking them.
   `tests/unit/agent-tools-websearch.test.ts`,
   `tests/unit/openai-responses.test.ts`, `tests/unit/provider-antigravity.test.ts`
 
-- [ ] **Step 1: Narrow before reading union members**
+- [x] **Step 1: Narrow before reading union members**
 
 Five errors read `.data` or `.error` off `BrowserCommandResult`, which is
 `{ ok: true; data: ... } | { ok: false; error: string }`. Three more read `.ok`,
@@ -240,7 +240,7 @@ it turns a wrong shape into a readable failure instead of `undefined`.
 For `relay-flow.test.ts:101-102`, read `RemoteEnvelope` in
 `src/shared/` first and narrow on whatever discriminant it actually carries.
 
-- [ ] **Step 2: Give `createLlm` its real signature**
+- [x] **Step 2: Give `createLlm` its real signature**
 
 Six `Tuple type '[]' of length '0'` errors in `tests/unit/bs-agent-manager.test.ts`
 come from `vi.fn((): LlmClient => ...)` declaring no parameters, so
@@ -258,7 +258,7 @@ not match what it replaces cannot catch a caller passing the wrong thing.
 Apply the same treatment to the two tuple errors in
 `tests/unit/agent-tools-websearch.test.ts:28`.
 
-- [ ] **Step 3: Type the `fetch` mocks**
+- [x] **Step 3: Type the `fetch` mocks**
 
 Six errors in `tests/unit/openai-responses.test.ts` and
 `tests/unit/provider-antigravity.test.ts` assign a `vi.fn()` to `global.fetch`
@@ -272,7 +272,7 @@ globalThis.fetch = fetchMock
 expect(fetchMock.mock.calls[0][0]).toContain('/responses')
 ```
 
-- [ ] **Step 4: Re-count and verify**
+- [x] **Step 4: Re-count and verify**
 
 ```bash
 npx tsc --noEmit -p tsconfig.test.json 2>&1 | grep -c "error TS"
@@ -281,7 +281,7 @@ npm test && npm run typecheck
 
 Expected: about **30** errors remaining, **1050** tests, typecheck green.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Commit as `test: narrow unions and type mocks instead of reaching past the types`.
 
@@ -295,7 +295,7 @@ Commit as `test: narrow unions and type mocks instead of reaching past the types
   the remaining test files named by the error output
 - Test: `tests/unit/design-docs.test.ts` (add the script-chain guard)
 
-- [ ] **Step 1: Declare the chat event scope instead of casting it**
+- [x] **Step 1: Declare the chat event scope instead of casting it**
 
 `tests/unit/chat-event-scope.test.ts` reports four errors because `ChatEvent` does
 not declare `projectPath`, `sessionId` or `turnId` — yet `emit()` in
@@ -326,7 +326,7 @@ the `as ChatEvent` casts from the test.
 Run `npx vitest run tests/unit/ipc-contract.test.ts` afterwards: that suite
 guards the event contract and may enumerate the union.
 
-- [ ] **Step 2: Fix the remaining one-off errors**
+- [x] **Step 2: Fix the remaining one-off errors**
 
 Work from the saved error output. Each of these is a single site:
 
@@ -351,7 +351,7 @@ Work from the saved error output. Each of these is a single site:
 
 For each, read the real type before changing the test. Do not add a cast.
 
-- [ ] **Step 3: Reach zero**
+- [x] **Step 3: Reach zero**
 
 ```bash
 npx tsc --noEmit -p tsconfig.test.json
@@ -360,7 +360,7 @@ echo "EXIT=$?"
 
 Expected: `EXIT=0` and no output.
 
-- [ ] **Step 4: Wire it into the typecheck chain**
+- [x] **Step 4: Wire it into the typecheck chain**
 
 In `package.json`, append to the `typecheck` script:
 
@@ -370,7 +370,7 @@ In `package.json`, append to the `typecheck` script:
 
 so the full chain is node, web, extension, server, then test.
 
-- [ ] **Step 5: Guard the wiring**
+- [x] **Step 5: Guard the wiring**
 
 Add to `tests/unit/design-docs.test.ts`, which already guards repo-level
 invariants:
@@ -385,7 +385,7 @@ it('typechecks the test suite as part of npm run typecheck', () => {
 Without this the config can silently fall out of the chain and the whole item
 quietly reverts.
 
-- [ ] **Step 6: Confirm no cast was added**
+- [x] **Step 6: Confirm no cast was added**
 
 ```bash
 git diff master -- tests/ | grep -nE "^\+.* as [A-Z]"
@@ -394,7 +394,7 @@ git diff master -- tests/ | grep -nE "^\+.* as [A-Z]"
 Read every hit. A cast is acceptable only where it existed before this work;
 a new one means the error was silenced rather than fixed.
 
-- [ ] **Step 7: Verify and commit**
+- [x] **Step 7: Verify and commit**
 
 ```bash
 npm test && npm run typecheck
@@ -425,7 +425,7 @@ whose scoping fields were carried entirely by casts.
 - Produces: `ProviderUsage.statusReason?: string`. `unavailableReason` no longer
   exists in `src/`.
 
-- [ ] **Step 1: Write the failing test for the stored old key**
+- [x] **Step 1: Write the failing test for the stored old key**
 
 The field is present in real `connections/accounts.json` files. Add a test that a
 record written under the old name still reads:
@@ -449,7 +449,7 @@ it('reads a reason stored under the old key', () => {
 })
 ```
 
-- [ ] **Step 2: Run to confirm it fails**
+- [x] **Step 2: Run to confirm it fails**
 
 ```bash
 npx vitest run tests/unit/provider-account-store.test.ts
@@ -458,7 +458,7 @@ npx vitest run tests/unit/provider-account-store.test.ts
 Expected: fails — `statusReason` is undefined, and the property does not exist on
 the type.
 
-- [ ] **Step 3: Rename the field**
+- [x] **Step 3: Rename the field**
 
 Rename `unavailableReason` to `statusReason` at all 21 sites in `src/`. Do it by
 reading each site, not with a blind find-and-replace: `quota-view.ts:155-159`
@@ -467,7 +467,7 @@ tests the string's *content*, and those regexes must keep working.
 Do not rename anything in `tests/` yet; Task 3 has made the compiler report those
 five files, which is the point.
 
-- [ ] **Step 4: Normalise on read**
+- [x] **Step 4: Normalise on read**
 
 In `src/main/connections/store.ts`, `load()` at line 118 is the single place
 stored records enter the process. Add the normalisation there:
@@ -493,14 +493,14 @@ and return `withStatusReason(parsed as StoredProviderAccounts)` from the success
 branch. The cast here reads a key that deliberately no longer exists on the type;
 it is describing legacy data, not silencing an error.
 
-- [ ] **Step 5: Update the five test files**
+- [x] **Step 5: Update the five test files**
 
 `npx tsc --noEmit -p tsconfig.test.json` now names them:
 `antigravity-error-classification.test.ts`, `antigravity-quota-refresh.test.ts`,
 `antigravity-usage.test.ts`, `quota-snapshot.test.tsx`, `quota-view.test.ts`.
 Rename the field in each.
 
-- [ ] **Step 6: Verify and commit**
+- [x] **Step 6: Verify and commit**
 
 ```bash
 npm test && npm run typecheck
@@ -525,7 +525,7 @@ key, since that is the part a reviewer would otherwise have to discover.
   `export function FeedRow(props: FeedRowProps)` from `FeedRow.tsx`.
   `ChatPanel` imports `FeedItem` from there rather than declaring it.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```tsx
 import { describe, expect, it } from 'vitest'
@@ -568,7 +568,7 @@ describe('FeedRow', () => {
 })
 ```
 
-- [ ] **Step 2: Run to confirm failure**
+- [x] **Step 2: Run to confirm failure**
 
 ```bash
 npx vitest run tests/unit/feed-row.test.tsx
@@ -576,7 +576,7 @@ npx vitest run tests/unit/feed-row.test.tsx
 
 Expected: cannot resolve `FeedRow`.
 
-- [ ] **Step 3: Create the component**
+- [x] **Step 3: Create the component**
 
 Move the `FeedItem` union from `ChatPanel.tsx:18` into `FeedRow.tsx` and export
 it. Move the body of the `items.map` callback verbatim into:
@@ -599,7 +599,7 @@ The `key` stays on the caller's side, so each branch returns its element without
 one. Keep the `message` branch's early `return null` for an empty assistant
 message — it is why a streaming turn does not flash an empty bubble.
 
-- [ ] **Step 4: Use it from ChatPanel**
+- [x] **Step 4: Use it from ChatPanel**
 
 ```tsx
 {items.map(item => (
@@ -617,7 +617,7 @@ message — it is why a streaming turn does not flash an empty bubble.
 Import `FeedItem` from `./FeedRow` in `ChatPanel.tsx` and delete the local
 declaration.
 
-- [ ] **Step 5: Verify and commit**
+- [x] **Step 5: Verify and commit**
 
 ```bash
 npm test && npm run typecheck
@@ -645,7 +645,7 @@ this test.
   `withNarrationNotices(items: FeedItem[]): FeedItem[]` from
   `src/renderer/src/components/chat/transcript-notices.ts`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 import { describe, expect, it } from 'vitest'
@@ -684,11 +684,11 @@ describe('withNarrationNotices', () => {
 The user-role case matters: a user can paste a tool transcript, and flagging that
 would be a false alarm.
 
-- [ ] **Step 2: Run to confirm failure**
+- [x] **Step 2: Run to confirm failure**
 
 Expected: cannot resolve `transcript-notices`.
 
-- [ ] **Step 3: Move the detector to shared**
+- [x] **Step 3: Move the detector to shared**
 
 Cut `NARRATED` and `looksLikeNarratedToolCall` from
 `src/main/agent/neutral-context.ts` into `src/shared/narrated-tool-call.ts`
@@ -704,7 +704,7 @@ Update the import in `tests/unit/neutral-context.test.ts`, or move the
 `tests/unit/narrated-tool-call.test.ts`. Either is fine; keep the assertions
 identical.
 
-- [ ] **Step 4: Implement the mapper**
+- [x] **Step 4: Implement the mapper**
 
 Create `src/renderer/src/components/chat/transcript-notices.ts`:
 
@@ -731,13 +731,13 @@ export function withNarrationNotices(items: FeedItem[]): FeedItem[] {
 The id derives from the message id, so it is stable across reloads and distinct
 per message — `Date.now()` would collide when two are appended in one pass.
 
-- [ ] **Step 5: Use it in loadTranscript**
+- [x] **Step 5: Use it in loadTranscript**
 
 In `ChatPanel.tsx`, wrap the existing `setItems(items.map(...))` call at the
 transcript load so the mapped array passes through `withNarrationNotices` before
 reaching `setItems`.
 
-- [ ] **Step 6: Verify and commit**
+- [x] **Step 6: Verify and commit**
 
 ```bash
 npm test && npm run typecheck
@@ -753,7 +753,7 @@ Expected: **1059**. Commit as
 **Files:**
 - Modify: `docs/technical-debt.md`
 
-- [ ] **Step 1: Close the four entries**
+- [x] **Step 1: Close the four entries**
 
 The document's own rule is "Remove it when the work lands, naming the commit."
 Remove entries 1, 4, 12 and 13 and their index rows, renumbering the survivors
@@ -764,12 +764,12 @@ was wrong twice.
 
 Update `Last reviewed:` to `2026-08-26 (v1.1.7, after the debt pass)`.
 
-- [ ] **Step 2: Record anything discovered**
+- [x] **Step 2: Record anything discovered**
 
 If Task 1 or 2 turned up a fixture whose correction changed what a test asserts,
 add a new entry describing it rather than leaving it in the commit message alone.
 
-- [ ] **Step 3: Regenerate the documentation tables of contents**
+- [x] **Step 3: Regenerate the documentation tables of contents**
 
 ```bash
 npm run docs:toc
@@ -778,7 +778,7 @@ npm run docs:toc
 `docs/design/README.md` cites `docs/technical-debt.md`; the guard in
 `tests/unit/design-docs.test.ts` fails if a table of contents drifts.
 
-- [ ] **Step 4: Full verification**
+- [x] **Step 4: Full verification**
 
 ```bash
 npm test && npm run typecheck
@@ -786,14 +786,14 @@ npm test && npm run typecheck
 
 Check the exit status of each, chained with `&&`, not a grep of the output.
 
-- [ ] **Step 5: Run the app**
+- [x] **Step 5: Run the app**
 
 Open a project, confirm a quota card still shows its reason for an account that
 had one — this is the `statusReason` read path against real stored data. Then
 reopen the session that contains the 17 narrated messages and confirm the notice
 now appears beneath them.
 
-- [ ] **Step 6: Report and stop**
+- [x] **Step 6: Report and stop**
 
 Do not merge, tag, or push. Report all seven tasks, the final error count at each
 stage, and every case where a fixture correction changed an assertion. Wait for
