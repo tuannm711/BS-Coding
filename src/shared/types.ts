@@ -343,7 +343,11 @@ export interface ProviderAccount {
 
 export interface ProviderQuotaWindow {
   id: string
+  // Short enough to sit on one line beside a countdown and a percentage —
+  // 'Weekly', '5-hour'. The provider's sentence about the window goes in
+  // `description`; a label that is a paragraph is not a label.
   label: string
+  description?: string
   kind: 'session' | 'weekly' | 'monthly' | 'additional' | 'unknown'
   remainingPercent?: number
   resetAt?: number

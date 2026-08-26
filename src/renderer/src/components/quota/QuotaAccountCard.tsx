@@ -63,6 +63,17 @@ function FleetAgent({ agent, coordinatorName, onSelect, onSpeedChange, onSetCoor
       </button>
       {agent.coordinator ? <span className="fleet-role">coordinates</span> : null}
       {agent.mode === 'plan' ? <span className="fleet-role plan">plan</span> : null}
+      {/* One toggle, not two buttons. At this width two labelled buttons push
+          the agent's own name out of the row, which is the one thing the row
+          exists to show. Standard is the unlit state. */}
+      <button
+        type="button"
+        className={`fleet-speed${agent.speed === 'fast' ? ' fast' : ''}`}
+        aria-pressed={agent.speed === 'fast'}
+        aria-label={`Fast mode for ${agent.name}`}
+        title={agent.speed === 'fast' ? 'Fast — click for standard' : 'Standard — click for fast'}
+        onClick={() => onSpeedChange?.(agent.id, agent.speed === 'fast' ? 'standard' : 'fast')}
+      ><Zap size={12} aria-hidden="true" /></button>
       {/* The one place the role is given. It names who loses it, because the
           role is exclusive and taking it demotes another agent silently
           otherwise. */}
@@ -72,14 +83,6 @@ function FleetAgent({ agent, coordinatorName, onSelect, onSpeedChange, onSetCoor
         title={coordinatorName ? `Take coordination from ${coordinatorName}` : 'Make this agent the coordinator'}
         onClick={() => onSetCoordinator(agent.id)}
       >{coordinatorName ? `Take from ${coordinatorName}` : 'Coordinate'}</button> : null}
-      <span className="quota-speed-control" role="group" aria-label={`Speed for ${agent.name}`}>
-        {(['standard', 'fast'] as const).map(speed => {
-          const selected = agent.speed === speed || (!agent.speed && speed === 'standard')
-          return <button key={speed} type="button" className={selected ? 'active' : ''} aria-pressed={selected} onClick={() => onSpeedChange?.(agent.id, speed)}>
-            {speed === 'fast' ? <Zap size={12} aria-hidden="true" /> : <Gauge size={12} aria-hidden="true" />}{speed === 'fast' ? 'Fast' : 'Standard'}
-          </button>
-        })}
-      </span>
     </div>
   )
 }
@@ -112,6 +115,16 @@ export default function QuotaAccountCard({
           </div>
         </div>
         <div className="quota-account-badges">
+          {/* In the header rather than a footer row: at panel width a labelled
+              Refresh button costs a whole line to say what an icon says. */}
+          {variant === 'fleet' && onRefresh ? <button
+            className="quota-account-refresh"
+            type="button"
+            disabled={refreshing}
+            title={refreshing ? 'Refreshing…' : 'Refresh quota'}
+            aria-label={`Refresh quota for ${accountLabel}`}
+            onClick={onRefresh}
+          ><RefreshCw size={13} aria-hidden="true" className={refreshing ? 'spinning' : undefined} /></button> : null}
           <span className={`quota-account-status ${active ? 'active' : 'inactive'}`}>{active ? 'Active' : account.status}</span>
           {planName ? <span className="quota-plan-badge">{planName}</span> : null}
           {providerState ? <span className={`quota-plan-badge quota-state-${providerState}`} role="status">{STATE_LABELS[providerState]}</span> : null}
@@ -166,12 +179,14 @@ export default function QuotaAccountCard({
         {pools.map(pool => <section className="quota-group" key={pool.group.id} aria-label={pool.group.label}>
           <h6>{pool.group.label}<PoolBadge group={pool.group} poolErrors={account.poolErrors} /></h6>
           {pool.group.windows.map(window => <QuotaWindow key={window.id} window={window} />)}
+          {/* No "nobody is using this pool" line. It repeated under every idle
+              pool and said nothing the empty space did not already say. */}
           {pool.agents.length > 0 ? <div className="fleet-pool-agents">
             {pool.agents.map(agent => <FleetAgent
               key={agent.id} agent={agent}
               onSelect={onSelectAgent} onSpeedChange={onSpeedChange}
               onSetCoordinator={onSetCoordinator} coordinatorName={coordinatorName} />)}
-          </div> : <p className="fleet-pool-idle">No agent drawing on this pool</p>}
+          </div> : null}
         </section>)}
       </div> : groups.length > 0 ? <div className="quota-groups">
         {groups.map(group => <section className="quota-group" key={group.id} aria-label={group.label}>
@@ -190,7 +205,12 @@ export default function QuotaAccountCard({
         </div>
       </div> : null}
 
-      {variant === 'provider' ? <ProviderMetrics tracked={tracked} /> : <SessionMetrics session={session} tracked={tracked} />}
+      {/* Nothing for the fleet variant. It is given no telemetry, so the row
+          rendered four truncated labels over four dashes — a heading for a
+          measurement that is not there. */}
+      {variant === 'provider' ? <ProviderMetrics tracked={tracked} />
+        : variant === 'chat' ? <SessionMetrics session={session} tracked={tracked} />
+        : null}
 
       {variant === 'provider' ? <footer className="quota-card-actions">
         <button className="btn small" type="button" disabled={refreshing} onClick={onRefresh}><RefreshCw size={13} aria-hidden="true" />{refreshing ? 'Refreshing…' : 'Refresh'}</button>
@@ -217,10 +237,20 @@ function PoolBadge({ group, poolErrors }: { group: ProviderQuotaGroup; poolError
 function QuotaWindow({ window }: { window: ProviderQuotaGroup['windows'][number] }) {
   const known = window.usageKnown && window.remainingPercent !== undefined
   const state = quotaWindowState(window)
-  return <div className={`quota-window state-${state}`}>
-    <div className="quota-window-label"><span>{window.label}</span><strong>{known ? `${formatPercent(window.remainingPercent)} left` : 'Not reported'}</strong></div>
+  // One line, then the bar. The percentage, the bar and the countdown are the
+  // same fact three ways; the absolute timestamp and the provider's sentence
+  // are wanted occasionally, so they hang off the row rather than filling it.
+  const detail = [
+    window.description,
+    window.resetAt ? `Next reset ${formatInstant(window.resetAt)}` : 'Reset not reported'
+  ].filter(Boolean).join('\n')
+  return <div className={`quota-window state-${state}`} title={detail}>
+    <div className="quota-window-label">
+      <span>{window.label}</span>
+      <em>{window.resetAt ? formatCountdown(window.resetAt) : '—'}</em>
+      <strong>{known ? formatPercent(window.remainingPercent) : '—'}</strong>
+    </div>
     {known ? <div className="quota-progress" role="progressbar" aria-label={`${window.label} remaining`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={window.remainingPercent}><span style={{ width: `${window.remainingPercent}%` }} /></div> : null}
-    <span className="quota-window-reset">{window.resetAt ? `Next reset · ${formatCountdown(window.resetAt)} · ${formatInstant(window.resetAt)}` : 'Reset not reported'}</span>
   </div>
 }
 

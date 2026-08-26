@@ -40,7 +40,10 @@ describe('Antigravity model and usage parsing', () => {
     const grouped = { response: { groups: [
       { displayName: 'Gemini Models', buckets: [
         { bucketId: 'gemini-5h', remaining: { remainingFraction: 0.7 }, resetTime: '2026-08-23T12:00:00Z', description: '5-hour' },
-        { bucketId: 'gemini-weekly', remainingFraction: 0.4, resetTime: '2026-08-30T12:00:00Z', description: 'Weekly' }
+        // What Cloud Code actually sends: a short label and a whole sentence
+        // beside it. Using the sentence as the label made one window three
+        // lines tall for a fact the percentage next to it already stated.
+        { bucketId: 'gemini-weekly', remainingFraction: 0.4, resetTime: '2026-08-30T12:00:00Z', label: 'Weekly', description: 'You have used some of your weekly limit, it will fully refresh in 3 days, 19 hours.' }
       ] },
       { displayName: 'Claude and GPT models', buckets: [
         { bucketId: '3p-5h', remaining: { remainingFraction: 0.55 }, resetTime: '2026-08-23T13:00:00Z' },
@@ -51,8 +54,8 @@ describe('Antigravity model and usage parsing', () => {
     expect(parseAntigravityQuotaSummary('a1', grouped, {}, 1).quotaGroups).toEqual([
       {
         id: 'gemini', label: 'Gemini Models', modelIds: [], windows: [
-          { id: 'gemini-5h', label: '5-hour', kind: 'session', remainingPercent: 70, resetAt: Date.parse('2026-08-23T12:00:00Z'), usageKnown: true, source: 'provider' },
-          { id: 'gemini-weekly', label: 'Weekly', kind: 'weekly', remainingPercent: 40, resetAt: Date.parse('2026-08-30T12:00:00Z'), usageKnown: true, source: 'provider' }
+          { id: 'gemini-5h', label: '5-hour', description: '5-hour', kind: 'session', remainingPercent: 70, resetAt: Date.parse('2026-08-23T12:00:00Z'), usageKnown: true, source: 'provider' },
+          { id: 'gemini-weekly', label: 'Weekly', description: 'You have used some of your weekly limit, it will fully refresh in 3 days, 19 hours.', kind: 'weekly', remainingPercent: 40, resetAt: Date.parse('2026-08-30T12:00:00Z'), usageKnown: true, source: 'provider' }
         ]
       },
       {

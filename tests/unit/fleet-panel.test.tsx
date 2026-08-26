@@ -4,6 +4,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { FleetBoard } from '../../src/renderer/src/components/fleet/FleetPanel'
 import type { FleetAgentRow, FleetModel } from '../../src/renderer/src/components/fleet/fleet-model'
 import type { ProviderAccountSnapshot } from '../../src/shared/provider-state'
+import type { ProviderQuotaWindow } from '../../src/shared/types'
 
 const account: ProviderAccountSnapshot = {
   id: 'acc1', providerId: 'antigravity', label: 'bdg', authMode: 'oauth',
@@ -13,9 +14,14 @@ const account: ProviderAccountSnapshot = {
 const row = (patch: Partial<FleetAgentRow> = {}): FleetAgentRow =>
   ({ id: 'a1', name: 'anti-claude-opus', mode: 'build', coordinator: false, ...patch })
 
-const pool = (id: string, agents: FleetAgentRow[]) => ({
-  group: { id, label: id, modelIds: [], windows: [] },
+const pool = (id: string, agents: FleetAgentRow[], windows: ProviderQuotaWindow[] = []) => ({
+  group: { id, label: id, modelIds: [], windows },
   agents
+})
+
+const window = (patch: Partial<ProviderQuotaWindow> = {}): ProviderQuotaWindow => ({
+  id: 'w1', label: 'Weekly', kind: 'weekly', remainingPercent: 93,
+  resetAt: Date.parse('2026-08-30T12:00:00Z'), usageKnown: true, source: 'provider', ...patch
 })
 
 const board = (fleet: FleetModel) =>
@@ -48,8 +54,31 @@ describe('FleetBoard', () => {
     expect(markup.indexOf('anti-claude-sonnet')).toBeGreaterThan(poolIndex)
   })
 
-  it('says when a pool has no agent drawing on it', () => {
-    expect(board(withPools([pool('gemini', [])]))).toContain('No agent drawing on this pool')
+  it('keeps a provider sentence out of the row and in the tooltip', () => {
+    // The label is a label. The provider's paragraph made one window three
+    // lines tall for a fact the percentage beside it already stated.
+    const prose = 'You have used some of your weekly limit, it will fully refresh in 3 days.'
+    const markup = board(withPools([pool('gemini', [], [window({ description: prose })])]))
+    expect(markup).toContain(`title="${prose}`)
+    expect(markup).toContain('>Weekly<')
+  })
+
+  it('states the countdown on the row and the timestamp only on hover', () => {
+    const markup = board(withPools([pool('gemini', [], [window()])]))
+    expect(markup).toContain('>93%<')
+    expect(markup).not.toContain('Next reset · ')
+  })
+
+  it('keeps the refresh control', () => {
+    // Moving a panel must not drop a function. This one was gated to the chat
+    // variant and disappeared with the pinned block.
+    expect(board(withPools([pool('gemini', [])]))).toContain('Refresh quota for')
+  })
+
+  it('says nothing about a pool with no agent drawing on it', () => {
+    // It repeated under every idle pool and said nothing the empty space did
+    // not already say.
+    expect(board(withPools([pool('gemini', [])]))).not.toContain('No agent drawing on this pool')
   })
 
   it('marks the coordinator', () => {

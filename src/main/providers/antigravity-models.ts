@@ -185,9 +185,13 @@ function quotaBucketWindow(bucket: CloudCodeQuotaBucket, groupId: string, index:
   const fraction = bucketFraction(bucket)
   const remainingPercent = fraction === undefined ? undefined : fractionPercent(fraction)
   const resetAt = parseReset(bucket.resetTime)
-  const label = bucket.description ?? bucket.label ?? (kind === 'weekly' ? 'Weekly' : kind === 'session' ? '5-hour' : 'Quota')
+  // label before description. Cloud Code's description is a whole sentence —
+  // "You have used some of your weekly limit, it will fully refresh in 3 days"
+  // — and using it as the label made every window three lines tall for one
+  // fact the percentage and countdown beside it already stated.
+  const label = bucket.label ?? (kind === 'weekly' ? 'Weekly' : kind === 'session' ? '5-hour' : 'Quota')
   if (remainingPercent === undefined && resetAt === undefined) return undefined
-  return { id, label, kind, ...(remainingPercent === undefined ? {} : { remainingPercent }), ...(resetAt === undefined ? {} : { resetAt }), usageKnown: remainingPercent !== undefined, source: 'provider' }
+  return { id, label, ...(bucket.description === undefined ? {} : { description: bucket.description }), kind, ...(remainingPercent === undefined ? {} : { remainingPercent }), ...(resetAt === undefined ? {} : { resetAt }), usageKnown: remainingPercent !== undefined, source: 'provider' }
 }
 
 function parseReset(value: string | number | undefined): number | undefined {

@@ -13,8 +13,8 @@ panel, settings and the tray. The terminal inside a pane is in
 | [Types that carry it](#types-that-carry-it) | 54-63 | `PaneModel`, `ChatEvent`, `src/shared/types.ts`, `QuotaAccountUiState`, `src/renderer/src/components/quota/quota-view.ts` |
 | [Design decisions](#design-decisions) | 64-98 | `getWindowChromeOptions`, `titleBarOverlay`, `tests/unit/window-chrome.test.ts`, `src/renderer/AGENTS.md`, `MainApp`, `app.setAppUserModelId` |
 | [The coordination view](#the-coordination-view) | 99-137 | `src/renderer/src/components/coordinator/CoordinatorView.tsx`, `App.tsx`, `setMode`, `RightPanel`, `CoordinatorBoard`, `CoordinatorView` |
-| [The fleet panel](#the-fleet-panel) | 138-168 | `RightPanel`, `buildFleet`, `ProviderQuotaGroup`, `modelIds`, `anti-claude-opus`, `anti-claude-sonnet` |
-| [Known limits](#known-limits) | 169-175 | `docs/technical-debt.md` |
+| [The fleet panel](#the-fleet-panel) | 138-186 | `RightPanel`, `buildFleet`, `ProviderQuotaGroup`, `modelIds`, `anti-claude-opus`, `anti-claude-sonnet` |
+| [Known limits](#known-limits) | 187-193 | `docs/technical-debt.md` |
 <!-- /toc -->
 
 ## Pieces
@@ -165,6 +165,24 @@ fault this panel exists to fix.
 
 Fleet is also where the coordinator role is given, on the agent row, labelled
 with who would lose it.
+
+**The card is built for a 300px column.** Three things were costing the height
+that made it unreadable there:
+
+- **A description used as a label.** `bucket.description ?? bucket.label` in
+  `antigravity-models.ts` put the provider's whole sentence — *"You have used
+  some of your weekly limit…"* — where a label goes, three lines to state what
+  the percentage beside it already stated. `label` now wins, and `description`
+  is a field of its own, shown on hover.
+- **Three lines per window.** The percentage, the bar and the countdown are one
+  fact three ways. The row is now `label · countdown · %` over the bar, with
+  the absolute timestamp in the tooltip.
+- **Five controls on one agent row.** Name, model, role badge, take-the-role
+  and two labelled speed buttons at 300px pushed the agent's own name out of
+  view. Speed is one lit-or-unlit toggle, and taking the role appears on hover.
+
+Refresh moved into the header as an icon for the same reason: a labelled button
+in a footer costs a whole row to say what an icon says.
 
 ## Known limits
 

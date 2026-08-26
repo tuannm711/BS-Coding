@@ -333,6 +333,11 @@ the chat variant showed.
 bars — the thing the panel exists for — are unaffected. But a reading that used
 to be one glance away now is not.
 
+**The card no longer pretends otherwise.** It rendered the metrics row anyway,
+producing four truncated labels over four dashes at panel width. The fleet
+variant now renders no metrics row: an absent measurement is better shown as
+absent than as a heading with nothing under it.
+
 **To close:** carry telemetry into `buildFleet` the way `buildQuotaRows` carries
 it, or decide the panel is about quota rather than spend and say so in the
 design doc instead.

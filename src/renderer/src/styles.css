@@ -1696,7 +1696,7 @@ select.input { width: 100%; }
 .quota-account-avatar { display: grid; place-items: center; width: 24px; height: 24px; flex: 0 0 24px; border-radius: 7px; background: var(--accent); color: var(--bg); font-size: var(--fs-sm); font-weight: 700; }
 .quota-account-identity > div { display: grid; gap: 1px; min-width: 0; }
 .quota-account-identity strong, .quota-account-identity span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.quota-account-identity > div > span, .quota-account-subline, .quota-window-reset, .quota-metric span { color: var(--text-faint); font-size: var(--fs-sm); }
+.quota-account-identity > div > span, .quota-account-subline, .quota-metric span { color: var(--text-faint); font-size: var(--fs-sm); }
 .quota-plan-badge { border: 1px solid var(--accent-border); border-radius: 999px; padding: 2px 7px; color: var(--accent); font-size: var(--fs-sm); white-space: nowrap; }
 .quota-pool-error {
   margin-left: 6px; font-size: var(--fs-xs); color: var(--red);
@@ -1721,8 +1721,14 @@ select.input { width: 100%; }
 .quota-speed-control button:hover, .quota-speed-control button:focus-visible { border-color: var(--accent-border); color: var(--text-strong); }
 .quota-speed-control button.active { border-color: var(--accent-border); background: var(--accent-dim); color: var(--accent); }
 .quota-window { display: grid; gap: 4px; }
-.quota-window-label { font-size: var(--fs-sm); }
-.quota-window-label strong { color: var(--text-strong); font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+/* Name on the left, countdown and remaining right-aligned and tabular so the
+   numbers line up down the card. One row, because the percentage, the bar and
+   the countdown are one fact stated three ways. */
+.quota-window-label { font-size: var(--fs-sm); flex-wrap: nowrap; }
+.quota-window-label > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.quota-window-label em { flex: none; font-style: normal; color: var(--text-faint); font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.quota-window-label strong { flex: none; color: var(--text-strong); font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.quota-window.state-exhausted .quota-window-label strong, .quota-window.state-cooldown .quota-window-label strong { color: var(--red); }
 .quota-progress { height: 7px; overflow: hidden; border-radius: 999px; background: var(--bg-input); }
 .quota-progress > span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 55%, white)); transition: width 200ms ease; }
 .quota-usage-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px; }
@@ -1758,8 +1764,21 @@ select.input { width: 100%; }
 .fleet-panel { display: flex; flex-direction: column; min-height: 0; height: 100%; overflow-y: auto; }
 .fleet-board { display: flex; flex-direction: column; gap: 8px; padding: 8px; }
 .fleet-pool-agents { display: flex; flex-direction: column; gap: 2px; margin-top: 6px; padding-left: 10px; border-left: 1px solid var(--hairline); }
-.fleet-pool-idle { margin: 6px 0 0; padding-left: 10px; border-left: 1px solid var(--hairline); color: var(--text-faint); font-size: var(--fs-xs); }
-.fleet-agent { display: flex; align-items: center; gap: 6px; padding: 3px 4px; border-radius: var(--radius-sm); }
+.quota-account-refresh { flex: none; display: grid; place-items: center; width: 22px; height: 22px; padding: 0; border-radius: var(--radius-sm); background: var(--bg-input); border: 1px solid var(--hairline); color: var(--text-dim); cursor: pointer; }
+.quota-account-refresh:hover:not(:disabled) { background: var(--bg-input-hover); color: var(--text-strong); }
+.quota-account-refresh:disabled { cursor: default; opacity: 0.6; }
+.quota-account-refresh:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+.quota-account-refresh .spinning { animation: fleet-spin 900ms linear infinite; }
+@keyframes fleet-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .quota-account-refresh .spinning { animation: none; } }
+
+/* One toggle rather than two labelled buttons: at 300px the pair pushed the
+   agent's own name out of its row. Unlit is standard. */
+.fleet-speed { flex: none; display: grid; place-items: center; width: 22px; height: 22px; padding: 0; border-radius: var(--radius-sm); background: var(--bg-input); border: 1px solid var(--hairline); color: var(--text-faint); cursor: pointer; }
+.fleet-speed:hover { background: var(--bg-input-hover); color: var(--text); }
+.fleet-speed.fast { background: var(--accent-dim); border-color: var(--accent-border); color: var(--accent-strong); }
+.fleet-speed:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+.fleet-agent { display: flex; align-items: center; gap: 6px; padding: 3px 4px; border-radius: var(--radius-sm); min-width: 0; }
 .fleet-agent:hover { background: var(--bg-hover); }
 .fleet-agent.coordinator { background: var(--accent-dim); }
 .fleet-agent-name { display: grid; gap: 1px; flex: 1; min-width: 0; padding: 0; background: none; border: 0; text-align: left; color: inherit; cursor: pointer; }
@@ -1782,7 +1801,6 @@ select.input { width: 100%; }
 .quota-group { display: grid; align-content: start; gap: 6px; min-width: 0; padding: 7px; border: 1px solid var(--hairline); border-radius: var(--radius-sm); background: color-mix(in srgb, var(--bg-input) 78%, transparent); }
 .quota-group h6 { margin: 0; color: var(--text-strong); font-size: var(--fs-sm); font-weight: var(--fw-semibold); }
 .quota-window + .quota-window { padding-top: 6px; border-top: 1px solid var(--hairline); }
-.quota-window-reset { font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
 .quota-window.state-exhausted .quota-progress > span, .quota-window.state-cooldown .quota-progress > span { background: var(--danger); }
 .quota-progress { height: 6px; }
 .quota-empty { padding: 6px 7px; border: 1px dashed var(--hairline); border-radius: var(--radius-sm); color: var(--text-faint); font-size: var(--fs-sm); }
