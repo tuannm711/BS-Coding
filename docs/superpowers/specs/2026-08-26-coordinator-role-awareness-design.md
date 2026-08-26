@@ -80,12 +80,18 @@ layer that matters, because the shape of the task is what decides whether the
 worker has to reason.
 
 **A short framing on the delegated text** tells the worker to carry out what it
-was given and report, rather than redesign it.
+was given, and to report back if it cannot, rather than redesigning it.
 
-**Neither is enforcement.** Removing a tool is enforcement — the model never
-sees the option. Nothing removes a worker's ability to reason, and this document
-should not be read as claiming otherwise. The honest statement is that the
-coordinator is instructed to leave nothing to reason about.
+**Neither is enforcement**, and neither should be. Removing a tool is
+enforcement — the model never sees the option. Nothing removes a worker's
+ability to reason, and nothing should: a worker needs enough judgement to
+notice that what it was told to do did not work, and to say so.
+
+The line is between two kinds of thinking. **Whether it worked** is the
+worker's, and reporting a failure is part of the job rather than a lapse from
+it. **What should be done** is the coordinator's. A worker that hits a wall
+stops and reports; it does not redesign its way around it, because the
+coordinator holds the context that would make that judgement sound.
 
 ## Verification
 
@@ -125,8 +131,9 @@ reason.
 **`subagentModels`.** Still overlapping with agents-and-modes, still undecided,
 and untouched here.
 
-**Making workers unable to reason.** Not possible with tools, and not attempted
-with claims.
+**Making workers unable to reason.** Not possible with tools, not attempted with
+claims, and not wanted: a worker that could not tell a failure from a success
+would report neither.
 
 ## Success criteria
 
