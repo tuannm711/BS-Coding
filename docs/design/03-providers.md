@@ -12,8 +12,8 @@ presentation.
 | [Data flow](#data-flow) | 38-60 | `ProviderManager.connect`, `ProviderAuthorizationStrategy`, `MainApp.startUsagePoll`, `ProviderManager.refreshUsage`, `adapter.refreshCredentials`, `adapter.fetchUsage` |
 | [Types that carry it](#types-that-carry-it) | 61-81 | `ProviderAdapter`, `refreshAccount`, `listModels`, `createRuntime`, `refreshCredentials`, `recoverRuntimeContext` |
 | [Design decisions](#design-decisions) | 82-126 | `ProviderUsage.status`, `'near-limit'`, `docs/technical-debt.md`, `primaryUsedPercent`, `providerError`, `hasRemainingQuota` |
-| [Choosing a replacement when a pool is refused](#choosing-a-replacement-when-a-pool-is-refused) | 127-144 | `rankFallbackAgents`, `src/shared/agent-fallback.ts`, `poolState`, `SessionRunner`, `currentTarget` |
-| [Known limits](#known-limits) | 145-155 | `openai.ts`, `antigravity.ts`, `fetchUsage`, `poolErrors` |
+| [Choosing a replacement when a pool is refused](#choosing-a-replacement-when-a-pool-is-refused) | 127-149 | `rankFallbackAgents`, `src/shared/agent-fallback.ts`, `poolState`, `SessionRunner`, `currentTarget` |
+| [Known limits](#known-limits) | 150-160 | `openai.ts`, `antigravity.ts`, `fetchUsage`, `poolErrors` |
 <!-- /toc -->
 
 ## Pieces
@@ -133,6 +133,11 @@ model on another account, then the same provider with another model, then
 another provider. Inside a tier the declaration order stands, because the
 trigger is exhaustion and draining one account before starting the next matches
 what is happening.
+
+A candidate must also be in the **same mode** as the agent it replaces. Modes
+carry different tool sets, so a plan or coordinate agent cannot carry a build
+turn, and a worker handed a coordinating turn would do the work instead of
+assigning it.
 
 Remaining quota never reorders that list. It only removes a candidate whose pool
 `poolState` already reports as spent — which matters because two agents on

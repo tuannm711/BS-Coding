@@ -8,12 +8,13 @@ this document assumes an `LlmClient` already exists.
 <!-- toc -->
 | Section | Lines | Names |
 | --- | --- | --- |
-| [Pieces](#pieces) | 19-38 | `src/main/bs-agent-manager.ts`, `BsAgentManager`, `src/main/agent/loop.ts`, `SessionRunner`, `src/main/agent/llm.ts`, `LlmClient` |
-| [Data flow](#data-flow) | 39-67 | `BsAgentManager`, `SessionRunner`, `LoopDeps`, `toLlmMessages(getItems())`, `LlmClient`, `text-delta` |
-| [Types that carry it](#types-that-carry-it) | 68-82 | `LoopDeps`, `src/main/agent/loop.ts`, `getItems`, `appendMessage`, `appendTool`, `tests/unit/agent-loop.test.ts` |
-| [Design decisions](#design-decisions) | 83-116 | `LoopDeps`, `createLlm`, `LlmClient`, `src/main/agent/AGENTS.md`, `takeSteers`, `tools/` |
-| [Two ways to hand work off](#two-ways-to-hand-work-off) | 117-140 | `SessionRunner`, `SUBAGENT_CONFIGS`, `COORDINATE_RULES`, `visibleToolDefs`, `decidePermission` |
-| [Known limits](#known-limits) | 141-153 | `MAX_COMPACT_PER_RUN`, `compactIfOverThreshold`, `undoTurn`, `pushTurn`, `turnId` |
+| [Pieces](#pieces) | 20-39 | `src/main/bs-agent-manager.ts`, `BsAgentManager`, `src/main/agent/loop.ts`, `SessionRunner`, `src/main/agent/llm.ts`, `LlmClient` |
+| [Data flow](#data-flow) | 40-68 | `BsAgentManager`, `SessionRunner`, `LoopDeps`, `toLlmMessages(getItems())`, `LlmClient`, `text-delta` |
+| [Types that carry it](#types-that-carry-it) | 69-83 | `LoopDeps`, `src/main/agent/loop.ts`, `getItems`, `appendMessage`, `appendTool`, `tests/unit/agent-loop.test.ts` |
+| [Design decisions](#design-decisions) | 84-117 | `LoopDeps`, `createLlm`, `LlmClient`, `src/main/agent/AGENTS.md`, `takeSteers`, `tools/` |
+| [Two ways to hand work off](#two-ways-to-hand-work-off) | 118-141 | `SessionRunner`, `SUBAGENT_CONFIGS`, `COORDINATE_RULES`, `visibleToolDefs`, `decidePermission` |
+| [What a coordinator is told, and what it can reach](#what-a-coordinator-is-told-and-what-it-can-reach) | 142-173 | `coordinatorNote`, `BsAgentManager`, `systemSuffix`, `modeNote`, `decidePermission`, `--output` |
+| [Known limits](#known-limits) | 174-186 | `MAX_COMPACT_PER_RUN`, `compactIfOverThreshold`, `undoTurn`, `pushTurn`, `turnId` |
 <!-- /toc -->
 
 ## Pieces
@@ -137,6 +138,38 @@ write.
 Concurrency needs no scheduler: `send` awaits a whole turn and `running` is
 keyed per agent, so two assignments to different agents run at once and two to
 the same agent queue.
+
+## What a coordinator is told, and what it can reach
+
+**Told, at each call.** `coordinatorNote` in `BsAgentManager` composes into
+`systemSuffix`, which the loop resolves per step. It names the role, lists every
+other native agent in the project with its provider and model, says to assign by
+default rather than wait, and says each task must stand on its own because the
+worker sees only that text.
+
+It is not in `modeNote`. Runners are cached per agent, so a roster fixed when the
+runner was built goes stale the moment an agent is added or changes mode.
+
+**Reach.** Write, edit, apply-patch, revert, bash and `task` are denied — the
+tools are absent from what the model is shown, not merely discouraged. `git` is
+allowed for an allowlist of read-only subcommands, through the same input-aware
+branch in `decidePermission` that lets plan mode read with bash but not write.
+`--output` is refused on any of them, because it writes a file from `diff`.
+
+`read`, `glob` and `grep` are kept. A coordinator could instead be told to have a
+worker investigate and report, and that is rejected: a report is a summary, and
+`docs/technical-debt.md` item 6 records what happens when design is written from
+a summary rather than from the code.
+
+`task` is denied so nothing is assigned outside the exchange — an anonymous
+subagent would be invisible to the coordination view and unrecorded as an
+assignment.
+
+**The division of labour is instruction, not enforcement.** Removing a tool is
+enforcement. Nothing removes a worker's ability to reason, and nothing should:
+a worker needs enough judgement to notice that what it was told to do did not
+work, and to say so. Each delegated task carries one sentence asking exactly
+that — carry it out, and report back rather than changing the approach.
 
 ## Known limits
 

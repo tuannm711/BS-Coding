@@ -144,3 +144,32 @@ describe('decidePermission (coordinate mode)', () => {
     expect(decidePermission('coordinate', {}, () => true, 'bash')).toBe('deny')
   })
 })
+
+describe('a coordinator reads git history but does not change it', () => {
+  it('lets a coordinator read history but not change it', () => {
+    // Reviewing results is the coordinator's job and git diff is how it is done.
+    // Committing is doing the work, and stays impossible.
+    for (const args of ['diff', 'status', 'log --oneline -5', 'show HEAD']) {
+      expect(decidePermission('coordinate', {}, noSaved, 'git', { args })).toBe('allow')
+    }
+    for (const args of ['commit -am x', 'push', 'stash', 'checkout main', 'reset --hard']) {
+      expect(decidePermission('coordinate', {}, noSaved, 'git', { args })).toBe('deny')
+    }
+  })
+
+  it('refuses a git flag that writes a file', () => {
+    // argv runs without a shell so `>` is unavailable, but --output writes
+    // anyway, and it can ride on a subcommand that is otherwise read-only.
+    expect(decidePermission('coordinate', {}, noSaved, 'git', { args: 'diff --output=leak.txt' })).toBe('deny')
+  })
+
+  it('refuses git with no arguments at all', () => {
+    expect(decidePermission('coordinate', {}, noSaved, 'git', {})).toBe('deny')
+  })
+
+  it('leaves git alone in the other modes', () => {
+    // plan denies git entirely today and this work does not change that.
+    expect(decidePermission('build', {}, noSaved, 'git', { args: 'commit -am x' })).toBe('ask')
+    expect(decidePermission('plan', {}, noSaved, 'git', { args: 'diff' })).toBe('deny')
+  })
+})

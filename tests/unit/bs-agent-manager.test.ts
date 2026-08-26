@@ -1163,3 +1163,104 @@ describe('stopping a fan-out', () => {
     expect(manager.isRunning('a3')).toBe(true)
   })
 })
+
+describe('fallback stays in the same mode', () => {
+  it('does not hand a build turn to an agent in another mode', async () => {
+    // Not a coordinate special case: a plan-mode agent is denied every write
+    // tool, so it could never carry a build turn either. This has been wrong
+    // since plan mode existed.
+    const { manager, events } = await makeManager({
+      secondAgent: true,
+      partsQueue: [[{ kind: 'error', error: '[bs] [request-failed] (429): quota' }]]
+    })
+    manager.setMode('a3', 'plan')
+    await manager.send('a1', 'go')
+    expect(events.some(event => event.type === 'agent-fallback')).toBe(false)
+    expect(events.some(event => event.type === 'error')).toBe(true)
+  })
+
+  it('still hands over to an agent in the same mode', async () => {
+    const { manager, events } = await makeManager({
+      secondAgent: true,
+      partsQueue: [
+        [{ kind: 'error', error: '[bs] [request-failed] (429): quota' }],
+        [{ kind: 'text', text: 'carried on' }, { kind: 'finish' }]
+      ]
+    })
+    await manager.send('a1', 'go')
+    expect(events.some(event => event.type === 'agent-fallback')).toBe(true)
+  })
+
+  it('does not hand a coordinator turn to a worker', async () => {
+    // A worker has no delegate tool, so it would do the work rather than
+    // assign it — the opposite of what the turn was for.
+    const { manager, events } = await makeManager({
+      secondAgent: true,
+      partsQueue: [[{ kind: 'error', error: '[bs] [request-failed] (429): quota' }]]
+    })
+    manager.setMode('a1', 'coordinate')
+    await manager.send('a1', 'go')
+    expect(events.some(event => event.type === 'agent-fallback')).toBe(false)
+  })
+})
+
+describe('the coordinator knows its role and its workers', () => {
+  it('tells a coordinator who its workers are and what they run', async () => {
+    const { manager, llmSystems } = await makeManager({ secondAgent: true })
+    manager.setMode('a1', 'coordinate')
+    await manager.send('a1', 'go')
+    const system = llmSystems[0]
+    expect(system).toContain('coordinator')
+    expect(system).toContain('helper')
+    expect(system).toContain('test-model')
+  })
+
+  it('leaves a non-coordinator alone', async () => {
+    const { manager, llmSystems } = await makeManager({ secondAgent: true })
+    await manager.send('a1', 'go')
+    expect(llmSystems[0]).not.toContain('coordinator')
+  })
+
+  it('does not offer a coordinator another coordinator as a worker', async () => {
+    const { manager, llmSystems } = await makeManager({ secondAgent: true })
+    manager.setMode('a1', 'coordinate')
+    manager.setMode('a3', 'coordinate')
+    await manager.send('a1', 'go')
+    expect(llmSystems[0]).not.toContain('helper')
+  })
+
+  it('reflects a mode changed after the runner was built', async () => {
+    // The case modeNote would get wrong: runners are cached per agent, so a
+    // roster baked in at build time goes stale the moment anything changes.
+    const { manager, llmSystems } = await makeManager({
+      secondAgent: true,
+      partsQueue: [[{ kind: 'text', text: 'a' }, { kind: 'finish' }], [{ kind: 'text', text: 'b' }, { kind: 'finish' }]]
+    })
+    manager.setMode('a1', 'coordinate')
+    await manager.send('a1', 'first')
+    manager.setMode('a3', 'coordinate')
+    await manager.send('a1', 'second')
+    expect(llmSystems[0]).toContain('helper')
+    expect(llmSystems[1]).not.toContain('helper')
+  })
+})
+
+describe('the delegated task is framed', () => {
+  const delegate = (manager: BsAgentManager, from: string, to: string, task: string) =>
+    (manager as unknown as { runAssignment: (c: string, n: string, t: string) => Promise<unknown> })
+      .runAssignment(from, to, task)
+
+  it('asks the worker to carry it out and report rather than redesign', async () => {
+    const { manager } = await makeManager({
+      secondAgent: true,
+      partsQueue: [[{ kind: 'text', text: 'done' }, { kind: 'finish' }]]
+    })
+    manager.setMode('a1', 'coordinate')
+    await delegate(manager, 'a1', 'helper', 'change the readme heading')
+    const sent = manager.listMessages('a3').find(message => message.role === 'user')
+    expect(sent?.text).toContain('change the readme heading')
+    // Reporting a failure is part of the job; redesigning around it is not,
+    // because the coordinator holds the context that judgement would need.
+    expect(sent?.text).toContain('report back')
+  })
+})
