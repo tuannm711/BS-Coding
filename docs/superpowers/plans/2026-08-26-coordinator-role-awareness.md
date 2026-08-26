@@ -268,7 +268,99 @@ Expected: **1143**. Commit as `feat: frame a delegated task as work to carry out
 
 ---
 
-### Task 4: Documentation, verify, report
+### Task 4: Read-only git for a coordinator
+
+**Files:**
+- Modify: `src/main/agent/permission.ts`
+- Test: `tests/unit/agent-permission.test.ts`
+
+- [ ] **Step 1: Write the failing tests**
+
+```ts
+  it('lets a coordinator read history but not change it', () => {
+    // Reviewing results is the coordinator's job and git diff is how it is done.
+    // Committing is doing the work, and stays impossible.
+    for (const args of ['diff', 'status', 'log --oneline -5', 'show HEAD']) {
+      expect(decidePermission('coordinate', {}, noSaved, 'git', { args })).toBe('allow')
+    }
+    for (const args of ['commit -am x', 'push', 'stash', 'checkout main', 'reset --hard']) {
+      expect(decidePermission('coordinate', {}, noSaved, 'git', { args })).toBe('deny')
+    }
+  })
+
+  it('refuses a git flag that writes a file', () => {
+    // argv runs without a shell so `>` is unavailable, but --output writes
+    // anyway, and it can ride on a subcommand that is otherwise read-only.
+    expect(decidePermission('coordinate', {}, noSaved, 'git', { args: 'diff --output=leak.txt' })).toBe('deny')
+  })
+
+  it('refuses git with no arguments at all', () => {
+    expect(decidePermission('coordinate', {}, noSaved, 'git', {})).toBe('deny')
+  })
+
+  it('leaves git alone in the other modes', () => {
+    expect(decidePermission('build', {}, noSaved, 'git', { args: 'commit -am x' })).toBe('ask')
+    expect(decidePermission('plan', {}, noSaved, 'git', { args: 'diff' })).toBe('deny')
+  })
+```
+
+The last case is deliberate: plan mode denies git entirely today and this work
+does not change that. Only the coordinator gets the reading half.
+
+- [ ] **Step 2: Run to confirm failure**
+
+Expected: every coordinate case returns `deny` — the rule set denies `git`
+outright.
+
+- [ ] **Step 3: Implement**
+
+In `permission.ts`, beside the plan-mode bash guard that already reads tool
+input:
+
+```ts
+// A coordinator reviews results, so it reads history; committing is doing the
+// work, so it cannot. Only subcommands known to read are allowed — an unknown
+// one is refused, which is the safe direction.
+const READ_ONLY_GIT = new Set([
+  'diff', 'status', 'log', 'show', 'blame', 'ls-files', 'rev-parse', 'describe', 'shortlog'
+])
+
+export function isReadOnlyGit(args: string | undefined): boolean {
+  if (!args) return false
+  // --output=<file> writes a file even from `diff`, and argv runs without a
+  // shell so this is the only redirection available to it.
+  if (args.includes('--output')) return false
+  const [subcommand] = args.trim().split(/\s+/)
+  return READ_ONLY_GIT.has(subcommand)
+}
+```
+
+and in `decidePermission`, beside the plan-mode bash branch:
+
+```ts
+  if (mode === 'coordinate' && toolName === 'git') {
+    return isReadOnlyGit(typeof input?.args === 'string' ? input.args : undefined) ? 'allow' : 'deny'
+  }
+```
+
+Remove `git` from the deny list inherited into `COORDINATE_RULES` is **not**
+needed — the branch above runs first and settles it either way. Leave the
+inherited `git: 'deny'` as the fallback for a call with no readable args.
+
+- [ ] **Step 4: Verify and commit**
+
+```bash
+npm test && npm run typecheck
+```
+
+Expected: **1147**. Commit as `feat: let a coordinator read git history but not change it`.
+
+Body must say what this corrects: denying git outright also denied `git diff`,
+while reviewing results is the coordinator's stated job.
+
+---
+
+### Task 5: Documentation, verify, report
 
 - [ ] **Step 1: Record it**
 
@@ -278,6 +370,10 @@ including that it is instruction rather than enforcement, and that reporting a
 failure is part of a worker's job.
 
 In `docs/design/03-providers.md`, the fallback section gains the same-mode rule.
+
+In `docs/design/02-agent-runtime.md` also record the coordinator's tool reach:
+read-only git through the input-aware permission branch, why read/glob/grep are
+kept, and that `task` is denied so nothing is assigned outside the exchange.
 
 - [ ] **Step 2: Correct the stale Next work**
 
