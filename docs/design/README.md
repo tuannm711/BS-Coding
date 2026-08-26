@@ -11,11 +11,11 @@ session. For the product view — features, screenshots, how to install — read
 | --- | --- | --- |
 | [How the domains relate](#how-the-domains-relate) | 21-37 | `LlmClient` |
 | [The documents](#the-documents) | 38-54 |  |
-| [Finding a name](#finding-a-name) | 55-212 | `.cmd`, `.exe`, `.github/workflows/build.yml`, `.ico`, `'near-limit'`, `/bin/bash` |
-| [What is here and what is history](#what-is-here-and-what-is-history) | 213-222 | `docs/design/`, `docs/superpowers/`, `docs/evidence/` |
-| [Current work](#current-work) | 223-230 | `docs/superpowers/specs/2026-08-25-narrated-tool-calls-design.md` |
-| [Next work](#next-work) | 231-239 |  |
-| [Debt](#debt) | 240-246 | `docs/technical-debt.md` |
+| [Finding a name](#finding-a-name) | 55-215 | `.cmd`, `.exe`, `.github/workflows/build.yml`, `.ico`, `'near-limit'`, `/bin/bash` |
+| [What is here and what is history](#what-is-here-and-what-is-history) | 216-225 | `docs/design/`, `docs/superpowers/`, `docs/evidence/` |
+| [Current work](#current-work) | 226-237 | `tests/`, `statusReason`, `docs/superpowers/specs/2026-08-25-narrated-tool-calls-design.md` |
+| [Next work](#next-work) | 238-246 |  |
+| [Debt](#debt) | 247-253 | `docs/technical-debt.md` |
 <!-- /toc -->
 
 ## How the domains relate
@@ -94,7 +94,7 @@ Generated from every domain document: which one introduces a name, and where.
 | `contextBridge` | [01-process-model.md#pieces](01-process-model.md#pieces) | 18 |
 | `createLlm` | [02-agent-runtime.md#design-decisions](02-agent-runtime.md#design-decisions) | 82 |
 | `createRuntime` | [03-providers.md#types-that-carry-it](03-providers.md#types-that-carry-it) | 60 |
-| `docs/technical-debt.md` | [01-process-model.md#known-limits](01-process-model.md#known-limits) | 99 |
+| `docs/technical-debt.md` | [03-providers.md#design-decisions](03-providers.md#design-decisions) | 81 |
 | `electron-builder.ts` | [07-build-release.md#pieces](07-build-release.md#pieces) | 17 |
 | `electron-builder` | [07-build-release.md#data-flow](07-build-release.md#data-flow) | 29 |
 | `electron.vite.config.ts` | [07-build-release.md#pieces](07-build-release.md#pieces) | 17 |
@@ -196,6 +196,7 @@ Generated from every domain document: which one introduces a name, and where.
 | `TerminalExitEvent` | [04-terminal-panes.md#types-that-carry-it](04-terminal-panes.md#types-that-carry-it) | 47 |
 | `tests/` | [01-process-model.md#known-limits](01-process-model.md#known-limits) | 99 |
 | `tests/unit/agent-loop.test.ts` | [02-agent-runtime.md#types-that-carry-it](02-agent-runtime.md#types-that-carry-it) | 67 |
+| `tests/unit/design-docs.test.ts` | [01-process-model.md#known-limits](01-process-model.md#known-limits) | 99 |
 | `tests/unit/ipc-contract.test.ts` | [01-process-model.md#design-decisions](01-process-model.md#design-decisions) | 70 |
 | `tests/unit/window-chrome.test.ts` | [06-ui-shell.md#design-decisions](06-ui-shell.md#design-decisions) | 61 |
 | `text-delta` | [02-agent-runtime.md#data-flow](02-agent-runtime.md#data-flow) | 38 |
@@ -204,7 +205,9 @@ Generated from every domain document: which one introduces a name, and where.
 | `tools/` | [02-agent-runtime.md#design-decisions](02-agent-runtime.md#design-decisions) | 82 |
 | `tree-kill` | [04-terminal-panes.md#types-that-carry-it](04-terminal-panes.md#types-that-carry-it) | 47 |
 | `TruncationStore` | [05-sessions.md#design-decisions](05-sessions.md#design-decisions) | 66 |
+| `tsconfig.test.json` | [01-process-model.md#known-limits](01-process-model.md#known-limits) | 99 |
 | `turnId` | [02-agent-runtime.md#known-limits](02-agent-runtime.md#known-limits) | 116 |
+| `undoCall` | [05-sessions.md#design-decisions](05-sessions.md#design-decisions) | 66 |
 | `undoTurn` | [02-agent-runtime.md#known-limits](02-agent-runtime.md#known-limits) | 116 |
 | `window.api` | [01-process-model.md#pieces](01-process-model.md#pieces) | 18 |
 | `XtermHost` | [04-terminal-panes.md#data-flow](04-terminal-panes.md#data-flow) | 29 |
@@ -222,7 +225,11 @@ beside them carry the release history.
 
 ## Current work
 
-None. v1.1.6 closed the narrated tool call defect: shared-session history no
+None. v1.1.7 closed four technical debt entries: `tests/` is typechecked, the
+quota reason field is named `statusReason`, the chat feed rows are testable,
+and narration already stored in a session is flagged when it is reopened.
+
+v1.1.6 closed the narrated tool call defect: shared-session history no
 longer attributes tool records to the assistant role, and a model that writes
 one out instead of calling the tool raises a visible notice.
 `docs/superpowers/specs/2026-08-25-narrated-tool-calls-design.md` has the

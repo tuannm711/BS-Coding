@@ -98,4 +98,4 @@ prevents.
 One window, one project open at a time. No router, no detachable panes.
 
 The tray icon is the same asset on all three platforms; macOS wants a template
-image — debt item 8 in `docs/technical-debt.md`.
+image — debt item 6 in `docs/technical-debt.md`.
