@@ -125,8 +125,14 @@ export default function QuotaAccountCard({
             aria-label={`Refresh quota for ${accountLabel}`}
             onClick={onRefresh}
           ><RefreshCw size={13} aria-hidden="true" className={refreshing ? 'spinning' : undefined} /></button> : null}
-          <span className={`quota-account-status ${active ? 'active' : 'inactive'}`}>{active ? 'Active' : account.status}</span>
-          {planName ? <span className="quota-plan-badge">{planName}</span> : null}
+          {/* At rail width the badges are the crowd. Active is the normal case,
+              so its absence carries it; the plan name identifies the account,
+              which the email above already does. Both stay for the wider
+              variants, where there is room to say them. */}
+          {variant === 'fleet' && active
+            ? null
+            : <span className={`quota-account-status ${active ? 'active' : 'inactive'}`}>{active ? 'Active' : account.status}</span>}
+          {planName && variant !== 'fleet' ? <span className="quota-plan-badge">{planName}</span> : null}
           {providerState ? <span className={`quota-plan-badge quota-state-${providerState}`} role="status">{STATE_LABELS[providerState]}</span> : null}
           {/* The count, and nothing about what it means: cockpit spends these
               successfully while ignoring applicable_available_count, so any
@@ -144,10 +150,19 @@ export default function QuotaAccountCard({
         </div>
       </header>
 
-      <div className="quota-account-subline">
+      {/* Two lines of provenance that are read rarely and take a fifth of the
+          card at rail width. Kept in full for the wider variants; in Fleet the
+          freshness alone stays visible, because a stale reading changes how
+          much the bars above it are worth. */}
+      {variant === 'fleet' ? <div
+        className="quota-account-subline"
+        title={usage?.subscriptionExpiresAt ? formatExpiry(usage.subscriptionExpiresAt) : 'Subscription expiry not reported'}
+      >
+        <span>{usage?.stale ? `Stale · ${formatAge(usage.lastSuccessfulRefreshAt ?? usage.refreshedAt)}` : `Updated ${formatAge(usage?.refreshedAt)}`}</span>
+      </div> : <div className="quota-account-subline">
         <span>{usage?.subscriptionExpiresAt ? formatExpiry(usage.subscriptionExpiresAt) : 'Subscription expiry not reported'}</span>
         <span>{usage?.stale ? `Stale · ${formatAge(usage.lastSuccessfulRefreshAt ?? usage.refreshedAt)}` : `Updated ${formatAge(usage?.refreshedAt)}`}</span>
-      </div>
+      </div>}
 
       {stageDetails.length > 0 ? <div className="provider-refresh-stages" aria-label={`Refresh stages for ${accountLabel}`}>
         {stageDetails.map(([stage, status]) => <span key={stage} className={`provider-refresh-stage ${status}`}>{stage} · {status}</span>)}

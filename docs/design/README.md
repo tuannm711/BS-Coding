@@ -15,11 +15,11 @@ should be checked against.
 | --- | --- | --- |
 | [How the domains relate](#how-the-domains-relate) | 25-41 | `LlmClient` |
 | [The documents](#the-documents) | 42-59 |  |
-| [Finding a name](#finding-a-name) | 60-258 | `--output`, `.cmd`, `.exe`, `.github/workflows/build.yml`, `.ico`, `'near-limit'` |
-| [What is here and what is history](#what-is-here-and-what-is-history) | 259-268 | `docs/design/`, `docs/superpowers/`, `docs/evidence/` |
-| [Current work](#current-work) | 269-280 | `tests/`, `statusReason`, `docs/superpowers/specs/2026-08-25-narrated-tool-calls-design.md` |
-| [Next work](#next-work) | 281-295 | `docs/technical-debt.md` |
-| [Debt](#debt) | 296-302 | `docs/technical-debt.md` |
+| [Finding a name](#finding-a-name) | 60-257 | `--output`, `.cmd`, `.exe`, `.github/workflows/build.yml`, `.ico`, `'near-limit'` |
+| [What is here and what is history](#what-is-here-and-what-is-history) | 258-267 | `docs/design/`, `docs/superpowers/`, `docs/evidence/` |
+| [Current work](#current-work) | 268-279 | `tests/`, `statusReason`, `docs/superpowers/specs/2026-08-25-narrated-tool-calls-design.md` |
+| [Next work](#next-work) | 280-294 | `docs/technical-debt.md` |
+| [Debt](#debt) | 295-301 | `docs/technical-debt.md` |
 <!-- /toc -->
 
 ## How the domains relate
@@ -77,8 +77,8 @@ Generated from every domain document: which one introduces a name, and where.
 | `adapter.refreshCredentials` | [03-providers.md#data-flow](03-providers.md#data-flow) | 38 |
 | `AgentApi` | [01-process-model.md#pieces](01-process-model.md#pieces) | 18 |
 | `AgentStateEvent` | [01-process-model.md#types-that-carry-it](01-process-model.md#types-that-carry-it) | 54 |
-| `anti-claude-opus` | [06-ui-shell.md#the-fleet-panel](06-ui-shell.md#the-fleet-panel) | 138 |
-| `anti-claude-sonnet` | [06-ui-shell.md#the-fleet-panel](06-ui-shell.md#the-fleet-panel) | 138 |
+| `anti-claude-opus` | [06-ui-shell.md#the-fleet-panel](06-ui-shell.md#the-fleet-panel) | 152 |
+| `anti-claude-sonnet` | [06-ui-shell.md#the-fleet-panel](06-ui-shell.md#the-fleet-panel) | 152 |
 | `antigravity.ts` | [03-providers.md#known-limits](03-providers.md#known-limits) | 150 |
 | `app.setAppUserModelId` | [06-ui-shell.md#design-decisions](06-ui-shell.md#design-decisions) | 64 |
 | `App.tsx` | [06-ui-shell.md#data-flow](06-ui-shell.md#data-flow) | 35 |
@@ -91,7 +91,7 @@ Generated from every domain document: which one introduces a name, and where.
 | `BsAgentManager` | [02-agent-runtime.md#pieces](02-agent-runtime.md#pieces) | 20 |
 | `buffersRef` | [06-ui-shell.md#data-flow](06-ui-shell.md#data-flow) | 35 |
 | `build/icons/32x32.png` | [07-build-release.md#design-decisions](07-build-release.md#design-decisions) | 58 |
-| `buildFleet` | [06-ui-shell.md#the-fleet-panel](06-ui-shell.md#the-fleet-panel) | 138 |
+| `buildFleet` | [06-ui-shell.md#the-fleet-panel](06-ui-shell.md#the-fleet-panel) | 152 |
 | `buildSpawnCommand` | [04-terminal-panes.md#design-decisions](04-terminal-panes.md#design-decisions) | 59 |
 | `Channels.EventPtyData` | [04-terminal-panes.md#data-flow](04-terminal-panes.md#data-flow) | 29 |
 | `Channels.EventRemoteStatus` | [08-remote-control.md#data-flow](08-remote-control.md#data-flow) | 30 |
@@ -108,9 +108,7 @@ Generated from every domain document: which one introduces a name, and where.
 | `Configuration` | [07-build-release.md#types-that-carry-it](07-build-release.md#types-that-carry-it) | 46 |
 | `contextBridge` | [01-process-model.md#pieces](01-process-model.md#pieces) | 18 |
 | `COORDINATE_RULES` | [02-agent-runtime.md#two-ways-to-hand-work-off](02-agent-runtime.md#two-ways-to-hand-work-off) | 118 |
-| `CoordinatorBoard` | [06-ui-shell.md#the-coordination-view](06-ui-shell.md#the-coordination-view) | 99 |
 | `coordinatorNote` | [02-agent-runtime.md#what-a-coordinator-is-told-and-what-it-can-reach](02-agent-runtime.md#what-a-coordinator-is-told-and-what-it-can-reach) | 142 |
-| `CoordinatorView` | [06-ui-shell.md#the-coordination-view](06-ui-shell.md#the-coordination-view) | 99 |
 | `createLlm` | [02-agent-runtime.md#design-decisions](02-agent-runtime.md#design-decisions) | 84 |
 | `createRuntime` | [03-providers.md#types-that-carry-it](03-providers.md#types-that-carry-it) | 61 |
 | `credits.balance` | [00-goals.md#group-c-quota-models](00-goals.md#group-c-quota-models) | 168 |
@@ -132,12 +130,13 @@ Generated from every domain document: which one introduces a name, and where.
 | `ipcRenderer.on` | [01-process-model.md#data-flow](01-process-model.md#data-flow) | 33 |
 | `JsonStore` | [05-sessions.md#design-decisions](05-sessions.md#design-decisions) | 66 |
 | `listModels` | [03-providers.md#types-that-carry-it](03-providers.md#types-that-carry-it) | 61 |
+| `listSessionTranscript` | [06-ui-shell.md#the-coordination-view](06-ui-shell.md#the-coordination-view) | 99 |
 | `LlmClient` | [02-agent-runtime.md#pieces](02-agent-runtime.md#pieces) | 20 |
 | `LoopDeps` | [02-agent-runtime.md#data-flow](02-agent-runtime.md#data-flow) | 40 |
 | `MainApp.startUsagePoll` | [03-providers.md#data-flow](03-providers.md#data-flow) | 38 |
 | `MainApp` | [01-process-model.md#pieces](01-process-model.md#pieces) | 18 |
 | `MAX_COMPACT_PER_RUN` | [02-agent-runtime.md#known-limits](02-agent-runtime.md#known-limits) | 174 |
-| `modelIds` | [06-ui-shell.md#the-fleet-panel](06-ui-shell.md#the-fleet-panel) | 138 |
+| `modelIds` | [06-ui-shell.md#the-fleet-panel](06-ui-shell.md#the-fleet-panel) | 152 |
 | `modeNote` | [02-agent-runtime.md#what-a-coordinator-is-told-and-what-it-can-reach](02-agent-runtime.md#what-a-coordinator-is-told-and-what-it-can-reach) | 142 |
 | `onExit` | [04-terminal-panes.md#design-decisions](04-terminal-panes.md#design-decisions) | 59 |
 | `onX` | [01-process-model.md#data-flow](01-process-model.md#data-flow) | 33 |
@@ -154,7 +153,7 @@ Generated from every domain document: which one introduces a name, and where.
 | `providerError` | [03-providers.md#design-decisions](03-providers.md#design-decisions) | 82 |
 | `ProviderManager.connect` | [03-providers.md#data-flow](03-providers.md#data-flow) | 38 |
 | `ProviderManager.refreshUsage` | [03-providers.md#data-flow](03-providers.md#data-flow) | 38 |
-| `ProviderQuotaGroup` | [06-ui-shell.md#the-fleet-panel](06-ui-shell.md#the-fleet-panel) | 138 |
+| `ProviderQuotaGroup` | [06-ui-shell.md#the-fleet-panel](06-ui-shell.md#the-fleet-panel) | 152 |
 | `ProviderQuotaWindow` | [00-goals.md#the-three-quota-models](00-goals.md#the-three-quota-models) | 117 |
 | `ProvidersTab.tsx` | [00-goals.md#group-b-the-quota-surface](00-goals.md#group-b-the-quota-surface) | 137 |
 | `ProviderUsage.status` | [03-providers.md#design-decisions](03-providers.md#design-decisions) | 82 |

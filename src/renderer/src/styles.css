@@ -53,6 +53,11 @@
   --orange: #ffb454;
   --red: #ff5f56;
 
+  /* Both rails are this wide, and neither is draggable. The centre is where
+     the work is — several live agent panes at once — and a right panel the
+     user could widen was taking that space away from it. */
+  --rail-width: 279px;
+
   /* misc */
   --radius-sm: 4px;
   --radius: 6px;
@@ -156,7 +161,7 @@ button, input, select, textarea { font-family: inherit; color: inherit; }
 /* Sidebar */
 .sidebar {
 
-  width: 268px;
+  width: var(--rail-width);
   background: var(--bg-panel);
   border-right: 1px solid var(--hairline);
   display: flex;
@@ -1627,7 +1632,8 @@ select.input { width: 100%; }
 .right-panel {
   border-radius: 0;
   position: relative;
-  flex: 0 0 auto;
+  flex: 0 0 var(--rail-width);
+  width: var(--rail-width);
   min-width: 0;
   display: flex; flex-direction: column;
   background: var(--bg-panel);
@@ -1635,11 +1641,6 @@ select.input { width: 100%; }
   animation: bs-rise 300ms 120ms ease-out both;
 }
 .right-panel-main { flex: 1; min-height: 0; display: flex; }
-.right-panel-resizer {
-  position: absolute; left: -3px; top: 0; bottom: 0; width: 7px;
-  cursor: col-resize; z-index: 5;
-}
-.right-panel-resizer:hover { background: var(--accent-dim); }
 .right-panel-content {
   border-radius: 0;
   flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden;
@@ -1790,24 +1791,41 @@ select.input { width: 100%; }
 /* Hidden until the row is under the pointer or focused: the roster is read far
    more often than the role is changed, and a button on every row would read as
    the panel's main action. */
-.fleet-make-coordinator { flex: none; opacity: 0; }
+.fleet-make-coordinator { flex: none; opacity: 0; max-width: 96px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fleet-agent:hover .fleet-make-coordinator,
 .fleet-make-coordinator:focus-visible { opacity: 1; }
+/* Rail width: the card carries no horizontal slack, so anything that can be
+   long is clamped rather than allowed to push a neighbour out of the row. */
+.quota-account-card.fleet { padding: 8px; }
+.quota-account-card.fleet .quota-account-header { flex-wrap: nowrap; }
+.quota-account-card.fleet .quota-account-identity { min-width: 0; }
+.quota-account-card.fleet .quota-account-identity strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.quota-account-card.fleet .quota-account-identity > div > span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.quota-account-card.fleet .quota-account-badges { flex: none; }
 .fleet-strays, .fleet-unassigned { display: flex; flex-direction: column; gap: 4px; padding: 8px; border: 1px dashed var(--hairline); border-radius: var(--radius); }
 .fleet-strays h6, .fleet-unassigned h6 { margin: 0; color: var(--text-dim); }
 .fleet-empty { padding: 16px; color: var(--text-dim); }
 
-/* Coordination: what a worker did belongs on the row. Reading it used to mean
-   opening that worker's own session. */
+/* Coordination is a grid of live chats, not a summary of them. The coordinator
+   is pinned left; every worker it has given work to tiles the rest. Watching
+   the work happen is the whole point of the screen. */
 .main-stack { display: contents; }
 .main-stack.hidden { display: none; }
-.coordinator-assignment-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; padding: 0; background: none; border: 0; color: inherit; cursor: pointer; text-align: left; }
-.coordinator-assignment-head:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
-.coordinator-tools { margin-top: 4px; color: var(--text-dim); font-size: var(--fs-xs); font-family: var(--font-mono); }
-.coordinator-note { margin: 4px 0 0; color: var(--yellow); font-size: var(--fs-xs); }
-.coordinator-assignment-detail { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--hairline); display: grid; gap: 8px; justify-items: start; }
-.coordinator-tool-list { margin: 0; padding-left: 18px; display: grid; gap: 2px; color: var(--text-dim); font-size: var(--fs-xs); }
+.coordinator-surface { flex: 1; min-height: 0; min-width: 0; display: grid; grid-template-columns: minmax(320px, 1fr) 2fr; gap: 8px; padding: 8px; }
+.coordinator-surface.tiles-0 { grid-template-columns: 1fr; }
+.coordinator-tile { min-width: 0; min-height: 0; display: flex; flex-direction: column; background: var(--bg-panel); border: 1px solid var(--hairline); border-radius: var(--radius); overflow: hidden; }
+.coordinator-tile.state-running { border-color: var(--accent-border); }
+.coordinator-tile.state-failed { border-color: color-mix(in srgb, var(--red) 45%, transparent); }
+.coordinator-tile.state-no-result { border-color: color-mix(in srgb, var(--yellow) 45%, transparent); }
+.coordinator-tile-head { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 10px; border-bottom: 1px solid var(--hairline); background: var(--bg-raised); }
+.coordinator-tile-head strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Every tile owns a full ChatPanel, so it must be allowed to scroll inside its
+   own box rather than stretch the grid row to fit its transcript. */
+.coordinator-tile > .chat-panel { min-height: 0; flex: 1; }
+.coordinator-workers { min-width: 0; min-height: 0; display: grid; gap: 8px; grid-template-columns: 1fr; }
+.coordinator-workers:has(> :nth-child(2)) { grid-template-columns: 1fr 1fr; }
 .coordinator-state.state-no-result { color: var(--yellow); }
+.coordinator-state.state-failed { color: var(--red); }
 .quota-speed-control button { min-height: 28px; padding-inline: 7px; }
 .quota-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 7px; min-width: 0; }
 .quota-group { display: grid; align-content: start; gap: 6px; min-width: 0; padding: 7px; border: 1px solid var(--hairline); border-radius: var(--radius-sm); background: color-mix(in srgb, var(--bg-input) 78%, transparent); }
@@ -1846,12 +1864,14 @@ select.input { width: 100%; }
 }
 .right-panel-view.hidden { display: none; }
 .right-panel-tabs {
-  flex: 0 0 44px; display: flex; flex-direction: column; align-items: stretch;
+  /* 30px, not 44. The rail is fixed at --rail-width now, so every pixel the
+     tab strip takes is a pixel the tree or the quota bars do not get. */
+  flex: 0 0 30px; display: flex; flex-direction: column; align-items: stretch;
   border-left: 1px solid var(--hairline); background: var(--bg-raised);
   border-radius: 0;
 }
 .right-panel-tab {
-  flex: 0 0 auto; height: 44px; display: flex; align-items: center; justify-content: center;
+  flex: 0 0 auto; height: 32px; display: flex; align-items: center; justify-content: center;
   background: transparent; border: none; color: var(--text-dim); cursor: pointer;
   transition: background 120ms ease, color 120ms ease;
 }

@@ -298,6 +298,13 @@ export class BsAgentManager {
     return id
   }
 
+  // The session this agent's next turn will land in. The coordination view
+  // renders each participating agent's live chat, and needs to know which
+  // session that is; listSessions leaves the caller guessing which is current.
+  activeSessionFor(agentId: string): string {
+    return this.activeSessionId(agentId)
+  }
+
   listSessions(agentId: string): SessionSummary[] {
     return this.deps.store.list(agentId)
   }
@@ -1782,6 +1789,7 @@ export class BsAgentManager {
       turnId: this.executionForAgent(coordinatorId)?.execution.turnId,
       workerId: target.id,
       workerName: target.name,
+      sessionId: this.activeSessionId(target.id),
       task,
       startedAt: Date.now(),
       state: 'running'

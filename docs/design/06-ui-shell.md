@@ -12,9 +12,9 @@ panel, settings and the tray. The terminal inside a pane is in
 | [Data flow](#data-flow) | 35-53 | `App.tsx`, `PaneModel`, `XtermHost`, `buffersRef`, `registerTerminal`, `ChatPanel` |
 | [Types that carry it](#types-that-carry-it) | 54-63 | `PaneModel`, `ChatEvent`, `src/shared/types.ts`, `QuotaAccountUiState`, `src/renderer/src/components/quota/quota-view.ts` |
 | [Design decisions](#design-decisions) | 64-98 | `getWindowChromeOptions`, `titleBarOverlay`, `tests/unit/window-chrome.test.ts`, `src/renderer/AGENTS.md`, `MainApp`, `app.setAppUserModelId` |
-| [The coordination view](#the-coordination-view) | 99-137 | `src/renderer/src/components/coordinator/CoordinatorView.tsx`, `App.tsx`, `setMode`, `RightPanel`, `CoordinatorBoard`, `CoordinatorView` |
-| [The fleet panel](#the-fleet-panel) | 138-186 | `RightPanel`, `buildFleet`, `ProviderQuotaGroup`, `modelIds`, `anti-claude-opus`, `anti-claude-sonnet` |
-| [Known limits](#known-limits) | 187-193 | `docs/technical-debt.md` |
+| [The coordination view](#the-coordination-view) | 99-151 | `src/renderer/src/components/coordinator/CoordinatorView.tsx`, `App.tsx`, `setMode`, `RightPanel`, `ChatPanel`, `listSessionTranscript` |
+| [The fleet panel](#the-fleet-panel) | 152-210 | `RightPanel`, `buildFleet`, `ProviderQuotaGroup`, `modelIds`, `anti-claude-opus`, `anti-claude-sonnet` |
+| [Known limits](#known-limits) | 211-217 | `docs/technical-debt.md` |
 <!-- /toc -->
 
 ## Pieces
@@ -123,17 +123,31 @@ Fleet is a roster you read while working, and the board is a surface you work
 *in*. A second window was rejected too: a second lifecycle, state synced over
 IPC and close/reopen handling, for a separation nothing has asked for.
 
-The board shows the coordinator's messages, an input, and one row per
-assignment with its worker, task, state and result. A row opens that worker's
-own session, because the full exchange is already there.
+The coordinator is pinned left; every worker it has given work to tiles the
+rest, each a full `ChatPanel` bound to the session that task ran in.
 
-**What it does not show is the design.** No tool cards, no streaming detail, no
-editing. Those belong to the chat frame this exists to be separate from, and a
-test asserts their absence rather than trusting the boundary to hold.
+**Sessions are one store keyed by cwd.** `listSessionTranscript` gates on
+`store.listProject(projectPath)` and then reads `store.transcript(sessionId)` —
+so a worker's session *is* a session of this project, and rendering it needs no
+change to the session model. An earlier note here claimed the two were
+different things and that Work therefore could not reach a worker's transcript.
+That was false. What was actually missing was recording **which** session a task
+ran in, which `CoordinationAssignment.sessionId` now carries.
 
-`CoordinatorBoard` is split from `CoordinatorView` the way `StatsView` is split
-from `StatsTab`: the presentational half takes props and can be rendered under
-`environment: 'node'`.
+**It shows a live chat per agent, and that reverses an earlier decision.** The
+first version was a summary board — worker, task, state — on the stated
+principle that tool cards and streaming belonged to the chat frame this surface
+exists to be separate from. A test asserted their absence.
+
+Use showed the principle was wrong. What goal 4 asked to leave was the
+**single-agent chat frame**, not the detail. Stripped of the detail the screen
+was a silent wait: nothing appeared between giving a command and its result,
+and the only way to learn what a worker was doing was to open its own session
+by hand. The principle and its test are gone.
+
+`coordinationTiles` is a pure function over assignments and agents, so which
+tiles exist — one per worker, newest first, a second task to the same worker
+reusing its tile — is asserted without rendering a `ChatPanel`.
 
 ## The fleet panel
 
@@ -183,6 +197,16 @@ that made it unreadable there:
 
 Refresh moved into the header as an icon for the same reason: a labelled button
 in a footer costs a whole row to say what an icon says.
+
+**Both rails are `--rail-width` and neither is draggable.** The right panel
+could be widened to 600px, which took that space from the centre — and the
+centre is where several live agent panes now sit at once. Fixed at the
+sidebar's width — 279px — the card carries no horizontal slack, so the fleet variant
+drops what the wider variants can afford: the Active badge, whose absence
+carries it, and the plan name, which the account's own email already
+identifies. Subscription expiry moves to the row's tooltip; freshness stays
+visible, because a stale reading changes what the bars above it are worth.
+The tab strip is 30px rather than 44 for the same reason.
 
 ## Known limits
 

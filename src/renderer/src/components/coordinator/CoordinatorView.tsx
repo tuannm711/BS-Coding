@@ -1,74 +1,49 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Square } from 'lucide-react'
-import type { ChatMessage, CoordinationAssignment } from '@shared/types'
+import type { AgentConfig, CoordinationAssignment } from '@shared/types'
+import ChatPanel from '../chat/ChatPanel'
 
-export interface CoordinatorBoardProps {
-  coordinatorName: string | null
-  messages: ChatMessage[]
+export interface CoordinationTile {
+  agent: AgentConfig
+  sessionId: string
+  assignment: CoordinationAssignment
+}
+
+// Newest assignment first, one tile per worker. A worker given two tasks in a
+// row is one tile, not two: the tile is that agent's session, and the session
+// already holds both exchanges in order.
+export function coordinationTiles(
+  assignments: CoordinationAssignment[], agents: AgentConfig[]
+): CoordinationTile[] {
+  const tiles: CoordinationTile[] = []
+  for (const item of [...assignments].reverse()) {
+    if (tiles.some(tile => tile.agent.id === item.workerId)) continue
+    const agent = agents.find(candidate => candidate.id === item.workerId)
+    // An agent removed from the project mid-run has no pane to render.
+    if (agent) tiles.push({ agent, sessionId: item.sessionId, assignment: item })
+  }
+  return tiles
+}
+
+export interface CoordinatorSurfaceProps {
+  projectPath: string
+  coordinator: AgentConfig | null
+  coordinatorSessionId: string | null
+  agents: AgentConfig[]
   assignments: CoordinationAssignment[]
-  running: boolean
-  onSend: (text: string) => void
-  onStop: () => void
-  onOpenWorker: (workerId: string) => void
   onOpenFleet?: () => void
 }
 
-const STATE_LABEL: Record<CoordinationAssignment['state'], string> = {
-  running: 'running',
-  completed: 'done',
-  failed: 'failed',
-  // Ran, used tools, wrote no reply. Calling that "failed" was how a worker
-  // that invoked two skills and stopped looked identical to one that never
-  // started — and telling them apart meant opening its session by hand.
-  'no-result': 'no reply'
-}
-
-function Assignment({ item, onOpenWorker }: {
-  item: CoordinationAssignment
-  onOpenWorker: (workerId: string) => void
-}) {
-  const [open, setOpen] = useState(false)
-  const tools = item.toolNames ?? []
-  return (
-    <div className={`coordinator-assignment state-${item.state}`}>
-      <button className="coordinator-assignment-head" type="button" aria-expanded={open} onClick={() => setOpen(value => !value)}>
-        <strong>{item.workerName}</strong>
-        <span className={`coordinator-state state-${item.state}`}>{STATE_LABEL[item.state]}</span>
-      </button>
-      <div className="coordinator-task">{item.task}</div>
-      {/* What it actually did, on the row. Without this the only way to learn
-          that a worker had run two skills was to open its own session. */}
-      {tools.length > 0 ? <div className="coordinator-tools">
-        {tools.length} tool{tools.length === 1 ? '' : 's'} · {[...new Set(tools)].join(', ')}
-      </div> : null}
-      {item.result ? <div className="coordinator-result">{item.result}</div> : null}
-      {item.state === 'no-result' && !item.result
-        ? <p className="coordinator-note">Used its tools and ended without a reply.</p>
-        : null}
-      {open ? <div className="coordinator-assignment-detail">
-        {tools.length > 0 ? <ol className="coordinator-tool-list">
-          {tools.map((tool, index) => <li key={`${tool}-${index}`}><code>{tool}</code></li>)}
-        </ol> : <p className="settings-hint">No tools used.</p>}
-        <button className="btn small" type="button" onClick={() => onOpenWorker(item.workerId)}>
-          Open {item.workerName} in Work
-        </button>
-      </div> : null}
-    </div>
-  )
-}
-
-// Presentational half, so every state can be asserted with renderToStaticMarkup
-// the way StatsView and FeedRow are.
-//
-// What this deliberately does not render: tool cards, streaming detail, message
-// editing. Those belong to the chat frame this surface exists to be separate
-// from — to read the detail, open the worker's session.
-export function CoordinatorBoard({
-  coordinatorName, messages, assignments, running, onSend, onStop, onOpenWorker, onOpenFleet
-}: CoordinatorBoardProps) {
-  const [draft, setDraft] = useState('')
-
-  if (!coordinatorName) {
+// One live chat per agent taking part, tiled. The first version of this screen
+// showed a summary board instead — worker, task, state — on the theory that
+// tool cards and streaming belonged to the chat frame this surface exists to
+// be separate from. That was wrong in a way only use revealed: what goal 4
+// asked to leave was the single-agent chat frame, not the detail. Stripped of
+// the detail the screen was a silent wait, and the only way to see what an
+// agent was doing was to open its own session by hand.
+export function CoordinatorSurface({
+  projectPath, coordinator, coordinatorSessionId, agents, assignments, onOpenFleet
+}: CoordinatorSurfaceProps) {
+  if (!coordinator) {
     // An empty screen is an invitation to act. One route, to the one place the
     // role is given — a picker here would be a second control doing the same
     // job, which is how the project ended up with two coordinators.
@@ -81,75 +56,78 @@ export function CoordinatorBoard({
     )
   }
 
-  const send = () => {
-    const text = draft.trim()
-    if (!text) return
-    onSend(text)
-    setDraft('')
-  }
+  const workers = coordinationTiles(assignments, agents)
 
   return (
-    <div className="coordinator-board">
-      <section className="coordinator-side" aria-label={`Coordinator ${coordinatorName}`}>
-        <header className="coordinator-head">
-          <strong>{coordinatorName}</strong>
-          {running ? <button className="btn small danger" type="button" onClick={onStop}>
-            <Square size={12} aria-hidden="true" />Stop
-          </button> : null}
+    <div className={`coordinator-surface tiles-${Math.min(workers.length, 3)}`}>
+      <section className="coordinator-tile lead" aria-label={`Coordinator ${coordinator.name}`}>
+        <header className="coordinator-tile-head">
+          <strong>{coordinator.name}</strong>
+          <span className="fleet-role">coordinates</span>
         </header>
-        <div className="coordinator-messages">
-          {messages.length === 0
-            ? <p className="settings-hint">Nothing yet. Give it something to organise.</p>
-            : messages.map(message => (
-              <div key={message.id} className={`coordinator-message ${message.role}`}>
-                {message.displayText ?? message.text}
-              </div>
-            ))}
-        </div>
-        <div className="coordinator-input">
-          <textarea
-            value={draft}
-            placeholder="What should be done?"
-            onChange={event => setDraft(event.target.value)}
-            onKeyDown={event => {
-              if (event.key === 'Enter' && !event.shiftKey) {
-                event.preventDefault()
-                send()
-              }
-            }}
-          />
-          <button className="btn small" type="button" onClick={send} disabled={!draft.trim()}>Send</button>
-        </div>
+        {coordinatorSessionId ? <ChatPanel
+          agentId={coordinator.id}
+          agents={[coordinator]}
+          onAgentChange={() => {}}
+          projectPath={projectPath}
+          sessionId={coordinatorSessionId}
+          onSessionChange={() => {}}
+          cwd={coordinator.cwd}
+          mode={coordinator.mode ?? 'coordinate'}
+        /> : <p className="settings-hint">No session yet.</p>}
       </section>
 
-      <section className="coordinator-work" aria-label="Assignments">
-        <h6>Assignments</h6>
-        {assignments.length === 0
-          ? <p className="settings-hint">No work assigned yet.</p>
-          : assignments.map(item => (
-            <Assignment key={item.id} item={item} onOpenWorker={onOpenWorker} />
+      <div className="coordinator-workers">
+        {workers.length === 0
+          ? <p className="settings-hint">No work assigned yet. Whatever it delegates appears here as it runs.</p>
+          : workers.map(({ agent, sessionId, assignment }) => (
+            <section key={agent.id} className={`coordinator-tile state-${assignment.state}`} aria-label={agent.name}>
+              <header className="coordinator-tile-head">
+                <strong>{agent.name}</strong>
+                <span className={`coordinator-state state-${assignment.state}`}>{STATE_LABEL[assignment.state]}</span>
+              </header>
+              <ChatPanel
+                agentId={agent.id}
+                agents={[agent]}
+                onAgentChange={() => {}}
+                projectPath={projectPath}
+                sessionId={sessionId}
+                onSessionChange={() => {}}
+                cwd={agent.cwd}
+                mode={agent.mode ?? 'build'}
+              />
+            </section>
           ))}
-      </section>
+      </div>
     </div>
   )
 }
 
+const STATE_LABEL: Record<CoordinationAssignment['state'], string> = {
+  running: 'running',
+  completed: 'done',
+  failed: 'failed',
+  // Ran, used tools, wrote no reply. Calling that "failed" made a worker that
+  // invoked two skills and stopped look identical to one that never started.
+  'no-result': 'no reply'
+}
+
 export default function CoordinatorView({
-  coordinatorId, coordinatorName, onOpenWorker, onOpenFleet
+  projectPath, coordinator, agents, onOpenFleet
 }: {
-  coordinatorId: string | null
-  coordinatorName: string | null
-  onOpenWorker: (workerId: string) => void
+  projectPath: string | null
+  coordinator: AgentConfig | null
+  agents: AgentConfig[]
   onOpenFleet?: () => void
 }) {
   const [assignments, setAssignments] = useState<CoordinationAssignment[]>([])
-  const [messages, setMessages] = useState<ChatMessage[]>([])
-  const [running, setRunning] = useState(false)
+  const [coordinatorSessionId, setCoordinatorSessionId] = useState<string | null>(null)
+  const coordinatorId = coordinator?.id ?? null
 
   const reload = useCallback(() => {
     if (!coordinatorId) return
     void window.api.listAssignments(coordinatorId).then(setAssignments)
-    void window.api.listChatMessages(coordinatorId).then(setMessages)
+    void window.api.activeSessionFor(coordinatorId).then(setCoordinatorSessionId)
   }, [coordinatorId])
 
   useEffect(() => { reload() }, [reload])
@@ -158,21 +136,23 @@ export default function CoordinatorView({
     if (!coordinatorId) return
     return window.api.onChatEvent(event => {
       if (event.agentId !== coordinatorId) return
+      // Only the edges that change which tiles exist or what their chips say.
+      // The transcripts inside them stream on their own — each ChatPanel is
+      // subscribed to its own session, so nothing here refetches them.
       if (event.type === 'assignment-started' || event.type === 'assignment-finished') reload()
-      if (event.type === 'turn-started') setRunning(true)
-      if (event.type === 'done' || event.type === 'error') { setRunning(false); reload() }
+      if (event.type === 'done' || event.type === 'error') reload()
     })
   }, [coordinatorId, reload])
 
+  if (!projectPath) return <div className="coordinator-empty"><p>No project open.</p></div>
+
   return (
-    <CoordinatorBoard
-      coordinatorName={coordinatorName}
-      messages={messages}
+    <CoordinatorSurface
+      projectPath={projectPath}
+      coordinator={coordinator}
+      coordinatorSessionId={coordinatorSessionId}
+      agents={agents}
       assignments={assignments}
-      running={running}
-      onSend={text => { if (coordinatorId) void window.api.sendChat(coordinatorId, text) }}
-      onStop={() => { if (coordinatorId) void window.api.stopAgent(coordinatorId) }}
-      onOpenWorker={onOpenWorker}
       onOpenFleet={onOpenFleet}
     />
   )

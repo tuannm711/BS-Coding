@@ -53,10 +53,6 @@ export default function App() {
     // or one hand-edited, must not select a view that is not there.
     return stored === 'artifacts' || stored === 'fleet' ? stored : 'tree'
   })
-  const [rightWidth, setRightWidth] = useState(() => {
-    const w = Number(localStorage.getItem('bs.rightpanel.width'))
-    return Number.isFinite(w) && w >= 300 && w <= 600 ? w : 340
-  })
   const [artifacts, setArtifacts] = useState<Record<string, ArtifactEntry[]>>({})
   const termsRef = useRef<Map<string, Terminal>>(new Map())
   const buffersRef = useRef<Map<string, string>>(new Map())
@@ -71,9 +67,6 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('bs.rightpanel.tab', rightTab)
   }, [rightTab])
-  useEffect(() => {
-    localStorage.setItem('bs.rightpanel.width', String(rightWidth))
-  }, [rightWidth])
 
   useEffect(() => {
     return window.api.onArtifactsChanged(({ projectPath, artifacts: list }) => {
@@ -343,9 +336,9 @@ export default function App() {
               views mounted for the same reason. */}
           {coordinateOpen ? (
             <CoordinatorView
-              coordinatorId={coordinator?.id ?? null}
-              coordinatorName={coordinator?.name ?? null}
-              onOpenWorker={handleOpenWorker}
+              projectPath={runtime?.workspace.projectPath ?? null}
+              coordinator={coordinator}
+              agents={nativeAgents}
               onOpenFleet={() => { setRightOpen(true); setRightTab('fleet') }}
             />
           ) : null}
@@ -387,13 +380,11 @@ export default function App() {
           <RightPanel
             root={runtime?.workspace.projectPath ?? null}
             tab={rightTab}
-            width={rightWidth}
             artifacts={artifacts[runtime?.workspace.projectPath ?? ''] ?? []}
             agents={nativeAgents}
             onSelectAgent={setSelectedNativeAgentId}
             onSetCoordinator={agentId => { void window.api.setAgentMode(agentId, 'coordinate') }}
             onTabChange={setRightTab}
-            onWidthChange={setRightWidth}
             onClearArtifacts={() => {
               const p = runtime?.workspace.projectPath
               if (p) void window.api.clearArtifacts(p)

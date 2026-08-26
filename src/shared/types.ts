@@ -173,6 +173,11 @@ export interface CoordinationAssignment {
   turnId?: string
   workerId: string
   workerName: string
+  // The session the task actually ran in, so the coordination view can render
+  // that worker's live chat rather than a summary of it. Sessions are one
+  // store keyed by cwd — a worker's session is a session of this project — so
+  // this needs no new lookup, only recording which one it was.
+  sessionId: string
   task: string
   startedAt: number
   finishedAt?: number

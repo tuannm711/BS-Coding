@@ -919,6 +919,7 @@ function registerIpcHandlers(): void {
   ipcMain.handle(Channels.ChatQueueEdit, (_e, agentId: string, id: string, text: string) =>
     mainApp.bsAgent.editQueued(agentId, id, text))
   ipcMain.handle(Channels.SessionList, (_e, agentId: string) => mainApp.bsAgent.listSessions(agentId))
+  ipcMain.handle(Channels.SessionActive, (_e, agentId: string) => mainApp.bsAgent.activeSessionFor(agentId))
   ipcMain.handle(Channels.SessionCreate, (_e, agentId: string) => mainApp.bsAgent.createSession(agentId))
   ipcMain.handle(Channels.SessionSwitch, (_e, agentId: string, sessionId: string) =>
     mainApp.bsAgent.switchSession(agentId, sessionId))
