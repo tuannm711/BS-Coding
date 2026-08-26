@@ -754,6 +754,18 @@ export class BsAgentManager {
   }
 
   setMode(agentId: string, mode: AgentMode): void {
+    // Enforced here rather than in the view: the manager knows each agent's
+    // cwd, so the rule holds whichever surface calls it and there is no second
+    // copy to disagree. Two coordinators in one project would assign work to
+    // the same workers with neither aware of the other. The recursion ends —
+    // this branch only runs for 'coordinate' and the demotion passes 'build'.
+    if (mode === 'coordinate') {
+      const cwd = this.agents.get(agentId)?.cwd
+      for (const other of [...this.agents.values()]) {
+        if (other.id === agentId || other.cwd !== cwd) continue
+        if ((this.modes.get(other.id) ?? 'build') === 'coordinate') this.setMode(other.id, 'build')
+      }
+    }
     this.modes.set(agentId, mode)
     const agent = this.agents.get(agentId)
     if (agent) {

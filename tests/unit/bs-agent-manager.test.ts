@@ -31,6 +31,11 @@ const SECOND_AGENT: AgentConfig = {
 const PTY_AGENT: AgentConfig = {
   id: 'a2', name: 'opencode', templateId: 'opencode', cwd: '/proj'
 }
+// A native agent in a different project. cwd is what separates projects here,
+// as it already does for fallback candidates and the coordinator's roster.
+const OTHER_PROJECT_AGENT: AgentConfig = {
+  id: 'b1', name: 'other', templateId: 'bs', cwd: '/other', kind: 'native'
+}
 
 interface StubLlmOptions {
   hangUntilAbort?: boolean
@@ -43,6 +48,7 @@ async function makeManager(opts: StubLlmOptions & {
   providerAccounts?: ProviderConnection[]
   providerRuntime?: (providerId: string, accountId: string, modelId: string) => LlmClient
   secondAgent?: boolean
+  secondProject?: boolean
 } = {}) {
   const cfgDir = mkdtempSync(path.join(tmpdir(), 'bs-mgr-cfg-'))
   const defaultCfg = path.join(cfgDir, 'bs.json')
@@ -126,9 +132,12 @@ async function makeManager(opts: StubLlmOptions & {
     onAssignmentChanged: assignment => assignmentEvents.push(assignment)
   })
   manager.setOnEvent(e => events.push(e))
-  await manager.init(opts.secondAgent
-    ? [{ ...BS_AGENT }, { ...SECOND_AGENT }, { ...PTY_AGENT }]
-    : [{ ...BS_AGENT }, { ...PTY_AGENT }])
+  await manager.init([
+    { ...BS_AGENT },
+    ...(opts.secondAgent ? [{ ...SECOND_AGENT }] : []),
+    ...(opts.secondProject ? [{ ...OTHER_PROJECT_AGENT }] : []),
+    { ...PTY_AGENT }
+  ])
   return { manager, store, events, assignmentEvents, createLlm, savedPermissions, llmCalls, llmSystems, llmVariants, llmModels }
 }
 
@@ -1135,6 +1144,36 @@ describe('delegation keeps conversations separate', () => {
     await manager.send('a3', 'do the thing')
     expect(manager.listMessages('a3').some(message => message.text.includes('worker done'))).toBe(true)
     expect(manager.listMessages('a1')).toHaveLength(before)
+  })
+})
+
+describe('one coordinator per project', () => {
+  const modeOf = (manager: BsAgentManager, agentId: string) =>
+    manager.listAgents().find(agent => agent.id === agentId)?.mode ?? 'build'
+
+  it('takes the role from whoever held it', async () => {
+    // find() in App.tsx picked one of them. Nothing had made either of them
+    // the coordinator, and both would assign work to the same workers.
+    const { manager } = await makeManager({ secondAgent: true })
+    manager.setMode('a1', 'coordinate')
+    manager.setMode('a3', 'coordinate')
+    expect(modeOf(manager, 'a1')).toBe('build')
+    expect(modeOf(manager, 'a3')).toBe('coordinate')
+  })
+
+  it('leaves a coordinator in another project alone', async () => {
+    const { manager } = await makeManager({ secondAgent: true, secondProject: true })
+    manager.setMode('a1', 'coordinate')
+    manager.setMode('b1', 'coordinate')
+    expect(modeOf(manager, 'a1')).toBe('coordinate')
+    expect(modeOf(manager, 'b1')).toBe('coordinate')
+  })
+
+  it('does not disturb agents in other modes', async () => {
+    const { manager } = await makeManager({ secondAgent: true })
+    manager.setMode('a3', 'plan')
+    manager.setMode('a1', 'coordinate')
+    expect(modeOf(manager, 'a3')).toBe('plan')
   })
 })
 
