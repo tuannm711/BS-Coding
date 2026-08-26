@@ -655,6 +655,13 @@ export class BsAgentManager {
     this.controllers.delete(key)
     this.running.delete(key)
     this.resolvePendingFor(agentId, null)
+    // Stop used to be per agent, so stopping a coordinator left every worker
+    // it started running with nothing to gather them. The cascade follows
+    // assignments, not agents: a worker busy with its own conversation is not
+    // part of this fan-out. One level deep, because delegation is.
+    for (const assignment of this.assignmentsByCoordinator.get(agentId) ?? []) {
+      if (assignment.state === 'running') this.stop(assignment.workerId)
+    }
   }
 
   // User-facing stop: aborts the active turn, keeps the queue, and immediately
@@ -1695,7 +1702,11 @@ export class BsAgentManager {
   // exist while the work is in flight.
   private async runAssignment(coordinatorId: string, name: string, task: string): Promise<{ output: string } | { error: string }> {
     const coordinator = this.agents.get(coordinatorId)
-    const target = [...this.agents.values()].find(other => other.name === name && other.cwd === coordinator?.cwd)
+    // Excluding the caller here as well as in listWorkers: agent names are not
+    // unique, so a coordinator sharing a name with a worker would otherwise
+    // resolve to itself and assign its own turn to itself.
+    const target = [...this.agents.values()]
+      .find(other => other.id !== coordinatorId && other.name === name && other.cwd === coordinator?.cwd)
     if (!target) return { error: `[bs] No agent named ${name}` }
     const assignment: CoordinationAssignment = {
       id: randomUUID(),

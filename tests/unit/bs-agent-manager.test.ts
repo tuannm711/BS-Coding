@@ -26,7 +26,7 @@ const BS_AGENT: AgentConfig = {
 // A second native agent, so a fallback candidate exists. Opt-in, because most
 // tests here count agents.
 const SECOND_AGENT: AgentConfig = {
-  id: 'a3', name: 'bs', templateId: 'bs', cwd: '/proj', kind: 'native'
+  id: 'a3', name: 'helper', templateId: 'bs', cwd: '/proj', kind: 'native'
 }
 const PTY_AGENT: AgentConfig = {
   id: 'a2', name: 'opencode', templateId: 'opencode', cwd: '/proj'
@@ -1089,7 +1089,7 @@ describe('coordination assignments', () => {
       partsQueue: [[{ kind: 'text', text: 'worker done' }, { kind: 'finish' }]]
     })
     manager.setMode('a1', 'coordinate')
-    const running = delegate(manager, 'a1', 'bs', 'do the thing')
+    const running = delegate(manager, 'a1', 'helper', 'do the thing')
     // Asserted before the await: the view exists to show work in flight, and a
     // record written only on completion would never show anything running.
     expect(manager.listAssignments('a1')[0]?.state).toBe('running')
@@ -1105,7 +1105,7 @@ describe('coordination assignments', () => {
       partsQueue: [[{ kind: 'error', error: 'boom' }]]
     })
     manager.setMode('a1', 'coordinate')
-    await delegate(manager, 'a1', 'bs', 'x')
+    await delegate(manager, 'a1', 'helper', 'x')
     expect(manager.listAssignments('a1')[0].state).toBe('failed')
   })
 
@@ -1115,8 +1115,51 @@ describe('coordination assignments', () => {
       partsQueue: [[{ kind: 'text', text: 'ok' }, { kind: 'finish' }]]
     })
     manager.setMode('a1', 'coordinate')
-    await delegate(manager, 'a1', 'bs', 'x')
+    await delegate(manager, 'a1', 'helper', 'x')
     expect(events.some(event => event.type === 'assignment-started')).toBe(true)
     expect(events.some(event => event.type === 'assignment-finished')).toBe(true)
+  })
+})
+
+describe('stopping a fan-out', () => {
+  const delegate = (manager: BsAgentManager, from: string, to: string, task: string) =>
+    (manager as unknown as { runAssignment: (c: string, n: string, t: string) => Promise<unknown> })
+      .runAssignment(from, to, task)
+  const settle = () => new Promise(resolve => setTimeout(resolve, 15))
+
+  it('stops the workers a coordinating turn started', async () => {
+    const { manager } = await makeManager({ secondAgent: true, hangUntilAbort: true })
+    manager.setMode('a1', 'coordinate')
+    void delegate(manager, 'a1', 'helper', 'long job')
+    await settle()
+    manager.stop('a1')
+    await settle()
+    expect(manager.isRunning('a3')).toBe(false)
+  })
+
+  it('does not resolve a shared name to the coordinator itself', async () => {
+    // Agent names are not unique. Before this, a coordinator named the same as
+    // a worker resolved to itself and assigned its own turn to itself — and
+    // the tests above passed while measuring exactly that.
+    const { manager } = await makeManager({
+      secondAgent: true,
+      partsQueue: [[{ kind: 'text', text: 'done' }, { kind: 'finish' }]]
+    })
+    manager.setMode('a1', 'coordinate')
+    const result = await delegate(manager, 'a1', 'bs', 'x') as { error?: string }
+    expect(result.error).toContain('No agent named bs')
+    expect(manager.listAssignments('a1')).toHaveLength(0)
+  })
+
+  it('leaves a worker running for something else alone', async () => {
+    // The cascade follows assignments, not agents. A worker busy with its own
+    // conversation is not part of this fan-out.
+    const { manager } = await makeManager({ secondAgent: true, hangUntilAbort: true })
+    manager.setMode('a1', 'coordinate')
+    void manager.send('a3', 'its own work')
+    await settle()
+    manager.stop('a1')
+    await settle()
+    expect(manager.isRunning('a3')).toBe(true)
   })
 })

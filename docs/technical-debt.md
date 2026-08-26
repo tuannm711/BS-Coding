@@ -7,7 +7,7 @@ purpose — none of it is a forgotten TODO.
 Add an entry when you decide *not* to do something you found. Remove it when the
 work lands, naming the commit.
 
-Last reviewed: 2026-08-26 (after the coordinator task exchange)
+Last reviewed: 2026-08-26 (after the coordinator surface)
 
 ## Index
 
@@ -23,8 +23,7 @@ Last reviewed: 2026-08-26 (after the coordinator task exchange)
 | 8 | [No guard checks whether a design sentence is true](#8-no-guard-checks-whether-a-design-sentence-is-true) | Docs | Medium |
 | 9 | [The balance quota model is unparsed](#9-the-balance-quota-model-is-unparsed) | Providers | Medium |
 | 10 | [A process-killing test times out under full-suite load](#10-a-process-killing-test-times-out-under-full-suite-load) | Build | Low |
-| 11 | [A fan-out cannot be cancelled](#11-a-fan-out-cannot-be-cancelled) | Agent | Medium |
-| 12 | [A coordinator can spend every worker's quota](#12-a-coordinator-can-spend-every-workers-quota) | Agent | Low |
+| 11 | [A coordinator can spend every worker's quota](#11-a-coordinator-can-spend-every-workers-quota) | Agent | Low |
 
 ---
 
@@ -51,6 +50,7 @@ for what was removed and why.
 
 
 
+
 ## 2. Only two providers report usage
 
 **Found:** 2026-08-25, while answering whether subscription expiry could be shown
@@ -72,6 +72,7 @@ cannot report usage in general.
 
 
 
+
 ## 3. Antigravity reports no subscription term
 
 **Found:** 2026-08-25. **Status: won't fix — recorded so it is not re-investigated.**
@@ -87,6 +88,7 @@ ChatGPT accounts do show a term. It comes from the `id_token` claim
 
 **To close:** nothing, unless Google adds the field. Do not synthesise a term
 from `g1-pro-tier`.
+
 
 
 
@@ -118,6 +120,7 @@ Both are product decisions, not engineering ones.
 
 
 
+
 ## 5. Tray artwork is not platform-specific
 
 **Found:** 2026-08-25, fixing the stale tray icon.
@@ -133,6 +136,7 @@ variant — glyph only, transparent background — would render better on all th
 **To close:** add per-platform tray assets and select by `process.platform` in
 `TrayManager.iconPath()`. `scripts/build-windows-icon.mjs` already regenerates the
 shared asset and would need to learn the variants.
+
 
 
 
@@ -169,6 +173,7 @@ Re-measure before planning from any summary, including this one.
 
 
 
+
 ## 7. The test runner crashes intermittently
 
 **Found:** 2026-08-25, twice while writing the design documentation.
@@ -189,6 +194,7 @@ a red run in this session.
 **To close:** capture a full `--reporter=verbose` log the next time it happens
 rather than re-running, and check whether vitest's `pool` or `poolOptions`
 settings avoid it. Do not chase it without a captured instance.
+
 
 
 
@@ -221,6 +227,7 @@ by reading the code, and the audit that finds a drift records it here.
 
 
 
+
 ## 9. The balance quota model is unparsed
 
 **Found:** 2026-08-26, in the same captured response.
@@ -243,6 +250,7 @@ currently zero.
 **To close:** design the balance model against this response, then decide
 whether a top-up provider such as DeepSeek maps onto the same shape or needs
 its own. Group C in `docs/design/00-goals.md`.
+
 
 
 ## 10. A process-killing test times out under full-suite load
@@ -269,24 +277,8 @@ touched.
 kill under parallel load, or whether this test should run in its own pool.
 Do not simply raise the number without knowing which.
 
-## 11. A fan-out cannot be cancelled
 
-**Found:** 2026-08-26, specifying the coordinator task exchange.
-
-A coordinator that assigns work to several agents starts a turn on each. Those
-are separate turns on separate agents, and Stop is per agent, so stopping the
-coordinator leaves every worker running. Nothing gathers them.
-
-**Why it matters.** The bigger the plan, the more there is to stop and the less
-the one Stop button does. A user who realises the plan is wrong has to stop each
-worker by hand, and may not know which ones were started.
-
-**To close:** record which agents a coordinating turn started, and have Stop on
-the coordinator stop them too. The record has a natural home beside `turnTargets`
-in `BsAgentManager`, which already tracks per-turn state and clears it in the
-same `finally`.
-
-## 12. A coordinator can spend every worker's quota
+## 11. A coordinator can spend every worker's quota
 
 **Found:** 2026-08-26, in the same spec.
 
