@@ -1796,7 +1796,8 @@ select.input { width: 100%; }
 .quota-account-head { display: grid; gap: 2px; min-width: 0; }
 .quota-head-identity { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .quota-head-identity strong { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.quota-head-source { color: var(--text-faint); font-size: var(--fs-xs); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.quota-head-source { display: flex; align-items: center; gap: 5px; min-width: 0; flex-wrap: wrap; }
+.quota-head-provider { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-faint); font-size: var(--fs-xs); }
 .quota-head-state { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: var(--fs-xs); }
 /* Badges keep their shape and colour at rail width; only the padding and type
    size come down. Flattening them to plain text saved a few pixels and cost

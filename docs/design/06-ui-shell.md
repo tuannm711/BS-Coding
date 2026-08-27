@@ -13,9 +13,9 @@ panel, settings and the tray. The terminal inside a pane is in
 | [Types that carry it](#types-that-carry-it) | 55-64 | `PaneModel`, `ChatEvent`, `src/shared/types.ts`, `QuotaAccountUiState`, `src/renderer/src/components/quota/quota-view.ts` |
 | [Design decisions](#design-decisions) | 65-99 | `getWindowChromeOptions`, `titleBarOverlay`, `tests/unit/window-chrome.test.ts`, `src/renderer/AGENTS.md`, `MainApp`, `app.setAppUserModelId` |
 | [The coordination view](#the-coordination-view) | 100-152 | `src/renderer/src/components/coordinator/CoordinatorView.tsx`, `App.tsx`, `setMode`, `RightPanel`, `ChatPanel`, `listSessionTranscript` |
-| [The fleet panel](#the-fleet-panel) | 153-211 | `RightPanel`, `buildFleet`, `ProviderQuotaGroup`, `modelIds`, `anti-claude-opus`, `anti-claude-sonnet` |
-| [Sessions live in the sidebar](#sessions-live-in-the-sidebar) | 212-235 | `activeSessionId`, `groupSessions` |
-| [Known limits](#known-limits) | 236-242 | `docs/technical-debt.md` |
+| [The fleet panel](#the-fleet-panel) | 153-227 | `RightPanel`, `buildFleet`, `ProviderQuotaGroup`, `modelIds`, `anti-claude-opus`, `anti-claude-sonnet` |
+| [Sessions live in the sidebar](#sessions-live-in-the-sidebar) | 228-251 | `activeSessionId`, `groupSessions` |
+| [Known limits](#known-limits) | 252-258 | `docs/technical-debt.md` |
 <!-- /toc -->
 
 ## Pieces
@@ -178,8 +178,24 @@ account but running a model no reported pool claims, and an **unassigned**
 agent with no ready assignment at all. A roster that hides an agent is the
 fault this panel exists to fix.
 
-Fleet is also where the coordinator role is given, on the agent row, labelled
-with who would lose it.
+Fleet is also where an agent's role is given, on its own row, as two icon
+toggles carrying three states — **coordinator**, **worker**, **no role**.
+
+Neither control is ever disabled or hidden. Pressing the lit one returns the
+agent to no role; pressing the other moves it there. An earlier version
+disabled the coordinator control once held and hid the worker control behind
+it, which made the press a one-way door with nothing on the row to undo it.
+
+The role is derived from `mode === 'coordinate'` and `worker === false` rather
+than stored as its own field — a role enum beside `mode` would be a second
+answer to the question `mode` already asks. `FleetAgentRow` carries it as one
+value, because two booleans have a fourth combination the manager cannot hold
+and the panel was able to show.
+
+**One press can change two agents.** Coordination is exclusive per project, so
+taking the role demotes whoever held it. `setMode` returns every agent it
+changed and `setAgentRole` persists and pushes all of them; when it pushed only
+the agent pressed, the panel kept both lit and a restart agreed with it.
 
 **The card is built for a 300px column.** Three things were costing the height
 that made it unreadable there:

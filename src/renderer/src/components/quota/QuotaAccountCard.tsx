@@ -137,8 +137,13 @@ export default function QuotaAccountCard({
             onClick={onRefresh}
           ><RefreshCw size={13} aria-hidden="true" className={refreshing ? 'spinning' : undefined} /></button> : null}
         </div>
+        {/* The provider names the account; the type and plan qualify it, and
+            they are the same kind of fact as the state badge below. Leaving
+            them as grey text made three unrelated things look alike. */}
         <div className="quota-head-source">
-          {providerLabel ?? account.providerId} · {accountType}{planName ? ` · ${planName}` : ''}
+          <span className="quota-head-provider">{providerLabel ?? account.providerId}</span>
+          <span className="quota-plan-badge quota-badge-tight">{accountType}</span>
+          {planName ? <span className="quota-plan-badge quota-badge-tight">{planName}</span> : null}
         </div>
         {/* Still badges, only tighter. Flattening them to plain text to save
             width took the one thing that made state readable at a glance —

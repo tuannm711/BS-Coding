@@ -69,6 +69,13 @@ describe('FleetBoard', () => {
     expect(markup).not.toContain('Next reset · ')
   })
 
+  it('renders the account type as a badge, not as grey text', () => {
+    // The plan and the state beside it are badges. Same kind of fact, so the
+    // same treatment.
+    const markup = board(withPools([pool('gemini', [])]))
+    expect(markup).toMatch(/class="[^"]*quota-badge-tight[^"]*"[^>]*>Antigravity OAuth</)
+  })
+
   it('keeps the refresh control', () => {
     // Moving a panel must not drop a function. This one was gated to the chat
     // variant and disappeared with the pinned block.
