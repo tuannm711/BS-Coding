@@ -75,11 +75,15 @@ describe('shared session Agent switching', () => {
     const betaContext = JSON.stringify(requests.get('antigravity'))
     expect(betaContext).toContain('alpha answer')
     expect(betaContext).not.toContain('thoughtSignature')
-    expect(betaContext).not.toContain('tool-call')
-    // The record blocks only appear on this path, so the note explaining them
-    // must appear here and nowhere else.
-    expect(systems.get('antigravity')).toContain('Session log')
-    expect(systems.get('antigravity')).toContain('call it through the tool interface')
+    // No tool-call assertion here: both stubbed turns are text only, so this
+    // fixture could never exhibit one. The native shape is pinned in
+    // neutral-context.test.ts, whose fixture has a call to replay; what this
+    // test proves is that the second provider sees the first agent's history
+    // at all, and sees nothing provider-specific in it.
+    //
+    // No note explaining a record format either, because there are no records.
+    expect(systems.get('antigravity')).not.toContain('Session log')
+    expect(systems.get('antigravity')).not.toContain('call it through the tool interface')
     expect(events.filter(event => event.type === 'turn-started')).toEqual([
       expect.objectContaining({ agentId: alpha.id, sessionId: session.id, projectPath: dir }),
       expect.objectContaining({ agentId: beta.id, sessionId: session.id, projectPath: dir })

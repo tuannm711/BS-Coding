@@ -1221,6 +1221,17 @@ describe('one coordinator per project', () => {
     expect(modeOf(manager, 'a3')).toBe('coordinate')
   })
 
+  it('does not describe a record format the model no longer sees', async () => {
+    // Through sendInSession, which is the only send path the window has and the
+    // only one that creates a shared execution. Asserted on manager.send first,
+    // where it passed before the change because the note never applied there.
+    const { manager, llmSystems } = await makeManager({ secondAgent: true })
+    const session = manager.createProjectSession('/proj', 'a1')
+    await manager.sendInSession('/proj', session.id, 'a1', 'go')
+    expect(llmSystems.length).toBeGreaterThan(0)
+    expect(llmSystems[0]).not.toContain('Session log')
+  })
+
   it('keeps the original agent as the identity after a handoff', async () => {
     // A handoff is another account answering this turn, not another agent
     // taking it over. Asserted on the mode note, which lives in `system` —

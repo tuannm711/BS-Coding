@@ -219,9 +219,24 @@ Two false statements reached `docs/design/` on the day it was written.
 is the redo path. Both sentences were written by citing debt item 7 (opencode feature gaps) rather than
 reading the code — the exact failure the design documents exist to prevent.
 
+**Third and fourth instances, 2026-08-27**, both in a *spec* rather than a
+design doc, and both load-bearing for a year of decisions after them.
+`2026-08-25-narrated-tool-calls-design.md` said *"the flattening itself is
+necessary and must stay"* — a conclusion its own stated reasons do not support —
+and *"single-agent chat is unaffected"*, which is true of the code and false of
+the product, since `ChatPanel` has only one send path and it is the shared one.
+Together they made the cause invisible and the blast radius look small. The
+owner found it by asking why Codex, on the same accounts, never had the problem.
+
+**Fifth instance, same day:** a *plan* asserted the pre-v1.1.6 detector
+alternative was dead. Measuring the owner's store found 2 messages matching it
+and 0 matching the alternative the plan proposed keeping.
+
 **Why it matters.** The guards are good enough to make the mechanical parts
 trustworthy, which makes the prose feel trustworthy by association. A reader has
-no way to tell which parts are checked.
+no way to tell which parts are checked. Specs and plans have no guards at all,
+and four of the five instances are the kind a single measurement would have
+caught.
 
 **To close:** no clean mechanism is known. One idea — require every Known limits
 sentence to name a symbol, and fail if that symbol exists in the source — was
