@@ -105,6 +105,35 @@ describe('buildFleet', () => {
     expect(fleet.accounts.map(section => section.account.label)).toEqual(['alpha', 'bravo', 'zed'])
   })
 
+  it('places agents by family when the provider sent no model list', () => {
+    // Cloud Code's quota summary carries no modelIds on its buckets, so every
+    // group arrives with modelIds: []. Matching on that alone put every agent
+    // in strays — the pool grouping, which is the whole point of the panel,
+    // was dead in the app while this suite stayed green on a fixture that
+    // happened to spell the ids out.
+    const empty = {
+      ...snapshot(),
+      accounts: [{
+        ...snapshot().accounts[0],
+        usage: {
+          ...snapshot().accounts[0].usage!,
+          quotaGroups: [
+            { id: 'gemini', label: 'Gemini Models', modelIds: [], windows: [] },
+            { id: 'claude-gpt', label: 'Claude and GPT models', modelIds: [], windows: [] }
+          ]
+        }
+      }]
+    } as ProviderSnapshot
+    const fleet = buildFleet([agent(), agent({ id: 'a2', name: 'anti-gemini-flash' })], {
+      ...empty,
+      assignments: [assignment('a1', 'claude-opus-4-6-thinking'), assignment('a2', 'gemini-3.6-flash-high')]
+    } as ProviderSnapshot)
+    const byPool = Object.fromEntries(fleet.accounts[0].pools.map(pool => [pool.group.id, pool.agents.map(row => row.name)]))
+    expect(byPool['claude-gpt']).toEqual(['anti-claude-opus'])
+    expect(byPool['gemini']).toEqual(['anti-gemini-flash'])
+    expect(fleet.accounts[0].strays).toEqual([])
+  })
+
   it('ignores pty agents', () => {
     // They have no model and no quota; a roster of who can be assigned work
     // is a roster of native agents.

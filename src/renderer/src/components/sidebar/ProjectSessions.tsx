@@ -12,8 +12,13 @@ export interface SessionGroup {
 // is dropped rather than shown empty — a heading over nothing is noise in a
 // 279px rail.
 export function groupSessions(sessions: ProjectSessionSummary[]): SessionGroup[] {
-  const coordination = sessions.filter(session => session.kind === 'coordination')
-  const work = sessions.filter(session => session.kind !== 'coordination')
+  // By creation, newest first — not by updatedAt. The store orders by updatedAt
+  // and switching a session touches it, so the one you clicked jumped to the
+  // top and everything else shifted under the cursor. A list that rearranges
+  // itself as you use it cannot be navigated by position.
+  const stable = [...sessions].sort((a, b) => b.createdAt - a.createdAt)
+  const coordination = stable.filter(session => session.kind === 'coordination')
+  const work = stable.filter(session => session.kind !== 'coordination')
   return [
     { kind: 'coordination' as const, label: 'Coordination', sessions: coordination },
     { kind: 'work' as const, label: 'Work', sessions: work }

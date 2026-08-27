@@ -28,6 +28,16 @@ describe('groupSessions', () => {
     expect(groupSessions([])).toEqual([])
   })
 
+  it('keeps a session in place when selecting it bumps its updatedAt', () => {
+    // switchProjectSession touches the session, and the store orders by
+    // updatedAt — so the one you clicked climbed to the top and the rest
+    // shifted under the cursor.
+    const older = session({ id: 'old', title: 'first', createdAt: 1, updatedAt: 999 })
+    const newer = session({ id: 'new', title: 'second', createdAt: 2, updatedAt: 2 })
+    expect(groupSessions([older, newer])[0].sessions.map(item => item.id)).toEqual(['new', 'old'])
+    expect(groupSessions([newer, older])[0].sessions.map(item => item.id)).toEqual(['new', 'old'])
+  })
+
   it('treats a session with no kind as work', () => {
     // Sessions stored before the field existed have none.
     expect(groupSessions([session({ kind: undefined })])[0].kind).toBe('work')

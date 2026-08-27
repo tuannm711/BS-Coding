@@ -1,6 +1,6 @@
 import type { ProviderAccountSnapshot, ProviderSnapshot } from '@shared/provider-state'
 import type { AgentConfig, AgentMode, AgentSpeed, ProviderQuotaGroup } from '@shared/types'
-import { quotaAccountState, type QuotaAccountUiState } from '../quota/quota-view'
+import { groupClaimsModel, quotaAccountState, type QuotaAccountUiState } from '../quota/quota-view'
 
 export interface FleetAgentRow {
   id: string
@@ -75,7 +75,7 @@ export function buildFleet(agents: AgentConfig[], snapshot: ProviderSnapshot | n
       strays: []
     }
     const entry = row(agent, stored.modelId, account.models.find(model => model.id === stored.modelId)?.name, stored.speed)
-    const pool = section.pools.find(item => item.group.modelIds.includes(stored.modelId))
+    const pool = section.pools.find(item => groupClaimsModel(item.group, stored.modelId))
     if (pool) pool.agents.push(entry)
     else section.strays.push(entry)
     accounts.set(key, section)
