@@ -180,16 +180,26 @@ export default function App() {
     const rt = await window.api.openWorkspace(path)
     const native = rt.workspace.agents.filter(agent => agent.kind === 'native')
     const fallbackAgentId = resolveSelectedNativeAgent(native, null) ?? undefined
-    const projectSessions = fallbackAgentId ? await window.api.listProjectSessions(path) : []
+    // Paint as soon as the workspace is known. Everything below is a further
+    // IPC round trip, and holding setRuntime until they all resolved is what
+    // made switching project feel slow: the shell showed the previous project
+    // until the last of them came back.
+    setRuntime(rt)
+    setTerminals([])
+    setSelectedNativeAgentId(resolveSelectedNativeAgent(native, fallbackAgentId ?? null))
+    setBackgrounds(Object.fromEntries(rt.workspace.agents.map(a => [a.id, a.background ?? false])))
+    // Independent of each other, so they wait together rather than in turn.
+    const [projectSessions, list] = await Promise.all([
+      fallbackAgentId ? window.api.listProjectSessions(path) : Promise.resolve([]),
+      window.api.listArtifacts(path)
+    ])
     const projectSession = projectSessions[0]
       ?? (fallbackAgentId ? await window.api.createProjectSession(path, fallbackAgentId) : null)
-    const list = await window.api.listArtifacts(path)
-    setRuntime(rt)
     setActiveProjectSessionId(projectSession?.id ?? null)
-    setSelectedNativeAgentId(resolveSelectedNativeAgent(native, projectSession?.lastAgentId ?? fallbackAgentId ?? null))
-    setTerminals([])
+    if (projectSession?.lastAgentId) {
+      setSelectedNativeAgentId(resolveSelectedNativeAgent(native, projectSession.lastAgentId))
+    }
     setArtifacts(prev => ({ ...prev, [path]: list }))
-    setBackgrounds(Object.fromEntries(rt.workspace.agents.map(a => [a.id, a.background ?? false])))
     for (const id of buffersRef.current.keys()) {
       if (!rt.workspace.agents.some(a => a.id === id)) buffersRef.current.delete(id)
     }

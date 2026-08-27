@@ -510,6 +510,66 @@ describe('BsAgentManager', () => {
     await first
   })
 
+  it('keeps a turn writing to the session it started in', async () => {
+    // The owner reported "switching session stops the agent". It does not stop:
+    // switchProjectSession repoints activeSessions, and every append resolved
+    // the session live, so the rest of the turn landed in the newly selected
+    // session while the view being watched — filtered by session — went quiet.
+    const { manager, events } = await makeManager({
+      partsQueue: [
+        [{ kind: 'tool-call', toolCallId: 'tc1', toolName: 'websearch', toolInput: { query: 'bs' } }, { kind: 'finish' }],
+        [{ kind: 'text', text: 'the answer' }, { kind: 'finish' }]
+      ]
+    })
+    const first = manager.activeSessionFor('a1')
+    const sendPromise = manager.send('a1', 'go')
+    // Suspended on the permission prompt, so the switch below is deterministic
+    // rather than a race with the stream.
+    await new Promise<void>(resolve => {
+      const timer = setInterval(() => {
+        const prompt = events.find(e => e.type === 'prompt-request') as Extract<ChatEvent, { type: 'prompt-request' }> | undefined
+        if (!prompt) return
+        clearInterval(timer)
+        const other = manager.createProjectSession('/proj', 'a1')
+        manager.switchProjectSession('/proj', other.id)
+        manager.respondPrompt('a1', prompt.promptId, { allow: true } satisfies PromptResponse)
+        resolve()
+      }, 5)
+    })
+    await sendPromise
+    const landed = manager.listSessionTranscript('/proj', first)
+      .flatMap(item => item.kind === 'message' && item.message.role === 'assistant' ? [item.message.text] : [])
+    expect(landed.join('\n')).toContain('the answer')
+  })
+
+  it('marks a session a coordinator dispatched into, and it survives a reload', async () => {
+    // Stored, not re-derived: the left panel groups by this, and a kind
+    // recomputed on each read is two answers to one question.
+    const { manager } = await makeManager({
+      secondAgent: true,
+      partsQueue: [[{ kind: 'text', text: 'done' }, { kind: 'finish' }]]
+    })
+    manager.setMode('a1', 'coordinate')
+    await (manager as unknown as { runAssignment: (c: string, n: string, t: string) => Promise<unknown> })
+      .runAssignment('a1', 'helper', 'do it')
+    const worker = manager.listProjectSessions('/proj').find(item => item.lastAgentId === 'a3')
+    expect(worker?.kind).toBe('coordination')
+    // Every read normalizes, so a field normalize drops does not persist.
+    expect(manager.listProjectSessions('/proj').find(item => item.id === worker?.id)?.kind)
+      .toBe('coordination')
+  })
+
+  it('reports which session has a turn running in it', async () => {
+    const { manager } = await makeManager({ hangUntilAbort: true })
+    const active = manager.activeSessionFor('a1')
+    const sending = manager.send('a1', 'go')
+    await new Promise(resolve => setTimeout(resolve, 15))
+    expect(manager.listProjectSessions('/proj').find(item => item.id === active)?.running).toBe(true)
+    manager.stop('a1')
+    await sending
+    expect(manager.listProjectSessions('/proj').find(item => item.id === active)?.running).toBe(false)
+  })
+
   it('respondPrompt allow lets a permission-ask tool run', async () => {
     const { manager: m2, events: evts } = await makeManager({
       partsQueue: [

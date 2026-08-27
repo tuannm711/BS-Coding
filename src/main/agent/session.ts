@@ -22,6 +22,8 @@ export interface StoredSession {
   agentId: string
   projectPath: string
   lastAgentId?: string
+  /** Set once, when a coordinator dispatches a task into this session. */
+  kind?: 'work' | 'coordination'
   legacyAgentId?: string
   title: string
   items: ChatTranscriptItem[]
@@ -61,6 +63,10 @@ function normalize(raw: RawSession): StoredSession {
     agentId: legacyAgentId,
     projectPath: String(raw.projectPath ?? ''),
     lastAgentId: typeof raw.lastAgentId === 'string' && raw.lastAgentId ? raw.lastAgentId : legacyAgentId || undefined,
+    // Carried through normalize or it would be stripped on the next load —
+    // every read runs through here, so a field this misses is a field that
+    // silently does not persist.
+    ...(raw.kind === 'coordination' ? { kind: 'coordination' as const } : {}),
     legacyAgentId: legacyAgentId || undefined,
     title: typeof raw.title === 'string' && raw.title ? raw.title : titleFromItems(items),
     items,
@@ -126,6 +132,7 @@ export class SessionStore {
         id: session.id,
         projectPath: session.projectPath,
         lastAgentId: session.lastAgentId,
+        kind: session.kind ?? 'work',
         title: session.title,
         messageCount: session.items.length,
         createdAt: session.createdAt,
@@ -359,6 +366,18 @@ export class SessionStore {
     const idx = all.findIndex(s => s.id === id)
     if (idx < 0) return
     all[idx].updatedAt = this.nextUpdatedAt()
+    this.saveSessions(all)
+  }
+
+  // Written once, when a coordinator dispatches into the session. Never
+  // cleared: a session that carried assigned work keeps that provenance, and
+  // re-deriving the kind on each read is how two answers to one question come
+  // to disagree.
+  markCoordination(id: string): void {
+    const all = this.loadSessions()
+    const idx = all.findIndex(s => s.id === id)
+    if (idx < 0 || all[idx].kind === 'coordination') return
+    all[idx].kind = 'coordination'
     this.saveSessions(all)
   }
 

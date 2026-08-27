@@ -159,6 +159,13 @@ export interface SessionSummary {
 export type ProjectSessionSummary = Omit<SessionSummary, 'agentId'> & {
   projectPath: string
   lastAgentId?: string
+  // A turn is running in this session right now. Derived from the turn's bound
+  // session, so it stays true no matter which session the user is looking at.
+  running?: boolean
+  // Where the session's work comes from. A session becomes 'coordination' when
+  // a coordinator dispatched a task into it; everything else is ordinary work.
+  // Stored rather than re-derived on each read, so two places cannot disagree.
+  kind?: 'work' | 'coordination'
 }
 
 /**

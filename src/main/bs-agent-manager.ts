@@ -469,6 +469,22 @@ export class BsAgentManager {
     this.emit({ type: 'queue-updated', agentId: state.agentId, queue: state.queue })
   }
 
+  // The session a running turn is bound to, keyed by lifecycle. Every append
+  // used to resolve activeSessionId live, so selecting another session mid-turn
+  // sent the rest of that turn's output into the newly selected one — and since
+  // the renderer filters events by session, the view being watched fell silent
+  // and the agent looked like it had stopped.
+  private turnSessions = new Map<string, string>()
+
+  private sessionForWrite(agentId: string): string {
+    return this.turnSessions.get(this.lifecycleKey(agentId)) ?? this.activeSessionId(agentId)
+  }
+
+  // Which sessions have a turn running in them right now.
+  runningSessionIds(): string[] {
+    return [...new Set(this.turnSessions.values())]
+  }
+
   // True while some coordinator has a running assignment on this agent. Derived
   // rather than stored: one source of truth, and it cannot be left set after a
   // turn ends the way a flag would be.
@@ -578,6 +594,8 @@ export class BsAgentManager {
     const controller = new AbortController()
     const lifecycleKey = this.lifecycleKey(agentId)
     const executionContext = this.executionForAgent(agentId)
+    // Bound once, here, and used by every write for the rest of the turn.
+    this.turnSessions.set(lifecycleKey, this.activeSessionId(agentId))
     this.controllers.set(lifecycleKey, controller)
     this.running.add(lifecycleKey)
     this.nextTurn(agentId)
@@ -593,6 +611,7 @@ export class BsAgentManager {
       await runner.run(controller.signal)
     } finally {
       this.deps.snapshots.commitTurn(lifecycleKey)
+      this.turnSessions.delete(lifecycleKey)
       this.turnTargets.delete(lifecycleKey)
       this.running.delete(lifecycleKey)
       this.controllers.delete(lifecycleKey)
@@ -830,6 +849,8 @@ export class BsAgentManager {
       id: session.id,
       projectPath: session.projectPath,
       lastAgentId: session.lastAgentId,
+      kind: session.kind ?? 'work',
+      running: this.runningSessionIds().includes(session.id),
       title: session.title,
       messageCount: session.items.length,
       createdAt: session.createdAt,
@@ -838,7 +859,11 @@ export class BsAgentManager {
   }
 
   listProjectSessions(projectPath: string): ProjectSessionSummary[] {
+    // running is stamped here rather than in the store: it is a fact about
+    // turns in flight, which the store knows nothing about.
+    const running = new Set(this.runningSessionIds())
     return this.deps.store.listProject(projectPath)
+      .map(session => ({ ...session, running: running.has(session.id) }))
   }
 
   createProjectSession(projectPath: string, agentId?: string): ProjectSessionSummary {
@@ -1448,7 +1473,7 @@ export class BsAgentManager {
       compaction: cfg.compaction,
       toolOutput: cfg.toolOutput,
       truncation: this.deps.truncation,
-      replaceItems: (items) => this.deps.store.replaceItems(this.activeSessionId(agent.id), items),
+      replaceItems: (items) => this.deps.store.replaceItems(this.sessionForWrite(agent.id), items),
       snapshots: this.deps.snapshots,
       snapshotScopeId: () => this.lifecycleKey(agent.id),
       onEvent: (e) => {
@@ -1457,7 +1482,7 @@ export class BsAgentManager {
         if (e.type === 'done') void this.maybeTitleSession(agent.id, llmClient, resolved.model)
       },
       onArtifact: (entry) => this.deps.onArtifact?.(entry),
-      getItems: () => this.deps.store.get(this.activeSessionId(agent.id))?.items ?? [],
+      getItems: () => this.deps.store.get(this.sessionForWrite(agent.id))?.items ?? [],
       buildMessages: (items) => {
         // After a handover the active turn carries the previous provider's tool
         // call ids and thoughtSignature, which the next provider refuses. The
@@ -1478,7 +1503,7 @@ export class BsAgentManager {
       },
       appendMessage: (msg) => {
         const execution = this.executionForAgent(agent.id)?.execution
-        this.deps.store.appendMessage(this.activeSessionId(agent.id), execution
+        this.deps.store.appendMessage(this.sessionForWrite(agent.id), execution
           ? { ...msg, turnId: execution.turnId, execution }
           : msg)
         // The format belongs to shared-session compilation, so the manager is
@@ -1489,7 +1514,7 @@ export class BsAgentManager {
       },
       appendTool: (tool) => {
         const execution = this.executionForAgent(agent.id)?.execution
-        this.deps.store.appendTool(this.activeSessionId(agent.id), execution
+        this.deps.store.appendTool(this.sessionForWrite(agent.id), execution
           ? { ...tool, turnId: execution.turnId, execution }
           : tool)
       },
@@ -1503,7 +1528,7 @@ export class BsAgentManager {
         return steers
       },
       setTodos: (todos) => {
-        this.deps.store.setTodos(this.activeSessionId(agent.id), todos)
+        this.deps.store.setTodos(this.sessionForWrite(agent.id), todos)
         this.emit({ type: 'todo-updated', agentId: agent.id, todos })
       },
       variantOptions,
@@ -1519,7 +1544,7 @@ export class BsAgentManager {
       }, this.priceFor(resolved.provider, resolved.model)),
       onUsage: (tokens) => {
         const price = this.priceFor(resolved.provider, resolved.model)
-        const sessionId = this.activeSessionId(agent.id)
+        const sessionId = this.sessionForWrite(agent.id)
         const usage: UsageSummary = {
           input: tokens.input,
           output: tokens.output,
@@ -1783,13 +1808,17 @@ export class BsAgentManager {
     const target = [...this.agents.values()]
       .find(other => other.id !== coordinatorId && other.name === name && other.cwd === coordinator?.cwd)
     if (!target) return { error: `[bs] No agent named ${name}` }
+    // Marked before the task is sent, so the session is already labelled by
+    // the time the left panel reacts to the assignment event.
+    const assignedSession = this.activeSessionId(target.id)
+    this.deps.store.markCoordination(assignedSession)
     const assignment: CoordinationAssignment = {
       id: randomUUID(),
       coordinatorId,
       turnId: this.executionForAgent(coordinatorId)?.execution.turnId,
       workerId: target.id,
       workerName: target.name,
-      sessionId: this.activeSessionId(target.id),
+      sessionId: assignedSession,
       task,
       startedAt: Date.now(),
       state: 'running'
