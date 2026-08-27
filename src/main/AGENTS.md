@@ -1,5 +1,7 @@
 # AGENTS.md — src/main
 
+> Luật dự án ở [`/AGENTS.md`](/AGENTS.md). File này chỉ mô tả thư mục này, không đặt luật.
+
 Electron main process. Nơi duy nhất được spawn/kill process. Sở hữu PTY, stores, services, IPC
 handlers và vòng đời app.
 
@@ -34,18 +36,6 @@ handlers và vòng đời app.
 - `connections/` + `providers/` — tài khoản provider, quota, OAuth — xem `docs/design/03-providers.md`.
 - `browser/` — BrowserBridge (WS server local + pairing) + Chrome launcher + snapshot format.
 
-## Quy ước
-
-- Service thuần (PtyManager, các store/service) không import Electron UI — test được với Vitest.
-- Trạng thái agent chỉ đổi qua `MainApp.setState`; renderer chỉ được notify khi có field "visible"
-  thay đổi (status/exitCode/alert).
-- Event push ra renderer qua `win.webContents.send(Channels.Event*)`; payload phải khớp contract
-  trong `src/shared/ipc.ts`.
-- Thêm IPC: thêm channel vào `Channels` + method vào `AgentApi` (`src/shared/ipc.ts`), handler trong
-  `registerIpcHandlers`, triển khai tương ứng trong preload. Không hardcode channel string.
-- Khi agent exit: chèn hint tiếng Việt prefix `[bs]` nếu thoát lỗi (code ≠ 0) và không có output.
-- Tránh để process mồ côi: mọi path stop đều đi qua `tree-kill`; kiểm tra sau khi đổi logic stop.
-
 ## Kiểm thử
 
 - Unit: `tests/unit/` — một file test cho một module: pty-spawn-command, terminal-shell,
@@ -54,4 +44,3 @@ handlers và vòng đời app.
   workspace-store, bs-agent-manager, ipc-contract, ...
 - Integration: `tests/integration/pty-manager.test.ts` (spawn thật qua ConPTY, dùng fixture CLI),
   `agent-stream-overlap.test.ts`, `browser/bridge-flow.test.ts`.
-- Chạy: `npm run typecheck`, `npm test`.

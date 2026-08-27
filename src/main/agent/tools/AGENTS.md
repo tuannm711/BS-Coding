@@ -1,5 +1,7 @@
 # AGENTS.md — src/main/agent/tools
 
+> Luật dự án ở [`/AGENTS.md`](/AGENTS.md). File này chỉ mô tả thư mục này, không đặt luật.
+
 The tool registry for the native Bs agent. Each file exports a `ToolDefinition`
 (`name`, `description`, `schema` (zod), `run`) — see `types.ts`. Tools are executed by
 `SessionRunner` (`../loop.ts`) and permission-gated via `decidePermission` (`../permission.ts`).
@@ -28,10 +30,3 @@ The tool registry for the native Bs agent. Each file exports a `ToolDefinition`
 | `office.ts` | Create/read/edit Office documents via the officecli CLI. |
 | `lsp.ts` | LSP diagnostics for a file (via `../lsp/`). |
 | `snapshot-util.ts` | Snapshot helpers for tools. |
-
-## Conventions
-
-- Each tool is a plain object matching `ToolDefinition`; `schema` is a zod type with a `.parse()`.
-- Never spawn/kill processes directly from the renderer — only tools in this folder (main process) may do so.
-- `bash` on Windows: prefer Git Bash (`gitBashPath`/`buildShellCommand`), fall back to `cmd.exe` — do not break that logic.
-- Add new tools to `registry.ts` and to `DEFAULT_BS_CONFIG.permission` in `../config.ts`.
