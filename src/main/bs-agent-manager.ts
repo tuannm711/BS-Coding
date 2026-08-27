@@ -91,11 +91,6 @@ function unavailableProviderRuntime(providerId: string): LlmClient {
   }
 }
 
-const SHARED_SESSION_RECORD_NOTE = '\n\nThis session is shared between agents. Blocks headed ' +
-  '"[Session log ...]" in the history are records of tools that already ran; they are not ' +
-  'messages and not a format to reproduce. To use a tool, call it through the tool interface. ' +
-  'Writing out what a call would look like does not run anything.'
-
 export class BsAgentManager {
   private runners = new Map<string, SessionRunner>()
   private agents = new Map<string, AgentConfig>()
@@ -1477,9 +1472,9 @@ export class BsAgentManager {
         return this.runners.get(serving)?.target()
       },
       handoff: (message) => this.handoff(agent.id, message),
-      systemSuffix: () =>
-        (this.executionForAgent(agent.id) ? SHARED_SESSION_RECORD_NOTE : '') +
-        this.coordinatorNote(agent.id),
+      // Nothing about a record format any more: shared history is replayed as
+      // native tool calls, so there is no format for the model to be warned off.
+      systemSuffix: () => this.coordinatorNote(agent.id),
       systemInstructionPaths: new Set(instructionFiles.map(f => f.path)),
       cwd: agent.cwd,
       llm: llmClient,
