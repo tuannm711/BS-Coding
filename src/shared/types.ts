@@ -4,6 +4,10 @@ export type AgentStatus = 'spawning' | 'running' | 'idle' | 'exited' | 'stopped'
 export type AlertLevel = 'normal' | 'attention' | 'error'
 export type AgentKind = 'pty' | 'native'
 export type AgentMode = 'build' | 'plan' | 'coordinate'
+// The three states one agent can be in for a coordinated run. Derived from
+// `mode` and `worker` rather than stored: a role field beside mode would be a
+// second answer to the question mode already asks.
+export type AgentRole = 'coordinator' | 'worker' | 'none'
 export type ModelVariant = string
 export type AgentSpeed = 'standard' | 'fast'
 export type ChatRole = 'user' | 'assistant'

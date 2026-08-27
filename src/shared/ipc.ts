@@ -1,5 +1,5 @@
 import type { CoordinationAssignment,
-  AgentConfig, AgentMode, AgentModelAssignment, AgentState, ArtifactEntry, CatalogProviderSummary, ChatEvent, ChatMessage, ChatTranscriptItem, Command,
+  AgentConfig, AgentMode, AgentRole, AgentModelAssignment, AgentState, ArtifactEntry, CatalogProviderSummary, ChatEvent, ChatMessage, ChatTranscriptItem, Command,
   ContextChangedEvent, ContextInfo, DirEntry, FileContentResult, FileSuggestion, FileViewerPayload,
   GitStatus, ImageAttachment, McpServerStatus, BsSettings, ModelRef, NewAgentInput, PromptResponse,
   ProjectSessionSummary, ProviderAccount, ProviderConnection, ProviderUsage, SessionSummary, StatsSummary, Template, TerminalInfo, TodoItem, TraceEvent, TraceSummary, UpdaterStatusEvent, UsageSummary, WorkspaceRuntime, WorkspaceSummary
@@ -92,7 +92,7 @@ export const Channels = {
   ChatQueueEdit: 'chat:queue-edit',
   SessionList: 'session:list',
   SessionActive: 'session:active',
-  AgentSetWorker: 'agent:set-worker',
+  AgentSetRole: 'agent:set-role',
   SessionCreate: 'session:create',
   SessionSwitch: 'session:switch',
   SessionDelete: 'session:delete',
@@ -295,7 +295,7 @@ export interface AgentApi {
   editQueued(agentId: string, id: string, text: string): Promise<void>
   listSessions(agentId: string): Promise<SessionSummary[]>
   activeSessionFor(agentId: string): Promise<string>
-  setAgentWorker(agentId: string, worker: boolean): Promise<void>
+  setAgentRole(agentId: string, role: AgentRole): Promise<void>
   createSession(agentId: string): Promise<SessionSummary>
   switchSession(agentId: string, sessionId: string): Promise<SessionSummary | null>
   deleteSession(agentId: string, sessionId: string): Promise<SessionSummary>

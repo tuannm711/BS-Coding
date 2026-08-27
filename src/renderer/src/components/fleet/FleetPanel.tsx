@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ProviderSnapshot } from '@shared/provider-state'
 import { shouldAcceptSnapshot } from '@shared/provider-state'
-import type { AgentConfig, AgentSpeed } from '@shared/types'
+import type { AgentConfig, AgentRole, AgentSpeed } from '@shared/types'
 import QuotaAccountCard from '../quota/QuotaAccountCard'
 import ResetCreditDialog from '../quota/ResetCreditDialog'
 import { mergeAssignmentEvent } from '../RightPanelQuota'
@@ -12,8 +12,7 @@ export interface FleetBoardProps {
   providerLabel: (providerId: string) => string | undefined
   refreshingId: string | null
   onSelectAgent: (agentId: string) => void
-  onSetCoordinator: (agentId: string) => void
-  onSetWorker: (agentId: string, worker: boolean) => void
+  onSetRole: (agentId: string, role: AgentRole) => void
   onSpeedChange: (agentId: string, speed: AgentSpeed) => void
   onRefresh: (providerId: string, accountId: string) => void
   onConsumeResetCredit: (account: { id: string; providerId: string; label: string; available: number }) => void
@@ -22,7 +21,7 @@ export interface FleetBoardProps {
 // Presentational half, so every state can be asserted with renderToStaticMarkup
 // the way CoordinatorBoard and StatsView are.
 export function FleetBoard({
-  fleet, providerLabel, refreshingId, onSelectAgent, onSetCoordinator, onSetWorker, onSpeedChange, onRefresh, onConsumeResetCredit
+  fleet, providerLabel, refreshingId, onSelectAgent, onSetRole, onSpeedChange, onRefresh, onConsumeResetCredit
 }: FleetBoardProps) {
   if (fleet.accounts.length === 0 && fleet.unassigned.length === 0) {
     return (
@@ -37,7 +36,7 @@ export function FleetBoard({
   // before it happens rather than discovered afterwards.
   const coordinatorName = fleet.accounts
     .flatMap(section => [...section.pools.flatMap(pool => pool.agents), ...section.strays])
-    .find(agent => agent.coordinator)?.name
+    .find(agent => agent.role === 'coordinator')?.name
 
   return (
     <div className="fleet-board">
@@ -54,8 +53,7 @@ export function FleetBoard({
           tracked={section.account.usage?.tracked}
           refreshing={refreshingId === section.account.id}
           onSelectAgent={onSelectAgent}
-          onSetCoordinator={onSetCoordinator}
-          onSetWorker={onSetWorker}
+          onSetRole={onSetRole}
           coordinatorName={coordinatorName}
           onSpeedChange={onSpeedChange}
           onRefresh={() => onRefresh(section.account.providerId, section.account.id)}
@@ -86,11 +84,10 @@ export function FleetBoard({
   )
 }
 
-export default function FleetPanel({ agents, onSelectAgent, onSetCoordinator, onSetWorker }: {
+export default function FleetPanel({ agents, onSelectAgent, onSetRole }: {
   agents: AgentConfig[]
   onSelectAgent: (agentId: string) => void
-  onSetCoordinator: (agentId: string) => void
-  onSetWorker: (agentId: string, worker: boolean) => void
+  onSetRole: (agentId: string, role: AgentRole) => void
 }) {
   const [snapshot, setSnapshot] = useState<ProviderSnapshot | null>(null)
   const [refreshingId, setRefreshingId] = useState<string | null>(null)
@@ -123,8 +120,7 @@ export default function FleetPanel({ agents, onSelectAgent, onSetCoordinator, on
         refreshingId={refreshingId}
         providerLabel={providerId => snapshot?.providers.find(provider => provider.id === providerId)?.displayName}
         onSelectAgent={onSelectAgent}
-        onSetCoordinator={onSetCoordinator}
-        onSetWorker={onSetWorker}
+        onSetRole={onSetRole}
         onSpeedChange={(agentId, speed) => {
           setSnapshot(previous => previous ? { ...previous, assignments: previous.assignments.map(assignment => assignment.agentId === agentId ? { ...assignment, speed } : assignment) } : previous)
           void window.api.setAgentSpeed(agentId, speed)

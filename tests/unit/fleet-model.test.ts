@@ -63,12 +63,19 @@ describe('buildFleet', () => {
     expect(fleet.unassigned.map(row => row.name)).toEqual(['newcomer'])
   })
 
+  it('reads an agent excluded from assignment as having no role', () => {
+    // Three states from two stored fields: absent `worker` means yes, so an
+    // agent stored before the field existed is still a worker.
+    const fleet = buildFleet([agent({ worker: false })], snapshot())
+    expect(fleet.accounts[0].pools.flatMap(pool => pool.agents)[0].role).toBe('none')
+  })
+
   it('marks the coordinator and nobody else', () => {
     const fleet = buildFleet([
       agent({ mode: 'coordinate' }), agent({ id: 'a2', name: 'anti-claude-sonnet' })
     ], snapshot())
     const rows = fleet.accounts.flatMap(account => account.pools.flatMap(pool => pool.agents))
-    expect(rows.filter(row => row.coordinator).map(row => row.name)).toEqual(['anti-claude-opus'])
+    expect(rows.filter(row => row.role === 'coordinator').map(row => row.name)).toEqual(['anti-claude-opus'])
   })
 
   it('returns everything as unassigned with no snapshot', () => {

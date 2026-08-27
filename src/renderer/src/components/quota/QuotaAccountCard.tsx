@@ -1,4 +1,4 @@
-import type { AgentModelAssignment, AgentSpeed, ProviderErrorState, ProviderQuotaGroup, ProviderTrackedUsage } from '@shared/types'
+import type { AgentModelAssignment, AgentRole, AgentSpeed, ProviderErrorState, ProviderQuotaGroup, ProviderTrackedUsage } from '@shared/types'
 import type { ProviderAccountSnapshot } from '@shared/provider-state'
 import type { FleetAgentRow, FleetPool } from '../fleet/fleet-model'
 import { resetCreditGate } from '@shared/reset-credit'
@@ -29,8 +29,7 @@ interface Props {
   pools?: FleetPool[]
   strays?: FleetAgentRow[]
   coordinatorName?: string
-  onSetCoordinator?: (agentId: string) => void
-  onSetWorker?: (agentId: string, worker: boolean) => void
+  onSetRole?: (agentId: string, role: AgentRole) => void
   onSelectAgent?: (agentId: string) => void
   variant: 'provider' | 'chat' | 'fleet'
   providerState?: 'ready' | 'unavailable' | 'quota-exhausted' | 'capacity-exhausted' | 'cooldown' | 'auth-error'
@@ -49,49 +48,45 @@ const resetCreditLabel = (available: number): string => `${available} reset${ava
 
 // One agent inside the pool it draws on. The speed control is the same one the
 // chat variant carries — moving the panel must not drop a function.
-function FleetAgent({ agent, coordinatorName, onSelect, onSpeedChange, onSetCoordinator, onSetWorker }: {
+function FleetAgent({ agent, coordinatorName, onSelect, onSpeedChange, onSetRole }: {
   agent: FleetAgentRow
   coordinatorName?: string
   onSelect?: (agentId: string) => void
   onSpeedChange?: (agentId: string, speed: AgentSpeed) => void
-  onSetCoordinator?: (agentId: string) => void
-  onSetWorker?: (agentId: string, worker: boolean) => void
+  onSetRole?: (agentId: string, role: AgentRole) => void
 }) {
   return (
-    <div className={`fleet-agent${agent.coordinator ? ' coordinator' : ''}`}>
+    <div className={`fleet-agent${agent.role === 'coordinator' ? ' coordinator' : ''}`}>
       <button className="fleet-agent-name" type="button" onClick={() => onSelect?.(agent.id)} title={`Open ${agent.name}`}>
         <strong>{agent.name}</strong>
         <code title={agent.modelId}>{agent.modelLabel ?? agent.modelId ?? 'Model not assigned'}</code>
       </button>
       {agent.mode === 'plan' ? <span className="fleet-role plan">plan</span> : null}
       {/* Icons, not words: three labelled controls left no room for the agent's
-          own name. Both are real toggles — the first version disabled the
-          coordinator control once held and hid the worker control behind it,
-          so pressing it was a one-way door with no way back. */}
-      {onSetCoordinator ? <button
+          own name. Both are real toggles and neither is ever disabled or
+          hidden — pressing the lit one returns the agent to no role. The first
+          version disabled the coordinator control once held and hid the worker
+          control behind it, which made the press a one-way door. */}
+      <button
         type="button"
-        className={`fleet-toggle${agent.coordinator ? ' on' : ''}`}
-        aria-pressed={agent.coordinator}
+        className={`fleet-toggle${agent.role === 'coordinator' ? ' on' : ''}`}
+        aria-pressed={agent.role === 'coordinator'}
         aria-label={`Coordinator: ${agent.name}`}
-        title={agent.coordinator
+        title={agent.role === 'coordinator'
           ? 'Coordinates this project — click to release'
           : coordinatorName ? `Coordinate — takes the role from ${coordinatorName}` : 'Make this agent the coordinator'}
-        onClick={() => onSetCoordinator(agent.id)}
-      ><Network size={12} aria-hidden="true" /></button> : null}
-      {/* Shown even while coordinating, so the row never loses a control. A
-          coordinator is not assignable, and the tooltip says why rather than
-          the button vanishing. */}
-      {onSetWorker ? <button
+        onClick={() => onSetRole?.(agent.id, agent.role === 'coordinator' ? 'none' : 'coordinator')}
+      ><Network size={12} aria-hidden="true" /></button>
+      <button
         type="button"
-        className={`fleet-toggle${agent.worker && !agent.coordinator ? ' on' : ''}`}
-        aria-pressed={agent.worker && !agent.coordinator}
+        className={`fleet-toggle${agent.role === 'worker' ? ' on' : ''}`}
+        aria-pressed={agent.role === 'worker'}
         aria-label={`Can be assigned work: ${agent.name}`}
-        disabled={agent.coordinator}
-        title={agent.coordinator
-          ? 'Coordinating — release the role to assign work to it'
-          : agent.worker ? 'Can be assigned work — click to exclude' : 'Excluded from assignment — click to include'}
-        onClick={() => onSetWorker(agent.id, !agent.worker)}
-      ><Hammer size={12} aria-hidden="true" /></button> : null}
+        title={agent.role === 'worker'
+          ? 'Can be assigned work — click to exclude'
+          : 'Excluded from assignment — click to include'}
+        onClick={() => onSetRole?.(agent.id, agent.role === 'worker' ? 'none' : 'worker')}
+      ><Hammer size={12} aria-hidden="true" /></button>
       {/* One toggle, not two buttons. At this width two labelled buttons push
           the agent's own name out of the row, which is the one thing the row
           exists to show. Standard is the unlit state. */}
@@ -111,7 +106,7 @@ const STATE_LABELS = { ready: 'Ready', unavailable: 'Usage unavailable', 'quota-
 
 export default function QuotaAccountCard({
   account, groups, providerLabel, tracked, session, agents = [], variant, providerState,
-  pools = [], strays = [], onSelectAgent, onSetCoordinator, onSetWorker, coordinatorName,
+  pools = [], strays = [], onSelectAgent, onSetRole, coordinatorName,
   expandedModels = false, refreshing = false, onToggleModels, onRefresh, onReconnect, onConsumeResetCredit,
   onAccountToggle, onRemove, onSpeedChange
 }: Props) {
@@ -240,7 +235,7 @@ export default function QuotaAccountCard({
             {pool.agents.map(agent => <FleetAgent
               key={agent.id} agent={agent}
               onSelect={onSelectAgent} onSpeedChange={onSpeedChange}
-              onSetCoordinator={onSetCoordinator} onSetWorker={onSetWorker} coordinatorName={coordinatorName} />)}
+              onSetRole={onSetRole} coordinatorName={coordinatorName} />)}
           </div> : null}
         </section>)}
       </div> : groups.length > 0 ? <div className="quota-groups">
@@ -259,7 +254,7 @@ export default function QuotaAccountCard({
           {strays.map(agent => <FleetAgent
             key={agent.id} agent={agent}
             onSelect={onSelectAgent} onSpeedChange={onSpeedChange}
-            onSetCoordinator={onSetCoordinator} onSetWorker={onSetWorker} coordinatorName={coordinatorName} />)}
+            onSetRole={onSetRole} coordinatorName={coordinatorName} />)}
         </div>
       </section> : null}
 

@@ -1,5 +1,5 @@
 import { FileText, FolderTree, Users } from 'lucide-react'
-import type { AgentConfig, ArtifactEntry } from '@shared/types'
+import type { AgentConfig, AgentRole, ArtifactEntry } from '@shared/types'
 import RightPanelTree from './RightPanelTree'
 import RightPanelArtifacts from './RightPanelArtifacts'
 import FleetPanel from './fleet/FleetPanel'
@@ -12,8 +12,7 @@ interface Props {
   artifacts: ArtifactEntry[]
   agents: AgentConfig[]
   onSelectAgent: (agentId: string) => void
-  onSetCoordinator: (agentId: string) => void
-  onSetWorker: (agentId: string, worker: boolean) => void
+  onSetRole: (agentId: string, role: AgentRole) => void
   onTabChange: (tab: RightPanelTab) => void
   onClearArtifacts: () => void
 }
@@ -27,7 +26,7 @@ function ArtifactIcon() {
 }
 
 export default function RightPanel({
-  root, tab, artifacts, agents, onSelectAgent, onSetCoordinator, onSetWorker, onTabChange, onClearArtifacts
+  root, tab, artifacts, agents, onSelectAgent, onSetRole, onTabChange, onClearArtifacts
 }: Props) {
 
   return (
@@ -43,7 +42,7 @@ export default function RightPanel({
           <RightPanelArtifacts root={root} artifacts={artifacts} onClear={onClearArtifacts} />
         </div>
         <div className={`right-panel-view${tab === 'fleet' ? '' : ' hidden'}`}>
-          <FleetPanel agents={agents} onSelectAgent={onSelectAgent} onSetCoordinator={onSetCoordinator} onSetWorker={onSetWorker} />
+          <FleetPanel agents={agents} onSelectAgent={onSelectAgent} onSetRole={onSetRole} />
         </div>
         </div>
         <div className="right-panel-tabs" role="tablist" aria-label="Right panel tabs">

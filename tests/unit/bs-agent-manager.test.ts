@@ -1259,6 +1259,28 @@ describe('one coordinator per project', () => {
     expect(llmSystems[0]).toContain('helper')
   })
 
+  it('reports the demotion as well as the promotion', async () => {
+    // setMode demoted the previous coordinator in the manager's memory only.
+    // The caller persisted and pushed just the agent pressed, so the panel kept
+    // both lit and a restart restored both from workspaces.json.
+    const { manager } = await makeManager({ secondAgent: true })
+    manager.setMode('a1', 'coordinate')
+    expect(manager.setMode('a3', 'coordinate')).toEqual(expect.arrayContaining(['a1', 'a3']))
+  })
+
+  it('reports only the agent it changed when there was no other', async () => {
+    const { manager } = await makeManager({ secondAgent: true })
+    expect(manager.setMode('a1', 'coordinate')).toEqual(['a1'])
+  })
+
+  it('clears the worker flag when an agent takes the coordinator role', async () => {
+    // A coordinator is not assignable, so the two states cannot both be held.
+    const { manager } = await makeManager({ secondAgent: true })
+    manager.setWorker('a1', true)
+    manager.setMode('a1', 'coordinate')
+    expect(manager.listAgents().find(agent => agent.id === 'a1')?.worker).toBe(false)
+  })
+
   it('leaves a coordinator in another project alone', async () => {
     const { manager } = await makeManager({ secondAgent: true, secondProject: true })
     manager.setMode('a1', 'coordinate')

@@ -12,7 +12,7 @@ const account: ProviderAccountSnapshot = {
 }
 
 const row = (patch: Partial<FleetAgentRow> = {}): FleetAgentRow =>
-  ({ id: 'a1', name: 'anti-claude-opus', mode: 'build', coordinator: false, worker: true, ...patch })
+  ({ id: 'a1', name: 'anti-claude-opus', mode: 'build', role: 'worker', ...patch })
 
 const pool = (id: string, agents: FleetAgentRow[], windows: ProviderQuotaWindow[] = []) => ({
   group: { id, label: id, modelIds: [], windows },
@@ -30,8 +30,7 @@ const board = (fleet: FleetModel) =>
     providerLabel: () => 'Antigravity',
     refreshingId: null,
     onSelectAgent: () => {},
-    onSetCoordinator: () => {},
-    onSetWorker: () => {},
+    onSetRole: () => {},
     onSpeedChange: () => {},
     onRefresh: () => {},
     onConsumeResetCredit: () => {}
@@ -82,36 +81,43 @@ describe('FleetBoard', () => {
     expect(board(withPools([pool('gemini', [])]))).not.toContain('No agent drawing on this pool')
   })
 
-  it('shows the coordinator toggle as held, and not as an offer', () => {
-    // Icons rather than words: three labelled controls left the agent's own
-    // name with nowhere to go. The state is carried by aria-pressed.
-    const markup = board(withPools([pool('codex', [row({ coordinator: true, mode: 'coordinate' })])]))
-    expect(markup).toContain('aria-label="Coordinator: anti-claude-opus"')
-    expect(markup).toContain('aria-pressed="true"')
-    expect(markup).toContain('disabled=""')
+  it('turns a lit control off rather than leaving it stuck on', () => {
+    // Pressing the coordinator control used to be a one-way door: it disabled
+    // itself and hid the worker control behind it, so nothing on the row could
+    // undo the press.
+    const markup = board(withPools([pool('codex', [row({ role: 'coordinator', mode: 'coordinate' })])]))
+    expect(markup).toContain('click to release')
+    expect(markup).not.toContain('disabled=""')
+  })
+
+  it('offers both controls in every state', () => {
+    for (const role of ['coordinator', 'worker', 'none'] as const) {
+      const markup = board(withPools([pool('codex', [row({ role })])]))
+      expect(markup).toContain('Coordinator:')
+      expect(markup).toContain('Can be assigned work:')
+    }
+  })
+
+  it('lights exactly one control, or neither', () => {
+    const lit = (role: FleetAgentRow['role']) =>
+      (board(withPools([pool('codex', [row({ role })])])).match(/aria-pressed="true"/g) ?? []).length
+    expect(lit('coordinator')).toBe(1)
+    expect(lit('worker')).toBe(1)
+    expect(lit('none')).toBe(0)
   })
 
   it('names who would lose the role on the control that would take it', () => {
     // Exclusive, so taking it demotes someone. Saying whose keeps that from
     // happening silently — the tooltip carries it now the label is an icon.
     const markup = board(withPools([pool('codex', [
-      row({ coordinator: true, mode: 'coordinate' }),
+      row({ role: 'coordinator', mode: 'coordinate' }),
       row({ id: 'a2', name: 'anti-claude-sonnet' })
     ])]))
     expect(markup).toContain('takes the role from anti-claude-opus')
   })
 
-  it('keeps both controls on the row while an agent coordinates', () => {
-    // The first version disabled the coordinator control once held and hid the
-    // worker control behind it, so pressing it was a one-way door: nothing on
-    // the row could undo it. Both stay, and the coordinator one releases.
-    const markup = board(withPools([pool('codex', [row({ coordinator: true, mode: 'coordinate' })])]))
-    expect(markup).toContain('click to release')
-    expect(markup).toContain('release the role to assign work to it')
-  })
-
   it('shows an excluded agent as excluded', () => {
-    const markup = board(withPools([pool('codex', [row({ worker: false })])]))
+    const markup = board(withPools([pool('codex', [row({ role: 'none' })])]))
     expect(markup).toContain('Excluded from assignment')
   })
 

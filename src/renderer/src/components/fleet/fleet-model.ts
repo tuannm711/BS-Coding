@@ -1,5 +1,5 @@
 import type { ProviderAccountSnapshot, ProviderSnapshot } from '@shared/provider-state'
-import type { AgentConfig, AgentMode, AgentSpeed, ProviderQuotaGroup } from '@shared/types'
+import type { AgentConfig, AgentMode, AgentRole, AgentSpeed, ProviderQuotaGroup } from '@shared/types'
 import { groupClaimsModel, quotaAccountState, type QuotaAccountUiState } from '../quota/quota-view'
 
 export interface FleetAgentRow {
@@ -11,9 +11,9 @@ export interface FleetAgentRow {
   // Carried so the speed control survives the move out of the pinned quota
   // block. Removing the block must not remove a function with it.
   speed?: AgentSpeed
-  coordinator: boolean
-  // Absent on the config means yes, so agents predating the switch stay usable.
-  worker: boolean
+  // One value, not two booleans with an impossible combination — that pairing
+  // let the panel show a state the manager could never hold.
+  role: AgentRole
 }
 
 export interface FleetPool {
@@ -42,8 +42,8 @@ function row(agent: AgentConfig, modelId?: string, modelLabel?: string, speed?: 
     id: agent.id,
     name: agent.name,
     mode: agent.mode ?? 'build',
-    coordinator: agent.mode === 'coordinate',
-    worker: agent.worker !== false,
+    // Absent `worker` means yes, so agents predating the field stay usable.
+    role: agent.mode === 'coordinate' ? 'coordinator' : agent.worker === false ? 'none' : 'worker',
     ...(modelId === undefined ? {} : { modelId }),
     ...(modelLabel === undefined ? {} : { modelLabel }),
     ...(speed === undefined ? {} : { speed })

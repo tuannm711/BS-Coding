@@ -801,23 +801,35 @@ export class BsAgentManager {
     this.agents.set(agentId, agent)
   }
 
-  setMode(agentId: string, mode: AgentMode): void {
+  // Returns every agent whose config this changed, because exclusivity means
+  // one press can change two — and persisting only the pressed one is what left
+  // the panel showing two coordinators with the file agreeing.
+  setMode(agentId: string, mode: AgentMode): string[] {
+    const changed: string[] = []
     // Enforced here rather than in the view: the manager knows each agent's
     // cwd, so the rule holds whichever surface calls it and there is no second
     // copy to disagree. Two coordinators in one project would assign work to
     // the same workers with neither aware of the other. The recursion ends —
     // this branch only runs for 'coordinate' and the demotion passes 'build'.
+    //
+    // Demotion first, so a failure between the two writes leaves no coordinator
+    // rather than the two this exists to prevent.
     if (mode === 'coordinate') {
       const cwd = this.agents.get(agentId)?.cwd
       for (const other of [...this.agents.values()]) {
         if (other.id === agentId || other.cwd !== cwd) continue
-        if ((this.modes.get(other.id) ?? 'build') === 'coordinate') this.setMode(other.id, 'build')
+        if ((this.modes.get(other.id) ?? 'build') === 'coordinate') {
+          this.setMode(other.id, 'build')
+          changed.push(other.id)
+        }
       }
     }
     this.modes.set(agentId, mode)
     const agent = this.agents.get(agentId)
     if (agent) {
       agent.mode = mode
+      // A coordinator is not assignable, so the two states cannot both be held.
+      if (mode === 'coordinate') agent.worker = false
       this.agents.set(agentId, agent)
       // Rebuild even while a turn is running: the in-flight runner keeps its
       // own reference, but the next turn must see the new mode in its system
@@ -826,6 +838,8 @@ export class BsAgentManager {
       this.resolved.delete(agentId)
       this.register(agent)
     }
+    changed.push(agentId)
+    return changed
   }
 
   setVariant(agentId: string, variant: string | undefined): void {

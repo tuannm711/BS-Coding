@@ -31,7 +31,7 @@ import { CommandStore } from './agent/commands'
 import { FileWatcher } from './file-watcher'
 import { ArtifactStore } from './artifact-store'
 import { isPathInside, listDir, shouldIgnore } from './dir-lister'
-import type { AgentMode, DirEntry } from '../shared/types'
+import type { AgentMode, AgentRole, DirEntry } from '../shared/types'
 import { LspManager } from './agent/lsp/manager'
 import { ModelsCatalog } from './models-catalog'
 import { APP_USER_MODEL_ID, getWindowChromeOptions, resolveWindowIconPath } from './window-chrome'
@@ -571,12 +571,23 @@ class MainApp {
     }
   }
 
-  setAgentWorker(agentId: string, worker: boolean): void {
-    this.bsAgent.setWorker(agentId, worker)
+  // One operation, because a role is one fact. Two IPC calls could leave the
+  // file holding a state the manager never had.
+  setAgentRole(agentId: string, role: AgentRole): void {
+    const changed = this.bsAgent.setMode(agentId, role === 'coordinator' ? 'coordinate' : 'build')
+    this.bsAgent.setWorker(agentId, role === 'worker')
     const ws = this.findWorkspaceByAgent(agentId)
-    if (ws) {
-      const updated = this.workspaces.updateAgent(ws.projectPath, agentId, { worker })
-      this.pushAgentConfig(updated, agentId)
+    if (!ws) return
+    // Every agent the change touched, not only the one pressed: taking the role
+    // demotes whoever held it, and that demotion has to reach the file and the
+    // renderer or the panel keeps showing two coordinators.
+    for (const id of new Set([...changed, agentId])) {
+      const config = this.bsAgent.listAgents().find(agent => agent.id === id)
+      if (!config) continue
+      const updated = this.workspaces.updateAgent(ws.projectPath, id, {
+        mode: config.mode, worker: config.worker
+      })
+      this.pushAgentConfig(updated, id)
     }
   }
 
@@ -929,7 +940,7 @@ function registerIpcHandlers(): void {
     mainApp.bsAgent.editQueued(agentId, id, text))
   ipcMain.handle(Channels.SessionList, (_e, agentId: string) => mainApp.bsAgent.listSessions(agentId))
   ipcMain.handle(Channels.SessionActive, (_e, agentId: string) => mainApp.bsAgent.activeSessionFor(agentId))
-  ipcMain.handle(Channels.AgentSetWorker, (_e, agentId: string, worker: boolean) => mainApp.setAgentWorker(agentId, worker))
+  ipcMain.handle(Channels.AgentSetRole, (_e, agentId: string, role: AgentRole) => mainApp.setAgentRole(agentId, role))
   ipcMain.handle(Channels.SessionCreate, (_e, agentId: string) => mainApp.bsAgent.createSession(agentId))
   ipcMain.handle(Channels.SessionSwitch, (_e, agentId: string, sessionId: string) =>
     mainApp.bsAgent.switchSession(agentId, sessionId))
