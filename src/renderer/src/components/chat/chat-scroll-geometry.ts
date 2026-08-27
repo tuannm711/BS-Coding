@@ -48,8 +48,12 @@ export function followScrollDelta(input: { feedBottom: number; latestBottom: num
   return Math.max(0, input.latestBottom - (input.feedBottom - CHAT_FOLLOW_BOTTOM_INSET))
 }
 
-export function shouldEnterManualForWheel(deltaY: number, atScrollEnd: boolean): boolean {
-  return deltaY < 0 || !atScrollEnd
+// Upward only. Scrolling down moves toward the content the feed is trying to
+// show; treating it as intent to take over froze the transcript, because during
+// a streaming turn the tail spacer keeps the feed off the exact bottom and the
+// old rule required being within 1px of it.
+export function shouldEnterManualForWheel(deltaY: number): boolean {
+  return deltaY < 0
 }
 
 export function shouldEnterManualForKey(key: string, atBottom: boolean): boolean {
