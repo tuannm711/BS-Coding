@@ -232,6 +232,14 @@ owner found it by asking why Codex, on the same accounts, never had the problem.
 alternative was dead. Measuring the owner's store found 2 messages matching it
 and 0 matching the alternative the plan proposed keeping.
 
+**Sixth instance, 2026-08-27, and it was a *test* rather than a sentence.**
+`shouldEnterManualForWheel` froze the chat transcript on any downward wheel
+movement, and the suite stayed green because its test asserted that as the
+intended rule — *"treats wheel movement as manual intent unless it is downward
+at the exact bottom"*. A test that states a defect is the same failure as a
+design sentence that states one, and it is worse: it actively defends the
+defect against being noticed.
+
 **Why it matters.** The guards are good enough to make the mechanical parts
 trustworthy, which makes the prose feel trustworthy by association. A reader has
 no way to tell which parts are checked. Specs and plans have no guards at all,

@@ -258,9 +258,7 @@ export function useChatScroll(): ChatScrollController {
 
   const onWheel = useCallback((event: ReactWheelEvent<HTMLDivElement>) => {
     trustedInteractionRef.current = true
-    const feed = feedRef.current
-    const atScrollEnd = feed !== null && feed.scrollHeight - feed.scrollTop - feed.clientHeight <= 1
-    if (shouldEnterManualForWheel(event.deltaY, atScrollEnd)) enterManual()
+    if (shouldEnterManualForWheel(event.deltaY)) enterManual()
   }, [enterManual])
 
   const onTouchMove = useCallback(() => {

@@ -66,10 +66,15 @@ describe('chat scroll geometry', () => {
     expect(nextChatScrollMode('manual', 'session-load')).toBe('following')
   })
 
-  it('treats wheel movement as manual intent unless it is downward at the exact bottom', () => {
-    expect(shouldEnterManualForWheel(-1, true)).toBe(true)
-    expect(shouldEnterManualForWheel(1, false)).toBe(true)
-    expect(shouldEnterManualForWheel(1, true)).toBe(false)
+  it('takes manual ownership only when the reader scrolls away', () => {
+    // Scrolling *away* is upward. This used to fire on downward movement too,
+    // unless the feed was within 1px of the bottom — and during a streaming
+    // turn the tail spacer keeps it off the bottom, so one wheel tick down
+    // froze the transcript until Scroll to end. The scroll spec's own words:
+    // "when the user deliberately scrolls away from the follow zone".
+    expect(shouldEnterManualForWheel(-1)).toBe(true)
+    expect(shouldEnterManualForWheel(1)).toBe(false)
+    expect(shouldEnterManualForWheel(0)).toBe(false)
   })
 
   it('does not claim manual ownership for downward keys already at the bottom', () => {
