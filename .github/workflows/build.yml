@@ -9,8 +9,14 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      # Every action here is on its first major that runs Node 24. GitHub
+      # forces Node 20 actions onto 24 already and warns; these are runtime
+      # bumps only — checked release by release, no API changed. The majors
+      # differ because each action reached Node 24 at a different one:
+      # checkout/setup-node at v5, upload-artifact at v6, download-artifact
+      # at v7. They also need runner >= 2.327.1, which GitHub-hosted meets.
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 20
           cache: npm
@@ -43,8 +49,8 @@ jobs:
       AZURE_TRUSTED_SIGNING_ACCOUNT_NAME: ${{ matrix.target == 'win' && secrets.AZURE_TRUSTED_SIGNING_ACCOUNT_NAME || '' }}
       AZURE_TRUSTED_SIGNING_CERTIFICATE_PROFILE: ${{ matrix.target == 'win' && secrets.AZURE_TRUSTED_SIGNING_CERTIFICATE_PROFILE || '' }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 20
           cache: npm
@@ -56,7 +62,7 @@ jobs:
         run: npm run build:icon
       - name: Azure login for Windows code signing
         if: matrix.target == 'win' && env.AZURE_CLIENT_ID != '' && env.AZURE_TRUSTED_SIGNING_ENDPOINT != '' && env.AZURE_TRUSTED_SIGNING_ACCOUNT_NAME != '' && env.AZURE_TRUSTED_SIGNING_CERTIFICATE_PROFILE != ''
-        uses: azure/login@v2
+        uses: azure/login@v3
         with:
           client-id: ${{ env.AZURE_CLIENT_ID }}
           tenant-id: ${{ env.AZURE_TENANT_ID }}
@@ -76,7 +82,7 @@ jobs:
             }
             Write-Host "Signature OK: $($file.Name)"
           }
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: bs-${{ matrix.os }}
           path: |
@@ -98,13 +104,13 @@ jobs:
     steps:
       # The job had no checkout, so it could not read anything from the repo.
       # That is why every release before v1.1.7 published with an empty body.
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v7
         with:
           path: artifacts
           merge-multiple: true
       - name: Publish release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: artifacts/**/*
           # Tag v1.1.7 reads docs/release-notes/v1.1.7.md. A test in
