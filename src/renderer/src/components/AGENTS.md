@@ -1,5 +1,7 @@
 # AGENTS.md — src/renderer/src/components
 
+> Luật dự án ở [`/AGENTS.md`](/AGENTS.md). File này chỉ mô tả thư mục này, không đặt luật.
+
 The React UI layer (renderer process). Everything the user sees: pane grid with per-agent
 terminal/chat, sidebar, status bar, title bar, and dialogs. All data flows through `window.api`
 (preload) — the renderer never touches Node/Electron directly.
@@ -28,9 +30,3 @@ terminal/chat, sidebar, status bar, title bar, and dialogs. All data flows throu
 | `trace/` | Trace inspector, timeline and subagent tree. |
 | `chat/` | The native-agent chat UI — see its own AGENTS.md. |
 | `settings/` | Settings dialog + tabs — see its own AGENTS.md. |
-
-## Conventions
-
-- **Never** import from `electron` or `node:*` here; use `window.api` (typed `AgentApi`).
-- `App.tsx` (parent) owns terminal registration and global state; components stay presentational-ish.
-- UI labels are English; system-style notices from main are Vietnamese with `[bs]` prefix.

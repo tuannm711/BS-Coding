@@ -1,5 +1,7 @@
 # AGENTS.md — src/main/agent
 
+> Luật dự án ở [`/AGENTS.md`](/AGENTS.md). File này chỉ mô tả thư mục này, không đặt luật.
+
 The native "Bs agent" core: the agent loop, LLM integration, config, sessions, permissions,
 commands, references, compaction and usage accounting. Orchestrated by `BsAgentManager` in
 `src/main/bs-agent-manager.ts` (which lives one level up).
@@ -32,10 +34,3 @@ commands, references, compaction and usage accounting. Orchestrated by `BsAgentM
 | `provider-stream.ts` / `openai-responses.ts` / `antigravity-llm.ts` | Provider-specific stream adapters behind `LlmClient`. |
 | `workspace-reconcile.ts` | Reconciles stored agents against the workspace on open. |
 | `tools/` `lsp/` `mcp/` | Tool implementations and service clients — see their own AGENTS.md. |
-
-## Conventions
-
-- All agent logic lives in the **main process**; the renderer only sees `ChatEvent`s over IPC.
-- Tests use a **model stub** (`createLlm` fake) — never hit a real LLM API (see `tests/unit/agent-loop.test.ts`).
-- New tools: implement in `tools/`, register in `tools/registry.ts`, add permission default in `config.ts`.
-- Session transcript items are the single source of truth for what the LLM sees (`message.ts` rebuilds prompts from them).

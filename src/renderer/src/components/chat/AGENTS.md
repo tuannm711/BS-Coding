@@ -1,5 +1,7 @@
 # AGENTS.md — src/renderer/src/components/chat
 
+> Luật dự án ở [`/AGENTS.md`](/AGENTS.md). File này chỉ mô tả thư mục này, không đặt luật.
+
 The native-agent chat panel: message feed, streaming deltas, tool-call cards, permission/question
 prompts, message queue, and the composer (input + image attach + @-mention). Renders `ChatEvent`s
 pushed from main over IPC (`window.api.onChatEvent`).
@@ -21,10 +23,3 @@ pushed from main over IPC (`window.api.onChatEvent`).
 | `Dropdown.tsx` | Reusable dropdown menu (used by ModelPicker/VariantPicker). |
 | `questionAnswer.ts` | `buildQuestionAnswer` — helper for permission/question answers. |
 | `markdownTable.ts` | `normalizeMarkdownTables` — repairs markdown table pipes before rendering. |
-
-## Conventions
-
-- Feed updates are batched per animation frame (`flushDeltas`) to avoid input lag — keep streaming hot paths cheap.
-- `FeedMessage`/`ToolCallCard` are memoized; update copy-on-write (never mutate items in place) so memo works.
-- Message queue: prompts sent while a turn runs are queued in main; renderer shows `queued` badge rows and supports remove/edit via `window.api.removeQueued/editQueued`.
-- Images travel as dataURL strings in `ImageAttachment`; only image/* accepted.
