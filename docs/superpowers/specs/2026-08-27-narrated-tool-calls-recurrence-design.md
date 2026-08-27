@@ -1,161 +1,182 @@
-# Narrated tool calls, second time — design
+# Narrated tool calls: the history was prose — design
 
 Date: 2026-08-27
 Branch: `fix/narrated-tool-calls`
-Supersedes nothing: `docs/superpowers/specs/2026-08-25-narrated-tool-calls-design.md`
-still describes what v1.1.6 fixed, and that fix still holds.
+Revises: `docs/superpowers/specs/2026-08-25-narrated-tool-calls-design.md`, whose
+cause section reached a conclusion its own evidence does not support.
 
-## What actually happened, from the stored transcript
+## The question that found this
 
-Session *"Thực hiện Wave 6"*, items 736–745, both turns on `openai/gpt-5.6-sol`:
+The owner asked why Codex, against the same ChatGPT and DeepSeek accounts, never
+does this. That question is the whole finding: the first version of this spec
+caught the model **imitating** a format and stopped it **spreading**, and never
+asked why the model was shown tools as prose to begin with.
+
+## Every conversation in this app is a shared session
+
+```
+ChatPanel.tsx:427   sendSessionChat(projectPath, sessionId, agentId, …)
+preload             Channels.ChatSend
+main/index.ts:908   mainApp.bsAgent.sendInSession(…)
+```
+
+That is the only send path the UI has. `sendInSession` always creates a
+`sessionExecutions` entry, so `executionForAgent` is never null during a turn
+from the window, so `buildMessages` always takes the shared branch: **prior turns
+through `compileNeutralContext`, current turn through `toLlmMessages`.**
+
+`compileNeutralContext` emits `user` and `assistant` messages of text only. No
+`tool-call` part, no `tool-result` message. Every tool the agent used in every
+earlier turn is replayed to it as a line of prose:
+
+```
+[Session log — tools already run in this session by its agents. …]
+- read · completed
+  input: {"file_path":"…","offset":70,"limit":60}
+  output: (lines 71-129 of 129)
+```
+
+So the model is shown a conversation in which using a tool looks like writing
+that. It writes that. Codex keeps native tool-call structure end to end and
+has no multi-agent shared history to flatten, which is why the same accounts
+behave differently there.
+
+## Two sentences in the record that hid this
+
+**"The flattening itself is necessary and must stay."** Justified by needing to
+strip Google `thoughtSignature`, provider-specific tool call ids and unfinished
+calls. None of those require destroying the structure — a call can be re-emitted
+natively under a fresh id. Neutral should mean **neutral ids**, not **neutral
+shape**.
+
+**"Scope is limited to shared project sessions. Single-agent chat goes through
+`toLlmMessages` and is unaffected."** True of the code and false of the product:
+there is no other path from the window. It made the blast radius read as an edge
+case when it is every conversation.
+
+And a test pins the shape rather than the requirement:
+
+```ts
+expect(serialized).not.toContain('tool-call')
+```
+
+That assertion is the design decision, and it is the one being reversed.
+
+## What the transcript shows, for the record
+
+Session *"Thực hiện Wave 6"*, both turns `openai/gpt-5.6-sol`:
 
 | Item | Agent | What |
 |---|---|---|
-| 736–742 | `h.ernandezrob5612` | working normally — tool calls between short replies |
-| **743** | `h.ernandezrob5612` | 21,042 characters opening `- read :: <path> :: 75 :: 50物理 reasoned breakdown:` |
-| 744 | — | the owner types *"tiếp tục"* and switches to `a.lcottdustin6360` |
-| **745** | `a.lcottdustin6360` | 8,468 characters opening `- read · completed\n  input: {…}\n  output: …` |
+| 736–742 | `h.ernandezrob5612` | normal tool use |
+| **743** | `h.ernandezrob5612` | 21,042 chars opening `- read :: <path> :: 75 :: 50物理` |
+| 744 | — | owner types *"tiếp tục"*, switches agent |
+| **745** | `a.lcottdustin6360` | 8,468 chars reproducing the record body exactly |
 
-These are two different failures and only one of them is ours.
-
-**743 is not imitation of anything this product emits.** `::` appears nowhere in
-the codebase or the skills, and the text carries mojibake (`50物理`). It is a
-degraded generation that invented its own separators.
-
-**745 is imitation, and exact.** It reproduces the body `compileNeutralContext`
-writes — `- <tool> · <status>`, two-space `input:`, two-space `output:` — with
-the header omitted. The agent changed between the two, so the runner, the system
-prompt and the tools all changed; what carried across was the **history**.
-
-## Why the v1.1.6 fix did not prevent this
-
-That fix moved tool records out of the assistant role, because text in the
-assistant role is what a model imitates. It works, and the records still sit in
-the user role.
-
-But a **narration is an assistant message.** It is stored like any reply and
-replayed to every later turn as the assistant's own prose. So the first
-narration recreates by hand exactly the condition the fix removed — and 743 → 745
-is that happening across an agent switch.
-
-Detection alone does not stop this. The renderer's notice tells the reader; it
-does not change what the next turn is shown.
-
-## The detector is anchored on the wrong part
-
-```ts
-const NARRATED = /^(?:\[Tool [^\]\n]+ · (?:completed|failed)\]\s*\r?\nInput:|\[Session log[^\]\n]*\]\s*\r?\n- )/m
-```
-
-Two alternatives, and neither matches 745:
-
-- The first describes a format that **no longer exists** — records have not been
-  headed `[Tool … · completed]` with a capitalised `Input:` since v1.1.6.
-- The second requires the `[Session log …]` header before the `- `. The model
-  copies the body and drops the header, which is the natural thing to copy: the
-  header says in words that it is not a format to reproduce.
-
-Measured across all 1,655 assistant messages in the owner's store: 2 match the
-current detector, 1 matches the record body and is missed, and 743 matches
-neither.
+743 invented its own separators and carries mojibake — a degraded generation,
+not imitation of anything emitted here. 745 is exact imitation, by a different
+agent with a different runner and prompt; the only thing shared was the history.
 
 ## Approach
 
-### 1. Detect the body
+### 1. Replay tool calls natively
 
-Match `- <tool> · completed|failed` followed by an indented `input:` line, at a
-line start. Drop the dead `[Tool …]` alternative. Keep the `[Session log …]`
-alternative — a message reproducing the header is narration too.
-
-The pattern stays in `src/shared/narrated-tool-call.ts`, which both processes
-already import, so main flags at append time and the renderer flags what a
-stored transcript already holds.
-
-**Not matched, deliberately:** 743. Its shape is the model's own invention, and
-a pattern loose enough to catch `- read :: … :: 75 :: 50物理` would catch
-ordinary prose about a `read`. It is caught by consequence rather than by shape —
-see below.
-
-### 2. Quarantine, so one narration does not seed the next
-
-`ChatMessage` gains `narrated?: boolean`, written where the flag is already
-computed:
+`compileNeutralContext` emits, per turn, what `toLlmMessages` already emits —
+minus everything provider-specific:
 
 ```ts
-appendMessage: (msg) => {
-  ...
-  if (msg.role === 'assistant' && looksLikeNarratedToolCall(msg.text)) {
-    this.emit({ type: 'narrated-tool-call', agentId: agent.id })
-  }
+// assistant
+{ role: 'assistant', content: [
+  { type: 'text', text: prose },
+  { type: 'tool-call', toolCallId: 'n1', toolName: 'read', input: … }
+]}
+// then
+{ role: 'tool', content: [
+  { type: 'tool-result', toolCallId: 'n1', toolName: 'read', output: { type: 'text', value: … } }
+]}
 ```
 
-That call already runs and throws its answer away.
+- **Fresh ids.** `n1`, `n2`, … assigned per compilation, so no provider sees
+  another provider's identifiers. The result must carry the same id as its call.
+- **No `thoughtSignature`, no `providerOptions`.** As today.
+- **Unfinished and pending calls stay dropped.** A call with no result would
+  leave an assistant message a provider will reject.
+- **Errors keep `type: 'error-text'`**, as `toLlmMessages` does.
 
-Both compilers then refuse to replay a flagged message as assistant prose:
+`RECORD_HEADER` and the record strings go. There is no longer a format to
+explain, so `SHARED_SESSION_RECORD_NOTE` goes with them.
 
-- `toLlmMessages` — the ordinary path
-- `compileNeutralContext` — the shared-session and post-handoff path
+### 2. Keep the detector, as a net rather than a cure
 
-It is replaced, not dropped, by one line in the **user** role:
-`[A reply here was a written-out tool call and did not run. It has been left out.]`
-Dropping it silently would leave a user message answered by nothing, and the
-next turn would read the request as unanswered.
+The regex still misses what actually happened — both alternatives anchor on a
+header the model omits, and one describes a format gone since v1.1.6. Fix it to
+match the body, `- <tool> · completed|failed` followed by an indented `input:`,
+and drop the dead alternative.
 
-**This is what catches 743.** Its shape is not matched, but the moment any
-message in the session is flagged, the replacement line tells the next turn that
-narration happened here and did not run. A degraded generation still costs one
-turn; it no longer costs every turn after it.
+This is no longer the fix. It is what tells us if the fix did not work, and it
+still flags the sessions already carrying narration.
 
-### 3. Existing sessions
+**Deliberately not done: quarantine.** The previous draft of this spec proposed
+excluding a flagged message from later context. With the history in native form
+there is nothing seeding imitation, and a rule that rewrites what the model is
+shown carries a real cost when it fires wrongly. If narration recurs after this,
+that is the evidence quarantine would need — and it is not in evidence now.
 
-The flag is absent on everything already stored. The renderer already
-re-evaluates stored text with the detector, so the notice appears on old
-sessions once the pattern is fixed. The **compilers** must do the same: treat a
-message as narrated if the flag is set **or** the text matches. Flag-only would
-leave the owner's Wave 6 session seeding narration forever.
+### 3. Attribution, which this does lose
+
+Today the record says these tools were run "by its agents", plural. Native parts
+have no way to say another agent made the call: agent B will see agent A's calls
+as its own.
+
+The assistant prose still carries agent names through `execution`, and the turn
+that matters — the one being answered — is the agent's own. Judged the smaller
+cost of the two, and named here so it is a decision rather than an oversight.
 
 ## Verification
 
-1. A message matching the record body is flagged at append time.
-2. A message reproducing the `[Session log …]` header is still flagged.
-3. Ordinary prose mentioning a tool — "I will read the file" — is not.
-4. The dead `[Tool … ] / Input:` alternative is gone and nothing depended on it.
-5. `toLlmMessages` replaces a flagged assistant message with the user-role line
-   and keeps the surrounding turns intact.
-6. `compileNeutralContext` does the same.
-7. A stored message with no flag but matching text is treated as narrated by
-   both compilers — the owner's existing session must stop seeding.
-8. The renderer still renders its notice, from the same pattern.
+1. `compileNeutralContext` emits `tool-call` and `tool-result` parts, with the
+   result's id matching its call.
+2. Ids are freshly generated: no original id from the transcript appears.
+3. No `thoughtSignature` and no `providerOptions` in the output.
+4. A call with no result is omitted, and no assistant message is left holding an
+   unanswered call.
+5. A tool error becomes `type: 'error-text'`.
+6. Tool output is truncated by `toolOutputMaxChars`, as now.
+7. The `[Session log …]` header and `SHARED_SESSION_RECORD_NOTE` no longer
+   appear anywhere in a compiled prompt.
+8. The detector matches the record body, still matches the header, and does not
+   fire on prose that mentions a tool.
 9. `npm test`, `npm run typecheck`, `npm run build`.
+10. **In the app, against a real Antigravity account**: a shared session with two
+    or more prior tool-using turns completes a further turn without the provider
+    rejecting the replayed calls.
 
 ## Risks
 
-**A false positive silences a real reply.** A message that genuinely quotes a
-session log — a user asking the agent to explain one — would be replaced rather
-than replayed. The pattern requires a line-start `- <tool> · <status>` followed
-by an indented `input:`, which prose does not produce by accident, but the cost
-of being wrong is higher than it was when detection only drew a notice.
+**Replaying tool calls to Gemini without `thoughtSignature` is untested.** They
+have never been sent as tool calls at all, so no provider has yet had the chance
+to refuse them. Antigravity is the one to try first, and step 10 above is not
+optional — if it refuses, this approach needs a per-provider answer before it
+can ship.
 
-**The replacement line is itself text in the history.** It is in the user role
-and says nothing tool-shaped, so it does not carry the property it is there to
-stop.
+**Every shared-session turn changes shape.** That is the point, and it is the
+whole product: not an edge case, and not reversible one conversation at a time.
 
-**743 remains possible.** Nothing here prevents a model from degrading; the
-scope of the fix is that one bad turn stays one bad turn.
+**Losing cross-agent attribution.** Recorded above.
+
+**The detector could still be wrong about what it is looking for.** It is now a
+net, not the fix, so a miss costs visibility rather than correctness.
 
 ## Out of scope
 
-**Changing the record format.** Dropping the `- ` prefix to make the body less
-imitable was considered and set aside: it changes the format every shared-session
-turn reads, to buy an unmeasured reduction in how often narration starts, and it
-does nothing about contagion once a narration exists. Worth revisiting with data
-from this fix, as its own piece of work.
+**Changing what a single agent sends.** `toLlmMessages` already emits native
+parts and is not touched.
 
-**Rejecting and retrying the step.** 743 shows the trigger can be model
-degradation, and retrying a degrading model is a loop.
+**Quarantining flagged messages.** Recorded above, with the condition under
+which it would be revisited.
 
 ## Success criteria
 
-A narrated reply is flagged whatever shape of the current record format it
-copies, is visible to the reader, and is never replayed to a later turn as
-something the assistant said.
+A model is never shown its own tool use as prose. `compileNeutralContext`
+produces the same conversation shape as `toLlmMessages`, differing only in that
+nothing provider-specific survives it.
