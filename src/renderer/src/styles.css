@@ -1798,16 +1798,16 @@ select.input { width: 100%; }
 .quota-head-identity strong { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .quota-head-source { color: var(--text-faint); font-size: var(--fs-xs); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .quota-head-state { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: var(--fs-xs); }
-/* Words, not pills: a pill spends horizontal padding this rail does not have. */
-.quota-word { flex: none; padding: 0; background: none; border: 0; color: var(--text-dim); font-size: var(--fs-xs); }
-.quota-word.quota-state-ready { color: var(--green); }
-.quota-word.quota-state-cooldown { color: var(--yellow); }
-.quota-word.quota-state-quota-exhausted,
-.quota-word.quota-state-capacity-exhausted,
-.quota-word.quota-state-auth-error { color: var(--red); }
-.quota-reset-word { text-decoration: underline dotted; cursor: pointer; }
-.quota-reset-word:disabled { cursor: default; text-decoration: none; opacity: 0.6; }
-.quota-age { margin-left: auto; color: var(--text-faint); }
+/* Badges keep their shape and colour at rail width; only the padding and type
+   size come down. Flattening them to plain text saved a few pixels and cost
+   the glance. */
+.quota-badge-tight { flex: none; padding: 1px 6px; font-size: var(--fs-xs); line-height: 1.5; }
+.quota-head-state .quota-plan-badge.quota-state-ready { border-color: color-mix(in srgb, var(--green) 45%, transparent); color: var(--green); }
+.quota-head-state .quota-plan-badge.quota-state-cooldown { border-color: color-mix(in srgb, var(--yellow) 45%, transparent); color: var(--yellow); }
+.quota-head-state .quota-plan-badge.quota-state-quota-exhausted,
+.quota-head-state .quota-plan-badge.quota-state-capacity-exhausted,
+.quota-head-state .quota-plan-badge.quota-state-auth-error { border-color: color-mix(in srgb, var(--red) 45%, transparent); color: var(--red); }
+.quota-age { flex: none; margin-left: auto; color: var(--text-faint); font-size: var(--fs-xs); white-space: nowrap; }
 
 /* Role controls are icons. Three labelled buttons left the agent's own name
    with nowhere to go — the one thing the row exists to show. */

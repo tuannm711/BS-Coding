@@ -89,16 +89,28 @@ export class SessionStore {
 
   constructor(private store: JsonStore<StoredSession>) {}
 
+  // Held in memory after the first read. Every store call used to re-read and
+  // re-parse the whole file — 16MB in the owner's install — and then serialise
+  // it twice more to decide whether normalizing had changed anything. Switching
+  // a session makes a dozen such calls, which is where five to ten seconds of
+  // waiting came from. This class is the only writer of that file, so the copy
+  // it holds is the file.
+  private cache: StoredSession[] | null = null
+
   private loadSessions(): StoredSession[] {
+    if (this.cache) return this.cache
     const raw = this.store.load() as unknown as RawSession[]
     const normalized = raw.map(normalize)
     const latest = normalized.reduce((max, session) => Math.max(max, session.updatedAt), 0)
     this.lastUpdatedAt = Math.max(this.lastUpdatedAt, latest)
+    this.cache = normalized
+    // Once, on the first read, not on every one: migration is a startup cost.
     if (JSON.stringify(raw) !== JSON.stringify(normalized)) this.saveSessions(normalized)
     return normalized
   }
 
   private saveSessions(sessions: StoredSession[]): void {
+    this.cache = sessions
     this.store.save(sessions)
   }
 

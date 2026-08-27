@@ -101,11 +101,13 @@ describe('FleetBoard', () => {
     expect(markup).toContain('takes the role from anti-claude-opus')
   })
 
-  it('offers no worker toggle on the coordinator itself', () => {
-    // It is not a worker and cannot be assigned to; a control saying otherwise
-    // would be a lie with a click target.
+  it('keeps both controls on the row while an agent coordinates', () => {
+    // The first version disabled the coordinator control once held and hid the
+    // worker control behind it, so pressing it was a one-way door: nothing on
+    // the row could undo it. Both stay, and the coordinator one releases.
     const markup = board(withPools([pool('codex', [row({ coordinator: true, mode: 'coordinate' })])]))
-    expect(markup).not.toContain('Can be assigned work')
+    expect(markup).toContain('click to release')
+    expect(markup).toContain('release the role to assign work to it')
   })
 
   it('shows an excluded agent as excluded', () => {

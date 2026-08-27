@@ -65,26 +65,31 @@ function FleetAgent({ agent, coordinatorName, onSelect, onSpeedChange, onSetCoor
       </button>
       {agent.mode === 'plan' ? <span className="fleet-role plan">plan</span> : null}
       {/* Icons, not words: three labelled controls left no room for the agent's
-          own name. Each says what it means on hover, and taking coordination
-          still names who loses it — the role is exclusive, and a silent
-          demotion is worse than a visible one. */}
+          own name. Both are real toggles — the first version disabled the
+          coordinator control once held and hid the worker control behind it,
+          so pressing it was a one-way door with no way back. */}
       {onSetCoordinator ? <button
         type="button"
         className={`fleet-toggle${agent.coordinator ? ' on' : ''}`}
         aria-pressed={agent.coordinator}
         aria-label={`Coordinator: ${agent.name}`}
-        disabled={agent.coordinator}
         title={agent.coordinator
-          ? 'Coordinates this project'
+          ? 'Coordinates this project — click to release'
           : coordinatorName ? `Coordinate — takes the role from ${coordinatorName}` : 'Make this agent the coordinator'}
         onClick={() => onSetCoordinator(agent.id)}
       ><Network size={12} aria-hidden="true" /></button> : null}
-      {onSetWorker && !agent.coordinator ? <button
+      {/* Shown even while coordinating, so the row never loses a control. A
+          coordinator is not assignable, and the tooltip says why rather than
+          the button vanishing. */}
+      {onSetWorker ? <button
         type="button"
-        className={`fleet-toggle${agent.worker ? ' on' : ''}`}
-        aria-pressed={agent.worker}
+        className={`fleet-toggle${agent.worker && !agent.coordinator ? ' on' : ''}`}
+        aria-pressed={agent.worker && !agent.coordinator}
         aria-label={`Can be assigned work: ${agent.name}`}
-        title={agent.worker ? 'Can be assigned work — click to exclude' : 'Excluded from assignment — click to include'}
+        disabled={agent.coordinator}
+        title={agent.coordinator
+          ? 'Coordinating — release the role to assign work to it'
+          : agent.worker ? 'Can be assigned work — click to exclude' : 'Excluded from assignment — click to include'}
         onClick={() => onSetWorker(agent.id, !agent.worker)}
       ><Hammer size={12} aria-hidden="true" /></button> : null}
       {/* One toggle, not two buttons. At this width two labelled buttons push
@@ -140,25 +145,26 @@ export default function QuotaAccountCard({
         <div className="quota-head-source">
           {providerLabel ?? account.providerId} · {accountType}{planName ? ` · ${planName}` : ''}
         </div>
-        {/* Plain words on one line rather than pills. A pill spends horizontal
-            padding this width does not have, which is what pushed these out of
-            sight when the rail was fixed. */}
+        {/* Still badges, only tighter. Flattening them to plain text to save
+            width took the one thing that made state readable at a glance —
+            the shape and colour — and left three grey words. */}
         <div className="quota-head-state">
-          <span className={`quota-word quota-state-${providerState ?? (active ? 'ready' : 'unavailable')}`}>
-            {active ? STATE_LABELS[providerState ?? 'ready'] : account.status}
-          </span>
+          <span
+            className={`quota-plan-badge quota-badge-tight quota-state-${providerState ?? (active ? 'ready' : 'unavailable')}`}
+            role="status"
+          >{active ? STATE_LABELS[providerState ?? 'ready'] : account.status}</span>
           {usage?.resetCredits ? (onConsumeResetCredit
             ? <button
-                className="quota-word quota-reset-word"
+                className="quota-plan-badge quota-badge-tight quota-reset-badge"
                 type="button"
                 disabled={!resetGate.allowed}
                 title={resetGate.allowed ? 'Spend one reset credit' : resetGate.reason}
                 onClick={onConsumeResetCredit}
               >{resetCreditLabel(usage.resetCredits.available)}</button>
-            : <span className="quota-word" role="status">{resetCreditLabel(usage.resetCredits.available)}</span>
+            : <span className="quota-plan-badge quota-badge-tight quota-reset-badge" role="status">{resetCreditLabel(usage.resetCredits.available)}</span>
           ) : null}
           <span
-            className="quota-word quota-age"
+            className="quota-age"
             title={usage?.subscriptionExpiresAt ? formatExpiry(usage.subscriptionExpiresAt) : 'Subscription expiry not reported'}
           >{usage?.stale ? `stale ${formatAge(usage.lastSuccessfulRefreshAt ?? usage.refreshedAt)}` : formatAge(usage?.refreshedAt)}</span>
         </div>

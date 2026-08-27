@@ -14,6 +14,34 @@ function userMessage(text: string): ChatMessage {
   return { id: Math.random().toString(36).slice(2), role: 'user', text, createdAt: Date.now() }
 }
 
+describe('SessionStore reads', () => {
+  it('parses the file once, not on every call', () => {
+    // Every store call used to re-read and re-parse the whole file — 16MB in
+    // the owner's install — and switching a session makes a dozen of them.
+    let loads = 0
+    const store = new SessionStore({
+      load: () => { loads += 1; return [] },
+      save: () => {}
+    })
+    store.listProject('/proj')
+    store.listProject('/proj')
+    store.list('a1')
+    expect(loads).toBe(1)
+  })
+
+  it('serves a write back without going to the file again', () => {
+    let loads = 0
+    let saved: unknown[] = []
+    const store = new SessionStore({
+      load: () => { loads += 1; return saved as never[] },
+      save: (items) => { saved = items }
+    })
+    const created = store.create('a1', '/proj')
+    expect(store.get(created.id)?.id).toBe(created.id)
+    expect(loads).toBe(1)
+  })
+})
+
 describe('SessionStore', () => {
   let dir: string
   let file: string

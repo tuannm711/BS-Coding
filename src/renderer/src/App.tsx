@@ -441,7 +441,12 @@ export default function App() {
             artifacts={artifacts[runtime?.workspace.projectPath ?? ''] ?? []}
             agents={nativeAgents}
             onSelectAgent={setSelectedNativeAgentId}
-            onSetCoordinator={agentId => { void window.api.setAgentMode(agentId, 'coordinate') }}
+            onSetCoordinator={agentId => {
+              // A toggle, not a one-way door: pressing it on the agent that
+              // already holds the role hands it back to build.
+              const holder = nativeAgents.find(agent => agent.id === agentId)
+              void window.api.setAgentMode(agentId, holder?.mode === 'coordinate' ? 'build' : 'coordinate')
+            }}
             onSetWorker={(agentId, worker) => { void window.api.setAgentWorker(agentId, worker) }}
             onTabChange={setRightTab}
             onClearArtifacts={() => {
