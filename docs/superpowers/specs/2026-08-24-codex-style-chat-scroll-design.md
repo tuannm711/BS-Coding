@@ -16,6 +16,15 @@ Make the native chat feed behave like Codex: a newly submitted user turn moves t
 - Preserve useful space below the anchored turn so the response can grow into view.
 - Follow streaming assistant, reasoning, tool, subagent, prompt, and status content only while automatic following is active.
 - Stop all forced scrolling when the user deliberately scrolls away from the follow zone.
+
+> **The wheel rule drifted from this line and was corrected 2026-08-27.**
+> `7b7d791` replaced an 80px follow-zone check with a 1px exact-bottom one, so
+> downward movement counted as scrolling *away* unless the feed sat on the
+> bottom — which the tail spacer prevents for the whole of a streaming turn.
+> One wheel tick down therefore froze the transcript until Scroll to end, and
+> the test stated that as the intent. Downward movement no longer takes
+> ownership at all; scrolling away means scrolling up. See
+> `docs/superpowers/specs/2026-08-27-chat-scroll-wheel-design.md`.
 - Resume following when the user returns to the bottom follow zone or activates `Scroll to end`.
 - Open or switch sessions at the true end of their stored transcript without animation.
 - Keep scrolling instant for high-frequency streaming updates and reserve smooth scrolling for the single new-turn transition.
