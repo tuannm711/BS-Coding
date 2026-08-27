@@ -65,10 +65,13 @@ Alias `@shared` → `src/shared` (đã cấu hình trong electron.vite.config.ts
 
 ## Docs
 
-- `docs/design/` — **tài liệu thiết kế: hệ thống hiện là gì.** Bắt đầu từ `docs/design/README.md`;
-  mỗi tài liệu miền mở đầu bằng TOC có khoảng dòng và danh sách tên, và overview có chỉ mục tên
-  xuyên file để nhảy thẳng tới nơi giải thích.
-- `docs/technical-debt.md` — việc đã hoãn, kèm lý do hoãn và điều kiện để đóng.
-- `docs/superpowers/specs` — design specs; `docs/superpowers/plans` — kế hoạch triển khai.
-- `docs/changelog-format.md` — format viết changelog giữa các version (tái sử dụng mỗi release).
-- Workflow: brainstorm → spec → plan → thực thi (chi tiết trong docs hiện có).
+- `docs/v2/` — **căn cứ cho V2.** Bắt đầu từ `docs/v2/START_HERE.md`, rồi
+  `docs/v2/architecture/README.md`, rồi `docs/v2/implementation-plans/00-MASTER-PLAN.md`.
+  Đặt nguyên khối, không sửa nội dung: liên kết nội bộ, `depends_on` và `MANIFEST.txt`
+  đều là đường dẫn tương đối trong đó.
+- `docs/v1/` — **hồ sơ lịch sử của V1.** Thiết kế, spec, plan, nợ kỹ thuật và changelog của
+  V1.3.2 trở về trước. Tham chiếu, không phải việc phải làm: V2 không kế thừa nợ của V1.
+- `docs/release-notes/` — ở nguyên ngoài `v1/`: job publish đọc `docs/release-notes/<tag>.md`
+  theo đúng tên tag.
+- Code V1 ở nguyên `src/`. Theo `docs/v2/implementation-plans/plans/01-...`, V2 dựng **bên cạnh**
+  tại `src/main/v2`, `src/shared/v2`, `src/renderer/src/v2`, và cutover nằm ở plan 18 và 20.
