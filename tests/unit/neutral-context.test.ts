@@ -57,34 +57,38 @@ describe('compileNeutralContext', () => {
     expect(serialized).not.toContain('call-openai-1')
     expect(serialized).not.toContain('unfinished-call')
     expect(serialized).not.toContain('providerOptions')
-    expect(serialized).not.toContain('tool-call')
-    expect(serialized).toContain('read · completed')
+    // Reversed deliberately. This asserted `not.toContain('tool-call')`, and
+    // that assertion was the design decision rather than a consequence of one:
+    // a history with no tool calls in it is a history demonstrating that using
+    // a tool looks like writing about one, which is exactly what models copied.
+    expect(serialized).toContain('tool-call')
     expect(serialized).toContain('abcd')
     expect(serialized).toContain('[Incomplete response from Reviewer]')
-    expect(messages.map(message => message.role)).toEqual(['user', 'assistant', 'user', 'assistant'])
   })
 
-  it('keeps tool records out of the assistant role', () => {
+  it('answers every replayed call with its own result', () => {
+    // Replaces "never emits two adjacent messages of the same role". That rule
+    // existed because the records were forced into the user role beside real
+    // user turns; native results carry their own `tool` role, so the property
+    // worth pinning is now that no call is left unanswered.
     const messages = compileNeutralContext(items, { toolOutputMaxChars: 4 })
-    const assistant = messages.filter(message => message.role === 'assistant')
-    for (const message of assistant) {
-      expect(String(message.content)).not.toContain('read')
-    }
-    expect(JSON.stringify(messages)).toContain('read')
+    const parts = (type: string) => messages.flatMap(message => Array.isArray(message.content)
+      ? (message.content as Array<{ type: string; toolCallId?: string }>)
+          .filter(part => part.type === type)
+          .map(part => part.toolCallId)
+      : [])
+    const calls = parts('tool-call')
+    expect(calls.length).toBeGreaterThan(0)
+    expect(parts('tool-result')).toEqual(calls)
   })
 
-  it('never emits two adjacent messages of the same role', () => {
-    const messages = compileNeutralContext(items, { toolOutputMaxChars: 4 })
-    for (let i = 1; i < messages.length; i++) {
-      expect(messages[i].role).not.toBe(messages[i - 1].role)
-    }
-  })
-
-  it('frames the record as a log rather than as speech', () => {
+  it('emits no session log header', () => {
+    // There is no longer a format to explain, so nothing explains one.
     const serialized = JSON.stringify(compileNeutralContext(items, { toolOutputMaxChars: 4 }))
-    expect(serialized).toContain('Session log')
-    expect(serialized).toContain('tool interface')
+    expect(serialized).not.toContain('Session log')
+    expect(serialized).not.toContain('read · completed')
   })
+
 })
 
 describe('looksLikeNarratedToolCall', () => {
@@ -105,18 +109,23 @@ describe('looksLikeNarratedToolCall', () => {
 })
 
 describe('a turn whose reply was only tool calls', () => {
-  it('still alternates roles and keeps the record out of the assistant role', () => {
+  it('anchors a call for a tool that has no assistant message ahead of it', () => {
     const toolOnly: ChatTranscriptItem[] = [
       { kind: 'message', message: { id: 'u1', role: 'user', text: 'look', turnId: 't1', createdAt: 1 } },
       { kind: 'tool', tool: { id: 'c1', tool: 'read', input: { file_path: 'a.ts' }, output: 'x', permission: 'allowed', turnId: 't1', execution: execution('completed') } },
       { kind: 'message', message: { id: 'u2', role: 'user', text: 'again', turnId: 't2', createdAt: 2 } },
       { kind: 'tool', tool: { id: 'c2', tool: 'read', input: { file_path: 'b.ts' }, output: 'y', permission: 'allowed', turnId: 't2', execution: execution('completed') } }
     ]
+    // A tool with no assistant message ahead of it used to be folded into a
+    // user-role record. Natively it needs a call to answer, so the sanitiser
+    // anchors one — otherwise the result refers to a call never made.
     const messages = compileNeutralContext(toolOnly, { toolOutputMaxChars: 20 })
-    for (let i = 1; i < messages.length; i++) {
-      expect(messages[i].role).not.toBe(messages[i - 1].role)
-    }
-    expect(messages.every(message => message.role === 'user')).toBe(true)
-    expect(String(messages[0].content)).toContain('b.ts')
+    const parts = (type: string) => messages.flatMap(message => Array.isArray(message.content)
+      ? (message.content as Array<{ type: string; toolCallId?: string }>)
+          .filter(part => part.type === type)
+          .map(part => part.toolCallId)
+      : [])
+    expect(parts('tool-call')).toHaveLength(2)
+    expect(parts('tool-result')).toEqual(parts('tool-call'))
   })
 })
