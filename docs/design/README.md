@@ -15,11 +15,11 @@ should be checked against.
 | --- | --- | --- |
 | [How the domains relate](#how-the-domains-relate) | 25-41 | `LlmClient` |
 | [The documents](#the-documents) | 42-59 |  |
-| [Finding a name](#finding-a-name) | 60-260 | `--output`, `.cmd`, `.exe`, `.github/workflows/build.yml`, `.ico`, `'near-limit'` |
-| [What is here and what is history](#what-is-here-and-what-is-history) | 261-270 | `docs/design/`, `docs/superpowers/`, `docs/evidence/` |
-| [Current work](#current-work) | 271-282 | `tests/`, `statusReason`, `docs/superpowers/specs/2026-08-25-narrated-tool-calls-design.md` |
-| [Next work](#next-work) | 283-297 | `docs/technical-debt.md` |
-| [Debt](#debt) | 298-304 | `docs/technical-debt.md` |
+| [Finding a name](#finding-a-name) | 60-257 | `--output`, `.cmd`, `.exe`, `.github/workflows/build.yml`, `.ico`, `'near-limit'` |
+| [What is here and what is history](#what-is-here-and-what-is-history) | 258-267 | `docs/design/`, `docs/superpowers/`, `docs/evidence/` |
+| [Current work](#current-work) | 268-279 | `tests/`, `statusReason`, `docs/superpowers/specs/2026-08-25-narrated-tool-calls-design.md` |
+| [Next work](#next-work) | 280-294 | `docs/technical-debt.md` |
+| [Debt](#debt) | 295-301 | `docs/technical-debt.md` |
 <!-- /toc -->
 
 ## How the domains relate
@@ -72,7 +72,7 @@ Generated from every domain document: which one introduces a name, and where.
 | `'near-limit'` | [03-providers.md#design-decisions](03-providers.md#design-decisions) | 82 |
 | `/bin/bash` | [04-terminal-panes.md#known-limits](04-terminal-panes.md#known-limits) | 91 |
 | `$SHELL` | [04-terminal-panes.md#known-limits](04-terminal-panes.md#known-limits) | 91 |
-| `0N-*.md` | [00-goals.md#what-this-document-is-not](00-goals.md#what-this-document-is-not) | 177 |
+| `0N-*.md` | [00-goals.md#what-this-document-is-not](00-goals.md#what-this-document-is-not) | 179 |
 | `activeSessionId` | [06-ui-shell.md#sessions-live-in-the-sidebar](06-ui-shell.md#sessions-live-in-the-sidebar) | 228 |
 | `adapter.fetchUsage` | [03-providers.md#data-flow](03-providers.md#data-flow) | 38 |
 | `adapter.refreshCredentials` | [03-providers.md#data-flow](03-providers.md#data-flow) | 38 |
@@ -87,8 +87,8 @@ Generated from every domain document: which one introduces a name, and where.
 | `appendTool` | [02-agent-runtime.md#types-that-carry-it](02-agent-runtime.md#types-that-carry-it) | 70 |
 | `appId` | [07-build-release.md#types-that-carry-it](07-build-release.md#types-that-carry-it) | 46 |
 | `ArtifactStore` | [05-sessions.md#known-limits](05-sessions.md#known-limits) | 100 |
-| `bankedLimit` | [00-goals.md#group-b-the-quota-surface](00-goals.md#group-b-the-quota-surface) | 137 |
-| `bankedUsed` | [00-goals.md#group-b-the-quota-surface](00-goals.md#group-b-the-quota-surface) | 137 |
+| `bankedLimit` | [00-goals.md#group-b-the-quota-surface-landed-v119](00-goals.md#group-b-the-quota-surface-landed-v119) | 137 |
+| `bankedUsed` | [00-goals.md#group-b-the-quota-surface-landed-v119](00-goals.md#group-b-the-quota-surface-landed-v119) | 137 |
 | `BsAgentManager` | [02-agent-runtime.md#pieces](02-agent-runtime.md#pieces) | 21 |
 | `buffersRef` | [06-ui-shell.md#data-flow](06-ui-shell.md#data-flow) | 36 |
 | `build/icons/32x32.png` | [07-build-release.md#design-decisions](07-build-release.md#design-decisions) | 58 |
@@ -112,8 +112,8 @@ Generated from every domain document: which one introduces a name, and where.
 | `coordinatorNote` | [02-agent-runtime.md#what-a-coordinator-is-told-and-what-it-can-reach](02-agent-runtime.md#what-a-coordinator-is-told-and-what-it-can-reach) | 175 |
 | `createLlm` | [02-agent-runtime.md#design-decisions](02-agent-runtime.md#design-decisions) | 85 |
 | `createRuntime` | [03-providers.md#types-that-carry-it](03-providers.md#types-that-carry-it) | 61 |
-| `credits.balance` | [00-goals.md#group-c-quota-models](00-goals.md#group-c-quota-models) | 168 |
-| `credits.has_credits` | [00-goals.md#group-c-quota-models](00-goals.md#group-c-quota-models) | 168 |
+| `credits.balance` | [00-goals.md#group-c-quota-models](00-goals.md#group-c-quota-models) | 170 |
+| `credits.has_credits` | [00-goals.md#group-c-quota-models](00-goals.md#group-c-quota-models) | 170 |
 | `currentTarget` | [03-providers.md#choosing-a-replacement-when-a-pool-is-refused](03-providers.md#choosing-a-replacement-when-a-pool-is-refused) | 127 |
 | `decidePermission` | [02-agent-runtime.md#two-ways-to-hand-work-off](02-agent-runtime.md#two-ways-to-hand-work-off) | 119 |
 | `docs/technical-debt.md` | [00-goals.md#the-four-goals](00-goals.md#the-four-goals) | 29 |
@@ -157,9 +157,8 @@ Generated from every domain document: which one introduces a name, and where.
 | `ProviderManager.refreshUsage` | [03-providers.md#data-flow](03-providers.md#data-flow) | 38 |
 | `ProviderQuotaGroup` | [06-ui-shell.md#the-fleet-panel](06-ui-shell.md#the-fleet-panel) | 153 |
 | `ProviderQuotaWindow` | [00-goals.md#the-three-quota-models](00-goals.md#the-three-quota-models) | 117 |
-| `ProvidersTab.tsx` | [00-goals.md#group-b-the-quota-surface](00-goals.md#group-b-the-quota-surface) | 137 |
+| `ProviderUsage.resetCredits` | [00-goals.md#group-b-the-quota-surface-landed-v119](00-goals.md#group-b-the-quota-surface-landed-v119) | 137 |
 | `ProviderUsage.status` | [03-providers.md#design-decisions](03-providers.md#design-decisions) | 82 |
-| `ProviderUsage` | [00-goals.md#group-b-the-quota-surface](00-goals.md#group-b-the-quota-surface) | 137 |
 | `ProviderUsageLedger` | [00-goals.md#the-three-quota-models](00-goals.md#the-three-quota-models) | 117 |
 | `PtyDataEvent` | [01-process-model.md#types-that-carry-it](01-process-model.md#types-that-carry-it) | 54 |
 | `PtyManager` | [04-terminal-panes.md#pieces](04-terminal-panes.md#pieces) | 18 |
@@ -170,7 +169,6 @@ Generated from every domain document: which one introduces a name, and where.
 | `recoverRuntimeContext` | [03-providers.md#types-that-carry-it](03-providers.md#types-that-carry-it) | 61 |
 | `refreshAccount` | [03-providers.md#types-that-carry-it](03-providers.md#types-that-carry-it) | 61 |
 | `refreshCredentials` | [03-providers.md#types-that-carry-it](03-providers.md#types-that-carry-it) | 61 |
-| `refreshProviderAccount` | [00-goals.md#group-b-the-quota-surface](00-goals.md#group-b-the-quota-surface) | 137 |
 | `registerIpcHandlers` | [01-process-model.md#data-flow](01-process-model.md#data-flow) | 33 |
 | `registerTerminal` | [06-ui-shell.md#data-flow](06-ui-shell.md#data-flow) | 36 |
 | `release/` | [07-build-release.md#data-flow](07-build-release.md#data-flow) | 29 |
@@ -195,7 +193,7 @@ Generated from every domain document: which one introduces a name, and where.
 | `SnapshotStore.snapshot` | [05-sessions.md#data-flow](05-sessions.md#data-flow) | 29 |
 | `SnapshotTurn` | [05-sessions.md#types-that-carry-it](05-sessions.md#types-that-carry-it) | 50 |
 | `SpawnCommand` | [04-terminal-panes.md#types-that-carry-it](04-terminal-panes.md#types-that-carry-it) | 47 |
-| `spend_control.individual_limit` | [00-goals.md#group-c-quota-models](00-goals.md#group-c-quota-models) | 168 |
+| `spend_control.individual_limit` | [00-goals.md#group-c-quota-models](00-goals.md#group-c-quota-models) | 170 |
 | `src/main/agent/AGENTS.md` | [02-agent-runtime.md#design-decisions](02-agent-runtime.md#design-decisions) | 85 |
 | `src/main/agent/llm.ts` | [02-agent-runtime.md#pieces](02-agent-runtime.md#pieces) | 21 |
 | `src/main/agent/loop.ts` | [02-agent-runtime.md#pieces](02-agent-runtime.md#pieces) | 21 |
@@ -203,7 +201,6 @@ Generated from every domain document: which one introduces a name, and where.
 | `src/main/agent/shared-session-coordinator.ts` | [05-sessions.md#pieces](05-sessions.md#pieces) | 17 |
 | `src/main/agent/snapshot.ts` | [05-sessions.md#pieces](05-sessions.md#pieces) | 17 |
 | `src/main/bs-agent-manager.ts` | [02-agent-runtime.md#pieces](02-agent-runtime.md#pieces) | 21 |
-| `src/main/connections/usage.ts` | [00-goals.md#group-b-the-quota-surface](00-goals.md#group-b-the-quota-surface) | 137 |
 | `src/main/index.ts` | [01-process-model.md#pieces](01-process-model.md#pieces) | 18 |
 | `src/main/providers/adapters/antigravity.ts` | [03-providers.md#pieces](03-providers.md#pieces) | 19 |
 | `src/main/providers/adapters/github-copilot.ts` | [03-providers.md#pieces](03-providers.md#pieces) | 19 |

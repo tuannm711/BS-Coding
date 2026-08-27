@@ -7,7 +7,7 @@ purpose — none of it is a forgotten TODO.
 Add an entry when you decide *not* to do something you found. Remove it when the
 work lands, naming the commit.
 
-Last reviewed: 2026-08-26 (after the coordinator surface)
+Last reviewed: 2026-08-27 (at the v1.3.0 release)
 
 ## Index
 
@@ -26,6 +26,9 @@ Last reviewed: 2026-08-26 (after the coordinator surface)
 | 11 | [A coordinator can spend every worker's quota](#11-a-coordinator-can-spend-every-workers-quota) | Agent | Low |
 | 12 | [Agent bindings live in app settings](#12-agent-bindings-live-in-app-settings) | UI | Medium |
 | 13 | [Fleet shows no session tokens or cost](#13-fleet-shows-no-session-tokens-or-cost) | UI | Low |
+| 14 | [subagentModels overlaps agents and modes](#14-subagentmodels-overlaps-agents-and-modes) | Product | Medium |
+| 15 | [Sessions cannot be reordered by hand](#15-sessions-cannot-be-reordered-by-hand) | UI | Low |
+| 16 | [This release's UI was not confirmed in the app](#16-this-releases-ui-was-not-confirmed-in-the-app) | Process | Medium |
 
 ---
 
@@ -341,3 +344,56 @@ absent than as a heading with nothing under it.
 **To close:** carry telemetry into `buildFleet` the way `buildQuotaRows` carries
 it, or decide the panel is about quota rather than spend and say so in the
 design doc instead.
+
+---
+
+## 14. subagentModels overlaps agents and modes
+
+**Found:** 2026-08-26, raised repeatedly and never settled.
+
+`subagentModels` configures which model an anonymous `task` subagent runs. Since
+`delegate`, `mode` and now `worker` arrived, it is a fourth thing answering a
+question the other three already share: which of the user's agents does a piece
+of work, and on what.
+
+**Why it matters.** Medium. It still works, but it is configuration nobody
+reaches for, describing a mechanism the coordination design routes around —
+`task` is denied to a coordinator, and denied to a worker while it carries an
+assignment.
+
+**Undecided, and the owner's to decide.** Either fold it into the agent model,
+or state what it is for that agents-and-modes does not cover. **To close:**
+decide that, then act on it.
+
+## 15. Sessions cannot be reordered by hand
+
+**Found:** 2026-08-27, raised by the owner while moving sessions into the
+sidebar and not decided.
+
+The list orders by creation, newest first, and holds still — which fixed the
+worse problem of the list rearranging itself as it was used. The owner asked
+whether entries could be dragged into an order of their own.
+
+**Why it matters.** Low. Nothing is unreachable; a long-lived project simply
+accumulates sessions in an order it did not choose.
+
+**To close:** decide whether hand-ordering is wanted, and if so where the order
+is stored — the session, or a per-project list.
+
+## 16. This release's UI was not confirmed in the app
+
+**Found:** 2026-08-27, at the release itself.
+
+Four things shipped without the owner reporting back on them: whether each
+coordination tile scrolls inside its own box rather than stretching its grid
+row; whether fleet agents now appear under their pool rather than in the
+"No quota reported" section; whether switching session is quick after the
+session store gained a cache; and whether switching project paints immediately.
+
+Each is covered by tests, and tests are what caught the pool grouping being
+dead in the app while the suite was green — on a fixture that spelled out
+`modelIds` the provider never sends. So a green suite is not the confirmation
+this needs.
+
+**Why it matters.** Medium, and only until someone looks. **To close:** exercise
+the four in the app and either close this or open what it turns up.
