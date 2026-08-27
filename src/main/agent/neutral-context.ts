@@ -15,6 +15,25 @@ const RECORD_HEADER = [
   'To use a tool, call it through the tool interface.]'
 ].join(' ')
 
+// Neutral means neutral *ids*, not neutral *shape*. The previous version read
+// that requirement as licence to flatten every call into prose, which is what
+// taught models that using a tool looks like writing about one.
+export function neutraliseItems(items: ChatTranscriptItem[]): ChatTranscriptItem[] {
+  const out: ChatTranscriptItem[] = []
+  let n = 0
+  for (const item of items) {
+    if (item.kind === 'message') { out.push(item); continue }
+    // A call with no outcome leaves an assistant message holding a call that
+    // nothing answers, which providers reject.
+    if (item.tool.permission === 'pending') continue
+    if (item.tool.output === undefined && item.tool.error === undefined) continue
+    n += 1
+    const { thoughtSignature: _signature, ...tool } = item.tool
+    out.push({ kind: 'tool', tool: { ...tool, id: `n${n}` } })
+  }
+  return out
+}
+
 export function compileNeutralContext(
   items: ChatTranscriptItem[],
   options: NeutralContextOptions

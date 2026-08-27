@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { compileNeutralContext } from '../../src/main/agent/neutral-context'
+import { compileNeutralContext, neutraliseItems } from '../../src/main/agent/neutral-context'
 import { looksLikeNarratedToolCall } from '../../src/shared/narrated-tool-call'
 import type { ChatTranscriptItem, TurnExecutionSnapshot } from '../../src/shared/types'
 
@@ -21,6 +21,32 @@ const items: ChatTranscriptItem[] = [
     id: 'unfinished-call', tool: 'write', input: { file_path: 'b.ts' }, permission: 'pending', turnId: 'turn-2'
   } }
 ]
+
+describe('neutraliseItems', () => {
+  it('gives every replayed call a fresh id', () => {
+    // No provider may see another provider's identifiers.
+    const out = neutraliseItems(items)
+    const ids = out.flatMap(item => item.kind === 'tool' ? [item.tool.id] : [])
+    expect(ids).not.toContain('call-openai-1')
+    expect(new Set(ids).size).toBe(ids.length)
+  })
+
+  it('drops a call that never finished', () => {
+    // An assistant message holding a call with no result is rejected outright.
+    expect(JSON.stringify(neutraliseItems(items))).not.toContain('unfinished-call')
+  })
+
+  it('strips provider metadata from a call it keeps', () => {
+    expect(JSON.stringify(neutraliseItems(items))).not.toContain('thoughtSignature')
+  })
+
+  it('keeps the tool, its input and its output', () => {
+    const out = neutraliseItems(items)
+    const tool = out.find(item => item.kind === 'tool')
+    expect(tool && tool.kind === 'tool' && tool.tool.tool).toBe('read')
+    expect(JSON.stringify(out)).toContain('abcdef')
+  })
+})
 
 describe('compileNeutralContext', () => {
   it('preserves semantic history without replaying provider tool metadata', () => {
