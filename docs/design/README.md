@@ -15,11 +15,11 @@ should be checked against.
 | --- | --- | --- |
 | [How the domains relate](#how-the-domains-relate) | 25-41 | `LlmClient` |
 | [The documents](#the-documents) | 42-59 |  |
-| [Finding a name](#finding-a-name) | 60-263 | `--output`, `.cmd`, `.exe`, `.github/workflows/build.yml`, `.ico`, `'near-limit'` |
-| [What is here and what is history](#what-is-here-and-what-is-history) | 264-273 | `docs/design/`, `docs/superpowers/`, `docs/evidence/` |
-| [Current work](#current-work) | 274-285 | `tests/`, `statusReason`, `docs/superpowers/specs/2026-08-25-narrated-tool-calls-design.md` |
-| [Next work](#next-work) | 286-300 | `docs/technical-debt.md` |
-| [Debt](#debt) | 301-307 | `docs/technical-debt.md` |
+| [Finding a name](#finding-a-name) | 60-264 | `--output`, `.cmd`, `.exe`, `.github/workflows/build.yml`, `.ico`, `'near-limit'` |
+| [What is here and what is history](#what-is-here-and-what-is-history) | 265-274 | `docs/design/`, `docs/superpowers/`, `docs/evidence/` |
+| [Current work](#current-work) | 275-286 | `tests/`, `statusReason`, `docs/superpowers/specs/2026-08-25-narrated-tool-calls-design.md` |
+| [Next work](#next-work) | 287-301 | `docs/technical-debt.md` |
+| [Debt](#debt) | 302-308 | `docs/technical-debt.md` |
 <!-- /toc -->
 
 ## How the domains relate
@@ -73,6 +73,7 @@ Generated from every domain document: which one introduces a name, and where.
 | `/bin/bash` | [04-terminal-panes.md#known-limits](04-terminal-panes.md#known-limits) | 91 |
 | `$SHELL` | [04-terminal-panes.md#known-limits](04-terminal-panes.md#known-limits) | 91 |
 | `0N-*.md` | [00-goals.md#what-this-document-is-not](00-goals.md#what-this-document-is-not) | 179 |
+| `action-gh-release` | [07-build-release.md#design-decisions](07-build-release.md#design-decisions) | 58 |
 | `activeSessionId` | [06-ui-shell.md#sessions-live-in-the-sidebar](06-ui-shell.md#sessions-live-in-the-sidebar) | 228 |
 | `adapter.fetchUsage` | [03-providers.md#data-flow](03-providers.md#data-flow) | 38 |
 | `adapter.refreshCredentials` | [03-providers.md#data-flow](03-providers.md#data-flow) | 38 |
@@ -86,12 +87,12 @@ Generated from every domain document: which one introduces a name, and where.
 | `appendMessage` | [02-agent-runtime.md#types-that-carry-it](02-agent-runtime.md#types-that-carry-it) | 71 |
 | `appendTool` | [02-agent-runtime.md#types-that-carry-it](02-agent-runtime.md#types-that-carry-it) | 71 |
 | `appId` | [07-build-release.md#types-that-carry-it](07-build-release.md#types-that-carry-it) | 46 |
+| `artifacts/` | [07-build-release.md#design-decisions](07-build-release.md#design-decisions) | 58 |
 | `ArtifactStore` | [05-sessions.md#known-limits](05-sessions.md#known-limits) | 100 |
 | `bankedLimit` | [00-goals.md#group-b-the-quota-surface-landed-v119](00-goals.md#group-b-the-quota-surface-landed-v119) | 137 |
 | `bankedUsed` | [00-goals.md#group-b-the-quota-surface-landed-v119](00-goals.md#group-b-the-quota-surface-landed-v119) | 137 |
 | `BsAgentManager` | [02-agent-runtime.md#pieces](02-agent-runtime.md#pieces) | 22 |
 | `buffersRef` | [06-ui-shell.md#data-flow](06-ui-shell.md#data-flow) | 36 |
-| `build/icons/32x32.png` | [07-build-release.md#design-decisions](07-build-release.md#design-decisions) | 58 |
 | `buildFleet` | [06-ui-shell.md#the-fleet-panel](06-ui-shell.md#the-fleet-panel) | 153 |
 | `buildSpawnCommand` | [04-terminal-panes.md#design-decisions](04-terminal-panes.md#design-decisions) | 59 |
 | `Channels.EventPtyData` | [04-terminal-panes.md#data-flow](04-terminal-panes.md#data-flow) | 29 |
@@ -120,18 +121,19 @@ Generated from every domain document: which one introduces a name, and where.
 | `docs/technical-debt.md` | [00-goals.md#the-four-goals](00-goals.md#the-four-goals) | 29 |
 | `electron-builder.ts` | [07-build-release.md#pieces](07-build-release.md#pieces) | 17 |
 | `electron-builder` | [07-build-release.md#data-flow](07-build-release.md#data-flow) | 29 |
+| `electron-updater` | [07-build-release.md#design-decisions](07-build-release.md#design-decisions) | 58 |
 | `electron.vite.config.ts` | [07-build-release.md#pieces](07-build-release.md#pieces) | 17 |
 | `Event*` | [01-process-model.md#data-flow](01-process-model.md#data-flow) | 33 |
-| `extraResources` | [07-build-release.md#design-decisions](07-build-release.md#design-decisions) | 58 |
 | `fetchUsage` | [03-providers.md#known-limits](03-providers.md#known-limits) | 150 |
 | `getItems` | [02-agent-runtime.md#types-that-carry-it](02-agent-runtime.md#types-that-carry-it) | 71 |
 | `getWindowChromeOptions` | [06-ui-shell.md#design-decisions](06-ui-shell.md#design-decisions) | 65 |
-| `GITHUB_ACTIONS` | [07-build-release.md#design-decisions](07-build-release.md#design-decisions) | 58 |
 | `groupSessions` | [06-ui-shell.md#sessions-live-in-the-sidebar](06-ui-shell.md#sessions-live-in-the-sidebar) | 228 |
 | `hasRemainingQuota` | [03-providers.md#design-decisions](03-providers.md#design-decisions) | 82 |
 | `icon.ico` | [07-build-release.md#pieces](07-build-release.md#pieces) | 17 |
 | `ipcRenderer.on` | [01-process-model.md#data-flow](01-process-model.md#data-flow) | 33 |
 | `JsonStore` | [05-sessions.md#design-decisions](05-sessions.md#design-decisions) | 66 |
+| `latest.yml` | [07-build-release.md#design-decisions](07-build-release.md#design-decisions) | 58 |
+| `latest*.yml` | [07-build-release.md#design-decisions](07-build-release.md#design-decisions) | 58 |
 | `listModels` | [03-providers.md#types-that-carry-it](03-providers.md#types-that-carry-it) | 61 |
 | `listSessionTranscript` | [06-ui-shell.md#the-coordination-view](06-ui-shell.md#the-coordination-view) | 100 |
 | `LlmClient` | [02-agent-runtime.md#pieces](02-agent-runtime.md#pieces) | 22 |
@@ -190,7 +192,6 @@ Generated from every domain document: which one introduces a name, and where.
 | `SessionStore` | [05-sessions.md#pieces](05-sessions.md#pieces) | 17 |
 | `setMode` | [06-ui-shell.md#the-coordination-view](06-ui-shell.md#the-coordination-view) | 100 |
 | `SharedSessionCoordinator` | [05-sessions.md#pieces](05-sessions.md#pieces) | 17 |
-| `sign-windows.ps1` | [07-build-release.md#design-decisions](07-build-release.md#design-decisions) | 58 |
 | `SnapshotFile[]` | [05-sessions.md#types-that-carry-it](05-sessions.md#types-that-carry-it) | 50 |
 | `SnapshotStore.snapshot` | [05-sessions.md#data-flow](05-sessions.md#data-flow) | 29 |
 | `SnapshotTurn` | [05-sessions.md#types-that-carry-it](05-sessions.md#types-that-carry-it) | 50 |
