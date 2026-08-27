@@ -10,8 +10,8 @@ v1.1.4.
 | [Pieces](#pieces) | 17-28 | `electron.vite.config.ts`, `out/`, `electron-builder.ts`, `.github/workflows/build.yml`, `scripts/build-windows-icon.mjs`, `icon.ico` |
 | [Data flow](#data-flow) | 29-45 | `.ico`, `resources/tray-icon.png`, `out/`, `electron-builder`, `release/`, `.github/workflows/build.yml` |
 | [Types that carry it](#types-that-carry-it) | 46-57 | `Configuration`, `electron-builder.ts`, `appId`, `com.bs.coding`, `productName`, `release/` |
-| [Design decisions](#design-decisions) | 58-91 | `scripts/build-windows-icon.mjs`, `sign-windows.ps1`, `GITHUB_ACTIONS`, `resources/tray-icon.png`, `build/icons/32x32.png`, `extraResources` |
-| [Known limits](#known-limits) | 92-102 |  |
+| [Design decisions](#design-decisions) | 58-109 | `action-gh-release`, `latest.yml`, `artifacts/`, `latest*.yml`, `electron-updater`, `scripts/build-windows-icon.mjs` |
+| [Known limits](#known-limits) | 110-120 |  |
 <!-- /toc -->
 
 ## Pieces
@@ -61,6 +61,24 @@ renderer.
 jobs declare `needs: test`, and `publish` declares `needs: build` plus a tag
 check. A failing test cannot produce an installer, and a failing build on any one
 platform stops the release rather than shipping a partial set.
+
+**A release is verified after publishing, not assumed.** `action-gh-release`
+creates the release as a draft, uploads the assets, and flips it to published
+last — so a failed upload leaves a draft holding most of them. A draft's assets
+are not publicly downloadable, which from outside is indistinguishable from a
+finished release: `gh release view` lists `latest.yml` while every updater gets
+404 on it. That is what v1.3.1 did, over one 151KB blockmap.
+
+The `Verify the release published` step therefore checks three things: the
+release is not a draft, every file in `artifacts/` has a matching asset, and each
+`latest*.yml` is reachable over the **public download URL** rather than the API.
+The last distinction is the one that mattered — the API reported the file present
+while the URL 404ed, and the URL is what `electron-updater` fetches. It retries,
+because an asset takes a moment to be served after publishing.
+
+**Never create the release by hand.** `gh release create` before CI finishes
+publishes an empty release, and a user checking for updates in that window gets
+the same 404 from a different cause. Push the tag and let the workflow do it.
 
 **Signing skips instead of failing when it is not configured.**
 `scripts/build-windows-icon.mjs` aside, `sign-windows.ps1` exits 0 with a message
