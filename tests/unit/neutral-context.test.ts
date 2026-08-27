@@ -101,6 +101,22 @@ describe('looksLikeNarratedToolCall', () => {
     expect(looksLikeNarratedToolCall('[Session log — tools already run]\n- bash · completed\n  input: {}')).toBe(true)
   })
 
+  it('recognises the record body without its header', () => {
+    // What actually happened in the owner's session: the model copied the body
+    // and dropped the header — the natural half to leave behind, since the
+    // header says in words that it is not a format to reproduce.
+    const narrated = [
+      '- read · completed',
+      '  input: {"file_path":"a.ts"}',
+      '  output: ok'
+    ].join('\n')
+    expect(looksLikeNarratedToolCall(narrated)).toBe(true)
+  })
+
+  it('does not fire on a list item that merely names a tool', () => {
+    expect(looksLikeNarratedToolCall(['- read the file first', '- then edit it'].join('\n'))).toBe(false)
+  })
+
   it('does not fire on ordinary prose that mentions tools', () => {
     expect(looksLikeNarratedToolCall('I will use the bash tool to list files.')).toBe(false)
     expect(looksLikeNarratedToolCall('The [Tool] section of the docs explains Input: and Output:.')).toBe(false)
