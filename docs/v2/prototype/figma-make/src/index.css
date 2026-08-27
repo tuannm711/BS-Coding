@@ -1,0 +1,68 @@
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap');
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: 'Instrument Sans', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Courier New', monospace;
+
+  --color-base: #0e0e11;
+  --color-surface: #16161a;
+  --color-elevated: #1e1e23;
+  --color-hover: #252529;
+  --color-line: #2c2c33;
+
+  --color-fore: #e4e4ed;
+  --color-dim: #878794;
+  --color-faint: #52525a;
+
+  --color-accent: #f47328;
+  --color-accent-muted: #1e130a;
+
+  --color-ok: #3ecf8e;
+  --color-ok-muted: #0d2318;
+  --color-err: #f46060;
+  --color-err-muted: #2b1010;
+  --color-warn: #f4c228;
+  --color-warn-muted: #28200a;
+  --color-info: #6098f4;
+  --color-info-muted: #0e1a30;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  background-color: var(--color-base);
+  color: var(--color-fore);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+*:hover {
+  scrollbar-color: #2c2c33 transparent;
+}
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 2px;
+}
+*:hover::-webkit-scrollbar-thumb {
+  background: #2c2c33;
+}
