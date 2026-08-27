@@ -117,3 +117,49 @@ jobs:
           # design-docs.test.ts fails first if the file is missing, so this
           # is the second net rather than the first.
           body_path: docs/release-notes/${{ github.ref_name }}.md
+
+      # v1.3.1 failed uploading one 151KB blockmap. action-gh-release creates
+      # the release as a draft, uploads, and flips it to published last — so a
+      # failure part-way leaves a draft holding most of the assets. A draft's
+      # assets are not publicly downloadable, which is indistinguishable from a
+      # finished release unless something looks: `gh release view` listed
+      # latest.yml while every updater got 404 on it.
+      - name: Verify the release published
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          if [ "$(gh release view "$TAG" --json isDraft --jq '.isDraft')" != "false" ]; then
+            echo "::error::Release $TAG is still a draft. Its assets cannot be downloaded; re-run the publish job."
+            exit 1
+          fi
+
+          gh release view "$TAG" --json assets --jq '.assets[].name' | sort > published.txt
+          find artifacts -type f -printf '%f\n' | sort > expected.txt
+          missing=$(comm -23 expected.txt published.txt)
+          if [ -n "$missing" ]; then
+            echo "::error::Uploaded files are missing from release $TAG:"
+            echo "$missing"
+            exit 1
+          fi
+
+          # The public download URL, not the API. The API reported latest.yml
+          # present on v1.3.1 while this URL returned 404, and this URL is what
+          # electron-updater fetches.
+          while read -r file; do
+            code=""
+            for _ in 1 2 3 4 5; do
+              code=$(curl -sL -o /dev/null -w '%{http_code}' "https://github.com/$REPO/releases/download/$TAG/$file")
+              if [ "$code" = "200" ]; then break; fi
+              sleep 5
+            done
+            if [ "$code" != "200" ]; then
+              echo "::error::$file is not downloadable (HTTP $code). Updaters will fail."
+              exit 1
+            fi
+          done < <(grep -E '^latest.*\.yml$' expected.txt)
+
+          echo "Release $TAG published with $(wc -l < expected.txt) assets."
