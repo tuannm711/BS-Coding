@@ -41,7 +41,7 @@ BS Coding is built on open-source technology and openly credits its design influ
 
 - **opencode** — the native agent's feature set (slash commands, undo/redo, LSP diagnostics,
   compaction, cost tracking, MCP, skills) is modeled on opencode's architecture. See
-  `docs/superpowers/notes/2026-08-05-opencode-feature-diff.md` for the detailed feature comparison.
+  `docs/v1/superpowers/notes/2026-08-05-opencode-feature-diff.md` for the detailed feature comparison.
 - **[obra/superpowers](https://github.com/obra/superpowers)** — the Superpowers workflow skills
   (brainstorming, writing-plans, executing-plans, systematic-debugging, etc.) bundled under
   `resources/skills/`.
@@ -141,7 +141,7 @@ Security: `contextIsolation: true`, `nodeIntegration: false`; the renderer never
 Electron directly.
 
 For the technical reference — how each domain works, the types involved, and the reasoning behind
-the decisions — see [`docs/design/`](docs/design/README.md).
+the decisions — see [`docs/v1/design/`](docs/v1/design/README.md).
 
 ## Requirements
 
