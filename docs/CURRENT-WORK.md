@@ -20,10 +20,9 @@ exists to say out loud.
 - **Branch:** `v2/p01-foundation`
 - **Gate:** `npm run typecheck` passes and the three P01 unit tests are green
 - **Landed so far:** the approved Figma Make prototype is vendored under
-  `docs/v2/prototype/` on that branch. P01 itself has not started.
-- **Also landed, on `docs/project-rules-and-steering`:** every project rule
-  consolidated into `/AGENTS.md`, and this file and `DEBT.md` opened. That branch
-  is finished and awaiting merge; nothing in it blocks P01.
+  `docs/v2/prototype/` on this branch. The project rules consolidation is merged
+  into `master` and this branch carries it, so P01 works against the current
+  rules. P01 itself has not started.
 - **Left to do:** the V2 directory and barrel skeleton; the common primitives
   `EntityId`, `IsoDateTime`, `CommandResult<T>`, `Clock` and `IdGenerator`; the
   `createV2Runtime` bootstrap gate and its seam in `src/main/index.ts`. Record
