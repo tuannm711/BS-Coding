@@ -56,6 +56,23 @@ Scope is limited to shared project sessions. Single-agent chat goes through
 `toLlmMessages` and is unaffected — `executionForAgent` returns nothing outside
 `sendInSession`.
 
+> **Both paragraphs above were wrong, corrected 2026-08-27.**
+>
+> **"The flattening itself is necessary and must stay"** does not follow from
+> the reason given. Stripping a signature and re-issuing an id are things you do
+> *to* a tool call; none of them requires turning it into prose. Neutral means
+> neutral **ids**, not neutral **shape**.
+>
+> **"Single-agent chat is unaffected"** is true of the code and false of the
+> product. `ChatPanel` sends through `sendSessionChat` → `sendInSession`, which
+> is the only path the window has, so every conversation took the shared branch.
+> The scope read as an edge case when it was everything.
+>
+> Together they hid the cause: the model was shown its own tool use as text, so
+> it produced text. `compileNeutralContext` now replays native tool calls, and
+> the records, their header and the note explaining them are gone. See
+> `docs/superpowers/specs/2026-08-27-narrated-tool-calls-recurrence-design.md`.
+
 ## Approach
 
 **Attribution, not wording.** The model imitates because the text sits in the

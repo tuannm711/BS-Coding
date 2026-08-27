@@ -8,14 +8,15 @@ this document assumes an `LlmClient` already exists.
 <!-- toc -->
 | Section | Lines | Names |
 | --- | --- | --- |
-| [Pieces](#pieces) | 21-40 | `src/main/bs-agent-manager.ts`, `BsAgentManager`, `src/main/agent/loop.ts`, `SessionRunner`, `src/main/agent/llm.ts`, `LlmClient` |
-| [Data flow](#data-flow) | 41-69 | `BsAgentManager`, `SessionRunner`, `LoopDeps`, `toLlmMessages(getItems())`, `LlmClient`, `text-delta` |
-| [Types that carry it](#types-that-carry-it) | 70-84 | `LoopDeps`, `src/main/agent/loop.ts`, `getItems`, `appendMessage`, `appendTool`, `tests/unit/agent-loop.test.ts` |
-| [Design decisions](#design-decisions) | 85-118 | `LoopDeps`, `createLlm`, `LlmClient`, `src/main/agent/AGENTS.md`, `takeSteers`, `tools/` |
-| [Two ways to hand work off](#two-ways-to-hand-work-off) | 119-144 | `SessionRunner`, `SUBAGENT_CONFIGS`, `COORDINATE_RULES`, `visibleToolDefs`, `decidePermission`, `runAssignment` |
-| [What a handoff borrows](#what-a-handoff-borrows) | 145-174 | `systemSuffix` |
-| [What a coordinator is told, and what it can reach](#what-a-coordinator-is-told-and-what-it-can-reach) | 175-206 | `coordinatorNote`, `BsAgentManager`, `systemSuffix`, `modeNote`, `decidePermission`, `--output` |
-| [Known limits](#known-limits) | 207-219 | `MAX_COMPACT_PER_RUN`, `compactIfOverThreshold`, `undoTurn`, `pushTurn`, `turnId` |
+| [Pieces](#pieces) | 22-41 | `src/main/bs-agent-manager.ts`, `BsAgentManager`, `src/main/agent/loop.ts`, `SessionRunner`, `src/main/agent/llm.ts`, `LlmClient` |
+| [Data flow](#data-flow) | 42-70 | `BsAgentManager`, `SessionRunner`, `LoopDeps`, `toLlmMessages(getItems())`, `LlmClient`, `text-delta` |
+| [Types that carry it](#types-that-carry-it) | 71-85 | `LoopDeps`, `src/main/agent/loop.ts`, `getItems`, `appendMessage`, `appendTool`, `tests/unit/agent-loop.test.ts` |
+| [Design decisions](#design-decisions) | 86-119 | `LoopDeps`, `createLlm`, `LlmClient`, `src/main/agent/AGENTS.md`, `takeSteers`, `tools/` |
+| [Two ways to hand work off](#two-ways-to-hand-work-off) | 120-145 | `SessionRunner`, `SUBAGENT_CONFIGS`, `COORDINATE_RULES`, `visibleToolDefs`, `decidePermission`, `runAssignment` |
+| [One conversation format](#one-conversation-format) | 146-163 | `tool-call`, `tool-result`, `toLlmMessages`, `compileNeutralContext`, `thoughtSignature`, `sendInSession` |
+| [What a handoff borrows](#what-a-handoff-borrows) | 164-193 | `systemSuffix` |
+| [What a coordinator is told, and what it can reach](#what-a-coordinator-is-told-and-what-it-can-reach) | 194-225 | `coordinatorNote`, `BsAgentManager`, `systemSuffix`, `modeNote`, `decidePermission`, `--output` |
+| [Known limits](#known-limits) | 226-238 | `MAX_COMPACT_PER_RUN`, `compactIfOverThreshold`, `undoTurn`, `pushTurn`, `turnId` |
 <!-- /toc -->
 
 ## Pieces
@@ -141,6 +142,24 @@ Concurrency needs no scheduler, but not for the reason once written here.
 when the turn ends — so `runAssignment` uses `sendAwaited`, which resolves after
 that message's own turn. `running` is keyed per agent, so two assignments to
 different agents run at once and two to the same agent queue.
+
+## One conversation format
+
+Both compilation paths emit the same shape: `assistant` messages carrying
+`tool-call` parts, answered by `tool` messages carrying `tool-result`.
+`toLlmMessages` does it from the live transcript; `compileNeutralContext` does
+it from a sanitised copy — fresh tool ids, no `thoughtSignature`, no unfinished
+calls — and then calls `toLlmMessages` itself.
+
+**It used to flatten prior turns into prose**, on the reasoning that stripping
+provider metadata required it. It did not, and the cost was the whole defect:
+every conversation in this app goes through `sendInSession`, so every model was
+shown its own earlier tool use as lines of text, and models reproduced them
+instead of calling tools. There is now no such format to reproduce, and the
+system note that used to explain it is gone.
+
+A tool item with no assistant message ahead of it gets an empty one, so its
+result always answers a call that was made.
 
 ## What a handoff borrows
 
