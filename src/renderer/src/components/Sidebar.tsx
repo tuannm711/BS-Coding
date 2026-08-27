@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Ellipsis, PanelLeft, RefreshCw, Settings, Server } from 'lucide-react'
-import type { NewAgentInput, Template, WorkspaceSummary } from '@shared/types'
+import type { NewAgentInput, ProjectSessionSummary, Template, WorkspaceSummary } from '@shared/types'
 import AddProjectDialog from './AddProjectDialog'
 import AddAgentDialog from './AddAgentDialog'
+import ProjectSessions from './sidebar/ProjectSessions'
 
 function MoreIcon() {
   return <Ellipsis size={14} aria-hidden="true" />
@@ -11,6 +12,11 @@ function MoreIcon() {
 
 interface Props {
   workspaces: WorkspaceSummary[]
+  sessions: ProjectSessionSummary[]
+  activeSessionId: string | null
+  onSelectSession: (sessionId: string) => void
+  onCreateSession: () => void
+  onDeleteSession: (sessionId: string) => void
   templates: Template[]
   activePath: string | null
   onOpen: (path: string) => void
@@ -24,7 +30,8 @@ interface Props {
 }
 
 export default function Sidebar({
-  workspaces, templates, activePath, onOpen, onRemove, onRefresh, onOpenTerminal, onOpenSettings, onOpenModelRouter, onCheckUpdate, updateChecking
+  workspaces, templates, activePath, sessions, activeSessionId, onSelectSession, onCreateSession, onDeleteSession,
+  onOpen, onRemove, onRefresh, onOpenTerminal, onOpenSettings, onOpenModelRouter, onCheckUpdate, updateChecking
 }: Props) {
   const [showAddProject, setShowAddProject] = useState(false)
   const [addAgentPath, setAddAgentPath] = useState<string | null>(null)
@@ -209,6 +216,16 @@ export default function Sidebar({
                 )}
               </div>
             </div>
+            {/* Under the open project only. Sessions belong to a project, and
+                listing every project's sessions at once would be a wall of
+                titles with no way to tell whose is whose. */}
+            {ws.projectPath === activePath ? <ProjectSessions
+              sessions={sessions}
+              activeSessionId={activeSessionId}
+              onSelect={onSelectSession}
+              onCreate={onCreateSession}
+              onDelete={onDeleteSession}
+            /> : null}
           </li>
         ))}
       </ul>

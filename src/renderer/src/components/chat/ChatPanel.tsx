@@ -1,11 +1,10 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { ChevronDown } from 'lucide-react'
-import type { AgentConfig, AgentMode, ChatEvent, ChatMessage, Command, ImageAttachment, ProjectSessionSummary, QuestionOption, QueuedMessage, TodoItem, TodoStatus, ToolCallData, TurnExecutionSnapshot } from '@shared/types'
+import type { AgentConfig, AgentMode, ChatEvent, ChatMessage, Command, ImageAttachment, QuestionOption, QueuedMessage, TodoItem, TodoStatus, ToolCallData, TurnExecutionSnapshot } from '@shared/types'
 import { appendStreamDelta } from '@shared/text'
 import { contextTokens } from '@shared/usage'
 import ChatInput from './ChatInput'
 import { buildQuestionAnswer } from './questionAnswer'
-import SessionBar from './SessionBar'
 import ModelPicker from './ModelPicker'
 import AgentPicker from './AgentPicker'
 import VariantPicker from './VariantPicker'
@@ -61,7 +60,6 @@ function ChatPanel({ agentId, agents, onAgentChange, projectPath, sessionId, onS
   const [contextLimit, setContextLimit] = useState<number | null>(null)
   const [compactThreshold, setCompactThreshold] = useState<number | null>(null)
   const [commands, setCommands] = useState<Command[]>([])
-  const [sessions, setSessions] = useState<ProjectSessionSummary[]>([])
   const [todos, setTodos] = useState<TodoItem[]>([])
   const [todosCollapsed, setTodosCollapsed] = useState(false)
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
@@ -151,10 +149,6 @@ function ChatPanel({ agentId, agents, onAgentChange, projectPath, sessionId, onS
     })
   }, [projectPath, sessionId, pinSessionToEnd])
 
-  const reloadSessions = useCallback(() => {
-    void window.api.listProjectSessions(projectPath).then(setSessions)
-  }, [projectPath])
-
   const loadTodos = useCallback(() => {
     void window.api.getSessionTodos(projectPath, sessionId).then(setTodos)
   }, [projectPath, sessionId])
@@ -182,7 +176,6 @@ function ChatPanel({ agentId, agents, onAgentChange, projectPath, sessionId, onS
   }, [loadTranscript, loadTodos, loadContextInfo, loadSessionUsage])
 
   useEffect(() => {
-    reloadSessions()
     loadTranscript()
     loadTodos()
     void window.api.listCommands(cwd).then(setCommands)
@@ -370,8 +363,7 @@ if (e.type === 'usage') {
     }
     if (e.type === 'session-created') {
       resetView()
-      reloadSessions()
-      return
+        return
     }
     if (e.type === 'turn-started') {
       activeTurnIdRef.current = (e as ChatEvent & { turnId?: string }).turnId
@@ -417,7 +409,7 @@ if (e.type === 'usage') {
       }
       return next
     })
-  }, [projectPath, sessionId, flushDeltas, resetView, reloadSessions, loadTranscript, loadSessionUsage, startTurnAnchor, replaceActiveAnchorId])
+  }, [projectPath, sessionId, flushDeltas, resetView, loadTranscript, loadSessionUsage, startTurnAnchor, replaceActiveAnchorId])
 
   const send = useCallback((text: string, images?: ImageAttachment[]) => {
     const trimmed = text.trim()
@@ -433,44 +425,11 @@ if (e.type === 'usage') {
       setRunning(true)
     }
     void window.api.sendSessionChat(projectPath, sessionId, agentId, trimmed, images)
-    reloadSessions()
-  }, [projectPath, sessionId, agentId, running, reloadSessions, startTurnAnchor])
+  }, [projectPath, sessionId, agentId, running, startTurnAnchor])
 
   const handleStop = useCallback(() => {
     void window.api.stopSessionChat(projectPath, sessionId)
   }, [projectPath, sessionId])
-
-  const handleCreateSession = useCallback(() => {
-    void window.api.createProjectSession(projectPath, agentId).then(next => {
-      resetView()
-      reloadSessions()
-      onSessionChange(next.id, next.lastAgentId)
-    })
-  }, [projectPath, agentId, resetView, reloadSessions, onSessionChange])
-
-  const handleSelectSession = useCallback((nextSessionId: string) => {
-    if (nextSessionId === sessionId) return
-    void window.api.switchProjectSession(projectPath, nextSessionId).then(next => {
-      if (!next) return
-      resetView()
-      reloadSessions()
-      onSessionChange(next.id, next.lastAgentId)
-    })
-  }, [projectPath, sessionId, resetView, reloadSessions, onSessionChange])
-
-  const handleDeleteSession = useCallback((deleteSessionId: string) => {
-    void window.api.deleteProjectSession(projectPath, deleteSessionId).then(next => {
-      resetView()
-      reloadSessions()
-      onSessionChange(next.id, next.lastAgentId)
-    })
-  }, [projectPath, resetView, reloadSessions, onSessionChange])
-
-  const handleRenameSession = useCallback((renameSessionId: string, title: string) => {
-    void window.api.renameProjectSession(projectPath, renameSessionId, title).then(() => {
-      reloadSessions()
-    })
-  }, [projectPath, reloadSessions])
 
   const pickerLocked = running || pendingPrompt !== null || queue.length > 0
   const handleAgentChange = useCallback((nextAgentId: string) => {
@@ -654,14 +613,6 @@ if (e.type === 'usage') {
           </div>
         )
       })()}
-      <SessionBar
-        sessions={sessions}
-        activeSessionId={sessionId}
-        onSelect={handleSelectSession}
-        onCreate={handleCreateSession}
-        onDelete={handleDeleteSession}
-        onRename={handleRenameSession}
-      />
       <div className="chat-history-actions">
         <button className="btn small" title="Undo last turn" onClick={handleUndo} disabled={running}>Undo</button>
         <button className="btn small" title="Redo undone turn" onClick={handleRedo} disabled={running}>Redo</button>

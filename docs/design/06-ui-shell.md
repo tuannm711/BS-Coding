@@ -8,13 +8,14 @@ panel, settings and the tray. The terminal inside a pane is in
 <!-- toc -->
 | Section | Lines | Names |
 | --- | --- | --- |
-| [Pieces](#pieces) | 20-34 | `src/renderer/src/App.tsx`, `PaneModel`, `src/renderer/src/components/TitleBar.tsx`, `src/renderer/src/components/Sidebar.tsx`, `src/renderer/src/components/RightPanel.tsx`, `src/renderer/src/components/fleet/` |
-| [Data flow](#data-flow) | 35-53 | `App.tsx`, `PaneModel`, `XtermHost`, `buffersRef`, `registerTerminal`, `ChatPanel` |
-| [Types that carry it](#types-that-carry-it) | 54-63 | `PaneModel`, `ChatEvent`, `src/shared/types.ts`, `QuotaAccountUiState`, `src/renderer/src/components/quota/quota-view.ts` |
-| [Design decisions](#design-decisions) | 64-98 | `getWindowChromeOptions`, `titleBarOverlay`, `tests/unit/window-chrome.test.ts`, `src/renderer/AGENTS.md`, `MainApp`, `app.setAppUserModelId` |
-| [The coordination view](#the-coordination-view) | 99-151 | `src/renderer/src/components/coordinator/CoordinatorView.tsx`, `App.tsx`, `setMode`, `RightPanel`, `ChatPanel`, `listSessionTranscript` |
-| [The fleet panel](#the-fleet-panel) | 152-210 | `RightPanel`, `buildFleet`, `ProviderQuotaGroup`, `modelIds`, `anti-claude-opus`, `anti-claude-sonnet` |
-| [Known limits](#known-limits) | 211-217 | `docs/technical-debt.md` |
+| [Pieces](#pieces) | 21-35 | `src/renderer/src/App.tsx`, `PaneModel`, `src/renderer/src/components/TitleBar.tsx`, `src/renderer/src/components/Sidebar.tsx`, `src/renderer/src/components/RightPanel.tsx`, `src/renderer/src/components/fleet/` |
+| [Data flow](#data-flow) | 36-54 | `App.tsx`, `PaneModel`, `XtermHost`, `buffersRef`, `registerTerminal`, `ChatPanel` |
+| [Types that carry it](#types-that-carry-it) | 55-64 | `PaneModel`, `ChatEvent`, `src/shared/types.ts`, `QuotaAccountUiState`, `src/renderer/src/components/quota/quota-view.ts` |
+| [Design decisions](#design-decisions) | 65-99 | `getWindowChromeOptions`, `titleBarOverlay`, `tests/unit/window-chrome.test.ts`, `src/renderer/AGENTS.md`, `MainApp`, `app.setAppUserModelId` |
+| [The coordination view](#the-coordination-view) | 100-152 | `src/renderer/src/components/coordinator/CoordinatorView.tsx`, `App.tsx`, `setMode`, `RightPanel`, `ChatPanel`, `listSessionTranscript` |
+| [The fleet panel](#the-fleet-panel) | 153-211 | `RightPanel`, `buildFleet`, `ProviderQuotaGroup`, `modelIds`, `anti-claude-opus`, `anti-claude-sonnet` |
+| [Sessions live in the sidebar](#sessions-live-in-the-sidebar) | 212-235 | `activeSessionId`, `groupSessions` |
+| [Known limits](#known-limits) | 236-242 | `docs/technical-debt.md` |
 <!-- /toc -->
 
 ## Pieces
@@ -207,6 +208,30 @@ carries it, and the plan name, which the account's own email already
 identifies. Subscription expiry moves to the row's tooltip; freshness stays
 visible, because a stale reading changes what the bars above it are worth.
 The tab strip is 30px rather than 44 for the same reason.
+
+## Sessions live in the sidebar
+
+They were a dropdown inside the chat frame, which could answer neither *which
+session is running* nor *what kind of work is in it*. They now sit under the
+open project in the left rail, grouped.
+
+**A session has a kind.** It becomes `coordination` when a coordinator
+dispatches a task into it; everything else is work. Stored on the session and
+carried through `normalize` — every read runs through there, so a field it
+misses is a field that silently does not persist. Stored rather than re-derived
+because two answers to one question is a mistake this project has already paid
+for.
+
+**A turn binds its session once, at the start.** Every write used to resolve
+`activeSessionId` live, so selecting another session mid-turn sent the rest of
+that turn's output into the newly selected one; the renderer filters events by
+session, so the view being watched fell silent and the agent looked stopped. It
+was never stopping. That binding is also what makes the running dot honest: the
+session with a turn in it is the one the turn is bound to, whatever the user is
+looking at.
+
+`groupSessions` is a pure function, so the ordering and the dropping of empty
+groups are asserted without a DOM.
 
 ## Known limits
 

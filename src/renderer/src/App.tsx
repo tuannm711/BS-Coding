@@ -3,7 +3,7 @@ import type { BrowserInstallGuideEvent } from '@shared/ipc'
 import type { BrowserStatusInfo } from '@shared/browser-types'
 import { Terminal } from '@xterm/xterm'
 import type {
-  AgentConfig, AgentState, ArtifactEntry, GitStatus, Template, TerminalInfo, UpdaterStatusEvent, WorkspaceRuntime, WorkspaceSummary
+  AgentConfig, AgentState, ArtifactEntry, GitStatus, ProjectSessionSummary, Template, TerminalInfo, UpdaterStatusEvent, WorkspaceRuntime, WorkspaceSummary
 } from '@shared/types'
 import Sidebar from './components/Sidebar'
 import PaneGrid from './components/PaneGrid'
@@ -53,6 +53,7 @@ export default function App() {
     // or one hand-edited, must not select a view that is not there.
     return stored === 'artifacts' || stored === 'fleet' ? stored : 'tree'
   })
+  const [projectSessions, setProjectSessions] = useState<ProjectSessionSummary[]>([])
   const [artifacts, setArtifacts] = useState<Record<string, ArtifactEntry[]>>({})
   const termsRef = useRef<Map<string, Terminal>>(new Map())
   const buffersRef = useRef<Map<string, string>>(new Map())
@@ -205,6 +206,48 @@ export default function App() {
     }
   }, [terminals])
 
+  const projectPath = runtime?.workspace.projectPath ?? null
+
+  const reloadProjectSessions = useCallback(() => {
+    if (!projectPath) { setProjectSessions([]); return }
+    void window.api.listProjectSessions(projectPath).then(setProjectSessions)
+  }, [projectPath])
+
+  useEffect(() => { reloadProjectSessions() }, [reloadProjectSessions])
+
+  // The running dot and a session's title both change from chat events, so the
+  // list follows the same edges the status bar does rather than polling.
+  useEffect(() => window.api.onChatEvent(event => {
+    if (event.type === 'turn-started' || event.type === 'done' || event.type === 'error'
+      || event.type === 'user-message' || event.type === 'assignment-started') reloadProjectSessions()
+  }), [reloadProjectSessions])
+
+  const handleSelectSession = useCallback((sessionId: string) => {
+    if (!projectPath) return
+    void window.api.switchProjectSession(projectPath, sessionId).then(next => {
+      if (!next) return
+      setActiveProjectSessionId(next.id)
+      if (next.lastAgentId) setSelectedNativeAgentId(next.lastAgentId)
+      reloadProjectSessions()
+    })
+  }, [projectPath, reloadProjectSessions])
+
+  const handleCreateSession = useCallback(() => {
+    if (!projectPath) return
+    void window.api.createProjectSession(projectPath, selectedNativeAgentId ?? undefined).then(next => {
+      setActiveProjectSessionId(next.id)
+      reloadProjectSessions()
+    })
+  }, [projectPath, selectedNativeAgentId, reloadProjectSessions])
+
+  const handleDeleteSession = useCallback((sessionId: string) => {
+    if (!projectPath) return
+    void window.api.deleteProjectSession(projectPath, sessionId).then(next => {
+      setActiveProjectSessionId(next?.id ?? null)
+      reloadProjectSessions()
+    })
+  }, [projectPath, reloadProjectSessions])
+
   const handleProjectSessionChange = useCallback((sessionId: string, agentId?: string) => {
     setActiveProjectSessionId(sessionId)
     if (agentId) setSelectedNativeAgentId(agentId)
@@ -330,6 +373,11 @@ export default function App() {
           workspaces={workspaces}
           templates={templates}
           activePath={runtime?.workspace.projectPath ?? null}
+          sessions={projectSessions}
+          activeSessionId={activeProjectSessionId}
+          onSelectSession={handleSelectSession}
+          onCreateSession={handleCreateSession}
+          onDeleteSession={handleDeleteSession}
           onOpen={openWorkspace}
           onRemove={removeWorkspace}
           onRefresh={refreshWorkspaces}
