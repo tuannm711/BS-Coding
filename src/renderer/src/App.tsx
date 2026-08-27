@@ -442,6 +442,7 @@ export default function App() {
             agents={nativeAgents}
             onSelectAgent={setSelectedNativeAgentId}
             onSetCoordinator={agentId => { void window.api.setAgentMode(agentId, 'coordinate') }}
+            onSetWorker={(agentId, worker) => { void window.api.setAgentWorker(agentId, worker) }}
             onTabChange={setRightTab}
             onClearArtifacts={() => {
               const p = runtime?.workspace.projectPath

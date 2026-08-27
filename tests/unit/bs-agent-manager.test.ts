@@ -1221,6 +1221,24 @@ describe('one coordinator per project', () => {
     expect(modeOf(manager, 'a3')).toBe('coordinate')
   })
 
+  it('leaves an agent switched off as a worker out of the roster', async () => {
+    // Absent rather than listed-and-refused: naming it would invite the
+    // coordinator to try, and the refusal would cost a round trip to learn.
+    const { manager, llmSystems } = await makeManager({ secondAgent: true })
+    manager.setMode('a1', 'coordinate')
+    manager.setWorker('a3', false)
+    await manager.send('a1', 'go')
+    expect(llmSystems[0]).not.toContain('helper')
+  })
+
+  it('keeps an agent that predates the switch usable', async () => {
+    // worker is absent on every agent stored before the field existed.
+    const { manager, llmSystems } = await makeManager({ secondAgent: true })
+    manager.setMode('a1', 'coordinate')
+    await manager.send('a1', 'go')
+    expect(llmSystems[0]).toContain('helper')
+  })
+
   it('leaves a coordinator in another project alone', async () => {
     const { manager } = await makeManager({ secondAgent: true, secondProject: true })
     manager.setMode('a1', 'coordinate')

@@ -13,6 +13,7 @@ export interface FleetBoardProps {
   refreshingId: string | null
   onSelectAgent: (agentId: string) => void
   onSetCoordinator: (agentId: string) => void
+  onSetWorker: (agentId: string, worker: boolean) => void
   onSpeedChange: (agentId: string, speed: AgentSpeed) => void
   onRefresh: (providerId: string, accountId: string) => void
   onConsumeResetCredit: (account: { id: string; providerId: string; label: string; available: number }) => void
@@ -21,7 +22,7 @@ export interface FleetBoardProps {
 // Presentational half, so every state can be asserted with renderToStaticMarkup
 // the way CoordinatorBoard and StatsView are.
 export function FleetBoard({
-  fleet, providerLabel, refreshingId, onSelectAgent, onSetCoordinator, onSpeedChange, onRefresh, onConsumeResetCredit
+  fleet, providerLabel, refreshingId, onSelectAgent, onSetCoordinator, onSetWorker, onSpeedChange, onRefresh, onConsumeResetCredit
 }: FleetBoardProps) {
   if (fleet.accounts.length === 0 && fleet.unassigned.length === 0) {
     return (
@@ -54,6 +55,7 @@ export function FleetBoard({
           refreshing={refreshingId === section.account.id}
           onSelectAgent={onSelectAgent}
           onSetCoordinator={onSetCoordinator}
+          onSetWorker={onSetWorker}
           coordinatorName={coordinatorName}
           onSpeedChange={onSpeedChange}
           onRefresh={() => onRefresh(section.account.providerId, section.account.id)}
@@ -84,10 +86,11 @@ export function FleetBoard({
   )
 }
 
-export default function FleetPanel({ agents, onSelectAgent, onSetCoordinator }: {
+export default function FleetPanel({ agents, onSelectAgent, onSetCoordinator, onSetWorker }: {
   agents: AgentConfig[]
   onSelectAgent: (agentId: string) => void
   onSetCoordinator: (agentId: string) => void
+  onSetWorker: (agentId: string, worker: boolean) => void
 }) {
   const [snapshot, setSnapshot] = useState<ProviderSnapshot | null>(null)
   const [refreshingId, setRefreshingId] = useState<string | null>(null)
@@ -121,6 +124,7 @@ export default function FleetPanel({ agents, onSelectAgent, onSetCoordinator }: 
         providerLabel={providerId => snapshot?.providers.find(provider => provider.id === providerId)?.displayName}
         onSelectAgent={onSelectAgent}
         onSetCoordinator={onSetCoordinator}
+        onSetWorker={onSetWorker}
         onSpeedChange={(agentId, speed) => {
           setSnapshot(previous => previous ? { ...previous, assignments: previous.assignments.map(assignment => assignment.agentId === agentId ? { ...assignment, speed } : assignment) } : previous)
           void window.api.setAgentSpeed(agentId, speed)

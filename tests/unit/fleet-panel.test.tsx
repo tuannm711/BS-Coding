@@ -12,7 +12,7 @@ const account: ProviderAccountSnapshot = {
 }
 
 const row = (patch: Partial<FleetAgentRow> = {}): FleetAgentRow =>
-  ({ id: 'a1', name: 'anti-claude-opus', mode: 'build', coordinator: false, ...patch })
+  ({ id: 'a1', name: 'anti-claude-opus', mode: 'build', coordinator: false, worker: true, ...patch })
 
 const pool = (id: string, agents: FleetAgentRow[], windows: ProviderQuotaWindow[] = []) => ({
   group: { id, label: id, modelIds: [], windows },
@@ -31,6 +31,7 @@ const board = (fleet: FleetModel) =>
     refreshingId: null,
     onSelectAgent: () => {},
     onSetCoordinator: () => {},
+    onSetWorker: () => {},
     onSpeedChange: () => {},
     onRefresh: () => {},
     onConsumeResetCredit: () => {}
@@ -81,23 +82,35 @@ describe('FleetBoard', () => {
     expect(board(withPools([pool('gemini', [])]))).not.toContain('No agent drawing on this pool')
   })
 
-  it('marks the coordinator', () => {
-    expect(board(withPools([pool('codex', [row({ coordinator: true, mode: 'coordinate' })])]))).toContain('coordinates')
+  it('shows the coordinator toggle as held, and not as an offer', () => {
+    // Icons rather than words: three labelled controls left the agent's own
+    // name with nowhere to go. The state is carried by aria-pressed.
+    const markup = board(withPools([pool('codex', [row({ coordinator: true, mode: 'coordinate' })])]))
+    expect(markup).toContain('aria-label="Coordinator: anti-claude-opus"')
+    expect(markup).toContain('aria-pressed="true"')
+    expect(markup).toContain('disabled=""')
   })
 
-  it('offers the role, and names who would lose it', () => {
-    // Exclusive, so taking the role demotes someone. Saying whose keeps that
-    // from happening silently.
+  it('names who would lose the role on the control that would take it', () => {
+    // Exclusive, so taking it demotes someone. Saying whose keeps that from
+    // happening silently — the tooltip carries it now the label is an icon.
     const markup = board(withPools([pool('codex', [
       row({ coordinator: true, mode: 'coordinate' }),
       row({ id: 'a2', name: 'anti-claude-sonnet' })
     ])]))
-    expect(markup).toContain('Take from anti-claude-opus')
+    expect(markup).toContain('takes the role from anti-claude-opus')
   })
 
-  it('does not offer the role to the agent that already holds it', () => {
+  it('offers no worker toggle on the coordinator itself', () => {
+    // It is not a worker and cannot be assigned to; a control saying otherwise
+    // would be a lie with a click target.
     const markup = board(withPools([pool('codex', [row({ coordinator: true, mode: 'coordinate' })])]))
-    expect(markup).not.toContain('Take from')
+    expect(markup).not.toContain('Can be assigned work')
+  })
+
+  it('shows an excluded agent as excluded', () => {
+    const markup = board(withPools([pool('codex', [row({ worker: false })])]))
+    expect(markup).toContain('Excluded from assignment')
   })
 
   it('shows an agent whose model no pool claims', () => {

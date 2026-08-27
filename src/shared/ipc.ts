@@ -92,6 +92,7 @@ export const Channels = {
   ChatQueueEdit: 'chat:queue-edit',
   SessionList: 'session:list',
   SessionActive: 'session:active',
+  AgentSetWorker: 'agent:set-worker',
   SessionCreate: 'session:create',
   SessionSwitch: 'session:switch',
   SessionDelete: 'session:delete',
@@ -294,6 +295,7 @@ export interface AgentApi {
   editQueued(agentId: string, id: string, text: string): Promise<void>
   listSessions(agentId: string): Promise<SessionSummary[]>
   activeSessionFor(agentId: string): Promise<string>
+  setAgentWorker(agentId: string, worker: boolean): Promise<void>
   createSession(agentId: string): Promise<SessionSummary>
   switchSession(agentId: string, sessionId: string): Promise<SessionSummary | null>
   deleteSession(agentId: string, sessionId: string): Promise<SessionSummary>

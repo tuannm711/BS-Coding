@@ -571,6 +571,15 @@ class MainApp {
     }
   }
 
+  setAgentWorker(agentId: string, worker: boolean): void {
+    this.bsAgent.setWorker(agentId, worker)
+    const ws = this.findWorkspaceByAgent(agentId)
+    if (ws) {
+      const updated = this.workspaces.updateAgent(ws.projectPath, agentId, { worker })
+      this.pushAgentConfig(updated, agentId)
+    }
+  }
+
   setAgentBackground(agentId: string, background: boolean): void {
     this.bsAgent.setBackground(agentId, background)
     const ws = this.findWorkspaceByAgent(agentId)
@@ -920,6 +929,7 @@ function registerIpcHandlers(): void {
     mainApp.bsAgent.editQueued(agentId, id, text))
   ipcMain.handle(Channels.SessionList, (_e, agentId: string) => mainApp.bsAgent.listSessions(agentId))
   ipcMain.handle(Channels.SessionActive, (_e, agentId: string) => mainApp.bsAgent.activeSessionFor(agentId))
+  ipcMain.handle(Channels.AgentSetWorker, (_e, agentId: string, worker: boolean) => mainApp.setAgentWorker(agentId, worker))
   ipcMain.handle(Channels.SessionCreate, (_e, agentId: string) => mainApp.bsAgent.createSession(agentId))
   ipcMain.handle(Channels.SessionSwitch, (_e, agentId: string, sessionId: string) =>
     mainApp.bsAgent.switchSession(agentId, sessionId))

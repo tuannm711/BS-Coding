@@ -12,6 +12,8 @@ export interface FleetAgentRow {
   // block. Removing the block must not remove a function with it.
   speed?: AgentSpeed
   coordinator: boolean
+  // Absent on the config means yes, so agents predating the switch stay usable.
+  worker: boolean
 }
 
 export interface FleetPool {
@@ -41,6 +43,7 @@ function row(agent: AgentConfig, modelId?: string, modelLabel?: string, speed?: 
     name: agent.name,
     mode: agent.mode ?? 'build',
     coordinator: agent.mode === 'coordinate',
+    worker: agent.worker !== false,
     ...(modelId === undefined ? {} : { modelId }),
     ...(modelLabel === undefined ? {} : { modelLabel }),
     ...(speed === undefined ? {} : { speed })

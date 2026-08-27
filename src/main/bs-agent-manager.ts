@@ -789,6 +789,18 @@ export class BsAgentManager {
     }
   }
 
+  // Absent means yes, so every agent that predates the switch keeps working.
+  private isWorker(agent: AgentConfig): boolean {
+    return agent.worker !== false
+  }
+
+  setWorker(agentId: string, worker: boolean): void {
+    const agent = this.agents.get(agentId)
+    if (!agent || agent.worker === worker) return
+    agent.worker = worker
+    this.agents.set(agentId, agent)
+  }
+
   setMode(agentId: string, mode: AgentMode): void {
     // Enforced here rather than in the view: the manager knows each agent's
     // cwd, so the rule holds whichever surface calls it and there is no second
@@ -1411,6 +1423,7 @@ export class BsAgentManager {
       // and delegating to yourself is impossible rather than checked.
       listWorkers: () => [...this.agents.values()]
         .filter(other => other.kind !== 'pty' && other.cwd === agent.cwd && other.id !== agent.id)
+        .filter(other => this.isWorker(other))
         .map(other => ({ name: other.name, coordinating: (this.modes.get(other.id) ?? 'build') === 'coordinate' })),
       run: (name, task) => this.runAssignment(agent.id, name, task)
     })
@@ -1873,6 +1886,9 @@ export class BsAgentManager {
     const workers = [...this.agents.values()]
       .filter(other => other.kind !== 'pty' && other.cwd === agent?.cwd && other.id !== agentId)
       .filter(other => (this.modes.get(other.id) ?? 'build') !== 'coordinate')
+      // An agent switched off as a worker is absent from the roster, not
+      // listed and refused: naming it would invite the coordinator to try.
+      .filter(other => this.isWorker(other))
       .map(other => {
         const resolved = this.resolved.get(other.id)
         return `  ${other.name}${resolved?.model ? ` — ${resolved.provider}/${resolved.model}` : ''}`

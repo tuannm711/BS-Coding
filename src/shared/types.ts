@@ -45,6 +45,11 @@ export interface AgentConfig {
   cwd: string
   kind?: AgentKind
   mode?: AgentMode
+  // May a coordinator assign work to this agent? Absent means yes, so every
+  // agent that existed before the switch keeps working. This is not a second
+  // answer to what `mode` asks: mode says what the agent is doing, worker says
+  // whether it can be given something to do.
+  worker?: boolean
   variant?: ModelVariant
   speed?: AgentSpeed
   model?: string

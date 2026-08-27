@@ -1791,9 +1791,32 @@ select.input { width: 100%; }
 /* Hidden until the row is under the pointer or focused: the roster is read far
    more often than the role is changed, and a button on every row would read as
    the panel's main action. */
-.fleet-make-coordinator { flex: none; opacity: 0; max-width: 96px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.fleet-agent:hover .fleet-make-coordinator,
-.fleet-make-coordinator:focus-visible { opacity: 1; }
+/* Three fixed lines in the fleet header, none of which may wrap: the avatar
+   used to end up alone on its own line at this width. */
+.quota-account-head { display: grid; gap: 2px; min-width: 0; }
+.quota-head-identity { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.quota-head-identity strong { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.quota-head-source { color: var(--text-faint); font-size: var(--fs-xs); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.quota-head-state { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: var(--fs-xs); }
+/* Words, not pills: a pill spends horizontal padding this rail does not have. */
+.quota-word { flex: none; padding: 0; background: none; border: 0; color: var(--text-dim); font-size: var(--fs-xs); }
+.quota-word.quota-state-ready { color: var(--green); }
+.quota-word.quota-state-cooldown { color: var(--yellow); }
+.quota-word.quota-state-quota-exhausted,
+.quota-word.quota-state-capacity-exhausted,
+.quota-word.quota-state-auth-error { color: var(--red); }
+.quota-reset-word { text-decoration: underline dotted; cursor: pointer; }
+.quota-reset-word:disabled { cursor: default; text-decoration: none; opacity: 0.6; }
+.quota-age { margin-left: auto; color: var(--text-faint); }
+
+/* Role controls are icons. Three labelled buttons left the agent's own name
+   with nowhere to go — the one thing the row exists to show. */
+.fleet-toggle { flex: none; display: grid; place-items: center; width: 22px; height: 22px; padding: 0; border-radius: var(--radius-sm); background: var(--bg-input); border: 1px solid var(--hairline); color: var(--text-faint); cursor: pointer; opacity: 0; }
+.fleet-agent:hover .fleet-toggle, .fleet-toggle:focus-visible, .fleet-toggle.on { opacity: 1; }
+.fleet-toggle:hover:not(:disabled) { background: var(--bg-input-hover); color: var(--text-strong); }
+.fleet-toggle.on { background: var(--accent-dim); border-color: var(--accent-border); color: var(--accent-strong); }
+.fleet-toggle:disabled { cursor: default; }
+.fleet-toggle:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
 /* Rail width: the card carries no horizontal slack, so anything that can be
    long is clamped rather than allowed to push a neighbour out of the row. */
 .quota-account-card.fleet { padding: 8px; }
@@ -1802,8 +1825,8 @@ select.input { width: 100%; }
 .quota-account-card.fleet .quota-account-identity strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .quota-account-card.fleet .quota-account-identity > div > span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .quota-account-card.fleet .quota-account-badges { flex: none; }
-.fleet-strays, .fleet-unassigned { display: flex; flex-direction: column; gap: 4px; padding: 8px; border: 1px dashed var(--hairline); border-radius: var(--radius); }
-.fleet-strays h6, .fleet-unassigned h6 { margin: 0; color: var(--text-dim); }
+.fleet-unassigned { display: flex; flex-direction: column; gap: 4px; padding: 8px; border: 1px dashed var(--hairline); border-radius: var(--radius); }
+.fleet-unassigned h6 { margin: 0; color: var(--text-dim); }
 .fleet-empty { padding: 16px; color: var(--text-dim); }
 
 /* Sessions under the open project. They were a dropdown inside the chat frame,
