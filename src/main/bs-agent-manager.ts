@@ -1920,13 +1920,14 @@ export class BsAgentManager {
     const state = this.turnTargets.get(key) ?? { agentId, tried: new Set([agentId]) }
     const from = this.candidateFor(state.agentId)
     if (!from) return false
-    const mode = this.modes.get(agentId) ?? 'build'
+    // Every account in the project. There was a same-mode filter here, added on
+    // the claim that a candidate in another mode has a different tool set — and
+    // that claim was false: the loop takes tools from the agent whose turn it
+    // is, never from the serving one. With the system prompt no longer borrowed
+    // either, a handoff is purely another account answering, and no account has
+    // a reason to be excluded.
     const candidates = [...this.agents.values()]
       .filter(agent => agent.kind !== 'pty' && agent.cwd === this.agents.get(agentId)?.cwd)
-      // A candidate in another mode has a different tool set: a plan or
-      // coordinate agent cannot carry a build turn, and a worker asked to
-      // carry a coordinating turn would do the work rather than assign it.
-      .filter(other => (this.modes.get(other.id) ?? 'build') === mode)
       .flatMap(agent => { const c = this.candidateFor(agent.id); return c ? [c] : [] })
     const ranked = rankFallbackAgents({ from, candidates, isPoolSpent: c => this.isPoolSpent(c) })
       .filter(candidate => !state.tried.has(candidate.agentId))

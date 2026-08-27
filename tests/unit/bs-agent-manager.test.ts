@@ -1221,6 +1221,26 @@ describe('one coordinator per project', () => {
     expect(modeOf(manager, 'a3')).toBe('coordinate')
   })
 
+  it('keeps the original agent as the identity after a handoff', async () => {
+    // A handoff is another account answering this turn, not another agent
+    // taking it over. Asserted on the mode note, which lives in `system` —
+    // the first version of this test read the coordinator note, which lives in
+    // systemSuffix and was never borrowed, so it passed before the fix existed.
+    const { manager, llmSystems } = await makeManager({
+      secondAgent: true,
+      partsQueue: [
+        [{ kind: 'error', error: '[bs] [request-failed] (429): quota' }],
+        [{ kind: 'text', text: 'carried on' }, { kind: 'finish' }]
+      ]
+    })
+    manager.setMode('a1', 'plan')
+    await manager.send('a1', 'go')
+    expect(llmSystems[0]).toContain('PLAN MODE')
+    // a3 is in build mode. Borrowing its prompt would drop the plan-mode note
+    // from a turn that is still a1's, and still denied every write tool.
+    expect(llmSystems[1]).toContain('PLAN MODE')
+  })
+
   it('leaves an agent switched off as a worker out of the roster', async () => {
     // Absent rather than listed-and-refused: naming it would invite the
     // coordinator to try, and the refusal would cost a round trip to learn.
@@ -1393,18 +1413,21 @@ describe('stopping a fan-out', () => {
 })
 
 describe('fallback stays in the same mode', () => {
-  it('does not hand a build turn to an agent in another mode', async () => {
-    // Not a coordinate special case: a plan-mode agent is denied every write
-    // tool, so it could never carry a build turn either. This has been wrong
-    // since plan mode existed.
+  it('falls back to an agent in another mode', async () => {
+    // This asserted the opposite until the premise behind it was checked: a
+    // handoff never changed the tool set, only llm, model and system. With the
+    // system prompt no longer borrowed either, the mode filter had nothing
+    // left to protect.
     const { manager, events } = await makeManager({
       secondAgent: true,
-      partsQueue: [[{ kind: 'error', error: '[bs] [request-failed] (429): quota' }]]
+      partsQueue: [
+        [{ kind: 'error', error: '[bs] [request-failed] (429): quota' }],
+        [{ kind: 'text', text: 'carried on' }, { kind: 'finish' }]
+      ]
     })
     manager.setMode('a3', 'plan')
     await manager.send('a1', 'go')
-    expect(events.some(event => event.type === 'agent-fallback')).toBe(false)
-    expect(events.some(event => event.type === 'error')).toBe(true)
+    expect(events.some(event => event.type === 'agent-fallback')).toBe(true)
   })
 
   it('still hands over to an agent in the same mode', async () => {
@@ -1419,16 +1442,20 @@ describe('fallback stays in the same mode', () => {
     expect(events.some(event => event.type === 'agent-fallback')).toBe(true)
   })
 
-  it('does not hand a coordinator turn to a worker', async () => {
-    // A worker has no delegate tool, so it would do the work rather than
-    // assign it — the opposite of what the turn was for.
+  it('gives a coordinator a fallback', async () => {
+    // Exclusive coordination plus a same-mode filter left a coordinator with
+    // no candidate at all: its quota ran out and the turn simply failed.
     const { manager, events } = await makeManager({
       secondAgent: true,
-      partsQueue: [[{ kind: 'error', error: '[bs] [request-failed] (429): quota' }]]
+      partsQueue: [
+        [{ kind: 'error', error: '[bs] [request-failed] (429): quota' }],
+        [{ kind: 'text', text: 'carried on' }, { kind: 'finish' }]
+      ]
     })
     manager.setMode('a1', 'coordinate')
     await manager.send('a1', 'go')
-    expect(events.some(event => event.type === 'agent-fallback')).toBe(false)
+    expect(events.some(event => event.type === 'agent-fallback')).toBe(true)
+    expect(events.filter(event => event.type === 'error')).toEqual([])
   })
 })
 

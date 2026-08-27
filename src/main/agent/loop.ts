@@ -146,11 +146,15 @@ export class SessionRunner {
       }
       try {
         // Resolved per step, so something above can change who answers without
-        // the loop learning what an agent is.
+        // the loop learning what an agent is. Only who answers: the system
+        // prompt stays this turn's own, because the serving agent's
+        // instructions and mode note describe an agent that is not doing this
+        // work. Borrowing them dropped a plan-mode turn's read-only note the
+        // moment it moved to a build agent's account.
         const target = this.deps.currentTarget?.()
         const stream = (target?.llm ?? this.deps.llm).stream({
           model: target?.model ?? this.deps.model,
-          system: (target?.system ?? this.deps.system) + (this.deps.systemSuffix?.() ?? ''),
+          system: this.deps.system + (this.deps.systemSuffix?.() ?? ''),
           messages: llmMessages,
           tools: isLastStep ? [] : this.visibleToolDefs(),
           signal,
