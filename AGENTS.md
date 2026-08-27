@@ -63,7 +63,8 @@ duyệt. Luật không bao giờ bị âm thầm bỏ đi vì code đã dời.
 - Event push ra renderer qua `win.webContents.send(Channels.Event*)`; payload phải khớp contract
   trong `src/shared/ipc.ts`.
 - Preload gọi method bằng `ipcRenderer.invoke(Channels.X, ...args)`. Event đăng ký qua helper
-  `subscribe`, trả về hàm huỷ để renderer gọi trong cleanup.
+  `subscribe`, trả về hàm huỷ để renderer gọi trong cleanup. Renderer dùng cùng kiểu `window.api`
+  (khai báo trong `src/renderer/src/env.d.ts`) nên tự đồng bộ.
 - Trạng thái agent chỉ đổi qua `MainApp.setState`; renderer chỉ được notify khi có field "visible"
   thay đổi (status/exitCode/alert).
 
@@ -86,7 +87,8 @@ duyệt. Luật không bao giờ bị âm thầm bỏ đi vì code đã dời.
 ### E. Kiểm thử
 
 - **Không bao giờ** gọi API LLM thật trong test — dùng stub `LlmClient` (`makeManager` trong
-  `bs-agent-manager.test.ts`) hoặc `partsQueue` để script output.
+  `bs-agent-manager.test.ts`, hoặc `createLlm` giả như trong `tests/unit/agent-loop.test.ts`) hoặc
+  `partsQueue` để script output.
 - Unit và integration **không** phụ thuộc agent thật (opencode/claude/aider); dùng fixture
   (`tests/fixtures/echo-agent.js`, `mock-lsp-server.js`) hoặc lệnh `node` + fixture.
 - Giữ test hermetic: temp dir qua `mkdtempSync(tmpdir())` + cleanup trong `afterEach`/`finally`.
@@ -97,7 +99,8 @@ duyệt. Luật không bao giờ bị âm thầm bỏ đi vì code đã dời.
   string được assert. **Cập nhật nó mỗi khi contract IPC đổi.**
 - Ưu tiên test hành vi quan sát được (event phát ra, nội dung store) hơn là nội bộ.
 - Alias `@shared` đã cấu hình trong `vitest.config.ts`; import code main bằng đường dẫn tương đối.
-- E2E **cần** `npm run build` trước, vì nó chạy app đã build trong `out/`. Playwright workers = 1.
+- E2E **cần** `npm run build` trước, vì nó chạy app đã build trong `out/`. Config Playwright ở
+  `playwright.config.ts`, workers = 1.
 - Mỗi test e2e dùng temp userData + temp project riêng; ghi `workspaces.json` trực tiếp. Dùng locator
   auto-wait (`toHaveText`/`toContainText`) cho UI bất đồng bộ.
 - Sau khi đụng IPC hoặc UI, thêm hoặc mở rộng một assertion trong e2e smoke để bắt regression.
@@ -107,9 +110,10 @@ duyệt. Luật không bao giờ bị âm thầm bỏ đi vì code đã dời.
 
 ### F. Thêm thứ mới
 
-- Thêm tool: implement trong `src/main/agent/tools/`, đăng ký trong `tools/registry.ts`, thêm
-  permission mặc định vào `DEFAULT_BS_CONFIG.permission` trong `src/main/agent/config.ts`. Mỗi tool là
-  object thuần khớp `ToolDefinition`; `schema` là kiểu zod có `.parse()`.
+- Thêm tool: implement trong `src/main/agent/tools/`, đăng ký trong
+  `src/main/agent/tools/registry.ts`, thêm permission mặc định vào
+  `DEFAULT_BS_CONFIG.permission` trong `src/main/agent/config.ts`. Mỗi tool là object thuần khớp
+  `ToolDefinition`; `schema` là kiểu zod có `.parse()`.
 - Thêm setting: kiểu `BsSettings` trong `src/shared/types.ts` + normalize trong
   `src/main/agent/config.ts` + tab tương ứng trong settings dialog. Sửa đi qua `patch()` trên bản
   draft — không ghi gì tới khi bấm Save; `saveSettings` trả về settings đã normalize.
