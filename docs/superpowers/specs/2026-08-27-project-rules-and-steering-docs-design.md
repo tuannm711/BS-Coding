@@ -244,11 +244,13 @@ Original numbers are kept, gaps and all: 1, 2, 3, 4, 5, 7, 8, 9, 10, 11, 14, 16.
 New entries start at 17.
 
 Renumbering was considered and rejected on evidence. Entries cite each other, and
-the V1 file already carries two stale citations from an earlier renumber: item 8
-says *"citing debt item 7 (opencode feature gaps)"* when opencode gaps is item 6,
-and item 10 says *"This is not item 8"* when the `ERR_IPC_CHANNEL_CLOSED` entry
-is item 7. Both are corrected during the move, since both have now been checked
-against the entries themselves.
+the V1 file already carries three stale citations from an earlier renumber: item
+8 says *"citing debt item 7 (opencode feature gaps)"* when opencode gaps is item
+6, and item 10 says both *"This is not item 8"* and *"Same reason as item 8"*
+when the `ERR_IPC_CHANNEL_CLOSED` entry is item 7. All three are corrected during
+the move, since all three have now been checked against the entries themselves.
+The citation of item 6 is rewritten to name `docs/v1/technical-debt.md`, because
+item 6 stays there rather than moving here.
 
 ### Triage of the sixteen V1 entries
 

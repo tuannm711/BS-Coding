@@ -126,7 +126,17 @@ Copy each body from `docs/v1/technical-debt.md` at the line ranges below, in thi
 | 14 | 373-389 |
 | 16 | 406-422 |
 
-Change nothing except the three stale citations in step 5.
+Change nothing except the three stale citations in step 5 and the two stale paths below. Both paths were
+correct when written and were moved by commit `0c327ff`; spec section 7 requires every path a project-level
+document cites to exist.
+
+| In entry | Reads | Becomes |
+|---|---|---|
+| 1 | `docs/superpowers/specs/2026-08-25-dead-usage-status-design.md` | `docs/v1/superpowers/specs/2026-08-25-dead-usage-status-design.md` |
+| 9 (twice) | `docs/design/00-goals.md` | `docs/v1/design/00-goals.md` |
+
+The references to `scripts/build-docs-toc.mjs` and `tests/unit/design-docs.test.ts` in entry 17 stay as they
+are: those files are named because they were deleted.
 
 - [ ] **Step 5: Correct the three stale cross-references**
 
@@ -537,6 +547,8 @@ import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 
 const files = ['AGENTS.md', 'docs/CURRENT-WORK.md', 'docs/DEBT.md']
+// Named in debt entry 17 precisely because they no longer exist.
+const deleted = new Set(['scripts/build-docs-toc.mjs', 'tests/unit/design-docs.test.ts'])
 let bad = 0
 for (const file of files) {
   const text = readFileSync(file, 'utf-8')
@@ -545,6 +557,8 @@ for (const file of files) {
   for (const m of text.matchAll(/`([\w./@-]+\.(?:md|ts|tsx|mjs|json))`/g)) targets.add(m[1])
   for (const raw of targets) {
     if (raw.startsWith('http')) continue
+    if (!raw.includes('/')) continue // a bare filename quoted in prose, not a path
+    if (deleted.has(raw)) continue
     const target = raw.split('#')[0]
     if (!target) continue
     const rel = resolve(dirname(file), target.replace(/^\//, ''))
@@ -566,7 +580,9 @@ Run:
 node <scratchpad>/check-doc-links.mjs
 ```
 
-Expected: `all links resolve`. Two paths are named in prose rather than linked because they do not exist yet — `docs/v2/implementation-progress.md` and `docs/v2/acceptance-matrix.md` — and the check must not report them. If it does, the prose was written as a link by mistake.
+Expected: `all links resolve`.
+
+Three groups are deliberately excluded and must not be reported. Bare filenames quoted in prose (`openai.ts`, `05-sessions.md`) are not paths. `scripts/build-docs-toc.mjs` and `tests/unit/design-docs.test.ts` are named in debt entry 17 precisely because they were deleted. `docs/v2/implementation-progress.md` and `docs/v2/acceptance-matrix.md` do not exist yet, so they are named in prose and never written as links — if the check reports one of those two, the prose was written as a link by mistake.
 
 - [ ] **Step 5: Confirm no rule was lost**
 
