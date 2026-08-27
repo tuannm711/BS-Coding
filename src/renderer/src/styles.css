@@ -53,6 +53,11 @@
   --orange: #ffb454;
   --red: #ff5f56;
 
+  /* Both rails are this wide, and neither is draggable. The centre is where
+     the work is — several live agent panes at once — and a right panel the
+     user could widen was taking that space away from it. */
+  --rail-width: 279px;
+
   /* misc */
   --radius-sm: 4px;
   --radius: 6px;
@@ -156,7 +161,7 @@ button, input, select, textarea { font-family: inherit; color: inherit; }
 /* Sidebar */
 .sidebar {
 
-  width: 268px;
+  width: var(--rail-width);
   background: var(--bg-panel);
   border-right: 1px solid var(--hairline);
   display: flex;
@@ -1119,12 +1124,16 @@ select.input { width: 100%; }
 .diff-sign { flex: 0 0 auto; }
 
 /* Mode bar */
+/* Two buttons now, not three: Coordinate moved to Fleet, where the project's
+   own settings live. No flex-wrap — the row fits, and wrapping would hide the
+   next thing crowded into it rather than showing it. */
 .chat-mode { display: flex; align-items: center; gap: 6px; }
+.title-bar-views { display: flex; gap: 2px; padding: 2px; border-radius: var(--radius); background: var(--bg-raised); }
+.title-bar-views .titlebar-btn.active { background: var(--accent); color: #ffffff; }
 .chat-mode-label { font-size: var(--fs-base); font-weight: var(--fw-semibold); text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-strong); font-family: var(--font-display); }
 .chat-mode .btn.active { background: var(--bg-active); border-color: var(--accent-dim); }
 .chat-mode .btn.mode-build.active { background: var(--accent); color: #ffffff; border-color: transparent; }
 .chat-mode .btn.mode-plan.active { background: var(--orange); color: #0b0e13; border-color: transparent; }
-.chat-mode .btn.mode-coordinate.active { background: var(--accent); color: #0b0e13; border-color: transparent; }
 .chat-mode-tools { margin-left: auto; display: flex; align-items: center; gap: 6px; min-width: 0; }
 .model-picker { position: relative; display: inline-flex; }
 .model-trigger {
@@ -1623,7 +1632,8 @@ select.input { width: 100%; }
 .right-panel {
   border-radius: 0;
   position: relative;
-  flex: 0 0 auto;
+  flex: 0 0 var(--rail-width);
+  width: var(--rail-width);
   min-width: 0;
   display: flex; flex-direction: column;
   background: var(--bg-panel);
@@ -1631,11 +1641,6 @@ select.input { width: 100%; }
   animation: bs-rise 300ms 120ms ease-out both;
 }
 .right-panel-main { flex: 1; min-height: 0; display: flex; }
-.right-panel-resizer {
-  position: absolute; left: -3px; top: 0; bottom: 0; width: 7px;
-  cursor: col-resize; z-index: 5;
-}
-.right-panel-resizer:hover { background: var(--accent-dim); }
 .right-panel-content {
   border-radius: 0;
   flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden;
@@ -1692,7 +1697,7 @@ select.input { width: 100%; }
 .quota-account-avatar { display: grid; place-items: center; width: 24px; height: 24px; flex: 0 0 24px; border-radius: 7px; background: var(--accent); color: var(--bg); font-size: var(--fs-sm); font-weight: 700; }
 .quota-account-identity > div { display: grid; gap: 1px; min-width: 0; }
 .quota-account-identity strong, .quota-account-identity span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.quota-account-identity > div > span, .quota-account-subline, .quota-window-reset, .quota-metric span { color: var(--text-faint); font-size: var(--fs-sm); }
+.quota-account-identity > div > span, .quota-account-subline, .quota-metric span { color: var(--text-faint); font-size: var(--fs-sm); }
 .quota-plan-badge { border: 1px solid var(--accent-border); border-radius: 999px; padding: 2px 7px; color: var(--accent); font-size: var(--fs-sm); white-space: nowrap; }
 .quota-pool-error {
   margin-left: 6px; font-size: var(--fs-xs); color: var(--red);
@@ -1717,8 +1722,14 @@ select.input { width: 100%; }
 .quota-speed-control button:hover, .quota-speed-control button:focus-visible { border-color: var(--accent-border); color: var(--text-strong); }
 .quota-speed-control button.active { border-color: var(--accent-border); background: var(--accent-dim); color: var(--accent); }
 .quota-window { display: grid; gap: 4px; }
-.quota-window-label { font-size: var(--fs-sm); }
-.quota-window-label strong { color: var(--text-strong); font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+/* Name on the left, countdown and remaining right-aligned and tabular so the
+   numbers line up down the card. One row, because the percentage, the bar and
+   the countdown are one fact stated three ways. */
+.quota-window-label { font-size: var(--fs-sm); flex-wrap: nowrap; }
+.quota-window-label > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.quota-window-label em { flex: none; font-style: normal; color: var(--text-faint); font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.quota-window-label strong { flex: none; color: var(--text-strong); font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.quota-window.state-exhausted .quota-window-label strong, .quota-window.state-cooldown .quota-window-label strong { color: var(--red); }
 .quota-progress { height: 7px; overflow: hidden; border-radius: 999px; background: var(--bg-input); }
 .quota-progress > span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 55%, white)); transition: width 200ms ease; }
 .quota-usage-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px; }
@@ -1748,12 +1759,120 @@ select.input { width: 100%; }
 .quota-agent-name { display: grid; gap: 1px; }
 .quota-agent-name strong, .quota-agent-name code { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .quota-agent-name code { font-size: var(--fs-xs); }
+
+/* Fleet — agents nested inside the quota pool they draw on, so two models
+   sharing one pool cannot read as two independent choices. */
+.fleet-panel { display: flex; flex-direction: column; min-height: 0; height: 100%; overflow-y: auto; }
+.fleet-board { display: flex; flex-direction: column; gap: 8px; padding: 8px; }
+.fleet-pool-agents { display: flex; flex-direction: column; gap: 2px; margin-top: 6px; padding-left: 10px; border-left: 1px solid var(--hairline); }
+.quota-account-refresh { flex: none; display: grid; place-items: center; width: 22px; height: 22px; padding: 0; border-radius: var(--radius-sm); background: var(--bg-input); border: 1px solid var(--hairline); color: var(--text-dim); cursor: pointer; }
+.quota-account-refresh:hover:not(:disabled) { background: var(--bg-input-hover); color: var(--text-strong); }
+.quota-account-refresh:disabled { cursor: default; opacity: 0.6; }
+.quota-account-refresh:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+.quota-account-refresh .spinning { animation: fleet-spin 900ms linear infinite; }
+@keyframes fleet-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .quota-account-refresh .spinning { animation: none; } }
+
+/* One toggle rather than two labelled buttons: at 300px the pair pushed the
+   agent's own name out of its row. Unlit is standard. */
+.fleet-speed { flex: none; display: grid; place-items: center; width: 22px; height: 22px; padding: 0; border-radius: var(--radius-sm); background: var(--bg-input); border: 1px solid var(--hairline); color: var(--text-faint); cursor: pointer; }
+.fleet-speed:hover { background: var(--bg-input-hover); color: var(--text); }
+.fleet-speed.fast { background: var(--accent-dim); border-color: var(--accent-border); color: var(--accent-strong); }
+.fleet-speed:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+.fleet-agent { display: flex; align-items: center; gap: 6px; padding: 3px 4px; border-radius: var(--radius-sm); min-width: 0; }
+.fleet-agent:hover { background: var(--bg-hover); }
+.fleet-agent.coordinator { background: var(--accent-dim); }
+.fleet-agent-name { display: grid; gap: 1px; flex: 1; min-width: 0; padding: 0; background: none; border: 0; text-align: left; color: inherit; cursor: pointer; }
+.fleet-agent-name strong, .fleet-agent-name code { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fleet-agent-name code { color: var(--text-faint); font-size: var(--fs-xs); }
+.fleet-agent-name:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+.fleet-role { flex: none; padding: 1px 6px; border-radius: 999px; background: var(--accent-dim); border: 1px solid var(--accent-border); color: var(--accent-strong); font-size: var(--fs-xs); }
+.fleet-role.plan { background: var(--bg-active); border-color: var(--hairline); color: var(--text-dim); }
+/* Hidden until the row is under the pointer or focused: the roster is read far
+   more often than the role is changed, and a button on every row would read as
+   the panel's main action. */
+/* Three fixed lines in the fleet header, none of which may wrap: the avatar
+   used to end up alone on its own line at this width. */
+.quota-account-head { display: grid; gap: 2px; min-width: 0; }
+.quota-head-identity { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.quota-head-identity strong { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.quota-head-source { display: flex; align-items: center; gap: 5px; min-width: 0; flex-wrap: wrap; }
+.quota-head-provider { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-faint); font-size: var(--fs-xs); }
+.quota-head-state { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: var(--fs-xs); }
+/* Badges keep their shape and colour at rail width; only the padding and type
+   size come down. Flattening them to plain text saved a few pixels and cost
+   the glance. */
+.quota-badge-tight { flex: none; padding: 1px 6px; font-size: var(--fs-xs); line-height: 1.5; }
+.quota-head-state .quota-plan-badge.quota-state-ready { border-color: color-mix(in srgb, var(--green) 45%, transparent); color: var(--green); }
+.quota-head-state .quota-plan-badge.quota-state-cooldown { border-color: color-mix(in srgb, var(--yellow) 45%, transparent); color: var(--yellow); }
+.quota-head-state .quota-plan-badge.quota-state-quota-exhausted,
+.quota-head-state .quota-plan-badge.quota-state-capacity-exhausted,
+.quota-head-state .quota-plan-badge.quota-state-auth-error { border-color: color-mix(in srgb, var(--red) 45%, transparent); color: var(--red); }
+.quota-age { flex: none; margin-left: auto; color: var(--text-faint); font-size: var(--fs-xs); white-space: nowrap; }
+
+/* Role controls are icons. Three labelled buttons left the agent's own name
+   with nowhere to go — the one thing the row exists to show. */
+.fleet-toggle { flex: none; display: grid; place-items: center; width: 22px; height: 22px; padding: 0; border-radius: var(--radius-sm); background: var(--bg-input); border: 1px solid var(--hairline); color: var(--text-faint); cursor: pointer; opacity: 0; }
+.fleet-agent:hover .fleet-toggle, .fleet-toggle:focus-visible, .fleet-toggle.on { opacity: 1; }
+.fleet-toggle:hover:not(:disabled) { background: var(--bg-input-hover); color: var(--text-strong); }
+.fleet-toggle.on { background: var(--accent-dim); border-color: var(--accent-border); color: var(--accent-strong); }
+.fleet-toggle:disabled { cursor: default; }
+.fleet-toggle:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+/* Rail width: the card carries no horizontal slack, so anything that can be
+   long is clamped rather than allowed to push a neighbour out of the row. */
+.quota-account-card.fleet { padding: 8px; }
+.quota-account-card.fleet .quota-account-header { flex-wrap: nowrap; }
+.quota-account-card.fleet .quota-account-identity { min-width: 0; }
+.quota-account-card.fleet .quota-account-identity strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.quota-account-card.fleet .quota-account-identity > div > span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.quota-account-card.fleet .quota-account-badges { flex: none; }
+.fleet-unassigned { display: flex; flex-direction: column; gap: 4px; padding: 8px; border: 1px dashed var(--hairline); border-radius: var(--radius); }
+.fleet-unassigned h6 { margin: 0; color: var(--text-dim); }
+.fleet-empty { padding: 16px; color: var(--text-dim); }
+
+/* Sessions under the open project. They were a dropdown inside the chat frame,
+   which could show neither which session was running nor what kind it was. */
+.project-sessions { padding: 4px 0 6px 10px; margin-left: 4px; border-left: 1px solid var(--hairline); display: grid; gap: 4px; }
+.project-sessions-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; color: var(--text-faint); font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: 0.08em; }
+.session-group { display: grid; gap: 1px; }
+.session-group h6 { margin: 4px 0 2px; color: var(--text-dim); font-size: var(--fs-xs); }
+.session-group.coordination h6 { color: var(--accent-strong); }
+.session-row { display: flex; align-items: center; gap: 4px; border-radius: var(--radius-sm); min-width: 0; }
+.session-row:hover { background: var(--bg-hover); }
+.session-row.active { background: var(--bg-active); }
+.session-open { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; padding: 3px 6px; background: none; border: 0; color: var(--text); text-align: left; cursor: pointer; }
+.session-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-sm); }
+.session-row.active .session-title { color: var(--text-strong); }
+.session-open:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
+.session-running { flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 3px color-mix(in srgb, var(--green) 20%, transparent); }
+.session-delete { flex: none; opacity: 0; }
+.session-row:hover .session-delete, .session-delete:focus-visible { opacity: 1; }
+
+/* Coordination is a grid of live chats, not a summary of them. The coordinator
+   is pinned left; every worker it has given work to tiles the rest. Watching
+   the work happen is the whole point of the screen. */
+.main-stack { display: contents; }
+.main-stack.hidden { display: none; }
+.coordinator-surface { flex: 1; min-height: 0; min-width: 0; display: grid; grid-template-columns: minmax(320px, 1fr) 2fr; gap: 8px; padding: 8px; }
+.coordinator-surface.tiles-0 { grid-template-columns: 1fr; }
+.coordinator-tile { min-width: 0; min-height: 0; display: flex; flex-direction: column; background: var(--bg-panel); border: 1px solid var(--hairline); border-radius: var(--radius); overflow: hidden; }
+.coordinator-tile.state-running { border-color: var(--accent-border); }
+.coordinator-tile.state-failed { border-color: color-mix(in srgb, var(--red) 45%, transparent); }
+.coordinator-tile.state-no-result { border-color: color-mix(in srgb, var(--yellow) 45%, transparent); }
+.coordinator-tile-head { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 10px; border-bottom: 1px solid var(--hairline); background: var(--bg-raised); }
+.coordinator-tile-head strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Every tile owns a full ChatPanel, so it must be allowed to scroll inside its
+   own box rather than stretch the grid row to fit its transcript. */
+.coordinator-tile > .chat-panel { min-height: 0; flex: 1; }
+.coordinator-workers { min-width: 0; min-height: 0; display: grid; gap: 8px; grid-template-columns: 1fr; }
+.coordinator-workers:has(> :nth-child(2)) { grid-template-columns: 1fr 1fr; }
+.coordinator-state.state-no-result { color: var(--yellow); }
+.coordinator-state.state-failed { color: var(--red); }
 .quota-speed-control button { min-height: 28px; padding-inline: 7px; }
 .quota-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 7px; min-width: 0; }
 .quota-group { display: grid; align-content: start; gap: 6px; min-width: 0; padding: 7px; border: 1px solid var(--hairline); border-radius: var(--radius-sm); background: color-mix(in srgb, var(--bg-input) 78%, transparent); }
 .quota-group h6 { margin: 0; color: var(--text-strong); font-size: var(--fs-sm); font-weight: var(--fw-semibold); }
 .quota-window + .quota-window { padding-top: 6px; border-top: 1px solid var(--hairline); }
-.quota-window-reset { font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
 .quota-window.state-exhausted .quota-progress > span, .quota-window.state-cooldown .quota-progress > span { background: var(--danger); }
 .quota-progress { height: 6px; }
 .quota-empty { padding: 6px 7px; border: 1px dashed var(--hairline); border-radius: var(--radius-sm); color: var(--text-faint); font-size: var(--fs-sm); }
@@ -1787,12 +1906,14 @@ select.input { width: 100%; }
 }
 .right-panel-view.hidden { display: none; }
 .right-panel-tabs {
-  flex: 0 0 44px; display: flex; flex-direction: column; align-items: stretch;
+  /* 30px, not 44. The rail is fixed at --rail-width now, so every pixel the
+     tab strip takes is a pixel the tree or the quota bars do not get. */
+  flex: 0 0 30px; display: flex; flex-direction: column; align-items: stretch;
   border-left: 1px solid var(--hairline); background: var(--bg-raised);
   border-radius: 0;
 }
 .right-panel-tab {
-  flex: 0 0 auto; height: 44px; display: flex; align-items: center; justify-content: center;
+  flex: 0 0 auto; height: 32px; display: flex; align-items: center; justify-content: center;
   background: transparent; border: none; color: var(--text-dim); cursor: pointer;
   transition: background 120ms ease, color 120ms ease;
 }

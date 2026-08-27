@@ -1,7 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { Channels } from '../shared/ipc'
 import type { ArtifactsChangedEvent } from '../shared/ipc'
-import type { AgentMode, ChatEvent, Command, ContextChangedEvent, FileViewerPayload, ImageAttachment, BsSettings, NewAgentInput, PromptResponse, ProviderConnection, ProviderUsage, Template, TraceEvent, UpdaterStatusEvent, WorkspaceRuntime } from '../shared/types'
+import type { AgentMode, AgentRole, ChatEvent, Command, ContextChangedEvent, FileViewerPayload, ImageAttachment, BsSettings, NewAgentInput, PromptResponse, ProviderConnection, ProviderUsage, Template, TraceEvent, UpdaterStatusEvent, WorkspaceRuntime } from '../shared/types'
 import type { AgentApi, AgentConfigEvent, AgentStateEvent, BrowserInstallGuideEvent, GitStatusEvent, PtyDataEvent, TerminalExitEvent, WindowMaximizedChangeEvent } from '../shared/ipc'
 import type { BrowserStatusInfo } from '../shared/browser-types'
 import type { RemoteStatus } from '../shared/remote-types'
@@ -146,6 +146,8 @@ const api: AgentApi = {
   editQueued: (agentId: string, id: string, text: string) =>
     ipcRenderer.invoke(Channels.ChatQueueEdit, agentId, id, text),
   listSessions: (agentId: string) => ipcRenderer.invoke(Channels.SessionList, agentId),
+  activeSessionFor: (agentId: string) => ipcRenderer.invoke(Channels.SessionActive, agentId),
+  setAgentRole: (agentId: string, role: AgentRole) => ipcRenderer.invoke(Channels.AgentSetRole, agentId, role),
   createSession: (agentId: string) => ipcRenderer.invoke(Channels.SessionCreate, agentId),
   switchSession: (agentId: string, sessionId: string) =>
     ipcRenderer.invoke(Channels.SessionSwitch, agentId, sessionId),

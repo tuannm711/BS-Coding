@@ -1,56 +1,36 @@
-import { useCallback, useRef } from 'react'
-import { FileText, FolderTree } from 'lucide-react'
-import type { ArtifactEntry } from '@shared/types'
+import { FileText, FolderTree, Users } from 'lucide-react'
+import type { AgentConfig, AgentRole, ArtifactEntry } from '@shared/types'
 import RightPanelTree from './RightPanelTree'
 import RightPanelArtifacts from './RightPanelArtifacts'
-import RightPanelQuota, { type QuotaAgent } from './RightPanelQuota'
+import FleetPanel from './fleet/FleetPanel'
+
+export type RightPanelTab = 'tree' | 'artifacts' | 'fleet'
 
 interface Props {
   root: string | null
-  tab: 'tree' | 'artifacts'
-  width: number
+  tab: RightPanelTab
   artifacts: ArtifactEntry[]
-  agents: QuotaAgent[]
-  onTabChange: (tab: 'tree' | 'artifacts') => void
-  onWidthChange: (width: number) => void
+  agents: AgentConfig[]
+  onSelectAgent: (agentId: string) => void
+  onSetRole: (agentId: string, role: AgentRole) => void
+  onTabChange: (tab: RightPanelTab) => void
   onClearArtifacts: () => void
 }
 
 function FolderTreeIcon() {
-  return <FolderTree size={16} aria-hidden="true" />
+  return <FolderTree size={14} aria-hidden="true" />
 }
 
 function ArtifactIcon() {
-  return <FileText size={16} aria-hidden="true" />
+  return <FileText size={14} aria-hidden="true" />
 }
 
 export default function RightPanel({
-  root, tab, width, artifacts, agents, onTabChange, onWidthChange, onClearArtifacts
+  root, tab, artifacts, agents, onSelectAgent, onSetRole, onTabChange, onClearArtifacts
 }: Props) {
-  const dragRef = useRef<{ startX: number; startWidth: number } | null>(null)
-
-  const startDrag = useCallback((e: React.MouseEvent) => {
-    e.preventDefault()
-    dragRef.current = { startX: e.clientX, startWidth: width }
-    const onMove = (ev: MouseEvent) => {
-      if (!dragRef.current) return
-      const delta = dragRef.current.startX - ev.clientX
-      const next = Math.min(600, Math.max(300, dragRef.current.startWidth + delta))
-      onWidthChange(next)
-    }
-    const onUp = () => {
-      dragRef.current = null
-      document.removeEventListener('mousemove', onMove)
-      document.removeEventListener('mouseup', onUp)
-    }
-    document.addEventListener('mousemove', onMove)
-    document.addEventListener('mouseup', onUp)
-  }, [width, onWidthChange])
 
   return (
-    <div className="right-panel" style={{ width }}>
-      <div className="right-panel-resizer" onMouseDown={startDrag} />
-      <RightPanelQuota agents={agents} />
+    <div className="right-panel">
       <div className="right-panel-main">
         <div className="right-panel-content">
         {/* Keep both views mounted so the tree keeps its expanded state (and
@@ -60,6 +40,9 @@ export default function RightPanel({
         </div>
         <div className={`right-panel-view${tab === 'artifacts' ? '' : ' hidden'}`}>
           <RightPanelArtifacts root={root} artifacts={artifacts} onClear={onClearArtifacts} />
+        </div>
+        <div className={`right-panel-view${tab === 'fleet' ? '' : ' hidden'}`}>
+          <FleetPanel agents={agents} onSelectAgent={onSelectAgent} onSetRole={onSetRole} />
         </div>
         </div>
         <div className="right-panel-tabs" role="tablist" aria-label="Right panel tabs">
@@ -78,6 +61,14 @@ export default function RightPanel({
           onClick={() => onTabChange('artifacts')}
         >
           <ArtifactIcon />
+        </button>
+        <button
+          className={`right-panel-tab${tab === 'fleet' ? ' active' : ''}`}
+          title="Fleet"
+          aria-label="Fleet"
+          onClick={() => onTabChange('fleet')}
+        >
+          <Users size={14} aria-hidden="true" />
         </button>
         </div>
       </div>

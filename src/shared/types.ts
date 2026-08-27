@@ -4,6 +4,10 @@ export type AgentStatus = 'spawning' | 'running' | 'idle' | 'exited' | 'stopped'
 export type AlertLevel = 'normal' | 'attention' | 'error'
 export type AgentKind = 'pty' | 'native'
 export type AgentMode = 'build' | 'plan' | 'coordinate'
+// The three states one agent can be in for a coordinated run. Derived from
+// `mode` and `worker` rather than stored: a role field beside mode would be a
+// second answer to the question mode already asks.
+export type AgentRole = 'coordinator' | 'worker' | 'none'
 export type ModelVariant = string
 export type AgentSpeed = 'standard' | 'fast'
 export type ChatRole = 'user' | 'assistant'
@@ -45,6 +49,11 @@ export interface AgentConfig {
   cwd: string
   kind?: AgentKind
   mode?: AgentMode
+  // May a coordinator assign work to this agent? Absent means yes, so every
+  // agent that existed before the switch keeps working. This is not a second
+  // answer to what `mode` asks: mode says what the agent is doing, worker says
+  // whether it can be given something to do.
+  worker?: boolean
   variant?: ModelVariant
   speed?: AgentSpeed
   model?: string
@@ -159,6 +168,13 @@ export interface SessionSummary {
 export type ProjectSessionSummary = Omit<SessionSummary, 'agentId'> & {
   projectPath: string
   lastAgentId?: string
+  // A turn is running in this session right now. Derived from the turn's bound
+  // session, so it stays true no matter which session the user is looking at.
+  running?: boolean
+  // Where the session's work comes from. A session becomes 'coordination' when
+  // a coordinator dispatched a task into it; everything else is ordinary work.
+  // Stored rather than re-derived on each read, so two places cannot disagree.
+  kind?: 'work' | 'coordination'
 }
 
 /**
@@ -173,11 +189,23 @@ export interface CoordinationAssignment {
   turnId?: string
   workerId: string
   workerName: string
+  // The session the task actually ran in, so the coordination view can render
+  // that worker's live chat rather than a summary of it. Sessions are one
+  // store keyed by cwd — a worker's session is a session of this project — so
+  // this needs no new lookup, only recording which one it was.
+  sessionId: string
   task: string
   startedAt: number
   finishedAt?: number
-  state: 'running' | 'completed' | 'failed'
+  // 'no-result' is not 'failed'. A worker that ran, used tools and ended
+  // without writing a reply has done something; calling that a failure hid the
+  // one case worth reading — and reading it meant opening the worker's own
+  // session, which is what this record exists to spare.
+  state: 'running' | 'completed' | 'failed' | 'no-result'
   result?: string
+  // What the turn actually did, so the board can say "2 tools, last: skill"
+  // instead of a bare state chip.
+  toolNames?: string[]
 }
 
 export type ChatEvent = Partial<Omit<ChatEventScope, 'agentId'>> & (
@@ -225,6 +253,11 @@ export interface QueuedMessage {
   text: string
   displayText?: string
   images?: ImageAttachment[]
+  // Delegated by a coordinator. Steering is something a person does while
+  // watching an agent work; a coordinator is not watching, it is waiting for a
+  // result it will act on, so this runs as its own turn rather than being
+  // folded into whatever the worker is already doing.
+  assigned?: boolean
 }
 
 export type SessionQueuedMessage = QueuedMessage & { agentId: string }
@@ -338,7 +371,11 @@ export interface ProviderAccount {
 
 export interface ProviderQuotaWindow {
   id: string
+  // Short enough to sit on one line beside a countdown and a percentage —
+  // 'Weekly', '5-hour'. The provider's sentence about the window goes in
+  // `description`; a label that is a paragraph is not a label.
   label: string
+  description?: string
   kind: 'session' | 'weekly' | 'monthly' | 'additional' | 'unknown'
   remainingPercent?: number
   resetAt?: number

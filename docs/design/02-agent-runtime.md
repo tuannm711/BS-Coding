@@ -8,13 +8,14 @@ this document assumes an `LlmClient` already exists.
 <!-- toc -->
 | Section | Lines | Names |
 | --- | --- | --- |
-| [Pieces](#pieces) | 20-39 | `src/main/bs-agent-manager.ts`, `BsAgentManager`, `src/main/agent/loop.ts`, `SessionRunner`, `src/main/agent/llm.ts`, `LlmClient` |
-| [Data flow](#data-flow) | 40-68 | `BsAgentManager`, `SessionRunner`, `LoopDeps`, `toLlmMessages(getItems())`, `LlmClient`, `text-delta` |
-| [Types that carry it](#types-that-carry-it) | 69-83 | `LoopDeps`, `src/main/agent/loop.ts`, `getItems`, `appendMessage`, `appendTool`, `tests/unit/agent-loop.test.ts` |
-| [Design decisions](#design-decisions) | 84-117 | `LoopDeps`, `createLlm`, `LlmClient`, `src/main/agent/AGENTS.md`, `takeSteers`, `tools/` |
-| [Two ways to hand work off](#two-ways-to-hand-work-off) | 118-141 | `SessionRunner`, `SUBAGENT_CONFIGS`, `COORDINATE_RULES`, `visibleToolDefs`, `decidePermission` |
-| [What a coordinator is told, and what it can reach](#what-a-coordinator-is-told-and-what-it-can-reach) | 142-173 | `coordinatorNote`, `BsAgentManager`, `systemSuffix`, `modeNote`, `decidePermission`, `--output` |
-| [Known limits](#known-limits) | 174-186 | `MAX_COMPACT_PER_RUN`, `compactIfOverThreshold`, `undoTurn`, `pushTurn`, `turnId` |
+| [Pieces](#pieces) | 21-40 | `src/main/bs-agent-manager.ts`, `BsAgentManager`, `src/main/agent/loop.ts`, `SessionRunner`, `src/main/agent/llm.ts`, `LlmClient` |
+| [Data flow](#data-flow) | 41-69 | `BsAgentManager`, `SessionRunner`, `LoopDeps`, `toLlmMessages(getItems())`, `LlmClient`, `text-delta` |
+| [Types that carry it](#types-that-carry-it) | 70-84 | `LoopDeps`, `src/main/agent/loop.ts`, `getItems`, `appendMessage`, `appendTool`, `tests/unit/agent-loop.test.ts` |
+| [Design decisions](#design-decisions) | 85-118 | `LoopDeps`, `createLlm`, `LlmClient`, `src/main/agent/AGENTS.md`, `takeSteers`, `tools/` |
+| [Two ways to hand work off](#two-ways-to-hand-work-off) | 119-144 | `SessionRunner`, `SUBAGENT_CONFIGS`, `COORDINATE_RULES`, `visibleToolDefs`, `decidePermission`, `runAssignment` |
+| [What a handoff borrows](#what-a-handoff-borrows) | 145-174 | `systemSuffix` |
+| [What a coordinator is told, and what it can reach](#what-a-coordinator-is-told-and-what-it-can-reach) | 175-206 | `coordinatorNote`, `BsAgentManager`, `systemSuffix`, `modeNote`, `decidePermission`, `--output` |
+| [Known limits](#known-limits) | 207-219 | `MAX_COMPACT_PER_RUN`, `compactIfOverThreshold`, `undoTurn`, `pushTurn`, `turnId` |
 <!-- /toc -->
 
 ## Pieces
@@ -135,9 +136,41 @@ drops anything `decidePermission` denies, so a coordinator is never shown an
 edit tool to decline. Asking a model not to write is not the same as removing
 write.
 
-Concurrency needs no scheduler: `send` awaits a whole turn and `running` is
-keyed per agent, so two assignments to different agents run at once and two to
-the same agent queue.
+Concurrency needs no scheduler, but not for the reason once written here.
+`send` resolves when a **busy** agent accepts the message into its queue, not
+when the turn ends — so `runAssignment` uses `sendAwaited`, which resolves after
+that message's own turn. `running` is keyed per agent, so two assignments to
+different agents run at once and two to the same agent queue.
+
+## What a handoff borrows
+
+A quota refusal moves the turn to another **account**, and that is all it moves.
+
+```ts
+// loop.ts, per step
+const target = this.deps.currentTarget?.()
+const stream = (target?.llm ?? this.deps.llm).stream({
+  model: target?.model ?? this.deps.model,
+  system: this.deps.system + (this.deps.systemSuffix?.() ?? ''),
+  tools: isLastStep ? [] : this.visibleToolDefs(),
+```
+
+`llm` and `model` come from the serving agent. **`tools`, `system` and
+`systemSuffix` stay with the agent whose turn it is** — its permissions, its
+instructions, its mode note, its identity.
+
+The prompt used to be borrowed too, which meant a plan-mode turn moving to a
+build agent's account lost its read-only note while still holding plan-mode
+tools. It no longer is.
+
+**There is no filter on candidates.** One existed, restricting them to the same
+mode, on the claim that the tool set differed — it never did. With the prompt no
+longer borrowed there is nothing left to protect, and removing it also gave a
+coordinator a fallback again: coordination is exclusive per project, so a
+same-mode filter left it with no candidate at all.
+
+An agent nobody assigned a role to is therefore spare quota without a rule
+saying so.
 
 ## What a coordinator is told, and what it can reach
 

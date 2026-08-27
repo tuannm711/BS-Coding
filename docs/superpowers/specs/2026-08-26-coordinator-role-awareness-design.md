@@ -38,6 +38,19 @@ in plan mode, which is denied every write tool. Coordinate only made it obvious.
 The fix is one rule, not a special case: **a candidate must be in the same mode
 as the agent it replaces.**
 
+> **Reversed on 2026-08-27.** The premise above is false. The loop takes
+> `tools` from the agent whose turn it is and never from the serving one, so a
+> handoff never changed the tool set — the sentence "a worker asked to carry a
+> coordinating turn would do the work rather than assign it" describes
+> something that could not happen. What a handoff did borrow was the serving
+> agent's **system prompt**, which is a real problem and a different one: it is
+> now not borrowed either, and the filter is gone.
+>
+> The filter also caused a fault of its own. Coordination became exclusive per
+> project, so a coordinator had no same-mode candidate at all and its turn
+> simply failed when quota ran out. See
+> `docs/superpowers/specs/2026-08-27-agent-roles-design.md`.
+
 ## 2. Everything the coordinator needs is already known
 
 ```ts

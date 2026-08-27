@@ -3,7 +3,7 @@ import type { BrowserInstallGuideEvent } from '@shared/ipc'
 import type { BrowserStatusInfo } from '@shared/browser-types'
 import { Terminal } from '@xterm/xterm'
 import type {
-  AgentConfig, AgentState, ArtifactEntry, GitStatus, Template, TerminalInfo, UpdaterStatusEvent, WorkspaceRuntime, WorkspaceSummary
+  AgentConfig, AgentState, ArtifactEntry, GitStatus, ProjectSessionSummary, Template, TerminalInfo, UpdaterStatusEvent, WorkspaceRuntime, WorkspaceSummary
 } from '@shared/types'
 import Sidebar from './components/Sidebar'
 import PaneGrid from './components/PaneGrid'
@@ -12,7 +12,7 @@ import EmptyState from './components/EmptyState'
 import StatusBar from './components/StatusBar'
 import TitleBar from './components/TitleBar'
 import CoordinatorView from './components/coordinator/CoordinatorView'
-import RightPanel from './components/RightPanel'
+import RightPanel, { type RightPanelTab } from './components/RightPanel'
 import SettingsDialog from './components/settings/SettingsDialog'
 import BrowserDialog from './components/BrowserDialog'
 import InstallGuideDialog from './components/InstallGuideDialog'
@@ -47,12 +47,13 @@ export default function App() {
   const manualCheckRef = useRef(false)
   const [terminals, setTerminals] = useState<TerminalInfo[]>([])
   const [rightOpen, setRightOpen] = useState(() => localStorage.getItem('bs.rightpanel.open') !== '0')
-  const [rightTab, setRightTab] = useState<'tree' | 'artifacts'>(() =>
-    localStorage.getItem('bs.rightpanel.tab') === 'artifacts' ? 'artifacts' : 'tree')
-  const [rightWidth, setRightWidth] = useState(() => {
-    const w = Number(localStorage.getItem('bs.rightpanel.width'))
-    return Number.isFinite(w) && w >= 300 && w <= 600 ? w : 340
+  const [rightTab, setRightTab] = useState<RightPanelTab>(() => {
+    const stored = localStorage.getItem('bs.rightpanel.tab')
+    // Validated rather than cast: a value stored before the fleet tab existed,
+    // or one hand-edited, must not select a view that is not there.
+    return stored === 'artifacts' || stored === 'fleet' ? stored : 'tree'
   })
+  const [projectSessions, setProjectSessions] = useState<ProjectSessionSummary[]>([])
   const [artifacts, setArtifacts] = useState<Record<string, ArtifactEntry[]>>({})
   const termsRef = useRef<Map<string, Terminal>>(new Map())
   const buffersRef = useRef<Map<string, string>>(new Map())
@@ -67,9 +68,6 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('bs.rightpanel.tab', rightTab)
   }, [rightTab])
-  useEffect(() => {
-    localStorage.setItem('bs.rightpanel.width', String(rightWidth))
-  }, [rightWidth])
 
   useEffect(() => {
     return window.api.onArtifactsChanged(({ projectPath, artifacts: list }) => {
@@ -183,20 +181,72 @@ export default function App() {
     const rt = await window.api.openWorkspace(path)
     const native = rt.workspace.agents.filter(agent => agent.kind === 'native')
     const fallbackAgentId = resolveSelectedNativeAgent(native, null) ?? undefined
-    const projectSessions = fallbackAgentId ? await window.api.listProjectSessions(path) : []
+    // Paint as soon as the workspace is known. Everything below is a further
+    // IPC round trip, and holding setRuntime until they all resolved is what
+    // made switching project feel slow: the shell showed the previous project
+    // until the last of them came back.
+    setRuntime(rt)
+    setTerminals([])
+    setSelectedNativeAgentId(resolveSelectedNativeAgent(native, fallbackAgentId ?? null))
+    setBackgrounds(Object.fromEntries(rt.workspace.agents.map(a => [a.id, a.background ?? false])))
+    // Independent of each other, so they wait together rather than in turn.
+    const [projectSessions, list] = await Promise.all([
+      fallbackAgentId ? window.api.listProjectSessions(path) : Promise.resolve([]),
+      window.api.listArtifacts(path)
+    ])
     const projectSession = projectSessions[0]
       ?? (fallbackAgentId ? await window.api.createProjectSession(path, fallbackAgentId) : null)
-    const list = await window.api.listArtifacts(path)
-    setRuntime(rt)
     setActiveProjectSessionId(projectSession?.id ?? null)
-    setSelectedNativeAgentId(resolveSelectedNativeAgent(native, projectSession?.lastAgentId ?? fallbackAgentId ?? null))
-    setTerminals([])
+    if (projectSession?.lastAgentId) {
+      setSelectedNativeAgentId(resolveSelectedNativeAgent(native, projectSession.lastAgentId))
+    }
     setArtifacts(prev => ({ ...prev, [path]: list }))
-    setBackgrounds(Object.fromEntries(rt.workspace.agents.map(a => [a.id, a.background ?? false])))
     for (const id of buffersRef.current.keys()) {
       if (!rt.workspace.agents.some(a => a.id === id)) buffersRef.current.delete(id)
     }
   }, [terminals])
+
+  const projectPath = runtime?.workspace.projectPath ?? null
+
+  const reloadProjectSessions = useCallback(() => {
+    if (!projectPath) { setProjectSessions([]); return }
+    void window.api.listProjectSessions(projectPath).then(setProjectSessions)
+  }, [projectPath])
+
+  useEffect(() => { reloadProjectSessions() }, [reloadProjectSessions])
+
+  // The running dot and a session's title both change from chat events, so the
+  // list follows the same edges the status bar does rather than polling.
+  useEffect(() => window.api.onChatEvent(event => {
+    if (event.type === 'turn-started' || event.type === 'done' || event.type === 'error'
+      || event.type === 'user-message' || event.type === 'assignment-started') reloadProjectSessions()
+  }), [reloadProjectSessions])
+
+  const handleSelectSession = useCallback((sessionId: string) => {
+    if (!projectPath) return
+    void window.api.switchProjectSession(projectPath, sessionId).then(next => {
+      if (!next) return
+      setActiveProjectSessionId(next.id)
+      if (next.lastAgentId) setSelectedNativeAgentId(next.lastAgentId)
+      reloadProjectSessions()
+    })
+  }, [projectPath, reloadProjectSessions])
+
+  const handleCreateSession = useCallback(() => {
+    if (!projectPath) return
+    void window.api.createProjectSession(projectPath, selectedNativeAgentId ?? undefined).then(next => {
+      setActiveProjectSessionId(next.id)
+      reloadProjectSessions()
+    })
+  }, [projectPath, selectedNativeAgentId, reloadProjectSessions])
+
+  const handleDeleteSession = useCallback((sessionId: string) => {
+    if (!projectPath) return
+    void window.api.deleteProjectSession(projectPath, sessionId).then(next => {
+      setActiveProjectSessionId(next?.id ?? null)
+      reloadProjectSessions()
+    })
+  }, [projectPath, reloadProjectSessions])
 
   const handleProjectSessionChange = useCallback((sessionId: string, agentId?: string) => {
     setActiveProjectSessionId(sessionId)
@@ -285,14 +335,25 @@ export default function App() {
   const nativeAgents = useMemo(() => runtime?.workspace.agents.filter(agent => agent.kind === 'native') ?? [], [runtime?.workspace.agents])
   const effectiveNativeAgentId = resolveSelectedNativeAgent(nativeAgents, selectedNativeAgentId)
   const panes = useMemo(() => projectVisiblePanes(allPanes, effectiveNativeAgentId), [allPanes, effectiveNativeAgentId])
+  // find, not filter, because at most one match is possible: setMode enforces
+  // one coordinator per project. The invariant lives in the manager, not here —
+  // when it lived nowhere, this line silently picked one of two.
   const coordinator = useMemo(
     () => nativeAgents.find(agent => agent.mode === 'coordinate') ?? null,
     [nativeAgents]
   )
+  // Selects the agent in the Work view, and says only that. It cannot show the
+  // assignment's own transcript: Work is bound to a project session, while a
+  // delegated turn runs in the worker's own agent session. The board shows the
+  // detail inline instead of pretending this navigates to it.
+  const handleOpenWorker = useCallback((workerId: string) => {
+    setSelectedNativeAgentId(workerId)
+    setCoordinateOpen(false)
+  }, [])
+  // Not closed when the coordinator goes away. The view now says so and offers
+  // the route to Fleet, which is more use than being thrown back to the panes
+  // with no explanation.
   const [coordinateOpen, setCoordinateOpen] = useState(false)
-  // A coordinator can be switched out of coordinate mode while its view is
-  // open; the view would then have nothing to show and no way back.
-  useEffect(() => { if (!coordinator) setCoordinateOpen(false) }, [coordinator])
 
   useEffect(() => {
     setSelectedNativeAgentId(current => resolveSelectedNativeAgent(nativeAgents, current))
@@ -312,6 +373,11 @@ export default function App() {
           workspaces={workspaces}
           templates={templates}
           activePath={runtime?.workspace.projectPath ?? null}
+          sessions={projectSessions}
+          activeSessionId={activeProjectSessionId}
+          onSelectSession={handleSelectSession}
+          onCreateSession={handleCreateSession}
+          onDeleteSession={handleDeleteSession}
           onOpen={openWorkspace}
           onRemove={removeWorkspace}
           onRefresh={refreshWorkspaces}
@@ -322,14 +388,20 @@ export default function App() {
           updateChecking={updateChecking}
         />
         <main className="main">
-          {coordinateOpen && coordinator ? (
+          {/* Hidden, not unmounted. Switching to Coordination used to tear down
+              every pane — xterm instances included — and rebuild them on the way
+              back, replaying buffers each time. RightPanel already keeps its
+              views mounted for the same reason. */}
+          {coordinateOpen ? (
             <CoordinatorView
-              coordinatorId={coordinator.id}
-              coordinatorName={coordinator.name}
-              onOpenWorker={workerId => { setSelectedNativeAgentId(workerId); setCoordinateOpen(false) }}
+              projectPath={runtime?.workspace.projectPath ?? null}
+              coordinator={coordinator}
+              agents={nativeAgents}
+              onOpenFleet={() => { setRightOpen(true); setRightTab('fleet') }}
             />
-          ) : panes.length > 0 ? (
-            <>
+          ) : null}
+          {panes.length > 0 ? (
+            <div className={coordinateOpen ? 'main-stack hidden' : 'main-stack'}>
               <PaneGrid
                 panes={panes}
                 nativeAgents={nativeAgents}
@@ -355,20 +427,22 @@ export default function App() {
                   else void window.api.stopAgent(agentId)
                 }}
               />
-            </>
-          ) : (
+            </div>
+          ) : coordinateOpen ? null : (
             <EmptyState hasWorkspace={runtime !== null} />
           )}
         </main>
         {rightOpen && (
+          // agents is every native agent in the project, not only the visible
+          // panes: a roster that hides an agent is the fault Fleet exists to fix.
           <RightPanel
             root={runtime?.workspace.projectPath ?? null}
             tab={rightTab}
-            width={rightWidth}
             artifacts={artifacts[runtime?.workspace.projectPath ?? ''] ?? []}
-            agents={panes.filter(pane => pane.agent.kind === 'native').map(pane => ({ id: pane.agent.id, name: pane.agent.name }))}
+            agents={nativeAgents}
+            onSelectAgent={setSelectedNativeAgentId}
+            onSetRole={(agentId, role) => { void window.api.setAgentRole(agentId, role) }}
             onTabChange={setRightTab}
-            onWidthChange={setRightWidth}
             onClearArtifacts={() => {
               const p = runtime?.workspace.projectPath
               if (p) void window.api.clearArtifacts(p)

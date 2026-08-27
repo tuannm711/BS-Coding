@@ -46,6 +46,7 @@ import { createDelegateTool } from './agent/tools/delegate'
 import { compileNeutralContext } from './agent/neutral-context'
 import { rankFallbackAgents, type FallbackCandidate } from '../shared/agent-fallback'
 import { poolState } from '../shared/quota-pool'
+import { partitionSteers } from '../shared/queue-steer'
 import { looksLikeNarratedToolCall } from '../shared/narrated-tool-call'
 import { toLlmMessages } from './agent/message'
 
@@ -122,6 +123,9 @@ export class BsAgentManager {
   private redoStacks = new Map<string, Array<{ items: ChatTranscriptItem[]; turn?: SnapshotTurn; agentId: string; turnId: string }>>()
   private backgrounds = new Map<string, boolean>()
   private queues = new Map<string, QueuedMessage[]>()
+  // Kept beside the queue, never inside it: emitQueue sends the array itself
+  // over IPC, and a function field would fail structured clone.
+  private queueHooks = new Map<string, () => void>()
   private onEvent: (e: ChatEvent) => void = () => {}
   private turnCounters = new Map<string, number>()
   private toolStartTs = new Map<string, number>()
@@ -269,6 +273,7 @@ export class BsAgentManager {
     this.assignments.remove(agentId)
     this.activeSessions.delete(agentId)
     this.backgrounds.delete(agentId)
+    for (const queued of this.queues.get(agentId) ?? []) this.settleQueued(queued.id)
     this.queues.delete(agentId)
     this.coordinator.reconcileAgents([...this.agents.values()])
   }
@@ -291,6 +296,13 @@ export class BsAgentManager {
     const id = latest?.id ?? this.deps.store.create(agentId, this.agents.get(agentId)?.cwd ?? '').id
     this.activeSessions.set(agentId, id)
     return id
+  }
+
+  // The session this agent's next turn will land in. The coordination view
+  // renders each participating agent's live chat, and needs to know which
+  // session that is; listSessions leaves the caller guessing which is current.
+  activeSessionFor(agentId: string): string {
+    return this.activeSessionId(agentId)
   }
 
   listSessions(agentId: string): SessionSummary[] {
@@ -344,6 +356,9 @@ export class BsAgentManager {
     if (next.length !== q.length) {
       if (next.length === 0) this.queues.delete(agentId)
       else this.queues.set(agentId, next)
+      // A caller awaiting this message will never get a turn now, so release
+      // it here rather than leaving it indistinguishable from a slow worker.
+      this.settleQueued(id)
       this.emitQueue(agentId)
     }
     // If the message was already injected into the running turn, drop it from
@@ -454,6 +469,64 @@ export class BsAgentManager {
     this.emit({ type: 'queue-updated', agentId: state.agentId, queue: state.queue })
   }
 
+  // The session a running turn is bound to, keyed by lifecycle. Every append
+  // used to resolve activeSessionId live, so selecting another session mid-turn
+  // sent the rest of that turn's output into the newly selected one — and since
+  // the renderer filters events by session, the view being watched fell silent
+  // and the agent looked like it had stopped.
+  private turnSessions = new Map<string, string>()
+
+  private sessionForWrite(agentId: string): string {
+    return this.turnSessions.get(this.lifecycleKey(agentId)) ?? this.activeSessionId(agentId)
+  }
+
+  // Which sessions have a turn running in them right now.
+  runningSessionIds(): string[] {
+    return [...new Set(this.turnSessions.values())]
+  }
+
+  // True while some coordinator has a running assignment on this agent. Derived
+  // rather than stored: one source of truth, and it cannot be left set after a
+  // turn ends the way a flag would be.
+  private isCarryingAssignment(agentId: string): boolean {
+    for (const list of this.assignmentsByCoordinator.values()) {
+      if (list.some(item => item.workerId === agentId && item.state === 'running')) return true
+    }
+    return false
+  }
+
+  private settleQueued(id: string): void {
+    const hook = this.queueHooks.get(id)
+    if (!hook) return
+    this.queueHooks.delete(id)
+    hook()
+  }
+
+  // send() resolves when the message is accepted, which is what every other
+  // caller wants. A coordinator needs the opposite — resolution when the work
+  // is done — because it reports the result as an assignment. Same queue,
+  // different promise.
+  async sendAwaited(agentId: string, text: string, images?: ImageAttachment[], displayText?: string): Promise<void> {
+    const agent = this.agents.get(agentId)
+    if (!agent) return
+    if (!this.running.has(agentId)) {
+      await this.runTurn(agentId, text, images, displayText)
+      await this.drainQueue(agentId)
+      return
+    }
+    const q = this.queues.get(agentId) ?? []
+    if (q.length >= this.MAX_QUEUE) {
+      this.emit({ type: 'error', agentId, message: '[bs] Hàng đợi đã đầy (tối đa 5 tin). Hãy chờ turn hiện tại xong hoặc xóa tin đang chờ.' })
+      return
+    }
+    const id = randomUUID()
+    const settled = new Promise<void>(resolve => this.queueHooks.set(id, resolve))
+    q.push({ id, text, images, displayText, assigned: true })
+    this.queues.set(agentId, q)
+    this.emitQueue(agentId)
+    await settled
+  }
+
   async send(agentId: string, text: string, images?: ImageAttachment[], displayText?: string): Promise<void> {
     const agent = this.agents.get(agentId)
     if (!agent) return
@@ -481,6 +554,7 @@ export class BsAgentManager {
     else this.queues.set(agentId, q)
     this.emitQueue(agentId)
     await this.runTurn(agentId, next.text, next.images, next.displayText)
+    this.settleQueued(next.id)
     await this.drainQueue(agentId)
   }
 
@@ -520,6 +594,8 @@ export class BsAgentManager {
     const controller = new AbortController()
     const lifecycleKey = this.lifecycleKey(agentId)
     const executionContext = this.executionForAgent(agentId)
+    // Bound once, here, and used by every write for the rest of the turn.
+    this.turnSessions.set(lifecycleKey, this.activeSessionId(agentId))
     this.controllers.set(lifecycleKey, controller)
     this.running.add(lifecycleKey)
     this.nextTurn(agentId)
@@ -535,6 +611,7 @@ export class BsAgentManager {
       await runner.run(controller.signal)
     } finally {
       this.deps.snapshots.commitTurn(lifecycleKey)
+      this.turnSessions.delete(lifecycleKey)
       this.turnTargets.delete(lifecycleKey)
       this.running.delete(lifecycleKey)
       this.controllers.delete(lifecycleKey)
@@ -712,11 +789,47 @@ export class BsAgentManager {
     }
   }
 
-  setMode(agentId: string, mode: AgentMode): void {
+  // Absent means yes, so every agent that predates the switch keeps working.
+  private isWorker(agent: AgentConfig): boolean {
+    return agent.worker !== false
+  }
+
+  setWorker(agentId: string, worker: boolean): void {
+    const agent = this.agents.get(agentId)
+    if (!agent || agent.worker === worker) return
+    agent.worker = worker
+    this.agents.set(agentId, agent)
+  }
+
+  // Returns every agent whose config this changed, because exclusivity means
+  // one press can change two — and persisting only the pressed one is what left
+  // the panel showing two coordinators with the file agreeing.
+  setMode(agentId: string, mode: AgentMode): string[] {
+    const changed: string[] = []
+    // Enforced here rather than in the view: the manager knows each agent's
+    // cwd, so the rule holds whichever surface calls it and there is no second
+    // copy to disagree. Two coordinators in one project would assign work to
+    // the same workers with neither aware of the other. The recursion ends —
+    // this branch only runs for 'coordinate' and the demotion passes 'build'.
+    //
+    // Demotion first, so a failure between the two writes leaves no coordinator
+    // rather than the two this exists to prevent.
+    if (mode === 'coordinate') {
+      const cwd = this.agents.get(agentId)?.cwd
+      for (const other of [...this.agents.values()]) {
+        if (other.id === agentId || other.cwd !== cwd) continue
+        if ((this.modes.get(other.id) ?? 'build') === 'coordinate') {
+          this.setMode(other.id, 'build')
+          changed.push(other.id)
+        }
+      }
+    }
     this.modes.set(agentId, mode)
     const agent = this.agents.get(agentId)
     if (agent) {
       agent.mode = mode
+      // A coordinator is not assignable, so the two states cannot both be held.
+      if (mode === 'coordinate') agent.worker = false
       this.agents.set(agentId, agent)
       // Rebuild even while a turn is running: the in-flight runner keeps its
       // own reference, but the next turn must see the new mode in its system
@@ -725,6 +838,8 @@ export class BsAgentManager {
       this.resolved.delete(agentId)
       this.register(agent)
     }
+    changed.push(agentId)
+    return changed
   }
 
   setVariant(agentId: string, variant: string | undefined): void {
@@ -760,6 +875,8 @@ export class BsAgentManager {
       id: session.id,
       projectPath: session.projectPath,
       lastAgentId: session.lastAgentId,
+      kind: session.kind ?? 'work',
+      running: this.runningSessionIds().includes(session.id),
       title: session.title,
       messageCount: session.items.length,
       createdAt: session.createdAt,
@@ -768,7 +885,11 @@ export class BsAgentManager {
   }
 
   listProjectSessions(projectPath: string): ProjectSessionSummary[] {
+    // running is stamped here rather than in the store: it is a fact about
+    // turns in flight, which the store knows nothing about.
+    const running = new Set(this.runningSessionIds())
     return this.deps.store.listProject(projectPath)
+      .map(session => ({ ...session, running: running.has(session.id) }))
   }
 
   createProjectSession(projectPath: string, agentId?: string): ProjectSessionSummary {
@@ -1316,6 +1437,7 @@ export class BsAgentManager {
       // and delegating to yourself is impossible rather than checked.
       listWorkers: () => [...this.agents.values()]
         .filter(other => other.kind !== 'pty' && other.cwd === agent.cwd && other.id !== agent.id)
+        .filter(other => this.isWorker(other))
         .map(other => ({ name: other.name, coordinating: (this.modes.get(other.id) ?? 'build') === 'coordinate' })),
       run: (name, task) => this.runAssignment(agent.id, name, task)
     })
@@ -1367,7 +1489,10 @@ export class BsAgentManager {
         cfg.permission,
         (t) => this.deps.savedPermissions.isAllowed(agent.cwd, t),
         tool,
-        input
+        input,
+        // Read live, not captured: runners are cached per agent, and an agent
+        // is a worker only for as long as an assignment is running on it.
+        this.isCarryingAssignment(agent.id)
       ),
       ask: (promptId, tool) => this.awaitPrompt(agent.id, promptId, tool),
       maxSteps: cfg.maxSteps,
@@ -1375,7 +1500,7 @@ export class BsAgentManager {
       compaction: cfg.compaction,
       toolOutput: cfg.toolOutput,
       truncation: this.deps.truncation,
-      replaceItems: (items) => this.deps.store.replaceItems(this.activeSessionId(agent.id), items),
+      replaceItems: (items) => this.deps.store.replaceItems(this.sessionForWrite(agent.id), items),
       snapshots: this.deps.snapshots,
       snapshotScopeId: () => this.lifecycleKey(agent.id),
       onEvent: (e) => {
@@ -1384,7 +1509,7 @@ export class BsAgentManager {
         if (e.type === 'done') void this.maybeTitleSession(agent.id, llmClient, resolved.model)
       },
       onArtifact: (entry) => this.deps.onArtifact?.(entry),
-      getItems: () => this.deps.store.get(this.activeSessionId(agent.id))?.items ?? [],
+      getItems: () => this.deps.store.get(this.sessionForWrite(agent.id))?.items ?? [],
       buildMessages: (items) => {
         // After a handover the active turn carries the previous provider's tool
         // call ids and thoughtSignature, which the next provider refuses. The
@@ -1405,7 +1530,7 @@ export class BsAgentManager {
       },
       appendMessage: (msg) => {
         const execution = this.executionForAgent(agent.id)?.execution
-        this.deps.store.appendMessage(this.activeSessionId(agent.id), execution
+        this.deps.store.appendMessage(this.sessionForWrite(agent.id), execution
           ? { ...msg, turnId: execution.turnId, execution }
           : msg)
         // The format belongs to shared-session compilation, so the manager is
@@ -1416,19 +1541,21 @@ export class BsAgentManager {
       },
       appendTool: (tool) => {
         const execution = this.executionForAgent(agent.id)?.execution
-        this.deps.store.appendTool(this.activeSessionId(agent.id), execution
+        this.deps.store.appendTool(this.sessionForWrite(agent.id), execution
           ? { ...tool, turnId: execution.turnId, execution }
           : tool)
       },
       takeSteers: () => {
         const q = this.queues.get(agent.id)
         if (!q || q.length === 0) return []
-        this.queues.delete(agent.id)
+        const { steers, keep } = partitionSteers(q)
+        if (keep.length === 0) this.queues.delete(agent.id)
+        else this.queues.set(agent.id, keep)
         this.emitQueue(agent.id)
-        return q
+        return steers
       },
       setTodos: (todos) => {
-        this.deps.store.setTodos(this.activeSessionId(agent.id), todos)
+        this.deps.store.setTodos(this.sessionForWrite(agent.id), todos)
         this.emit({ type: 'todo-updated', agentId: agent.id, todos })
       },
       variantOptions,
@@ -1444,7 +1571,7 @@ export class BsAgentManager {
       }, this.priceFor(resolved.provider, resolved.model)),
       onUsage: (tokens) => {
         const price = this.priceFor(resolved.provider, resolved.model)
-        const sessionId = this.activeSessionId(agent.id)
+        const sessionId = this.sessionForWrite(agent.id)
         const usage: UsageSummary = {
           input: tokens.input,
           output: tokens.output,
@@ -1708,12 +1835,17 @@ export class BsAgentManager {
     const target = [...this.agents.values()]
       .find(other => other.id !== coordinatorId && other.name === name && other.cwd === coordinator?.cwd)
     if (!target) return { error: `[bs] No agent named ${name}` }
+    // Marked before the task is sent, so the session is already labelled by
+    // the time the left panel reacts to the assignment event.
+    const assignedSession = this.activeSessionId(target.id)
+    this.deps.store.markCoordination(assignedSession)
     const assignment: CoordinationAssignment = {
       id: randomUUID(),
       coordinatorId,
       turnId: this.executionForAgent(coordinatorId)?.execution.turnId,
       workerId: target.id,
       workerName: target.name,
+      sessionId: assignedSession,
       task,
       startedAt: Date.now(),
       state: 'running'
@@ -1722,19 +1854,41 @@ export class BsAgentManager {
     list.push(assignment)
     this.assignmentsByCoordinator.set(coordinatorId, list)
     this.emit({ type: 'assignment-started', agentId: coordinatorId, assignment })
-    // send awaits the whole turn, and running already serialises per agent: two
-    // assignments to different agents run at once, two to the same one queue.
-    // One sentence, because this lands in the worker's own transcript where the
-    // user will read it. It asks for a report on failure rather than a redesign:
-    // the coordinator holds the context that judgement would need.
-    const framed = `${task}\n\n[Assigned by ${coordinator?.name ?? 'the coordinator'}. Carry this out as specified; if you cannot, stop and report back rather than changing the approach.]`
-    await this.send(target.id, framed)
-    const last = [...this.listMessages(target.id)].reverse().find(message => message.role === 'assistant')
+    // "Dispatched ... to execute this specific task" is not a turn of phrase.
+    // superpowers' using-superpowers skill opens with a SUBAGENT-STOP block —
+    // "if you were dispatched as a subagent to execute a specific task, ignore
+    // this skill" — and the earlier wording, "Assigned by bs. Carry this out as
+    // specified", matched none of it. A worker therefore loaded the whole
+    // process, was told it had no choice but to invoke an applicable skill,
+    // reached dispatching-parallel-agents, and stopped: it had been instructed
+    // to hand the work on with no delegate tool to do it.
+    //
+    // So the sentence has three jobs: put the worker in the executing role, shut
+    // the delegating path, and require a written result — which is the only
+    // thing this method can read back as the assignment's outcome.
+    const framed = `${task}\n\n[Dispatched by ${coordinator?.name ?? 'the coordinator'} to execute this specific task. Carry it out yourself and report the result as your reply. Do not delegate, dispatch, or re-plan it. If you cannot finish, stop and say why.]`
+    // A boundary rather than ChatMessage.turnId: that field comes from
+    // executionForAgent(...)?.execution.turnId and is absent unless the agent
+    // is in a shared execution, so keying on it would work under test and fail
+    // in ordinary use. sendAwaited, not send, because send resolves the moment
+    // a busy worker accepts the message into its queue.
+    // The whole transcript, not just messages: a worker that used tools and
+    // then said nothing looked identical to one that never ran, and telling
+    // them apart meant opening its session by hand.
+    const before = this.listTranscript(target.id).length
+    await this.sendAwaited(target.id, framed)
+    const appended = this.listTranscript(target.id).slice(before)
+    const produced = appended
+      .flatMap(item => item.kind === 'message' && item.message.role === 'assistant' ? [item.message.text] : [])
+      .filter(text => text.trim().length > 0)
+      .join('\n')
+    const toolNames = appended.flatMap(item => item.kind === 'tool' ? [item.tool.tool] : [])
     assignment.finishedAt = Date.now()
-    assignment.state = last?.text ? 'completed' : 'failed'
-    assignment.result = last?.text
+    assignment.state = produced ? 'completed' : toolNames.length > 0 ? 'no-result' : 'failed'
+    assignment.result = produced || undefined
+    if (toolNames.length > 0) assignment.toolNames = toolNames
     this.emit({ type: 'assignment-finished', agentId: coordinatorId, assignment })
-    return last?.text ? { output: last.text } : { error: `[bs] ${name} produced no result` }
+    return produced ? { output: produced } : { error: `[bs] ${name} produced no result` }
   }
 
   // Computed per call, not baked into the runner: runners are cached per agent,
@@ -1746,6 +1900,9 @@ export class BsAgentManager {
     const workers = [...this.agents.values()]
       .filter(other => other.kind !== 'pty' && other.cwd === agent?.cwd && other.id !== agentId)
       .filter(other => (this.modes.get(other.id) ?? 'build') !== 'coordinate')
+      // An agent switched off as a worker is absent from the roster, not
+      // listed and refused: naming it would invite the coordinator to try.
+      .filter(other => this.isWorker(other))
       .map(other => {
         const resolved = this.resolved.get(other.id)
         return `  ${other.name}${resolved?.model ? ` — ${resolved.provider}/${resolved.model}` : ''}`
@@ -1777,13 +1934,14 @@ export class BsAgentManager {
     const state = this.turnTargets.get(key) ?? { agentId, tried: new Set([agentId]) }
     const from = this.candidateFor(state.agentId)
     if (!from) return false
-    const mode = this.modes.get(agentId) ?? 'build'
+    // Every account in the project. There was a same-mode filter here, added on
+    // the claim that a candidate in another mode has a different tool set — and
+    // that claim was false: the loop takes tools from the agent whose turn it
+    // is, never from the serving one. With the system prompt no longer borrowed
+    // either, a handoff is purely another account answering, and no account has
+    // a reason to be excluded.
     const candidates = [...this.agents.values()]
       .filter(agent => agent.kind !== 'pty' && agent.cwd === this.agents.get(agentId)?.cwd)
-      // A candidate in another mode has a different tool set: a plan or
-      // coordinate agent cannot carry a build turn, and a worker asked to
-      // carry a coordinating turn would do the work rather than assign it.
-      .filter(other => (this.modes.get(other.id) ?? 'build') === mode)
       .flatMap(agent => { const c = this.candidateFor(agent.id); return c ? [c] : [] })
     const ranked = rankFallbackAgents({ from, candidates, isPoolSpent: c => this.isPoolSpent(c) })
       .filter(candidate => !state.tried.has(candidate.agentId))

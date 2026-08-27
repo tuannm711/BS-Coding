@@ -49,6 +49,16 @@ export const COORDINATE_RULES: Record<string, PermissionRule> = {
 // delegate belongs to a coordinator alone; every other mode denies it.
 const DEFAULT_RULES: Record<string, PermissionRule> = { delegate: 'deny' }
 
+// A worker carrying an assignment may not spawn an anonymous subagent. Same
+// reason `task` is denied to a coordinator: work done through it runs outside
+// the exchange — invisible on the coordination board, unrecorded as an
+// assignment, and under a fixed prompt rather than one of the user's agents.
+// Scoped to the assignment rather than denied outright, because subagents are a
+// configured feature of this product for an agent working on its own behalf.
+export function deniesTaskWhileAssigned(carryingAssignment: boolean, toolName: string): boolean {
+  return carryingAssignment && toolName === 'task'
+}
+
 export function rulesForMode(mode: AgentMode): Record<string, PermissionRule> {
   if (mode === 'plan') return { ...PLAN_RULES, ...DEFAULT_RULES }
   if (mode === 'coordinate') return COORDINATE_RULES
@@ -87,8 +97,13 @@ export function decidePermission(
   configRules: Record<string, PermissionRule>,
   isSavedAllow: (toolName: string) => boolean,
   toolName: string,
-  input?: Record<string, unknown>
+  input?: Record<string, unknown>,
+  carryingAssignment = false
 ): PermissionDecision {
+  // Removing the tool, not asking the model to refrain: the model never sees
+  // the option. A worker was told by a skill to dispatch agents and stopped
+  // dead when it had nothing to dispatch with — prompts do not settle this.
+  if (deniesTaskWhileAssigned(carryingAssignment, toolName)) return 'deny'
   // A coordinator gets the reading half of git and nothing else.
   if (mode === 'coordinate' && toolName === 'git') {
     return isReadOnlyGit(typeof input?.args === 'string' ? input.args : undefined) ? 'allow' : 'deny'

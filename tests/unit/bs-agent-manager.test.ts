@@ -31,6 +31,11 @@ const SECOND_AGENT: AgentConfig = {
 const PTY_AGENT: AgentConfig = {
   id: 'a2', name: 'opencode', templateId: 'opencode', cwd: '/proj'
 }
+// A native agent in a different project. cwd is what separates projects here,
+// as it already does for fallback candidates and the coordinator's roster.
+const OTHER_PROJECT_AGENT: AgentConfig = {
+  id: 'b1', name: 'other', templateId: 'bs', cwd: '/other', kind: 'native'
+}
 
 interface StubLlmOptions {
   hangUntilAbort?: boolean
@@ -43,6 +48,7 @@ async function makeManager(opts: StubLlmOptions & {
   providerAccounts?: ProviderConnection[]
   providerRuntime?: (providerId: string, accountId: string, modelId: string) => LlmClient
   secondAgent?: boolean
+  secondProject?: boolean
 } = {}) {
   const cfgDir = mkdtempSync(path.join(tmpdir(), 'bs-mgr-cfg-'))
   const defaultCfg = path.join(cfgDir, 'bs.json')
@@ -126,9 +132,12 @@ async function makeManager(opts: StubLlmOptions & {
     onAssignmentChanged: assignment => assignmentEvents.push(assignment)
   })
   manager.setOnEvent(e => events.push(e))
-  await manager.init(opts.secondAgent
-    ? [{ ...BS_AGENT }, { ...SECOND_AGENT }, { ...PTY_AGENT }]
-    : [{ ...BS_AGENT }, { ...PTY_AGENT }])
+  await manager.init([
+    { ...BS_AGENT },
+    ...(opts.secondAgent ? [{ ...SECOND_AGENT }] : []),
+    ...(opts.secondProject ? [{ ...OTHER_PROJECT_AGENT }] : []),
+    { ...PTY_AGENT }
+  ])
   return { manager, store, events, assignmentEvents, createLlm, savedPermissions, llmCalls, llmSystems, llmVariants, llmModels }
 }
 
@@ -436,6 +445,129 @@ describe('BsAgentManager', () => {
     for (const m of manager.listQueued('a1')) manager.removeQueued('a1', m.id)
     manager.stop('a1')
     await sendPromise
+  })
+
+  it('does not resolve an awaited send while the message is still queued', async () => {
+    // The whole bug behind a silent worker: send resolves on acceptance, so a
+    // caller could not tell "queued" from "finished".
+    const { manager } = await makeManager({ hangUntilAbort: true })
+    const first = manager.send('a1', 'first')
+    await new Promise(r => setTimeout(r, 20))
+    let settled = false
+    const second = manager.sendAwaited('a1', 'second').then(() => { settled = true })
+    await new Promise(r => setTimeout(r, 20))
+    expect(manager.listQueued('a1')).toHaveLength(1)
+    expect(settled).toBe(false)
+    for (const m of manager.listQueued('a1')) manager.removeQueued('a1', m.id)
+    manager.stop('a1')
+    await Promise.all([first, second])
+  })
+
+  it('resolves an awaited send that runs inline', async () => {
+    const { manager } = await makeManager({
+      partsQueue: [[{ kind: 'text', text: 'done' }, { kind: 'finish' }]]
+    })
+    await manager.sendAwaited('a1', 'go')
+    expect(manager.listMessages('a1').some(m => m.role === 'assistant')).toBe(true)
+  })
+
+  it('resolves an awaited send that the queue refuses', async () => {
+    // A refusal that never resolved would hang the coordinator exactly as a
+    // silent worker does.
+    const { manager } = await makeManager({ hangUntilAbort: true })
+    const first = manager.send('a1', 'first')
+    await new Promise(r => setTimeout(r, 20))
+    for (let i = 0; i < 5; i++) await manager.send('a1', `msg ${i}`)
+    await manager.sendAwaited('a1', 'refused')
+    for (const m of manager.listQueued('a1')) manager.removeQueued('a1', m.id)
+    manager.stop('a1')
+    await first
+  })
+
+  it('resolves an awaited send whose queued message is deleted', async () => {
+    const { manager } = await makeManager({ hangUntilAbort: true })
+    const first = manager.send('a1', 'first')
+    await new Promise(r => setTimeout(r, 20))
+    let settled = false
+    const pending = manager.sendAwaited('a1', 'doomed').then(() => { settled = true })
+    await new Promise(r => setTimeout(r, 20))
+    for (const m of manager.listQueued('a1')) manager.removeQueued('a1', m.id)
+    await pending
+    expect(settled).toBe(true)
+    manager.stop('a1')
+    await first
+  })
+
+  it('resolves an awaited send whose agent is removed', async () => {
+    const { manager } = await makeManager({ hangUntilAbort: true })
+    const first = manager.send('a1', 'first')
+    await new Promise(r => setTimeout(r, 20))
+    const pending = manager.sendAwaited('a1', 'orphan')
+    await new Promise(r => setTimeout(r, 20))
+    manager.removeAgent('a1')
+    await pending
+    manager.stop('a1')
+    await first
+  })
+
+  it('keeps a turn writing to the session it started in', async () => {
+    // The owner reported "switching session stops the agent". It does not stop:
+    // switchProjectSession repoints activeSessions, and every append resolved
+    // the session live, so the rest of the turn landed in the newly selected
+    // session while the view being watched — filtered by session — went quiet.
+    const { manager, events } = await makeManager({
+      partsQueue: [
+        [{ kind: 'tool-call', toolCallId: 'tc1', toolName: 'websearch', toolInput: { query: 'bs' } }, { kind: 'finish' }],
+        [{ kind: 'text', text: 'the answer' }, { kind: 'finish' }]
+      ]
+    })
+    const first = manager.activeSessionFor('a1')
+    const sendPromise = manager.send('a1', 'go')
+    // Suspended on the permission prompt, so the switch below is deterministic
+    // rather than a race with the stream.
+    await new Promise<void>(resolve => {
+      const timer = setInterval(() => {
+        const prompt = events.find(e => e.type === 'prompt-request') as Extract<ChatEvent, { type: 'prompt-request' }> | undefined
+        if (!prompt) return
+        clearInterval(timer)
+        const other = manager.createProjectSession('/proj', 'a1')
+        manager.switchProjectSession('/proj', other.id)
+        manager.respondPrompt('a1', prompt.promptId, { allow: true } satisfies PromptResponse)
+        resolve()
+      }, 5)
+    })
+    await sendPromise
+    const landed = manager.listSessionTranscript('/proj', first)
+      .flatMap(item => item.kind === 'message' && item.message.role === 'assistant' ? [item.message.text] : [])
+    expect(landed.join('\n')).toContain('the answer')
+  })
+
+  it('marks a session a coordinator dispatched into, and it survives a reload', async () => {
+    // Stored, not re-derived: the left panel groups by this, and a kind
+    // recomputed on each read is two answers to one question.
+    const { manager } = await makeManager({
+      secondAgent: true,
+      partsQueue: [[{ kind: 'text', text: 'done' }, { kind: 'finish' }]]
+    })
+    manager.setMode('a1', 'coordinate')
+    await (manager as unknown as { runAssignment: (c: string, n: string, t: string) => Promise<unknown> })
+      .runAssignment('a1', 'helper', 'do it')
+    const worker = manager.listProjectSessions('/proj').find(item => item.lastAgentId === 'a3')
+    expect(worker?.kind).toBe('coordination')
+    // Every read normalizes, so a field normalize drops does not persist.
+    expect(manager.listProjectSessions('/proj').find(item => item.id === worker?.id)?.kind)
+      .toBe('coordination')
+  })
+
+  it('reports which session has a turn running in it', async () => {
+    const { manager } = await makeManager({ hangUntilAbort: true })
+    const active = manager.activeSessionFor('a1')
+    const sending = manager.send('a1', 'go')
+    await new Promise(resolve => setTimeout(resolve, 15))
+    expect(manager.listProjectSessions('/proj').find(item => item.id === active)?.running).toBe(true)
+    manager.stop('a1')
+    await sending
+    expect(manager.listProjectSessions('/proj').find(item => item.id === active)?.running).toBe(false)
   })
 
   it('respondPrompt allow lets a permission-ask tool run', async () => {
@@ -1075,6 +1207,96 @@ describe('delegation keeps conversations separate', () => {
   })
 })
 
+describe('one coordinator per project', () => {
+  const modeOf = (manager: BsAgentManager, agentId: string) =>
+    manager.listAgents().find(agent => agent.id === agentId)?.mode ?? 'build'
+
+  it('takes the role from whoever held it', async () => {
+    // find() in App.tsx picked one of them. Nothing had made either of them
+    // the coordinator, and both would assign work to the same workers.
+    const { manager } = await makeManager({ secondAgent: true })
+    manager.setMode('a1', 'coordinate')
+    manager.setMode('a3', 'coordinate')
+    expect(modeOf(manager, 'a1')).toBe('build')
+    expect(modeOf(manager, 'a3')).toBe('coordinate')
+  })
+
+  it('keeps the original agent as the identity after a handoff', async () => {
+    // A handoff is another account answering this turn, not another agent
+    // taking it over. Asserted on the mode note, which lives in `system` —
+    // the first version of this test read the coordinator note, which lives in
+    // systemSuffix and was never borrowed, so it passed before the fix existed.
+    const { manager, llmSystems } = await makeManager({
+      secondAgent: true,
+      partsQueue: [
+        [{ kind: 'error', error: '[bs] [request-failed] (429): quota' }],
+        [{ kind: 'text', text: 'carried on' }, { kind: 'finish' }]
+      ]
+    })
+    manager.setMode('a1', 'plan')
+    await manager.send('a1', 'go')
+    expect(llmSystems[0]).toContain('PLAN MODE')
+    // a3 is in build mode. Borrowing its prompt would drop the plan-mode note
+    // from a turn that is still a1's, and still denied every write tool.
+    expect(llmSystems[1]).toContain('PLAN MODE')
+  })
+
+  it('leaves an agent switched off as a worker out of the roster', async () => {
+    // Absent rather than listed-and-refused: naming it would invite the
+    // coordinator to try, and the refusal would cost a round trip to learn.
+    const { manager, llmSystems } = await makeManager({ secondAgent: true })
+    manager.setMode('a1', 'coordinate')
+    manager.setWorker('a3', false)
+    await manager.send('a1', 'go')
+    expect(llmSystems[0]).not.toContain('helper')
+  })
+
+  it('keeps an agent that predates the switch usable', async () => {
+    // worker is absent on every agent stored before the field existed.
+    const { manager, llmSystems } = await makeManager({ secondAgent: true })
+    manager.setMode('a1', 'coordinate')
+    await manager.send('a1', 'go')
+    expect(llmSystems[0]).toContain('helper')
+  })
+
+  it('reports the demotion as well as the promotion', async () => {
+    // setMode demoted the previous coordinator in the manager's memory only.
+    // The caller persisted and pushed just the agent pressed, so the panel kept
+    // both lit and a restart restored both from workspaces.json.
+    const { manager } = await makeManager({ secondAgent: true })
+    manager.setMode('a1', 'coordinate')
+    expect(manager.setMode('a3', 'coordinate')).toEqual(expect.arrayContaining(['a1', 'a3']))
+  })
+
+  it('reports only the agent it changed when there was no other', async () => {
+    const { manager } = await makeManager({ secondAgent: true })
+    expect(manager.setMode('a1', 'coordinate')).toEqual(['a1'])
+  })
+
+  it('clears the worker flag when an agent takes the coordinator role', async () => {
+    // A coordinator is not assignable, so the two states cannot both be held.
+    const { manager } = await makeManager({ secondAgent: true })
+    manager.setWorker('a1', true)
+    manager.setMode('a1', 'coordinate')
+    expect(manager.listAgents().find(agent => agent.id === 'a1')?.worker).toBe(false)
+  })
+
+  it('leaves a coordinator in another project alone', async () => {
+    const { manager } = await makeManager({ secondAgent: true, secondProject: true })
+    manager.setMode('a1', 'coordinate')
+    manager.setMode('b1', 'coordinate')
+    expect(modeOf(manager, 'a1')).toBe('coordinate')
+    expect(modeOf(manager, 'b1')).toBe('coordinate')
+  })
+
+  it('does not disturb agents in other modes', async () => {
+    const { manager } = await makeManager({ secondAgent: true })
+    manager.setMode('a3', 'plan')
+    manager.setMode('a1', 'coordinate')
+    expect(modeOf(manager, 'a3')).toBe('plan')
+  })
+})
+
 describe('coordination assignments', () => {
   // runAssignment is private and its only production caller is the delegate
   // tool's closure. Casting here rather than adding a method to production
@@ -1118,6 +1340,54 @@ describe('coordination assignments', () => {
     await delegate(manager, 'a1', 'helper', 'x')
     expect(events.some(event => event.type === 'assignment-started')).toBe(true)
     expect(events.some(event => event.type === 'assignment-finished')).toBe(true)
+  })
+
+  it('does not report an earlier answer when its own turn produced nothing', async () => {
+    // The worker already answered once. Reading the last assistant message in
+    // the session returns that answer and calls the assignment completed.
+    const { manager } = await makeManager({
+      secondAgent: true,
+      partsQueue: [
+        [{ kind: 'text', text: 'an earlier answer' }, { kind: 'finish' }],
+        [{ kind: 'error', error: 'boom' }]
+      ]
+    })
+    await manager.send('a3', 'unrelated earlier work')
+    manager.setMode('a1', 'coordinate')
+    await delegate(manager, 'a1', 'helper', 'the real task')
+    const assignment = manager.listAssignments('a1')[0]
+    expect(assignment.state).toBe('failed')
+    expect(assignment.result ?? '').not.toContain('an earlier answer')
+  })
+
+  it('reports only what its own turn produced', async () => {
+    const { manager } = await makeManager({
+      secondAgent: true,
+      partsQueue: [
+        [{ kind: 'text', text: 'an earlier answer' }, { kind: 'finish' }],
+        [{ kind: 'text', text: 'the assigned result' }, { kind: 'finish' }]
+      ]
+    })
+    await manager.send('a3', 'unrelated earlier work')
+    manager.setMode('a1', 'coordinate')
+    await delegate(manager, 'a1', 'helper', 'the real task')
+    const assignment = manager.listAssignments('a1')[0]
+    expect(assignment.state).toBe('completed')
+    expect(assignment.result).toContain('the assigned result')
+    expect(assignment.result).not.toContain('an earlier answer')
+  })
+
+  it('keeps an assignment running until a busy worker reaches its turn', async () => {
+    // The case the owner saw as silence: the worker was busy, so send resolved
+    // on acceptance and the assignment closed before any work began.
+    const { manager } = await makeManager({ secondAgent: true, hangUntilAbort: true })
+    manager.setMode('a1', 'coordinate')
+    void manager.send('a3', 'worker is already busy')
+    await new Promise(resolve => setTimeout(resolve, 15))
+    void delegate(manager, 'a1', 'helper', 'queued behind it')
+    await new Promise(resolve => setTimeout(resolve, 15))
+    expect(manager.listAssignments('a1')[0].state).toBe('running')
+    manager.stop('a3')
   })
 })
 
@@ -1165,18 +1435,21 @@ describe('stopping a fan-out', () => {
 })
 
 describe('fallback stays in the same mode', () => {
-  it('does not hand a build turn to an agent in another mode', async () => {
-    // Not a coordinate special case: a plan-mode agent is denied every write
-    // tool, so it could never carry a build turn either. This has been wrong
-    // since plan mode existed.
+  it('falls back to an agent in another mode', async () => {
+    // This asserted the opposite until the premise behind it was checked: a
+    // handoff never changed the tool set, only llm, model and system. With the
+    // system prompt no longer borrowed either, the mode filter had nothing
+    // left to protect.
     const { manager, events } = await makeManager({
       secondAgent: true,
-      partsQueue: [[{ kind: 'error', error: '[bs] [request-failed] (429): quota' }]]
+      partsQueue: [
+        [{ kind: 'error', error: '[bs] [request-failed] (429): quota' }],
+        [{ kind: 'text', text: 'carried on' }, { kind: 'finish' }]
+      ]
     })
     manager.setMode('a3', 'plan')
     await manager.send('a1', 'go')
-    expect(events.some(event => event.type === 'agent-fallback')).toBe(false)
-    expect(events.some(event => event.type === 'error')).toBe(true)
+    expect(events.some(event => event.type === 'agent-fallback')).toBe(true)
   })
 
   it('still hands over to an agent in the same mode', async () => {
@@ -1191,16 +1464,20 @@ describe('fallback stays in the same mode', () => {
     expect(events.some(event => event.type === 'agent-fallback')).toBe(true)
   })
 
-  it('does not hand a coordinator turn to a worker', async () => {
-    // A worker has no delegate tool, so it would do the work rather than
-    // assign it — the opposite of what the turn was for.
+  it('gives a coordinator a fallback', async () => {
+    // Exclusive coordination plus a same-mode filter left a coordinator with
+    // no candidate at all: its quota ran out and the turn simply failed.
     const { manager, events } = await makeManager({
       secondAgent: true,
-      partsQueue: [[{ kind: 'error', error: '[bs] [request-failed] (429): quota' }]]
+      partsQueue: [
+        [{ kind: 'error', error: '[bs] [request-failed] (429): quota' }],
+        [{ kind: 'text', text: 'carried on' }, { kind: 'finish' }]
+      ]
     })
     manager.setMode('a1', 'coordinate')
     await manager.send('a1', 'go')
-    expect(events.some(event => event.type === 'agent-fallback')).toBe(false)
+    expect(events.some(event => event.type === 'agent-fallback')).toBe(true)
+    expect(events.filter(event => event.type === 'error')).toEqual([])
   })
 })
 
@@ -1259,8 +1536,47 @@ describe('the delegated task is framed', () => {
     await delegate(manager, 'a1', 'helper', 'change the readme heading')
     const sent = manager.listMessages('a3').find(message => message.role === 'user')
     expect(sent?.text).toContain('change the readme heading')
+    // "Dispatched ... to execute this specific task" is load-bearing, not
+    // phrasing: superpowers' using-superpowers skill opens with a SUBAGENT-STOP
+    // block keyed on exactly that, and the earlier "Assigned by bs. Carry this
+    // out as specified" matched none of it. A worker loaded the whole process,
+    // was told it had no choice but to invoke an applicable skill, reached
+    // dispatching-parallel-agents, and stopped with nothing to dispatch with.
+    expect(sent?.text).toContain('Dispatched by bs to execute this specific task')
+    expect(sent?.text).toContain('Do not delegate, dispatch, or re-plan it')
     // Reporting a failure is part of the job; redesigning around it is not,
     // because the coordinator holds the context that judgement would need.
-    expect(sent?.text).toContain('report back')
+    expect(sent?.text).toContain('stop and say why')
+  })
+
+  it('records what the turn did, and does not call a silent worker failed', async () => {
+    // The case the owner hit: two skills invoked, no reply written. Marking it
+    // failed with no detail meant opening the worker's session to learn that.
+    const { manager } = await makeManager({
+      secondAgent: true,
+      partsQueue: [[
+        { kind: 'tool-call', toolCallId: 'tc1', toolName: 'read', toolInput: { path: 'nope.txt' } },
+        { kind: 'finish' }
+      ], [{ kind: 'finish' }]]
+    })
+    manager.setMode('a1', 'coordinate')
+    await delegate(manager, 'a1', 'helper', 'look something up')
+    const assignment = manager.listAssignments('a1')[0]
+    expect(assignment.state).toBe('no-result')
+    expect(assignment.toolNames).toContain('read')
+  })
+
+  it('takes the task tool away from a worker carrying an assignment', async () => {
+    // Removing the tool, not asking it to refrain. Work done through an
+    // anonymous subagent runs outside the exchange: invisible on the board and
+    // unrecorded as an assignment.
+    const { manager } = await makeManager({ secondAgent: true, hangUntilAbort: true })
+    manager.setMode('a1', 'coordinate')
+    void delegate(manager, 'a1', 'helper', 'long job')
+    await new Promise(resolve => setTimeout(resolve, 15))
+    const carrying = (manager as unknown as { isCarryingAssignment: (id: string) => boolean })
+    expect(carrying.isCarryingAssignment('a3')).toBe(true)
+    expect(carrying.isCarryingAssignment('a1')).toBe(false)
+    manager.stop('a1')
   })
 })

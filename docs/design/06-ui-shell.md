@@ -8,12 +8,14 @@ panel, settings and the tray. The terminal inside a pane is in
 <!-- toc -->
 | Section | Lines | Names |
 | --- | --- | --- |
-| [Pieces](#pieces) | 19-32 | `src/renderer/src/App.tsx`, `PaneModel`, `src/renderer/src/components/TitleBar.tsx`, `src/renderer/src/components/Sidebar.tsx`, `src/renderer/src/components/RightPanel.tsx`, `src/renderer/src/components/chat/` |
-| [Data flow](#data-flow) | 33-51 | `App.tsx`, `PaneModel`, `XtermHost`, `buffersRef`, `registerTerminal`, `ChatPanel` |
-| [Types that carry it](#types-that-carry-it) | 52-61 | `PaneModel`, `ChatEvent`, `src/shared/types.ts`, `QuotaAccountUiState`, `src/renderer/src/components/quota/quota-view.ts` |
-| [Design decisions](#design-decisions) | 62-96 | `getWindowChromeOptions`, `titleBarOverlay`, `tests/unit/window-chrome.test.ts`, `src/renderer/AGENTS.md`, `MainApp`, `app.setAppUserModelId` |
-| [The coordination view](#the-coordination-view) | 97-120 | `src/renderer/src/components/coordinator/CoordinatorView.tsx`, `App.tsx`, `RightPanel`, `CoordinatorBoard`, `CoordinatorView`, `StatsView` |
-| [Known limits](#known-limits) | 121-127 | `docs/technical-debt.md` |
+| [Pieces](#pieces) | 21-35 | `src/renderer/src/App.tsx`, `PaneModel`, `src/renderer/src/components/TitleBar.tsx`, `src/renderer/src/components/Sidebar.tsx`, `src/renderer/src/components/RightPanel.tsx`, `src/renderer/src/components/fleet/` |
+| [Data flow](#data-flow) | 36-54 | `App.tsx`, `PaneModel`, `XtermHost`, `buffersRef`, `registerTerminal`, `ChatPanel` |
+| [Types that carry it](#types-that-carry-it) | 55-64 | `PaneModel`, `ChatEvent`, `src/shared/types.ts`, `QuotaAccountUiState`, `src/renderer/src/components/quota/quota-view.ts` |
+| [Design decisions](#design-decisions) | 65-99 | `getWindowChromeOptions`, `titleBarOverlay`, `tests/unit/window-chrome.test.ts`, `src/renderer/AGENTS.md`, `MainApp`, `app.setAppUserModelId` |
+| [The coordination view](#the-coordination-view) | 100-152 | `src/renderer/src/components/coordinator/CoordinatorView.tsx`, `App.tsx`, `setMode`, `RightPanel`, `ChatPanel`, `listSessionTranscript` |
+| [The fleet panel](#the-fleet-panel) | 153-227 | `RightPanel`, `buildFleet`, `ProviderQuotaGroup`, `modelIds`, `anti-claude-opus`, `anti-claude-sonnet` |
+| [Sessions live in the sidebar](#sessions-live-in-the-sidebar) | 228-251 | `activeSessionId`, `groupSessions` |
+| [Known limits](#known-limits) | 252-258 | `docs/technical-debt.md` |
 <!-- /toc -->
 
 ## Pieces
@@ -23,7 +25,8 @@ panel, settings and the tray. The terminal inside a pane is in
 | `src/renderer/src/App.tsx` | State centre: workspaces, templates, the open runtime, and `PaneModel` per pane |
 | `src/renderer/src/components/TitleBar.tsx` | Custom title bar where the native one is hidden |
 | `src/renderer/src/components/Sidebar.tsx` | Projects and agents |
-| `src/renderer/src/components/RightPanel.tsx` | Tab host for tree, artifacts and quota |
+| `src/renderer/src/components/RightPanel.tsx` | Tab host for files, artifacts and fleet |
+| `src/renderer/src/components/fleet/` | `buildFleet` and the panel that renders it |
 | `src/renderer/src/components/chat/` | The native agent's chat surface, 20 files |
 | `src/renderer/src/components/settings/` | Settings dialog and its twelve tabs |
 | `src/renderer/src/components/trace/` | Trace inspector, timeline and subagent tree |
@@ -98,25 +101,153 @@ prevents.
 
 `src/renderer/src/components/coordinator/CoordinatorView.tsx` is a **top-level
 view**, not a panel: `App.tsx` renders either the workspace panes or the board
-inside `<main>`, switched from a title-bar control that is disabled when no
-agent is in coordinate mode.
+inside `<main>`, switched from a **Work / Coordination** control in the title
+bar.
 
-A third tab in `RightPanel` was rejected — it is a narrow column beside the
-panes and would still sit inside the chat frame, which is the thing goal 4 asks
-to leave. A second window was rejected too: a second lifecycle, state synced
-over IPC and close/reopen handling, for a separation nothing has asked for.
+**That control is always enabled**, including when no agent is coordinating.
+It shipped disabled in that case, which was backwards: the view is where you
+would go to find out why there is no coordinator, and it could not be reached
+until one existed. With none, the board says so and offers one route — to
+Fleet. Deliberately one: a picker on the board as well would be a second
+control doing the same job, which is how a project came to have two
+coordinators in the first place.
 
-The board shows the coordinator's messages, an input, and one row per
-assignment with its worker, task, state and result. A row opens that worker's
-own session, because the full exchange is already there.
+**The role is exclusive per project and given in Fleet.** `setMode` returns any
+other coordinating agent in the same `cwd` to build, so `App.tsx` resolving the
+coordinator with `find` is sound — the invariant lives in the manager, not in
+the view. When it lived nowhere, that `find` silently picked one of two.
 
-**What it does not show is the design.** No tool cards, no streaming detail, no
-editing. Those belong to the chat frame this exists to be separate from, and a
-test asserts their absence rather than trusting the boundary to hold.
+Putting **the board itself** in a `RightPanel` tab was rejected — it is a narrow
+column beside the panes and would still sit inside the chat frame, which is the
+thing goal 4 asks to leave. That is not contradicted by the fleet tab below:
+Fleet is a roster you read while working, and the board is a surface you work
+*in*. A second window was rejected too: a second lifecycle, state synced over
+IPC and close/reopen handling, for a separation nothing has asked for.
 
-`CoordinatorBoard` is split from `CoordinatorView` the way `StatsView` is split
-from `StatsTab`: the presentational half takes props and can be rendered under
-`environment: 'node'`.
+The coordinator is pinned left; every worker it has given work to tiles the
+rest, each a full `ChatPanel` bound to the session that task ran in.
+
+**Sessions are one store keyed by cwd.** `listSessionTranscript` gates on
+`store.listProject(projectPath)` and then reads `store.transcript(sessionId)` —
+so a worker's session *is* a session of this project, and rendering it needs no
+change to the session model. An earlier note here claimed the two were
+different things and that Work therefore could not reach a worker's transcript.
+That was false. What was actually missing was recording **which** session a task
+ran in, which `CoordinationAssignment.sessionId` now carries.
+
+**It shows a live chat per agent, and that reverses an earlier decision.** The
+first version was a summary board — worker, task, state — on the stated
+principle that tool cards and streaming belonged to the chat frame this surface
+exists to be separate from. A test asserted their absence.
+
+Use showed the principle was wrong. What goal 4 asked to leave was the
+**single-agent chat frame**, not the detail. Stripped of the detail the screen
+was a silent wait: nothing appeared between giving a command and its result,
+and the only way to learn what a worker was doing was to open its own session
+by hand. The principle and its test are gone.
+
+`coordinationTiles` is a pure function over assignments and agents, so which
+tiles exist — one per worker, newest first, a second task to the same worker
+reusing its tile — is asserted without rendering a `ChatPanel`.
+
+## The fleet panel
+
+Controls belong at their scope. The product has three — app (providers, MCP,
+permissions, updates), project (which agents, who coordinates, files,
+artifacts), and agent or session (the conversation, its mode, its speed) — and
+the shell had been mixing them wherever there was room.
+
+`RightPanel` is the project surface, and it now has three equal tabs: **Files ·
+Artifacts · Fleet**. The pinned *Session models* block above the tabs is gone;
+quota is not a file view and was stapled to the top of one.
+
+**Fleet groups by pool, not by agent.** `buildFleet` puts each agent inside the
+`ProviderQuotaGroup` whose `modelIds` claim its model:
+
+```
+account → quota group (the pool) → the agents drawing on it
+```
+
+`anti-claude-opus` and `anti-claude-sonnet` are different models drawing on one
+pool. Listed flat they read as alternatives — pick the other when the first is
+spent — when exhausting one exhausts both. The account card already knew both
+halves and rendered them apart; its `fleet` variant nests them.
+
+Two kinds of agent are kept rather than dropped: a **stray**, configured for an
+account but running a model no reported pool claims, and an **unassigned**
+agent with no ready assignment at all. A roster that hides an agent is the
+fault this panel exists to fix.
+
+Fleet is also where an agent's role is given, on its own row, as two icon
+toggles carrying three states — **coordinator**, **worker**, **no role**.
+
+Neither control is ever disabled or hidden. Pressing the lit one returns the
+agent to no role; pressing the other moves it there. An earlier version
+disabled the coordinator control once held and hid the worker control behind
+it, which made the press a one-way door with nothing on the row to undo it.
+
+The role is derived from `mode === 'coordinate'` and `worker === false` rather
+than stored as its own field — a role enum beside `mode` would be a second
+answer to the question `mode` already asks. `FleetAgentRow` carries it as one
+value, because two booleans have a fourth combination the manager cannot hold
+and the panel was able to show.
+
+**One press can change two agents.** Coordination is exclusive per project, so
+taking the role demotes whoever held it. `setMode` returns every agent it
+changed and `setAgentRole` persists and pushes all of them; when it pushed only
+the agent pressed, the panel kept both lit and a restart agreed with it.
+
+**The card is built for a 300px column.** Three things were costing the height
+that made it unreadable there:
+
+- **A description used as a label.** `bucket.description ?? bucket.label` in
+  `antigravity-models.ts` put the provider's whole sentence — *"You have used
+  some of your weekly limit…"* — where a label goes, three lines to state what
+  the percentage beside it already stated. `label` now wins, and `description`
+  is a field of its own, shown on hover.
+- **Three lines per window.** The percentage, the bar and the countdown are one
+  fact three ways. The row is now `label · countdown · %` over the bar, with
+  the absolute timestamp in the tooltip.
+- **Five controls on one agent row.** Name, model, role badge, take-the-role
+  and two labelled speed buttons at 300px pushed the agent's own name out of
+  view. Speed is one lit-or-unlit toggle, and taking the role appears on hover.
+
+Refresh moved into the header as an icon for the same reason: a labelled button
+in a footer costs a whole row to say what an icon says.
+
+**Both rails are `--rail-width` and neither is draggable.** The right panel
+could be widened to 600px, which took that space from the centre — and the
+centre is where several live agent panes now sit at once. Fixed at the
+sidebar's width — 279px — the card carries no horizontal slack, so the fleet variant
+drops what the wider variants can afford: the Active badge, whose absence
+carries it, and the plan name, which the account's own email already
+identifies. Subscription expiry moves to the row's tooltip; freshness stays
+visible, because a stale reading changes what the bars above it are worth.
+The tab strip is 30px rather than 44 for the same reason.
+
+## Sessions live in the sidebar
+
+They were a dropdown inside the chat frame, which could answer neither *which
+session is running* nor *what kind of work is in it*. They now sit under the
+open project in the left rail, grouped.
+
+**A session has a kind.** It becomes `coordination` when a coordinator
+dispatches a task into it; everything else is work. Stored on the session and
+carried through `normalize` — every read runs through there, so a field it
+misses is a field that silently does not persist. Stored rather than re-derived
+because two answers to one question is a mistake this project has already paid
+for.
+
+**A turn binds its session once, at the start.** Every write used to resolve
+`activeSessionId` live, so selecting another session mid-turn sent the rest of
+that turn's output into the newly selected one; the renderer filters events by
+session, so the view being watched fell silent and the agent looked stopped. It
+was never stopping. That binding is also what makes the running dot honest: the
+session with a turn in it is the one the turn is bound to, whatever the user is
+looking at.
+
+`groupSessions` is a pure function, so the ordering and the dropping of empty
+groups are asserted without a DOM.
 
 ## Known limits
 

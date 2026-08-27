@@ -20,10 +20,10 @@ from a wrong reading of it.
 | [Vocabulary](#vocabulary) | 103-116 |  |
 | [The three quota models](#the-three-quota-models) | 117-131 | `ProviderQuotaWindow`, `ProviderUsageLedger` |
 | [The three groups of work](#the-three-groups-of-work) | 132-136 |  |
-| &nbsp;&nbsp;[Group B — The quota surface](#group-b-the-quota-surface) | 137-148 | `refreshProviderAccount`, `ProvidersTab.tsx`, `bankedUsed`, `bankedLimit`, `src/main/connections/usage.ts`, `ProviderUsage` |
-| &nbsp;&nbsp;[Group A — Routing](#group-a-routing) | 149-167 |  |
-| &nbsp;&nbsp;[Group C — Quota models](#group-c-quota-models) | 168-176 | `credits.balance`, `credits.has_credits`, `spend_control.individual_limit` |
-| [What this document is not](#what-this-document-is-not) | 177-182 | `0N-*.md` |
+| &nbsp;&nbsp;[Group B — The quota surface — **landed v1.1.9**](#group-b-the-quota-surface-landed-v119) | 137-150 | `bankedUsed`, `bankedLimit`, `ProviderUsage.resetCredits` |
+| &nbsp;&nbsp;[Group A — Routing](#group-a-routing) | 151-169 |  |
+| &nbsp;&nbsp;[Group C — Quota models](#group-c-quota-models) | 170-178 | `credits.balance`, `credits.has_credits`, `spend_control.individual_limit` |
+| [What this document is not](#what-this-document-is-not) | 179-184 | `0N-*.md` |
 <!-- /toc -->
 
 ## The four goals
@@ -134,17 +134,19 @@ be expressed in it. A silent provider can only be tracked from
 Recorded 2026-08-26. Group B is being done first: it is small, independent of
 the other two, and addresses friction the owner meets daily.
 
-### Group B — The quota surface
+### Group B — The quota surface — **landed v1.1.9**
 
-- A refresh control on the quota card. Today `refreshProviderAccount` is reached
-  from exactly one place, `ProvidersTab.tsx`, so seeing a current number means
-  opening Settings.
-- Show banked usage. `bankedUsed` and `bankedLimit` are already parsed from the
-  OpenAI response in `src/main/connections/usage.ts` and stored on
-  `ProviderUsage`; nothing in the renderer reads them.
-- A banked reset action for ChatGPT accounts, so it can be done in the app
-  rather than on the web. **Needs API investigation before it can be scoped** —
-  no endpoint, IPC channel or control exists for it today.
+- **A refresh control on the quota card** — landed. It now sits in the fleet
+  card's header as an icon.
+- **A reset action for ChatGPT accounts** — landed, with a confirmation, since
+  spending a credit is irreversible.
+- **~~Show banked usage~~ — withdrawn, the fields do not exist.** This asked for
+  `bankedUsed` and `bankedLimit` to be surfaced, described here as *"already
+  parsed from the OpenAI response"*. A read-only probe showed the endpoint
+  returns `rate_limit_reset_credits.{available_count, applicable_available_count}`
+  and nothing banked at all; the parser was reading a field that was never
+  there. `ProviderUsage.resetCredits` replaced it. Recorded as debt item 8's
+  second instance.
 
 ### Group A — Routing
 
