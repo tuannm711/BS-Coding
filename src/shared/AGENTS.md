@@ -1,5 +1,7 @@
 # AGENTS.md — src/shared
 
+> Luật dự án ở [`/AGENTS.md`](/AGENTS.md). File này chỉ mô tả thư mục này, không đặt luật.
+
 Hợp đồng dùng chung giữa main / preload / renderer.
 
 - `types.ts` — data models thuần (Template, Workspace, AgentConfig, AgentState, GitStatus, ...).
@@ -17,12 +19,3 @@ Hợp đồng dùng chung giữa main / preload / renderer.
 - `providers.ts` / `provider-state.ts` — capability, snapshot và trạng thái lỗi của provider.
 - `remote-types.ts` — `RemoteStatus` và payload lệnh remote.
 - `agent-selection.ts` / `openai-oauth.ts` / `text.ts` / `usage.ts` — helper thuần dùng chung.
-
-## Quy ước
-
-- **KHÔNG** hardcode channel string ở nơi khác; chỉ dùng `Channels`.
-- Đổi contract phải cập nhật đồng bộ 4 chỗ: handler main (`src/main/index.ts`), preload
-  (`src/preload/index.ts`), renderer (`window.api`), và test `tests/unit/ipc-contract.test.ts`.
-- Thêm event push mới: thêm channel `Event*` + interface payload + method subscribe trong `AgentApi`,
-  rồi triển khai trong preload và forward trong main.
-- File ở đây được dùng cho cả build main, preload, renderer và test → không kéo dependency bên ngoài.

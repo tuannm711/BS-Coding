@@ -1,5 +1,7 @@
 # AGENTS.md — src/renderer/src/components/settings
 
+> Luật dự án ở [`/AGENTS.md`](/AGENTS.md). File này chỉ mô tả thư mục này, không đặt luật.
+
 The Settings dialog: a tabbed screen editing the whole `bs.json`-backed `BsSettings` object.
 Reads via `window.api.getSettings()`, saves via `saveSettings(settings)`; changes propagate to the
 main process config.
@@ -22,9 +24,3 @@ main process config.
 | `RemoteTab.tsx` | Remote control: enable, pairing code, revoke. |
 | `AddProviderModal.tsx` | Connect a provider account. |
 | `AgentPromptModal.tsx` | Per-agent system prompt override. |
-
-## Conventions
-
-- `BsSettings` shape lives in `src/shared/types.ts`; adding a setting touches shared types + `src/main/agent/config.ts` normalize + this dialog.
-- Edits go through `patch()` on a draft — nothing writes until Save; `saveSettings` returns the normalized settings.
-- UI labels are English.
