@@ -19,15 +19,14 @@ exists to say out loud.
 
 - **Branch:** `v2/p01-foundation`
 - **Gate:** `npm run typecheck` passes and the three P01 unit tests are green
-- **Landed so far:** the approved Figma Make prototype is vendored under
-  `docs/v2/prototype/` on this branch. The project rules consolidation is merged
-  into `master` and this branch carries it, so P01 works against the current
-  rules. P01 itself has not started.
-- **Left to do:** the V2 directory and barrel skeleton; the common primitives
-  `EntityId`, `IsoDateTime`, `CommandResult<T>`, `Clock` and `IdGenerator`; the
-  `createV2Runtime` bootstrap gate and its seam in `src/main/index.ts`. Record
-  the completion commit in `docs/v2/implementation-progress.md`, which P01
-  creates.
+- **Status:** all three tasks landed, completion gate green — `npm run typecheck`
+  plus the three P01 unit tests, and the full suite at 1185 passing. **Awaiting
+  review** before P02.
+- **Landed:** the approved Figma Make prototype vendored under `docs/v2/prototype/`;
+  the V2 skeleton and barrels; the common primitives `EntityId`, `IsoDateTime`,
+  `CommandResult<T>`, `Clock`, `IdGenerator`; the `createV2Runtime` bootstrap gate
+  and its `BS_V2`-gated seam in `src/main/index.ts`. Commits recorded in
+  [`v2/implementation-progress.md`](v2/implementation-progress.md).
 - **Plan:** [`v2/implementation-plans/plans/01-foundation-module-boundaries.md`](v2/implementation-plans/plans/01-foundation-module-boundaries.md)
 
 ## Next
