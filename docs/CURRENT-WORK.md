@@ -15,20 +15,18 @@ Last updated: 2026-08-29
 Exactly one entry. If two things are genuinely running, that is what this file
 exists to say out loud.
 
-**V2 plan 01 — foundation and module boundaries.**
+**V2 plan 02 — domain model and state machines.**
 
-- **Branch:** `v2/p01-foundation`
-- **Gate:** `npm run typecheck` passes and the three P01 unit test files are green
-- **Status:** all three tasks landed, review findings resolved, and the completion
-  gate rerun green — `npm run typecheck`, 9/9 tests across the three P01 test
-  files, and the full suite at 1186 passing. **Reviewed; awaiting merge** before
-  P02.
-- **Landed:** the approved Figma Make prototype vendored under `docs/v2/prototype/`;
-  the V2 skeleton and barrels; the common primitives `EntityId`, `IsoDateTime`,
-  `CommandResult<T>`, `Clock`, `IdGenerator`; the `createV2Runtime` bootstrap gate
-  and its `BS_V2`-gated seam in `src/main/index.ts`. Commits recorded in
-  [`v2/implementation-progress.md`](v2/implementation-progress.md).
-- **Plan:** [`v2/implementation-plans/plans/01-foundation-module-boundaries.md`](v2/implementation-plans/plans/01-foundation-module-boundaries.md)
+- **Branch:** `v2/p02-domain`
+- **Gate:** `npm run typecheck` plus `tests/unit/v2/*state*.test.ts`,
+  `domain-entities.test.ts`, and `agent-version.test.ts` are green
+- **Status:** P01 merged into `master` at `0fa655d` and its post-merge gate is
+  green. The P02 branch is open with no P02 implementation landed. **Awaiting
+  execution approval.**
+- **Scope:** domain entity/correlation contracts; WorkflowRun and TaskRun state
+  machines; WorkSession status projection; immutable AgentVersion and terminal
+  RuntimeEpoch guards.
+- **Plan:** [`v2/implementation-plans/plans/02-domain-model-state-machines.md`](v2/implementation-plans/plans/02-domain-model-state-machines.md)
 
 ## Next
 
@@ -37,10 +35,8 @@ after it has been decided.
 
 | # | Work | Prerequisite |
 |---|---|---|
-| 1 | Merge V2 plan 01 into `master` | P01 gate green and reviewed |
-| 2 | V2 plan 02 — domain model and state machines | P01 merged |
-| 3 | V2 plan 03 — SQLite persistence and event store | P02. Needs a SQLite dependency chosen; the repo has none today |
-| 4 | V2 plan 04 — canonical event protocol | P03 |
+| 1 | V2 plan 03 — SQLite persistence and event store | P02 merged. Needs a SQLite dependency chosen; the repo has none today |
+| 2 | V2 plan 04 — canonical event protocol | P03 |
 
 ## Blocked
 
