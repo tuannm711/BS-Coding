@@ -52,12 +52,15 @@ import { RemoteManager } from './remote/remote-manager'
 import { RemoteSettingsStore } from './remote/remote-settings'
 import { RemotePairing } from './remote/remote-pairing'
 import { migrateLegacyUserData, resolveUserDataDir } from './bs-migration'
+import { createV2Runtime, type V2Runtime } from './v2/application/v2-bootstrap'
 import { Channels } from '../shared/ipc'
 import type { AgentState, Command, FileViewerPayload, ImageAttachment, BsSettings, NewAgentInput, PromptResponse, Template, TerminalInfo, Workspace, WorkspaceRuntime } from '../shared/types'
 
 let win: BrowserWindow | null = null
 let isQuitting = false
 let tray: TrayManager | null = null
+// Side-by-side V2 core. Disabled unless BS_V2=1, so V1 behavior is unchanged.
+let v2Runtime: V2Runtime | null = null
 
 if (process.env.BS_USER_DATA) app.setPath('userData', process.env.BS_USER_DATA)
 
@@ -992,6 +995,7 @@ app.whenReady().then(async () => {
   await migrateLegacyUserData(userDataDir, {
     legacyDir: path.join(path.dirname(userDataDir), 'BS Coding')
   })
+  v2Runtime = await createV2Runtime({ enabled: process.env.BS_V2 === '1', userDataPath: userDataDir })
   mainApp = new MainApp()
   mainApp.bsAgent.truncationCleanup()
   await mainApp.browserBridge.start().catch(err => {
@@ -1053,6 +1057,8 @@ app.on('before-quit', (event) => {
     return mainApp.browserBridge.close()
   }).then(() => {
     mainApp.remote?.dispose()
+  }).then(() => {
+    return v2Runtime?.dispose()
   }).then(() => {
     tray?.dispose()
     tray = null
