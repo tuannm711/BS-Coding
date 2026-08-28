@@ -15,7 +15,7 @@ plan be reviewed — that gate is tracked in `../CURRENT-WORK.md`, not here.
 
 ## P01 notes
 
-- V2 roots created beside V1: `src/main/v2/{domain,application,runtime,infrastructure,ipc}`, `src/shared/v2`, `src/renderer/src/v2`. No V1 module imports V2 and no V2 module imports legacy orchestration.
+- V2 roots created beside V1: `src/main/v2/{domain,application,runtime,infrastructure,ipc}`, `src/shared/v2`, `src/renderer/src/v2`. The legacy main entry point imports only the explicit V2 bootstrap seam; V2 does not import legacy orchestration.
 - Common primitives: `EntityId`, `IsoDateTime`, `CommandResult<T>` with `success`/`failure` in `src/shared/v2/contracts/common.ts` (serializable, no Node import); `Clock` and `IdGenerator` ports in the application layer; `SystemClock` and `UuidGenerator` in infrastructure.
 - Bootstrap gate `createV2Runtime({ enabled, userDataPath })` wired into `src/main/index.ts`, gated on `BS_V2=1` and off by default, disposed in the before-quit chain. V1 behavior unchanged.
 - Task commits: `0bbe7b2` (boundaries), `6d1fff5` (primitives), `a3d8ab1` (bootstrap gate).
