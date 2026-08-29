@@ -3,6 +3,9 @@ export interface PlanTaskDefinition {
   dependsOn: readonly string[]
   acceptanceCriteria: readonly string[]
   informational?: boolean
+  requiredCapability?: string
+  workspaceKey?: string
+  qualityGateScopes?: readonly string[]
 }
 
 export interface TaskGraph {

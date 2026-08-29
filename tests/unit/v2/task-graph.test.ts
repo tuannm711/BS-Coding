@@ -30,4 +30,18 @@ describe('task graph validation', () => {
       { id: 'C', status: 'QUEUED', dependsOn: ['B'] }
     ])).toEqual(['B'])
   })
+
+  it('rejects unsatisfied capabilities, workspace conflicts and invalid gate scopes', () => {
+    const tasks = [{ id: 'A', dependsOn: [], acceptanceCriteria: ['done'],
+      requiredCapability: 'typescript', workspaceKey: 'shared', qualityGateScopes: ['missing'] }]
+    expect(() => validateGraph(tasks, { eligibleCapabilities: new Set(),
+      resolvableWorkspaceKeys: new Set(['shared']), validQualityGateScopes: new Set(['A']) }))
+      .toThrow(/capability/i)
+    expect(() => validateGraph(tasks, { eligibleCapabilities: new Set(['typescript']),
+      resolvableWorkspaceKeys: new Set(), validQualityGateScopes: new Set(['A']) }))
+      .toThrow(/workspace/i)
+    expect(() => validateGraph(tasks, { eligibleCapabilities: new Set(['typescript']),
+      resolvableWorkspaceKeys: new Set(['shared']), validQualityGateScopes: new Set(['A']) }))
+      .toThrow(/quality gate/i)
+  })
 })

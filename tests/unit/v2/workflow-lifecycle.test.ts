@@ -8,7 +8,8 @@ describe('workflow lifecycle controls', () => {
     const cancellations: string[] = []
     const service = createWorkflowLifecycleService({ load: async () => state,
       save: async next => { state = next as typeof state },
-      cancelActiveAgentRuns: async reason => { cancellations.push(reason) } })
+      cancelActiveAgentRuns: async reason => { cancellations.push(reason) },
+      transaction: async operation => operation() })
     const paused = await service.pause('run')
     expect(paused).toMatchObject({ id: 'run', status: 'PAUSED', completedOutputIds: ['artifact'] })
     expect(cancellations).toEqual(['pause'])
@@ -19,7 +20,8 @@ describe('workflow lifecycle controls', () => {
     let state: any = { id: 'run', status: 'EXECUTING', blockingGates: 0,
       completedOutputIds: ['artifact'] }
     const service = createWorkflowLifecycleService({ load: async () => state,
-      save: async next => { state = next }, cancelActiveAgentRuns: async () => {} })
+      save: async next => { state = next }, cancelActiveAgentRuns: async () => {},
+      transaction: async operation => operation() })
     expect(await service.cancel('run')).toMatchObject({ status: 'CANCELLED',
       completedOutputIds: ['artifact'] })
     state = { ...state, status: 'COMPLETED' }
@@ -29,7 +31,19 @@ describe('workflow lifecycle controls', () => {
   it('marks an interrupted active run recoverably blocked', async () => {
     let state: any = { id: 'run', status: 'EXECUTING', blockingGates: 0 }
     const service = createWorkflowLifecycleService({ load: async () => state,
-      save: async next => { state = next }, cancelActiveAgentRuns: async () => {} })
+      save: async next => { state = next }, cancelActiveAgentRuns: async () => {},
+      transaction: async operation => operation() })
     expect(await service.recoverInterrupted('run')).toMatchObject({ status: 'BLOCKED' })
+  })
+
+  it('runs lifecycle state and AgentRun cancellation atomically', async () => {
+    let transactions = 0
+    const service = createWorkflowLifecycleService({
+      load: async () => ({ id: 'run', status: 'EXECUTING', blockingGates: 0 }),
+      save: async () => {}, cancelActiveAgentRuns: async () => {},
+      transaction: async operation => { transactions += 1; return operation() }
+    })
+    await service.pause('run')
+    expect(transactions).toBe(1)
   })
 })
