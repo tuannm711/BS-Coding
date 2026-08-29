@@ -15,29 +15,29 @@ Last updated: 2026-08-29
 Exactly one entry. If two things are genuinely running, that is what this file
 exists to say out loud.
 
-**V2 plan 04 — canonical event protocol.**
+**V2 plan 05 — provider, account, model and routing.**
 
-- **Branch:** `v2/p04-canonical-events`
-- **Gate:** `npm run typecheck` plus `canonical-event-schema.test.ts`,
-  `event-assembler.test.ts`, and `event-redaction.test.ts` are green
-- **Status:** P03 merged into `master` at `cfc46b2`; typecheck, 14 targeted
-  tests, production build and the full suite at 1241 passing are green after
-  merge. All three P04 tasks and review remediation landed; 17/17 P04 plus
-  EventStore regression tests, the boundary guard, production build and the
-  full suite at 1254 passing are green. **Awaiting review** before merge.
-- **Scope:** versioned canonical event schemas; transient-to-durable event
-  assembly; event factory, correlation enforcement and recursive redaction.
-- **Contract reconciliation:** P04 will finalize the architecture envelope
-  (`timestamp` and canonical correlation IDs) and adapt the P03 forward
-  EventStore contract/storage mapping without rewriting migration 002.
-- **Plan:** [`v2/implementation-plans/plans/04-canonical-event-protocol.md`](v2/implementation-plans/plans/04-canonical-event-protocol.md)
+- **Branch:** `v2/p05-provider-routing`
+- **Gate:** `npm run typecheck` plus `provider-contract.test.ts`,
+  `v1-provider-compat.test.ts`, `capability-probe.test.ts`, and
+  `account-router.test.ts` are green
+- **Status:** P04 merged into `master` at `4489bc7`; typecheck, 19 targeted
+  tests, production build and the full suite at 1254 passing are green after
+  merge. All four P05 tasks and review remediation landed; 13/13 P05 tests,
+  boundary guard, production build and full suite at 1267 passing are green.
+  **Awaiting review** before merge.
+- **Scope:** provider/account/model contracts, V1 compatibility adapter,
+  capability probes and sticky AUTO/PREFERRED/PINNED routing.
+- **Plan:** [`v2/implementation-plans/plans/05-provider-account-model-routing.md`](v2/implementation-plans/plans/05-provider-account-model-routing.md)
 
 ## Next
 
 Decided work, in order. Not an idea backlog — something reaches this list only
 after it has been decided.
 
-Nothing is decided beyond P04 yet.
+| # | Work | Prerequisite |
+|---|---|---|
+| 1 | V2 plan 07 — tool execution and protocol guard | P04 merged; scheduled after P05 because work is inline |
 
 ## Blocked
 

@@ -15,6 +15,7 @@ plan be reviewed — that gate is tracked in `../CURRENT-WORK.md`, not here.
 | P02 | Domain model and state machines | `d0a6dff` | `npm run typecheck` + 7 P02 unit test files green; full suite 1229 passing |
 | P03 | SQLite persistence and event store | `fa246e7` | `npm run typecheck` + 4 P03 unit test files + production build green; full suite 1241 passing |
 | P04 | Canonical event protocol | `a818fe3` | `npm run typecheck` + 3 P04 unit test files + EventStore/boundary regressions + production build green; full suite 1254 passing |
+| P05 | Provider, account, model and routing | `289b8d4` | `npm run typecheck` + 4 P05 unit test files + boundary guard + production build green; full suite 1267 passing |
 
 ## P01 notes
 
@@ -45,3 +46,11 @@ plan be reviewed — that gate is tracked in `../CURRENT-WORK.md`, not here.
 - Stream assembly compacts text deltas, excludes reasoning/partial calls, preserves narrated tool-like prose as text, and rejects duplicate/orphan call IDs.
 - Event factory uses injected Clock/IdGenerator and recursively redacts credential-like fields without mutating input.
 - Task commits: `e0c1904` (schemas/EventStore/rules reconciliation), `a338a99` (assembler), `592c757` (factory/redaction), `a818fe3` (tool correlation and persisted schema validation).
+
+## P05 notes
+
+- Added secret-free provider/account/model/RuntimeTarget contracts, Zod schemas, and ProviderPort; multiple accounts remain independently enabled with no active-account singleton.
+- V1 compatibility uses structural edge types, strips secrets, maps unknown health/capabilities conservatively, and has a P18 deletion criterion.
+- Capability probes trust only structured tool events; narrated tool-like prose is DEGRADED, never VERIFIED.
+- Router implements deterministic AUTO/PREFERRED/PINNED policy, capability filtering, quota/load scoring, frozen epoch-sticky targets and explicit epoch release.
+- Task commits: `8742a48` (contracts/port), `a7bb22c` (V1 adapter), `2dc526c` (capability probe), `87621e7` (router), `289b8d4` (review remediation).
