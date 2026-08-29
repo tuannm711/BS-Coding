@@ -20,6 +20,7 @@ plan be reviewed — that gate is tracked in `../CURRENT-WORK.md`, not here.
 | P06 | Context compiler and RuntimeEpoch switching | `3bcd077` | `npm run typecheck` + 4 P06 unit test files + boundary guard + production build green; full suite 1288 passing |
 | P08 | Agent runtime V2 | `ce8256d` | `npm run typecheck` + 5 P08 unit test files + boundary guard + production build green; full suite 1300 passing |
 | P09 | Workflow and task graph engine | `89f50ac` | `npm run typecheck` + 4 P09 unit test files + boundary guard + production build green; full suite 1313 passing |
+| P10 | Agent team and orchestrator | `e3d96d9` | `npm run typecheck` + 4 P10 unit test files + boundary guard + production build green; full suite 1323 passing |
 
 ## P01 notes
 
@@ -89,3 +90,11 @@ plan be reviewed — that gate is tracked in `../CURRENT-WORK.md`, not here.
 - Pause/resume/cancel/recovery use named state transitions, preserve completed outputs and run lifecycle state plus AgentRun cancellation through an injected transaction boundary.
 - Retry policy distinguishes transient same-attempt/new-epoch handoff from implementation retry with explicit TaskRun provenance.
 - Task commits: `392fdbb` (DAG validation), `17cc25c` (WorkflowEngine), `a6c713e` (lifecycle controls), `39038a4` (retry policy), `89f50ac` (execution-constraint/atomicity remediation).
+
+## P10 notes
+
+- Eight immutable standard agent templates keep Security Reviewer and QA/Tester responsibilities distinct; templates remain data rather than hard-coded classes.
+- Assignment service loads immutable AgentVersion references, persists an auditable assignment before dispatch and supplies a deep-frozen, self-contained TaskEnvelope with no hidden coordinator context.
+- Orchestrator uses an explicit read/planning allowlist and default-denies unknown, write, shell and recursive worker tools; plan/task proposals cross the WorkflowEngine boundary.
+- Admission policy uses only explicit concurrency/budget settings, returns ALLOW/ASK/BLOCK with projected spend, and invents no hard defaults.
+- Task commits: `9d734ce` (profiles), `e67f766` (assignments), `1cd316d` (Orchestrator policy), `d31174d` (admission), `e3d96d9` (default-deny/immutability remediation).

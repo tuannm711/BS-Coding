@@ -1,4 +1,5 @@
-export type Permission = 'ALLOW' | 'ASK' | 'DENY'
+import type { Permission } from '../../../../shared/v2/contracts/tools'
+export type { Permission } from '../../../../shared/v2/contracts/tools'
 
 export interface PermissionLayers {
   hardSecurity?: Permission
