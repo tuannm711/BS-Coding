@@ -23,6 +23,7 @@ plan be reviewed — that gate is tracked in `../CURRENT-WORK.md`, not here.
 | P10 | Agent team and orchestrator | `e3d96d9` | `npm run typecheck` + 4 P10 unit test files + boundary guard + production build green; full suite 1323 passing |
 | P11 | Git worktree integration | `43edf01` | `npm run typecheck` + P11 integration/unit tests + boundary guard + production build green; full suite 1332 passing |
 | P12 | Review, rework and quality gates | `a8f05c1` | `npm run typecheck` + 14 P12/boundary tests + production build green; full suite 1344 passing |
+| P13 | Skills, MCP and LSP integration | `7682c61` | `npm run typecheck` + 17 P13/boundary tests + production build green; full suite 1359 passing |
 
 ## P01 notes
 
@@ -117,3 +118,11 @@ plan be reviewed — that gate is tracked in `../CURRENT-WORK.md`, not here.
 - Rework tasks and finding links persist transactionally before worker dispatch; required mechanical gates and failed specialist reviews rerun before final verification can emit completion.
 - Final verification rejects failed/blocked gates, open blocking findings, failed/blocked mandatory reviews and empty gate/review rerun results, so worker success cannot bypass quality policy.
 - Task commits: `5601a04` (contracts), `b353ac8` (mechanical gates), `080d5b3` (review ingestion), `e2689c5` (rework/final verification), `a8f05c1` (completion-bypass remediation).
+
+## P13 notes
+
+- Skill, MCP and LSP contracts are strict JSON-serializable schemas; skill sources include built-in, marketplace, user and project scopes without executable functions crossing shared boundaries.
+- Skill resolution uses explicit project-first precedence, rejects ambiguous same-scope duplicates and creates frozen version/hash/artifact snapshots after validating all discovered skills.
+- The structural V1 MCP adapter exposes conservative V2 ToolDefinitions without invoking bindings during discovery; only connected, registered tools can reach the explicit call port and descriptors expose no environment secrets.
+- The structural V1 LSP adapter enforces lexical workspace scope, normalizes legacy positions/severity and returns evidence-only diagnostics with no workflow mutation fields.
+- Task commits: `a7ddb79` (contracts), `492a7d9` (skill snapshots), `3de9ecf` (MCP adapter), `76f116e` (LSP adapter), `7682c61` (registered-tool remediation).
