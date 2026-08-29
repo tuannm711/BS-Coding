@@ -23,7 +23,9 @@ exists to say out loud.
   `account-router.test.ts` are green
 - **Status:** P04 merged into `master` at `4489bc7`; typecheck, 19 targeted
   tests, production build and the full suite at 1254 passing are green after
-  merge. P05 is implicitly approved under the V2 default; Task 1 is in progress.
+  merge. All four P05 tasks and review remediation landed; 13/13 P05 tests,
+  boundary guard, production build and full suite at 1267 passing are green.
+  **Awaiting review** before merge.
 - **Scope:** provider/account/model contracts, V1 compatibility adapter,
   capability probes and sticky AUTO/PREFERRED/PINNED routing.
 - **Plan:** [`v2/implementation-plans/plans/05-provider-account-model-routing.md`](v2/implementation-plans/plans/05-provider-account-model-routing.md)
