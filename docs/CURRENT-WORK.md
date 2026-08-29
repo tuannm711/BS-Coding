@@ -21,8 +21,8 @@ exists to say out loud.
 - **Gate:** `npm run typecheck` plus `tests/unit/v2/*state*.test.ts`,
   `domain-entities.test.ts`, and `agent-version.test.ts` are green
 - **Status:** P01 merged into `master` at `0fa655d` and its post-merge gate is
-  green. The P02 branch is open with no P02 implementation landed. **Awaiting
-  execution approval.**
+  green. P02 execution was approved after downstream contract review; Task 1
+  (domain entities and correlation) is in progress.
 - **Scope:** domain entity/correlation contracts; WorkflowRun and TaskRun state
   machines; WorkSession status projection; immutable AgentVersion and terminal
   RuntimeEpoch guards.
