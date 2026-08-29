@@ -15,20 +15,20 @@ Last updated: 2026-08-29
 Exactly one entry. If two things are genuinely running, that is what this file
 exists to say out loud.
 
-**V2 plan 08 — agent runtime.**
+**V2 plan 09 — workflow and task graph engine.**
 
-- **Branch:** `v2/p08-agent-runtime`
-- **Gate:** `npm run typecheck` plus `runtime-port.test.ts`,
-  `v1-llm-runtime-adapter.test.ts`, `agent-runner.test.ts`,
-  `steering-queue.test.ts`, and `compaction-policy.test.ts` are green
-- **Status:** P06 merged into `master` at `ab37a76`; typecheck, 11 targeted
-  tests, production build and the full suite at 1288 passing are green after
-  merge. All four P08 tasks and review remediation landed; 12/12 P08 tests,
-  boundary guard, production build and full suite at 1300 passing are green.
+- **Branch:** `v2/p09-workflow-engine`
+- **Gate:** `npm run typecheck` plus `task-graph.test.ts`,
+  `workflow-engine.test.ts`, `workflow-lifecycle.test.ts`, and
+  `retry-policy.test.ts` are green
+- **Status:** P08 merged into `master` at `058df92`; typecheck, 14 targeted
+  tests, production build and the full suite at 1300 passing are green after
+  merge. All four P09 tasks and review remediation landed; 13/13 P09 tests,
+  boundary guard, production build and full suite at 1313 passing are green.
   **Awaiting review** before merge.
-- **Scope:** provider-neutral RuntimePort, V1 LLM adapter, AgentRun loop,
-  cancellation/limits, steering boundaries and canonical compaction.
-- **Plan:** [`v2/implementation-plans/plans/08-agent-runtime-v2.md`](v2/implementation-plans/plans/08-agent-runtime-v2.md)
+- **Scope:** plan/DAG validation, deterministic scheduling and task outcomes,
+  workflow lifecycle controls, retry and attempt provenance.
+- **Plan:** [`v2/implementation-plans/plans/09-workflow-task-graph-engine.md`](v2/implementation-plans/plans/09-workflow-task-graph-engine.md)
 
 ## Next
 
@@ -37,7 +37,7 @@ after it has been decided.
 
 | # | Work | Prerequisite |
 |---|---|---|
-| 1 | V2 plan 09 — workflow/task graph engine | P08 merged |
+| 1 | V2 plan 10 — agent team/orchestrator | P09 merged |
 
 ## Blocked
 
