@@ -15,18 +15,19 @@ Last updated: 2026-08-29
 Exactly one entry. If two things are genuinely running, that is what this file
 exists to say out loud.
 
-**V2 plan 02 — domain model and state machines.**
+**V2 plan 03 — SQLite persistence and event store.**
 
-- **Branch:** `v2/p02-domain`
-- **Gate:** `npm run typecheck` plus the seven P02 unit test files are green
-- **Status:** P01 merged into `master` at `0fa655d` and its post-merge gate is
-  green. All four P02 tasks and review remediation landed; 43/43 P02 tests,
-  the boundary guard, and the full suite at 1229 passing are green. **Awaiting
-  review** before merge.
-- **Scope:** domain entity/correlation contracts; WorkflowRun and TaskRun state
-  machines; AgentRun and RuntimeEpoch guards; WorkSession status projection;
-  immutable AgentVersion snapshots.
-- **Plan:** [`v2/implementation-plans/plans/02-domain-model-state-machines.md`](v2/implementation-plans/plans/02-domain-model-state-machines.md)
+- **Branch:** `v2/p03-persistence`
+- **Gate:** `npm run typecheck` plus `database.test.ts`, `migrations.test.ts`,
+  `sqlite-event-store.test.ts`, and `repositories.test.ts` are green
+- **Status:** P02 merged into `master` at `fd74386`; typecheck, 45/45 targeted
+  tests and the full suite at 1229 passing are green after merge. The P03 branch
+  is open with no implementation landed. **Awaiting SQLite dependency approval.**
+- **Scope:** SQLite/WAL bootstrap; transactional migrations; monotonic EventStore;
+  domain repositories and filesystem artifact references.
+- **Dependency decision:** the locked plan specifies `better-sqlite3` plus
+  `@types/better-sqlite3`; the repository currently has no SQLite dependency.
+- **Plan:** [`v2/implementation-plans/plans/03-sqlite-persistence-event-store.md`](v2/implementation-plans/plans/03-sqlite-persistence-event-store.md)
 
 ## Next
 
@@ -35,8 +36,7 @@ after it has been decided.
 
 | # | Work | Prerequisite |
 |---|---|---|
-| 1 | V2 plan 03 — SQLite persistence and event store | P02 merged. Needs a SQLite dependency chosen; the repo has none today |
-| 2 | V2 plan 04 — canonical event protocol | P03 |
+| 1 | V2 plan 04 — canonical event protocol | P03 merged |
 
 ## Blocked
 
