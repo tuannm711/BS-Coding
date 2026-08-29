@@ -7,10 +7,16 @@ export type AgentRunOutcome =
   | { status: 'CANCELLED'; steps: number }
   | { status: 'DEGRADED'; steps: number; code: 'STEP_LIMIT' }
 
+export interface SteeringSource<T> {
+  drain(): T[]
+}
+
 export interface AgentRunnerInput {
   maxSteps: number
   signal?: AbortSignal
-  nextStep(step: number, toolResults: readonly unknown[], signal?: AbortSignal):
+  steering?: SteeringSource<string>
+  nextStep(step: number, toolResults: readonly unknown[], signal?: AbortSignal,
+    steering?: readonly string[]):
     Promise<readonly RuntimeStreamPart[]>
   executeTool(call: CanonicalToolCall, signal?: AbortSignal): Promise<unknown>
 }

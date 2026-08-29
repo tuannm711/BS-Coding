@@ -7,7 +7,8 @@ export class AgentRunner implements AgentRunExecutor {
     for (let step = 0; step < input.maxSteps; step += 1) {
       if (input.signal?.aborted) return { status: 'CANCELLED', steps: step }
       try {
-        const parts = await input.nextStep(step, toolResults, input.signal)
+        const steering = input.steering?.drain() ?? []
+        const parts = await input.nextStep(step, toolResults, input.signal, steering)
         const runtimeError = parts.find(part => part.kind === 'error')
         if (runtimeError?.kind === 'error') {
           return { status: 'FAILED', steps: step + 1, code: runtimeError.error.code,

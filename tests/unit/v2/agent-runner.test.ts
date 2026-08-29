@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createAgentRunService } from '../../../src/main/v2/application/agent/agent-run-service'
 import { AgentRunner } from '../../../src/main/v2/runtime/agent/agent-runner'
+import { SteeringQueue } from '../../../src/main/v2/runtime/agent/steering-queue'
 
 describe('AgentRunner', () => {
   it('succeeds after a finished step with no tool calls', async () => {
@@ -36,6 +37,23 @@ describe('AgentRunner', () => {
     expect(limited).toMatchObject({
       status: 'DEGRADED', code: 'STEP_LIMIT'
     })
+  })
+
+  it('drains steering only at model step boundaries', async () => {
+    const steering = new SteeringQueue<string>()
+    steering.push('before')
+    const seen: string[][] = []
+    const runner = new AgentRunner()
+    await runner.run({ maxSteps: 2, steering,
+      nextStep: async (step, _results, _signal, messages) => {
+        seen.push([...(messages ?? [])])
+        return step === 0 ? [{ kind: 'tool-call', call: { callId: 'c', toolName: 'read',
+          arguments: {}, origin: 'model', requestedAt: '2026-08-29T00:00:00.000Z' } }]
+          : [{ kind: 'finish', reason: 'stop' }]
+      },
+      executeTool: async () => { steering.push('during'); return {} }
+    })
+    expect(seen).toEqual([['before'], ['during']])
   })
 })
 
