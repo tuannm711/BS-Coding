@@ -10,6 +10,7 @@ export class IntegrationService {
   constructor(private readonly deps: {
     merge(branch: string): Promise<WorkspaceMergeOutcome>
     createConflictTask(input: { taskId: string; branch: string; files: string[] }): Promise<void>
+    requestQualityGateRerun(taskIds: readonly string[]): Promise<void>
   }) {}
 
   async integrate(candidates: readonly IntegrationCandidate[]): Promise<WorkspaceMergeOutcome> {
@@ -25,6 +26,9 @@ export class IntegrationService {
         return { kind: 'CONFLICT', files: [...outcome.files] }
       }
       lastCommit = outcome.commit
+    }
+    if (approved.length > 0) {
+      await this.deps.requestQualityGateRerun(approved.map(candidate => candidate.taskId))
     }
     return { kind: 'MERGED', commit: lastCommit }
   }

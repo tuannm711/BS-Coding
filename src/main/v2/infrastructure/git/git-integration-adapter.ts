@@ -2,16 +2,20 @@ import type { WorkspaceMergeOutcome } from '../../../../shared/v2/contracts/work
 import { runGit } from './git-command'
 
 export class GitIntegrationAdapter {
-  constructor(private readonly integrationWorktreePath: string) {}
+  constructor(
+    private readonly integrationWorktreePath: string,
+    private readonly git: (cwd: string, args: readonly string[]) => Promise<string> = runGit
+  ) {}
 
   async merge(branch: string): Promise<WorkspaceMergeOutcome> {
     try {
-      await runGit(this.integrationWorktreePath, ['merge', '--no-ff', '--no-edit', branch])
-      return { kind: 'MERGED', commit: await runGit(this.integrationWorktreePath, ['rev-parse', 'HEAD']) }
-    } catch {
-      const output = await runGit(this.integrationWorktreePath,
+      await this.git(this.integrationWorktreePath, ['merge', '--no-ff', '--no-edit', branch])
+      return { kind: 'MERGED', commit: await this.git(this.integrationWorktreePath, ['rev-parse', 'HEAD']) }
+    } catch (error) {
+      const output = await this.git(this.integrationWorktreePath,
         ['diff', '--name-only', '--diff-filter=U'])
-      return { kind: 'CONFLICT', files: output ? output.split(/\r?\n/) : [] }
+      if (!output) throw error
+      return { kind: 'CONFLICT', files: output.split(/\r?\n/) }
     }
   }
 }
