@@ -18,12 +18,11 @@ exists to say out loud.
 **V2 plan 13 — skills, MCP and LSP integration.**
 
 - **Branch:** `v2/p13-skills-mcp-lsp`
-- **Gate:** `npm run typecheck` plus `extension-contracts.test.ts`,
-  `skill-resolver.test.ts`, `v1-mcp-adapter.test.ts`, and
-  `v1-lsp-adapter.test.ts` are green
-- **Status:** P12 merged into `master` at `41a0135`; typecheck, 14 targeted
-  tests, production build and the full suite at 1344 passing are green after
-  merge. P13 prerequisites are merged; Task 1 is in progress.
+- **Gate:** `npm run typecheck`, 17 P13/boundary tests, production build and the
+  full suite at 1359 passing are green
+- **Status:** implementation and inline review complete at `7682c61`; review
+  remediation prevents hidden/stale MCP bindings from bypassing the registered
+  tool set. P13 is awaiting approval to merge into `master`.
 - **Scope:** serializable Skill/MCP/LSP contracts, immutable skill resolution
   snapshots, guarded MCP tool normalization and evidence-only LSP diagnostics.
 - **Plan:** [`v2/implementation-plans/plans/13-skills-mcp-lsp.md`](v2/implementation-plans/plans/13-skills-mcp-lsp.md)
@@ -35,7 +34,8 @@ after it has been decided.
 
 | # | Work | Prerequisite |
 |---|---|---|
-| 1 | V2 plan 14 — IPC and preload contracts | Scheduled after P13 |
+| 1 | Merge V2 plan 13 into `master` | P13 implementation/review complete; awaiting approval |
+| 2 | V2 plan 14 — IPC and preload contracts | Scheduled after P13 merge |
 
 ## Blocked
 
