@@ -14,25 +14,31 @@ interface EpochDependencies {
     workSessionId: string; agentRunId: string }): Promise<void>
   nextId(): string
   now(): string
+  transaction<T>(operation: () => Promise<T>): Promise<T>
 }
 
 export function createRuntimeEpochService(deps: EpochDependencies) {
   return {
     async switchRuntime(input: { workSessionId: string; agentRunId: string; target: RuntimeTarget |
       { providerId: string; accountId: string; modelId: string }; reason: string }) {
-      const active = await deps.findActive(input.agentRunId)
-      if (!active || active.status !== 'ACTIVE') throw new Error('active RuntimeEpoch is required')
-      const timestamp = deps.now()
-      await deps.save({ ...active, status: 'CLOSED', endedAt: timestamp, endReason: input.reason })
-      await deps.appendLifecycle({ type: 'RUNTIME_EPOCH_CLOSED', epochId: active.id,
-        workSessionId: input.workSessionId, agentRunId: input.agentRunId })
-      const next: EpochRecord = { id: deps.nextId(), workSessionId: input.workSessionId,
-        agentRunId: input.agentRunId, status: 'ACTIVE', target: structuredClone(input.target),
-        startedAt: timestamp }
-      await deps.save(next)
-      await deps.appendLifecycle({ type: 'RUNTIME_EPOCH_STARTED', epochId: next.id,
-        workSessionId: input.workSessionId, agentRunId: input.agentRunId })
-      return { epochId: next.id, workSessionId: next.workSessionId, agentRunId: next.agentRunId }
+      return deps.transaction(async () => {
+        const active = await deps.findActive(input.agentRunId)
+        if (!active || active.status !== 'ACTIVE') throw new Error('active RuntimeEpoch is required')
+        if (active.workSessionId !== input.workSessionId) {
+          throw new Error('active RuntimeEpoch belongs to a different WorkSession')
+        }
+        const timestamp = deps.now()
+        await deps.save({ ...active, status: 'CLOSED', endedAt: timestamp, endReason: input.reason })
+        await deps.appendLifecycle({ type: 'RUNTIME_EPOCH_CLOSED', epochId: active.id,
+          workSessionId: input.workSessionId, agentRunId: input.agentRunId })
+        const next: EpochRecord = { id: deps.nextId(), workSessionId: input.workSessionId,
+          agentRunId: input.agentRunId, status: 'ACTIVE', target: structuredClone(input.target),
+          startedAt: timestamp }
+        await deps.save(next)
+        await deps.appendLifecycle({ type: 'RUNTIME_EPOCH_STARTED', epochId: next.id,
+          workSessionId: input.workSessionId, agentRunId: input.agentRunId })
+        return { epochId: next.id, workSessionId: next.workSessionId, agentRunId: next.agentRunId }
+      })
     }
   }
 }

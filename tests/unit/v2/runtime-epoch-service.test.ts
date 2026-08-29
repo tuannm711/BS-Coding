@@ -12,7 +12,8 @@ describe('RuntimeEpochService', () => {
       save: async epoch => { epochs.set(epoch.id, epoch) },
       appendLifecycle: async event => { events.push(event.type) },
       nextId: () => `e${++id}`,
-      now: () => '2026-08-29T00:00:00.000Z'
+      now: () => '2026-08-29T00:00:00.000Z',
+      transaction: async operation => operation()
     })
     const next = await service.switchRuntime({ workSessionId: 'w', agentRunId: 'a',
       target: { providerId: 'openai', accountId: 'new', modelId: 'codex' }, reason: 'user-switch' })
@@ -23,8 +24,24 @@ describe('RuntimeEpochService', () => {
 
   it('requires an active epoch when switching', async () => {
     const service = createRuntimeEpochService({ findActive: async () => null, save: async () => {},
-      appendLifecycle: async () => {}, nextId: () => 'e2', now: () => '2026-08-29T00:00:00.000Z' })
+      appendLifecycle: async () => {}, nextId: () => 'e2', now: () => '2026-08-29T00:00:00.000Z',
+      transaction: async operation => operation() })
     await expect(service.switchRuntime({ workSessionId: 'w', agentRunId: 'a', target: {
       providerId: 'p', accountId: 'a', modelId: 'm' }, reason: 'fallback' })).rejects.toThrow(/active/i)
+  })
+
+  it('runs close and start inside one transaction and rejects WorkSession mismatch', async () => {
+    let transactions = 0
+    const service = createRuntimeEpochService({
+      findActive: async () => ({ id: 'e1', workSessionId: 'other', agentRunId: 'a', status: 'ACTIVE',
+        target: { providerId: 'p', accountId: 'a', modelId: 'm' } }),
+      save: async () => {}, appendLifecycle: async () => {}, nextId: () => 'e2',
+      now: () => '2026-08-29T00:00:00.000Z',
+      transaction: async operation => { transactions += 1; return operation() }
+    })
+    await expect(service.switchRuntime({ workSessionId: 'w', agentRunId: 'a', target: {
+      providerId: 'p', accountId: 'a', modelId: 'next' }, reason: 'fallback' }))
+      .rejects.toThrow(/WorkSession/i)
+    expect(transactions).toBe(1)
   })
 })
