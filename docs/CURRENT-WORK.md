@@ -15,20 +15,17 @@ Last updated: 2026-08-29
 Exactly one entry. If two things are genuinely running, that is what this file
 exists to say out loud.
 
-**V2 plan 10 — agent team and orchestrator.**
+**V2 plan 11 — Git worktree integration.**
 
-- **Branch:** `v2/p10-agent-team`
-- **Gate:** `npm run typecheck` plus `default-agent-profiles.test.ts`,
-  `assignment-service.test.ts`, `orchestrator-policy.test.ts`, and
-  `admission-policy.test.ts` are green
-- **Status:** P09 merged into `master` at `7817226`; typecheck, 15 targeted
-  tests, production build and the full suite at 1313 passing are green after
-  merge. All four P10 tasks and review remediation landed; 10/10 P10 tests,
-  boundary guard, production build and full suite at 1323 passing are green.
-  **Awaiting review** before merge.
-- **Scope:** standard project agent profiles, auditable assignments,
-  Orchestrator non-writing policy and explicit concurrency/budget admission.
-- **Plan:** [`v2/implementation-plans/plans/10-agent-team-orchestrator.md`](v2/implementation-plans/plans/10-agent-team-orchestrator.md)
+- **Branch:** `v2/p11-git-worktree`
+- **Gate:** `npm run typecheck` plus `worktree-manager.test.ts`,
+  `integration-service.test.ts`, and `workspace-cleanup.test.ts` are green
+- **Status:** P10 merged into `master` at `214d4fc`; typecheck, 12 targeted
+  tests, production build and the full suite at 1323 passing are green after
+  merge. P11 prerequisites are merged; Task 1 is in progress.
+- **Scope:** WorkspacePort contracts, isolated task worktrees, deterministic
+  integration/conflict outcomes and data-safe cleanup policy.
+- **Plan:** [`v2/implementation-plans/plans/11-git-worktree-integration.md`](v2/implementation-plans/plans/11-git-worktree-integration.md)
 
 ## Next
 
@@ -37,7 +34,7 @@ after it has been decided.
 
 | # | Work | Prerequisite |
 |---|---|---|
-| 1 | V2 plan 11 — Git worktree integration | P10 merged |
+| 1 | V2 plan 12 — review and quality gates | P11 merged |
 
 ## Blocked
 
