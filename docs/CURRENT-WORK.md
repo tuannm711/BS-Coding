@@ -15,17 +15,18 @@ Last updated: 2026-08-29
 Exactly one entry. If two things are genuinely running, that is what this file
 exists to say out loud.
 
-**V2 plan 12 — review and quality gates.**
+**V2 plan 13 — skills, MCP and LSP integration.**
 
-- **Branch:** `v2/p12-review-gates`
-- **Gate:** `npm run typecheck`, 14 P12/boundary tests, production build and the
-  full suite at 1344 passing are green
-- **Status:** implementation and inline review complete at `a8f05c1`; review
-  remediation closed failed-decision and empty-rerun completion bypasses. P12
-  is awaiting approval to merge into `master`.
-- **Scope:** review/finding/gate contracts, mechanical gates, specialist review
-  ingestion, rework and final verification completion invariant.
-- **Plan:** [`v2/implementation-plans/plans/12-review-quality-gates.md`](v2/implementation-plans/plans/12-review-quality-gates.md)
+- **Branch:** `v2/p13-skills-mcp-lsp`
+- **Gate:** `npm run typecheck` plus `extension-contracts.test.ts`,
+  `skill-resolver.test.ts`, `v1-mcp-adapter.test.ts`, and
+  `v1-lsp-adapter.test.ts` are green
+- **Status:** P12 merged into `master` at `41a0135`; typecheck, 14 targeted
+  tests, production build and the full suite at 1344 passing are green after
+  merge. P13 prerequisites are merged; Task 1 is in progress.
+- **Scope:** serializable Skill/MCP/LSP contracts, immutable skill resolution
+  snapshots, guarded MCP tool normalization and evidence-only LSP diagnostics.
+- **Plan:** [`v2/implementation-plans/plans/13-skills-mcp-lsp.md`](v2/implementation-plans/plans/13-skills-mcp-lsp.md)
 
 ## Next
 
@@ -34,8 +35,7 @@ after it has been decided.
 
 | # | Work | Prerequisite |
 |---|---|---|
-| 1 | Merge V2 plan 12 into `master` | P12 implementation/review complete; awaiting approval |
-| 2 | V2 plan 13 — skills, MCP and LSP | P07/P08 merged; scheduled after P12 merge |
+| 1 | V2 plan 14 — IPC and preload contracts | Scheduled after P13 |
 
 ## Blocked
 
