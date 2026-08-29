@@ -61,6 +61,16 @@ describe('rework and final verification lifecycle', () => {
       findings: [fixedFinding],
       reviews: [passedReview]
     })).toBe(true)
+    expect(canFinalize({
+      gates: [],
+      findings: [fixedFinding],
+      reviews: [passedReview]
+    })).toBe(false)
+    expect(canFinalize({
+      gates: [passedGate],
+      findings: [fixedFinding],
+      reviews: []
+    })).toBe(false)
   })
 
   it('persists linked rework before the worker, reruns required checks, then completes', async () => {

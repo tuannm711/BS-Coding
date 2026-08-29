@@ -37,4 +37,24 @@ describe('specialist review ingestion', () => {
     expect(reviewPasses([{ blocking: true, status: 'OPEN' }])).toBe(false)
     expect(reviewPasses([{ blocking: true, status: 'FIXED' }])).toBe(true)
   })
+
+  it('blocks a failed reviewer decision even when no finding is returned', async () => {
+    const service = createReviewService({
+      nextId: () => 'id',
+      now: () => '2026-08-29T00:00:00.000Z',
+      saveReview: async () => {},
+      saveFinding: async () => {},
+      transaction: async operation => operation()
+    })
+
+    const result = await service.ingest({
+      workflowRunId: 'wf',
+      reviewerAgentVersionId: 'av',
+      scope: ['src/auth.ts'],
+      decision: 'FAIL',
+      findings: []
+    })
+
+    expect(result.blocked).toBe(true)
+  })
 })

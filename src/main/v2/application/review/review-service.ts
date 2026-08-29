@@ -35,7 +35,8 @@ export function createReviewService(deps: {
         for (const finding of findings) await deps.saveFinding(finding)
         await deps.saveReview(review)
       })
-      return { review, findings, blocked: !reviewPasses(findings) }
+      const failedDecision = review.decision === 'FAIL' || review.decision === 'BLOCKED'
+      return { review, findings, blocked: failedDecision || !reviewPasses(findings) }
     }
   }
 }
