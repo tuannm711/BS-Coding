@@ -15,20 +15,18 @@ Last updated: 2026-08-29
 Exactly one entry. If two things are genuinely running, that is what this file
 exists to say out loud.
 
-**V2 plan 06 — context compiler and RuntimeEpoch switching.**
+**V2 plan 08 — agent runtime.**
 
-- **Branch:** `v2/p06-context-epoch`
-- **Gate:** `npm run typecheck` plus `context-policy.test.ts`,
-  `context-compiler.test.ts`, `runtime-epoch-service.test.ts`, and
-  `native-context-projector.test.ts` are green
-- **Status:** P07 merged into `master` at `94e10b2`; typecheck, 14 targeted
-  tests, production build and the full suite at 1279 passing are green after
-  merge. All four P06 tasks and review remediation landed; 9/9 P06 tests,
-  boundary guard, production build and full suite at 1288 passing are green.
-  **Awaiting review** before merge.
-- **Scope:** provider-neutral ContextPacket/Compiler, canonical selection policy,
-  explicit RuntimeEpoch switching and provider-native projection boundary.
-- **Plan:** [`v2/implementation-plans/plans/06-context-compiler-runtime-epoch.md`](v2/implementation-plans/plans/06-context-compiler-runtime-epoch.md)
+- **Branch:** `v2/p08-agent-runtime`
+- **Gate:** `npm run typecheck` plus `runtime-port.test.ts`,
+  `v1-llm-runtime-adapter.test.ts`, `agent-runner.test.ts`,
+  `steering-queue.test.ts`, and `compaction-policy.test.ts` are green
+- **Status:** P06 merged into `master` at `ab37a76`; typecheck, 11 targeted
+  tests, production build and the full suite at 1288 passing are green after
+  merge. P08 prerequisites P04-P07 are merged; Task 1 is in progress.
+- **Scope:** provider-neutral RuntimePort, V1 LLM adapter, AgentRun loop,
+  cancellation/limits, steering boundaries and canonical compaction.
+- **Plan:** [`v2/implementation-plans/plans/08-agent-runtime-v2.md`](v2/implementation-plans/plans/08-agent-runtime-v2.md)
 
 ## Next
 
@@ -37,7 +35,7 @@ after it has been decided.
 
 | # | Work | Prerequisite |
 |---|---|---|
-| 1 | V2 plan 08 — agent runtime | P06 merged; P07 already merged |
+| 1 | V2 plan 09 — workflow/task graph engine | P08 merged |
 
 ## Blocked
 
