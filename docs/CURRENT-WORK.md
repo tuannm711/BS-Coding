@@ -15,19 +15,18 @@ Last updated: 2026-08-29
 Exactly one entry. If two things are genuinely running, that is what this file
 exists to say out loud.
 
-**V2 plan 11 — Git worktree integration.**
+**V2 plan 12 — review and quality gates.**
 
-- **Branch:** `v2/p11-git-worktree`
-- **Gate:** `npm run typecheck` plus `worktree-manager.test.ts`,
-  `integration-service.test.ts`, and `workspace-cleanup.test.ts` are green
-- **Status:** P10 merged into `master` at `214d4fc`; typecheck, 12 targeted
-  tests, production build and the full suite at 1323 passing are green after
-  merge. All four P11 tasks and review remediation landed; 9/9 P11 tests,
-  boundary guard, production build and full suite at 1332 passing are green.
-  **Awaiting review** before merge.
-- **Scope:** WorkspacePort contracts, isolated task worktrees, deterministic
-  integration/conflict outcomes and data-safe cleanup policy.
-- **Plan:** [`v2/implementation-plans/plans/11-git-worktree-integration.md`](v2/implementation-plans/plans/11-git-worktree-integration.md)
+- **Branch:** `v2/p12-review-gates`
+- **Gate:** `npm run typecheck` plus `review-contract.test.ts`,
+  `mechanical-gates.test.ts`, `review-service.test.ts`, and
+  `rework-lifecycle.test.ts` are green
+- **Status:** P11 merged into `master` at `6350109`; typecheck, 11 targeted
+  tests, production build and the full suite at 1332 passing are green after
+  merge. P12 prerequisites are merged; Task 1 is in progress.
+- **Scope:** review/finding/gate contracts, mechanical gates, specialist review
+  ingestion, rework and final verification completion invariant.
+- **Plan:** [`v2/implementation-plans/plans/12-review-quality-gates.md`](v2/implementation-plans/plans/12-review-quality-gates.md)
 
 ## Next
 
@@ -36,7 +35,7 @@ after it has been decided.
 
 | # | Work | Prerequisite |
 |---|---|---|
-| 1 | V2 plan 12 — review and quality gates | P11 merged |
+| 1 | V2 plan 13 — skills, MCP and LSP | P07/P08 merged; scheduled after P12 |
 
 ## Blocked
 
