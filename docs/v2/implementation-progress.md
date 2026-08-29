@@ -21,6 +21,7 @@ plan be reviewed — that gate is tracked in `../CURRENT-WORK.md`, not here.
 | P08 | Agent runtime V2 | `ce8256d` | `npm run typecheck` + 5 P08 unit test files + boundary guard + production build green; full suite 1300 passing |
 | P09 | Workflow and task graph engine | `89f50ac` | `npm run typecheck` + 4 P09 unit test files + boundary guard + production build green; full suite 1313 passing |
 | P10 | Agent team and orchestrator | `e3d96d9` | `npm run typecheck` + 4 P10 unit test files + boundary guard + production build green; full suite 1323 passing |
+| P11 | Git worktree integration | `43edf01` | `npm run typecheck` + P11 integration/unit tests + boundary guard + production build green; full suite 1332 passing |
 
 ## P01 notes
 
@@ -98,3 +99,11 @@ plan be reviewed — that gate is tracked in `../CURRENT-WORK.md`, not here.
 - Orchestrator uses an explicit read/planning allowlist and default-denies unknown, write, shell and recursive worker tools; plan/task proposals cross the WorkflowEngine boundary.
 - Admission policy uses only explicit concurrency/budget settings, returns ALLOW/ASK/BLOCK with projected spend, and invents no hard defaults.
 - Task commits: `9d734ce` (profiles), `e67f766` (assignments), `1cd316d` (Orchestrator policy), `d31174d` (admission), `e3d96d9` (default-deny/immutability remediation).
+
+## P11 notes
+
+- WorkspacePort separates serializable workspace identity from Git operations; deterministic branch names are sanitized and write TaskRuns receive distinct branches/worktree paths.
+- WorktreeManager uses Git CLI behind an infrastructure adapter, refuses cleanup of dirty/unmerged work and integration tests operate only on hermetic temporary repositories.
+- IntegrationService merges approved branches in deterministic task order, models actual unmerged-file conflicts as explicit conflict tasks, propagates non-conflict Git failures and requests quality-gate reruns after successful integration.
+- Cleanup requires merged/archived state, recorded audit and zero active references; removal is never forced and failures surface as warnings.
+- Task commits: `1eabe7f` (WorkspacePort), `5824a6e` (worktree manager), `e022d7d` (integration), `02fdab5` (cleanup), `43edf01` (conflict classification/gate rerun remediation).

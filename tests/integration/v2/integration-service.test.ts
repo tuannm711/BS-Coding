@@ -1,0 +1,42 @@
+import { describe, expect, it } from 'vitest'
+import { IntegrationService } from '../../../src/main/v2/application/workflow/integration-service'
+import { GitIntegrationAdapter } from '../../../src/main/v2/infrastructure/git/git-integration-adapter'
+
+describe('IntegrationService', () => {
+  it('merges approved branches in deterministic task order', async () => {
+    const merged: string[] = []
+    const reruns: string[][] = []
+    const service = new IntegrationService({ merge: async branch => {
+      merged.push(branch); return { kind: 'MERGED' as const, commit: `commit-${branch}` }
+    }, createConflictTask: async () => {},
+    requestQualityGateRerun: async taskIds => { reruns.push([...taskIds]) } })
+    const outcome = await service.integrate([
+      { taskId: 'B', branch: 'branch-b', approved: true },
+      { taskId: 'A', branch: 'branch-a', approved: true },
+      { taskId: 'C', branch: 'branch-c', approved: false }
+    ])
+    expect(merged).toEqual(['branch-a', 'branch-b'])
+    expect(outcome).toEqual({ kind: 'MERGED', commit: 'commit-branch-b' })
+    expect(reruns).toEqual([['A', 'B']])
+  })
+
+  it('turns merge conflicts into explicit audited conflict tasks', async () => {
+    const conflicts: unknown[] = []
+    const service = new IntegrationService({ merge: async () => ({
+      kind: 'CONFLICT' as const, files: ['src/auth.ts']
+    }), createConflictTask: async conflict => { conflicts.push(conflict) },
+    requestQualityGateRerun: async () => {} })
+    const outcome = await service.integrate([{ taskId: 'A', branch: 'branch-a', approved: true }])
+    expect(outcome).toEqual({ kind: 'CONFLICT', files: ['src/auth.ts'] })
+    expect(conflicts).toEqual([{ taskId: 'A', branch: 'branch-a', files: ['src/auth.ts'] }])
+  })
+
+  it('does not misclassify non-conflict Git failures', async () => {
+    const failure = new Error('unknown branch')
+    const adapter = new GitIntegrationAdapter('repo', async (_cwd, args) => {
+      if (args[0] === 'merge') throw failure
+      return ''
+    })
+    await expect(adapter.merge('missing')).rejects.toBe(failure)
+  })
+})
