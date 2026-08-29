@@ -15,20 +15,18 @@ Last updated: 2026-08-29
 Exactly one entry. If two things are genuinely running, that is what this file
 exists to say out loud.
 
-**V2 plan 07 — tool execution and protocol guard.**
+**V2 plan 06 — context compiler and RuntimeEpoch switching.**
 
-- **Branch:** `v2/p07-tool-guard`
-- **Gate:** `npm run typecheck` plus `tool-call-schema.test.ts`,
-  `protocol-guard.test.ts`, `permission-engine.test.ts`, and
-  `tool-executor.test.ts` are green
-- **Status:** P05 merged into `master` at `7c1066b`; typecheck, 15 targeted
-  tests, production build and the full suite at 1267 passing are green after
-  merge. All four P07 tasks and review remediation landed; 12/12 P07 tests,
-  boundary guard, production build and full suite at 1279 passing are green.
-  **Awaiting review** before merge.
-- **Scope:** tool definitions/executor, permission policy and protocol guard;
-  narrated prose must never become an executable tool call.
-- **Plan:** [`v2/implementation-plans/plans/07-tool-execution-protocol-guard.md`](v2/implementation-plans/plans/07-tool-execution-protocol-guard.md)
+- **Branch:** `v2/p06-context-epoch`
+- **Gate:** `npm run typecheck` plus `context-policy.test.ts`,
+  `context-compiler.test.ts`, `runtime-epoch-service.test.ts`, and
+  `native-context-projector.test.ts` are green
+- **Status:** P07 merged into `master` at `94e10b2`; typecheck, 14 targeted
+  tests, production build and the full suite at 1279 passing are green after
+  merge. P06 prerequisites P02-P05 are merged; Task 1 is in progress.
+- **Scope:** provider-neutral ContextPacket/Compiler, canonical selection policy,
+  explicit RuntimeEpoch switching and provider-native projection boundary.
+- **Plan:** [`v2/implementation-plans/plans/06-context-compiler-runtime-epoch.md`](v2/implementation-plans/plans/06-context-compiler-runtime-epoch.md)
 
 ## Next
 
@@ -37,8 +35,7 @@ after it has been decided.
 
 | # | Work | Prerequisite |
 |---|---|---|
-| 1 | V2 plan 06 — context compiler and RuntimeEpoch switching | P05 merged; scheduled after P07 because work is inline |
-| 2 | V2 plan 08 — agent runtime | P06 and P07 merged |
+| 1 | V2 plan 08 — agent runtime | P06 merged; P07 already merged |
 
 ## Blocked
 
