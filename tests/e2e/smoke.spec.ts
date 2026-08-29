@@ -3,10 +3,13 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync, mkdirSync } from 'nod
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 
-test('app launches and shows the main window', async () => {
+test('app launches with the V2 IPC bootstrap and keeps the V1 shell available', async () => {
   const userData = mkdtempSync(path.join(tmpdir(), 'bs-ud-launch-'))
   try {
-    const app = await electron.launch({ args: ['.'], env: { ...process.env as Record<string, string>, BS_USER_DATA: userData } })
+    const app = await electron.launch({
+      args: ['.'],
+      env: { ...process.env as Record<string, string>, BS_USER_DATA: userData, BS_V2: '1' }
+    })
     const window = await app.firstWindow()
     await expect(window).toHaveTitle(/BS Coding/)
     await expect(window.locator('.sidebar')).toBeVisible()

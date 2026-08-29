@@ -53,6 +53,7 @@ import { RemoteSettingsStore } from './remote/remote-settings'
 import { RemotePairing } from './remote/remote-pairing'
 import { migrateLegacyUserData, resolveUserDataDir } from './bs-migration'
 import { createV2Runtime, type V2Runtime } from './v2/application/v2-bootstrap'
+import { registerV2Ipc } from './v2/ipc/register-v2-ipc'
 import { Channels } from '../shared/ipc'
 import type { AgentState, Command, FileViewerPayload, ImageAttachment, BsSettings, NewAgentInput, PromptResponse, Template, TerminalInfo, Workspace, WorkspaceRuntime } from '../shared/types'
 
@@ -995,7 +996,11 @@ app.whenReady().then(async () => {
   await migrateLegacyUserData(userDataDir, {
     legacyDir: path.join(path.dirname(userDataDir), 'BS Coding')
   })
-  v2Runtime = await createV2Runtime({ enabled: process.env.BS_V2 === '1', userDataPath: userDataDir })
+  v2Runtime = await createV2Runtime({
+    enabled: process.env.BS_V2 === '1',
+    userDataPath: userDataDir,
+    registerIpc: () => registerV2Ipc({ registrar: ipcMain, routes: [] })
+  })
   mainApp = new MainApp()
   mainApp.bsAgent.truncationCleanup()
   await mainApp.browserBridge.start().catch(err => {

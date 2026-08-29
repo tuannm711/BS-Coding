@@ -6,6 +6,7 @@ export interface V2Runtime {
 export interface V2BootstrapInput {
   enabled: boolean
   userDataPath: string
+  registerIpc?: () => () => void
 }
 
 // Side-by-side V2 entry point. While disabled it starts nothing and owns no
@@ -16,5 +17,6 @@ export async function createV2Runtime(input: V2BootstrapInput): Promise<V2Runtim
   if (!input.enabled) {
     return { enabled: false, dispose: async () => {} }
   }
-  return { enabled: true, dispose: async () => {} }
+  const unregisterIpc = input.registerIpc?.()
+  return { enabled: true, dispose: async () => { unregisterIpc?.() } }
 }
