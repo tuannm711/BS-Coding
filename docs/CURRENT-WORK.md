@@ -18,14 +18,14 @@ exists to say out loud.
 **V2 plan 02 — domain model and state machines.**
 
 - **Branch:** `v2/p02-domain`
-- **Gate:** `npm run typecheck` plus `tests/unit/v2/*state*.test.ts`,
-  `domain-entities.test.ts`, and `agent-version.test.ts` are green
+- **Gate:** `npm run typecheck` plus the seven P02 unit test files are green
 - **Status:** P01 merged into `master` at `0fa655d` and its post-merge gate is
-  green. P02 execution was approved after downstream contract review; Task 1
-  (domain entities and correlation) is in progress.
+  green. All four P02 tasks and review remediation landed; 43/43 P02 tests,
+  the boundary guard, and the full suite at 1229 passing are green. **Awaiting
+  review** before merge.
 - **Scope:** domain entity/correlation contracts; WorkflowRun and TaskRun state
-  machines; WorkSession status projection; immutable AgentVersion and terminal
-  RuntimeEpoch guards.
+  machines; AgentRun and RuntimeEpoch guards; WorkSession status projection;
+  immutable AgentVersion snapshots.
 - **Plan:** [`v2/implementation-plans/plans/02-domain-model-state-machines.md`](v2/implementation-plans/plans/02-domain-model-state-machines.md)
 
 ## Next
