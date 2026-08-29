@@ -48,7 +48,11 @@ function findV2BoundaryViolations(): string[] {
       }
 
       if (isWithin(filePath, sharedV2Root)) {
-        if (!target || !isWithin(target, sharedV2Root)) report('shared V2 must stay dependency-free')
+        const sharedSchemaRoot = path.join(sharedV2Root, 'schemas')
+        const allowedZodSchemaImport = isWithin(filePath, sharedSchemaRoot) && moduleName === 'zod'
+        if ((!target || !isWithin(target, sharedV2Root)) && !allowedZodSchemaImport) {
+          report('shared V2 may import only shared V2 modules; schemas may additionally import zod')
+        }
         continue
       }
 

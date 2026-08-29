@@ -1,11 +1,6 @@
-export interface EventToAppend {
-  schemaVersion: number
-  id: string
-  type: string
-  occurredAt: string
-  correlation: Readonly<Record<string, string | undefined>>
-  payload: unknown
-}
+import type { CanonicalEvent } from '../../../../shared/v2/contracts/events'
+
+export type EventToAppend = Omit<CanonicalEvent, 'sequence'>
 
 export interface StoredEvent extends EventToAppend {
   aggregateId: string

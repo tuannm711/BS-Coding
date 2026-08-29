@@ -4,6 +4,7 @@ import type {
   EventToAppend,
   StoredEvent
 } from '../../application/ports/event-store'
+import { CanonicalEventSchema } from '../../../../shared/v2/schemas/canonical-event'
 
 interface SequenceRow {
   sequence: number
@@ -70,8 +71,11 @@ export class SqliteEventStore implements EventStore {
           event.schemaVersion,
           event.id,
           event.type,
-          event.occurredAt,
-          serializeJson(event.correlation, 'event correlation'),
+          event.timestamp,
+          serializeJson({ projectId: event.projectId, workSessionId: event.workSessionId,
+            workflowRunId: event.workflowRunId, taskRunId: event.taskRunId,
+            agentRunId: event.agentRunId, runtimeEpochId: event.runtimeEpochId,
+            causationId: event.causationId, correlationId: event.correlationId }, 'event correlation'),
           serializeJson(event.payload, 'event payload')
         )
       }
@@ -94,15 +98,22 @@ export class SqliteEventStore implements EventStore {
       ORDER BY sequence ASC
     `).all(aggregateId, afterSequence) as EventRow[]
 
-    return rows.map(row => ({
+    return rows.map(row => {
+      const correlation = JSON.parse(row.correlation_json) as Record<string, string | undefined>
+      const parsed = CanonicalEventSchema.parse({
       aggregateId: row.aggregate_id,
       sequence: row.sequence,
       schemaVersion: row.schema_version,
       id: row.event_id,
       type: row.event_type,
-      occurredAt: row.occurred_at,
-      correlation: JSON.parse(row.correlation_json) as Record<string, string | undefined>,
-      payload: JSON.parse(row.payload_json) as unknown
-    }))
+      timestamp: row.occurred_at, projectId: correlation.projectId!,
+      workSessionId: correlation.workSessionId, workflowRunId: correlation.workflowRunId,
+      taskRunId: correlation.taskRunId, agentRunId: correlation.agentRunId,
+      runtimeEpochId: correlation.runtimeEpochId, causationId: correlation.causationId,
+      correlationId: correlation.correlationId!,
+        payload: JSON.parse(row.payload_json) as unknown
+      })
+      return { ...parsed, aggregateId: row.aggregate_id } as StoredEvent
+    })
   }
 }

@@ -35,7 +35,8 @@ duyệt. Luật không bao giờ bị âm thầm bỏ đi vì code đã dời.
   không import thư viện Node ngoài `electron`.
 - `src/shared` chỉ chứa thứ JSON-serializable: không class, không function, không import
   Node/Electron. File ở đây dùng cho cả build main, preload, renderer và test → không kéo dependency
-  bên ngoài.
+  bên ngoài. Ngoại lệ V2 duy nhất: `src/shared/v2/schemas` được import `zod` để runtime-validate
+  contract tại external boundary; `contracts`/`dto` và phần shared còn lại không có ngoại lệ này.
 - Service thuần (PtyManager, các store/service) không import Electron UI — để test được với Vitest.
 - Toàn bộ logic agent nằm ở main process; renderer chỉ thấy `ChatEvent` qua IPC.
 - LSP và MCP chỉ chạy ở main; renderer không nói chuyện trực tiếp với chúng. Lỗi được nuốt theo từng
