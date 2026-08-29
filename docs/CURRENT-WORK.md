@@ -22,8 +22,9 @@ exists to say out loud.
   `event-assembler.test.ts`, and `event-redaction.test.ts` are green
 - **Status:** P03 merged into `master` at `cfc46b2`; typecheck, 14 targeted
   tests, production build and the full suite at 1241 passing are green after
-  merge. P04 execution was approved; Task 1 (canonical schemas and EventStore
-  contract reconciliation) is in progress.
+  merge. All three P04 tasks and review remediation landed; 17/17 P04 plus
+  EventStore regression tests, the boundary guard, production build and the
+  full suite at 1254 passing are green. **Awaiting review** before merge.
 - **Scope:** versioned canonical event schemas; transient-to-durable event
   assembly; event factory, correlation enforcement and recursive redaction.
 - **Contract reconciliation:** P04 will finalize the architecture envelope

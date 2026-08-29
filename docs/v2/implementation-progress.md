@@ -14,6 +14,7 @@ plan be reviewed — that gate is tracked in `../CURRENT-WORK.md`, not here.
 | P01 | Foundation and module boundaries | `a3d8ab1` | `npm run typecheck` + `tests/unit/v2/{module-boundaries,common-primitives,v2-bootstrap}.test.ts` green; full suite 1185 passing |
 | P02 | Domain model and state machines | `d0a6dff` | `npm run typecheck` + 7 P02 unit test files green; full suite 1229 passing |
 | P03 | SQLite persistence and event store | `fa246e7` | `npm run typecheck` + 4 P03 unit test files + production build green; full suite 1241 passing |
+| P04 | Canonical event protocol | `a818fe3` | `npm run typecheck` + 3 P04 unit test files + EventStore/boundary regressions + production build green; full suite 1254 passing |
 
 ## P01 notes
 
@@ -36,3 +37,11 @@ plan be reviewed — that gate is tracked in `../CURRENT-WORK.md`, not here.
 - EventStore uses `BEGIN IMMEDIATE`, per-aggregate monotonic sequence, optimistic concurrency and atomic batch append. Typed repositories enforce ownership FKs; artifacts persist metadata references only.
 - The legacy artifact adapter uses a structural edge and has a P18 deletion criterion, so no legacy type enters V2.
 - Task commits: `deeb6ec` (SQLite runtime), `7a78cc4` (migrations), `b0c0d9f` (EventStore), `708c7a3` (repositories/artifacts), `fa246e7` (review remediation for writer locking/indexing).
+
+## P04 notes
+
+- Finalized the versioned architecture envelope with timestamp and canonical correlation IDs; P03 EventStore maps it to the existing SQLite columns and validates loaded events.
+- Zod runtime schemas cover durable event families and structured tool call/result payloads. The approved rules exception permits only `zod` under `src/shared/v2/schemas`.
+- Stream assembly compacts text deltas, excludes reasoning/partial calls, preserves narrated tool-like prose as text, and rejects duplicate/orphan call IDs.
+- Event factory uses injected Clock/IdGenerator and recursively redacts credential-like fields without mutating input.
+- Task commits: `e0c1904` (schemas/EventStore/rules reconciliation), `a338a99` (assembler), `592c757` (factory/redaction), `a818fe3` (tool correlation and persisted schema validation).
