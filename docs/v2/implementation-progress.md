@@ -19,6 +19,7 @@ plan be reviewed — that gate is tracked in `../CURRENT-WORK.md`, not here.
 | P07 | Tool execution and protocol guard | `d66b0df` | `npm run typecheck` + 4 P07 unit test files + boundary guard + production build green; full suite 1279 passing |
 | P06 | Context compiler and RuntimeEpoch switching | `3bcd077` | `npm run typecheck` + 4 P06 unit test files + boundary guard + production build green; full suite 1288 passing |
 | P08 | Agent runtime V2 | `ce8256d` | `npm run typecheck` + 5 P08 unit test files + boundary guard + production build green; full suite 1300 passing |
+| P09 | Workflow and task graph engine | `89f50ac` | `npm run typecheck` + 4 P09 unit test files + boundary guard + production build green; full suite 1313 passing |
 
 ## P01 notes
 
@@ -80,3 +81,11 @@ plan be reviewed — that gate is tracked in `../CURRENT-WORK.md`, not here.
 - AgentRunner owns only AgentRun step execution/outcomes, propagates abort signals to runtime/tool callbacks, enforces step limits and depends on an application port rather than workflow state/runtime implementation.
 - Steering drains FIFO only at model step boundaries. Compaction produces an immutable canonical summary artifact/event plan without rewriting source history or provider-native state.
 - Task commits: `a00c4e0` (runtime port), `7726751` (V1 LLM adapter), `ddf6077` (AgentRunner/service), `e7d895d` (steering/compaction), `ce8256d` (steering integration remediation).
+
+## P09 notes
+
+- Task graph validation rejects duplicate IDs, missing dependencies, cycles, missing acceptance criteria, unsatisfied capabilities, unresolved workspace conflicts and invalid quality-gate scopes.
+- WorkflowEngine creates state only from approved valid plans, selects dependency-ready tasks deterministically and maps AgentRun outcomes copy-on-write; agents cannot persist task/workflow status directly.
+- Pause/resume/cancel/recovery use named state transitions, preserve completed outputs and run lifecycle state plus AgentRun cancellation through an injected transaction boundary.
+- Retry policy distinguishes transient same-attempt/new-epoch handoff from implementation retry with explicit TaskRun provenance.
+- Task commits: `392fdbb` (DAG validation), `17cc25c` (WorkflowEngine), `a6c713e` (lifecycle controls), `39038a4` (retry policy), `89f50ac` (execution-constraint/atomicity remediation).

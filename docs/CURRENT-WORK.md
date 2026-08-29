@@ -23,7 +23,9 @@ exists to say out loud.
   `retry-policy.test.ts` are green
 - **Status:** P08 merged into `master` at `058df92`; typecheck, 14 targeted
   tests, production build and the full suite at 1300 passing are green after
-  merge. P09 prerequisites are merged; Task 1 is in progress.
+  merge. All four P09 tasks and review remediation landed; 13/13 P09 tests,
+  boundary guard, production build and full suite at 1313 passing are green.
+  **Awaiting review** before merge.
 - **Scope:** plan/DAG validation, deterministic scheduling and task outcomes,
   workflow lifecycle controls, retry and attempt provenance.
 - **Plan:** [`v2/implementation-plans/plans/09-workflow-task-graph-engine.md`](v2/implementation-plans/plans/09-workflow-task-graph-engine.md)
