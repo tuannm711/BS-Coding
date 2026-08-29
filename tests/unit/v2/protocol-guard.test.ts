@@ -36,6 +36,8 @@ describe('ProtocolGuard', () => {
       origin: 'model' as const, requestedAt: '2026-08-29T00:00:00.000Z' }
     expect(guard.validateToolCall(call)).toMatchObject({ ok: true })
     expect(guard.validateToolCall(call)).toMatchObject({ ok: false, code: 'DUPLICATE_CALL' })
+    guard.releaseCall('c1')
+    expect(guard.validateToolCall(call)).toMatchObject({ ok: true })
 
     const textOnly = new ProtocolGuard(new Map([['read', readTool]]), { structuredTools: false })
     expect(textOnly.validateToolCall(call)).toMatchObject({

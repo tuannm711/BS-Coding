@@ -24,6 +24,22 @@ describe('ToolExecutor', () => {
     await expect(executor.execute({ callId: 'failed' }, run)).rejects.toThrow('boom')
     expect(attempts).toBe(1)
   })
+
+  it('uses durable reservation to prevent replay after restart', async () => {
+    const completed = new Map<string, unknown>()
+    const idempotency = {
+      reserve: async (id: string) => completed.has(id) ? { status: 'COMPLETED' as const,
+        result: completed.get(id) } : { status: 'RESERVED' as const },
+      complete: async (id: string, result: unknown) => { completed.set(id, result) },
+      fail: async () => {}
+    }
+    let effects = 0
+    const first = new ToolExecutor({ record: async () => {} }, idempotency)
+    expect(await first.execute({ callId: 'durable' }, async () => ++effects)).toBe(1)
+    const restarted = new ToolExecutor({ record: async () => {} }, idempotency)
+    expect(await restarted.execute({ callId: 'durable' }, async () => ++effects)).toBe(1)
+    expect(effects).toBe(1)
+  })
 })
 
 describe('V1 tool registry adapter', () => {

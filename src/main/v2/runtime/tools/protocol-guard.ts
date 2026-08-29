@@ -37,4 +37,8 @@ export class ProtocolGuard {
     this.callIds.add(call.data.callId)
     return { ok: true, call: { ...call.data, arguments: args.data }, tool }
   }
+
+  releaseCall(callId: string): void {
+    this.callIds.delete(callId)
+  }
 }
