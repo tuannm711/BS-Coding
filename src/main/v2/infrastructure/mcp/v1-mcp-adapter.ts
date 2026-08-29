@@ -59,6 +59,13 @@ export class V1McpAdapter implements McpPort {
   }
 
   async callTool(serverId: string, toolName: string, input: JsonObject): Promise<unknown> {
+    const server = this.legacy.status().find(status => status.name === serverId)
+    if (server?.status !== 'connected' || !server.tools.includes(toolName)) {
+      throw new Error(`MCP tool ${serverId}/${toolName} is not registered`)
+    }
+    if (input === null || Array.isArray(input) || typeof input !== 'object') {
+      throw new Error('MCP tool input must be a JSON object')
+    }
     const tool = this.legacy.getTools().get(fullName(serverId, toolName))
     if (!tool) throw new Error(`MCP tool ${serverId}/${toolName} not found`)
     return tool.run(input)

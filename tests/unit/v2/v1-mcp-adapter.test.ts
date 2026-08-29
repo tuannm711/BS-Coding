@@ -37,7 +37,7 @@ describe('V1 MCP adapter', () => {
     await expect(adapter.callTool('github', 'query', { q: 'repo' }))
       .resolves.toEqual({ output: { q: 'repo' } })
     expect(run).toHaveBeenCalledOnce()
-    await expect(adapter.callTool('other', 'query', {})).rejects.toThrow(/not found/i)
+    await expect(adapter.callTool('other', 'query', {})).rejects.toThrow(/registered/i)
   })
 
   it('maps server errors without exposing environment values', async () => {
@@ -50,5 +50,22 @@ describe('V1 MCP adapter', () => {
       id: 'github', name: 'github', transport: 'STDIO', status: 'ERROR',
       environmentRefs: [], toolNames: [], error: 'offline'
     }])
+  })
+
+  it('refuses hidden bindings and malformed input before legacy execution', async () => {
+    const run = vi.fn(async () => ({ output: 'bypass' }))
+    const adapter = new V1McpAdapter({
+      status: () => [{ name: 'github', status: 'connected', tools: ['query'] }],
+      getTools: () => new Map([
+        ['mcp__github__query', { name: 'mcp__github__query', description: 'Query',
+          schema: { type: 'object' }, run: async () => ({ output: 'ok' }) }],
+        ['mcp__github__hidden', { name: 'mcp__github__hidden', description: 'Hidden',
+          schema: { type: 'object' }, run }]
+      ])
+    })
+
+    await expect(adapter.callTool('github', 'hidden', {})).rejects.toThrow(/registered/i)
+    await expect(adapter.callTool('github', 'query', [] as never)).rejects.toThrow(/JSON object/i)
+    expect(run).not.toHaveBeenCalled()
   })
 })
