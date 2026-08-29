@@ -1,6 +1,7 @@
 CREATE TABLE canonical_events (
   aggregate_id TEXT NOT NULL,
   sequence INTEGER NOT NULL CHECK (sequence > 0),
+  schema_version INTEGER NOT NULL CHECK (schema_version > 0),
   event_id TEXT NOT NULL UNIQUE,
   event_type TEXT NOT NULL,
   occurred_at TEXT NOT NULL,
