@@ -13,6 +13,7 @@ plan be reviewed — that gate is tracked in `../CURRENT-WORK.md`, not here.
 |---|---|---|---|
 | P01 | Foundation and module boundaries | `a3d8ab1` | `npm run typecheck` + `tests/unit/v2/{module-boundaries,common-primitives,v2-bootstrap}.test.ts` green; full suite 1185 passing |
 | P02 | Domain model and state machines | `d0a6dff` | `npm run typecheck` + 7 P02 unit test files green; full suite 1229 passing |
+| P03 | SQLite persistence and event store | `fa246e7` | `npm run typecheck` + 4 P03 unit test files + production build green; full suite 1241 passing |
 
 ## P01 notes
 
@@ -27,3 +28,11 @@ plan be reviewed — that gate is tracked in `../CURRENT-WORK.md`, not here.
 - WorkflowRun, TaskRun, AgentRun and RuntimeEpoch transitions are named, centrally validated and reject illegal/terminal transitions. WorkSession status is an exhaustive projection of WorkflowRun state.
 - AgentVersion snapshots are cloned and deeply frozen; the shared AgentVersion contract exposes readonly configuration.
 - Task commits: `0d702ae` (entities/correlation), `d2c6aac` (workflow/task states), `4409777` (WorkSession projection), `a1052f3` (AgentVersion/RuntimeEpoch), `d0a6dff` (review remediation and AgentRun guards).
+
+## P03 notes
+
+- Added `better-sqlite3@13.0.3` and `@types/better-sqlite3@9.6.0`; native load verified with Node 24 and Electron 41 on Windows x64 without rebuild.
+- Database bootstrap enables WAL for file-backed databases, foreign keys and a busy timeout. Migrations are transactional/idempotent and create core entity, canonical event and import-history tables.
+- EventStore uses `BEGIN IMMEDIATE`, per-aggregate monotonic sequence, optimistic concurrency and atomic batch append. Typed repositories enforce ownership FKs; artifacts persist metadata references only.
+- The legacy artifact adapter uses a structural edge and has a P18 deletion criterion, so no legacy type enters V2.
+- Task commits: `deeb6ec` (SQLite runtime), `7a78cc4` (migrations), `b0c0d9f` (EventStore), `708c7a3` (repositories/artifacts), `fa246e7` (review remediation for writer locking/indexing).

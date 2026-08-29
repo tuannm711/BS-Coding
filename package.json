@@ -33,6 +33,7 @@
   "devDependencies": {
     "@electron/rebuild": "^4.2.0",
     "@playwright/test": "^1.62.1",
+    "@types/better-sqlite3": "^9.6.0",
     "@types/chrome": "^0.0.313",
     "@types/node": "^26.1.2",
     "@types/react": "^19.2.18",
@@ -59,6 +60,7 @@
     "@xterm/addon-fit": "^0.11.0",
     "@xterm/xterm": "^6.0.0",
     "ai": "^6.0.241",
+    "better-sqlite3": "^13.0.3",
     "dompurify": "^3.4.13",
     "electron-updater": "^6.8.9",
     "glob": "^13.0.6",
