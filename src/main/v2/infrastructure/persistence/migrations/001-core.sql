@@ -69,6 +69,7 @@ CREATE TABLE artifacts (
   id TEXT PRIMARY KEY,
   project_id TEXT NOT NULL REFERENCES projects(id),
   kind TEXT NOT NULL,
-  uri TEXT NOT NULL,
-  metadata_json TEXT NOT NULL CHECK (json_valid(metadata_json))
+  path TEXT NOT NULL,
+  size INTEGER NOT NULL CHECK (size >= 0),
+  sha256 TEXT
 );
