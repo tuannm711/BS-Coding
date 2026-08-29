@@ -15,20 +15,17 @@ Last updated: 2026-08-29
 Exactly one entry. If two things are genuinely running, that is what this file
 exists to say out loud.
 
-**V2 plan 05 — provider, account, model and routing.**
+**V2 plan 07 — tool execution and protocol guard.**
 
-- **Branch:** `v2/p05-provider-routing`
-- **Gate:** `npm run typecheck` plus `provider-contract.test.ts`,
-  `v1-provider-compat.test.ts`, `capability-probe.test.ts`, and
-  `account-router.test.ts` are green
-- **Status:** P04 merged into `master` at `4489bc7`; typecheck, 19 targeted
-  tests, production build and the full suite at 1254 passing are green after
-  merge. All four P05 tasks and review remediation landed; 13/13 P05 tests,
-  boundary guard, production build and full suite at 1267 passing are green.
-  **Awaiting review** before merge.
-- **Scope:** provider/account/model contracts, V1 compatibility adapter,
-  capability probes and sticky AUTO/PREFERRED/PINNED routing.
-- **Plan:** [`v2/implementation-plans/plans/05-provider-account-model-routing.md`](v2/implementation-plans/plans/05-provider-account-model-routing.md)
+- **Branch:** `v2/p07-tool-guard`
+- **Gate:** defined by the P07 detailed plan and its focused tests, plus
+  `npm run typecheck`
+- **Status:** P05 merged into `master` at `7c1066b`; typecheck, 15 targeted
+  tests, production build and the full suite at 1267 passing are green after
+  merge. P07 prerequisites P02/P04 are green and merged. **Ready to execute.**
+- **Scope:** tool definitions/executor, permission policy and protocol guard;
+  narrated prose must never become an executable tool call.
+- **Plan:** [`v2/implementation-plans/plans/07-tool-execution-protocol-guard.md`](v2/implementation-plans/plans/07-tool-execution-protocol-guard.md)
 
 ## Next
 
@@ -37,7 +34,8 @@ after it has been decided.
 
 | # | Work | Prerequisite |
 |---|---|---|
-| 1 | V2 plan 07 — tool execution and protocol guard | P04 merged; scheduled after P05 because work is inline |
+| 1 | V2 plan 06 — context compiler and RuntimeEpoch switching | P05 merged; scheduled after P07 because work is inline |
+| 2 | V2 plan 08 — agent runtime | P06 and P07 merged |
 
 ## Blocked
 
