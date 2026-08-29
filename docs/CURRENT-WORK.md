@@ -15,20 +15,18 @@ Last updated: 2026-08-29
 Exactly one entry. If two things are genuinely running, that is what this file
 exists to say out loud.
 
-**V2 plan 09 — workflow and task graph engine.**
+**V2 plan 10 — agent team and orchestrator.**
 
-- **Branch:** `v2/p09-workflow-engine`
-- **Gate:** `npm run typecheck` plus `task-graph.test.ts`,
-  `workflow-engine.test.ts`, `workflow-lifecycle.test.ts`, and
-  `retry-policy.test.ts` are green
-- **Status:** P08 merged into `master` at `058df92`; typecheck, 14 targeted
-  tests, production build and the full suite at 1300 passing are green after
-  merge. All four P09 tasks and review remediation landed; 13/13 P09 tests,
-  boundary guard, production build and full suite at 1313 passing are green.
-  **Awaiting review** before merge.
-- **Scope:** plan/DAG validation, deterministic scheduling and task outcomes,
-  workflow lifecycle controls, retry and attempt provenance.
-- **Plan:** [`v2/implementation-plans/plans/09-workflow-task-graph-engine.md`](v2/implementation-plans/plans/09-workflow-task-graph-engine.md)
+- **Branch:** `v2/p10-agent-team`
+- **Gate:** `npm run typecheck` plus `default-agent-profiles.test.ts`,
+  `assignment-service.test.ts`, `orchestrator-policy.test.ts`, and
+  `admission-policy.test.ts` are green
+- **Status:** P09 merged into `master` at `7817226`; typecheck, 15 targeted
+  tests, production build and the full suite at 1313 passing are green after
+  merge. P10 prerequisites are merged; Task 1 is in progress.
+- **Scope:** standard project agent profiles, auditable assignments,
+  Orchestrator non-writing policy and explicit concurrency/budget admission.
+- **Plan:** [`v2/implementation-plans/plans/10-agent-team-orchestrator.md`](v2/implementation-plans/plans/10-agent-team-orchestrator.md)
 
 ## Next
 
@@ -37,7 +35,7 @@ after it has been decided.
 
 | # | Work | Prerequisite |
 |---|---|---|
-| 1 | V2 plan 10 — agent team/orchestrator | P09 merged |
+| 1 | V2 plan 11 — Git worktree integration | P10 merged |
 
 ## Blocked
 
