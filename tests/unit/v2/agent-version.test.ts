@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, expectTypeOf, it } from 'vitest'
 import { createAgentVersion } from '../../../src/main/v2/domain/agent/agent-version'
+import type { AgentVersion } from '../../../src/shared/v2/contracts/domain'
 
 describe('AgentVersion snapshots', () => {
   it('deeply clones and freezes configuration', () => {
@@ -25,5 +26,10 @@ describe('AgentVersion snapshots', () => {
   it('rejects mutation through the returned snapshot', () => {
     const version = createAgentVersion({ tools: ['read'] })
     expect(() => (version.tools as string[]).push('write')).toThrow(TypeError)
+  })
+
+  it('exposes a readonly domain contract', () => {
+    expectTypeOf<AgentVersion>().toEqualTypeOf<Readonly<AgentVersion>>()
+    expectTypeOf<AgentVersion['toolIds']>().toEqualTypeOf<readonly string[]>()
   })
 })

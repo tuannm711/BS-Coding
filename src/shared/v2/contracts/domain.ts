@@ -28,6 +28,11 @@ export type WorkflowRunStatus =
   | 'CANCELLED'
   | 'COMPLETED'
 
+export type WorkflowResumableStatus = Exclude<
+  WorkflowRunStatus,
+  'PAUSED' | 'BLOCKED' | 'FAILED' | 'CANCELLED' | 'COMPLETED'
+>
+
 export type TaskRunStatus =
   | 'QUEUED'
   | 'READY'
@@ -91,7 +96,7 @@ export interface WorkflowRun {
   status: WorkflowRunStatus
   blockingGates: number
   planVersionId?: EntityId
-  pausedFrom?: Exclude<WorkflowRunStatus, 'PAUSED'>
+  pausedFrom?: WorkflowResumableStatus
   createdAt: IsoDateTime
   updatedAt: IsoDateTime
   completedAt?: IsoDateTime
@@ -131,14 +136,14 @@ export interface AgentDefinition {
 }
 
 export interface AgentVersion {
-  id: EntityId
-  agentDefinitionId: EntityId
-  revision: number
-  systemInstructions: string
-  toolIds: EntityId[]
-  skillIds: EntityId[]
-  permissionProfile: Record<string, string>
-  createdAt: IsoDateTime
+  readonly id: EntityId
+  readonly agentDefinitionId: EntityId
+  readonly revision: number
+  readonly systemInstructions: string
+  readonly toolIds: readonly EntityId[]
+  readonly skillIds: readonly EntityId[]
+  readonly permissionProfile: Readonly<Record<string, string>>
+  readonly createdAt: IsoDateTime
 }
 
 export interface AgentRun {

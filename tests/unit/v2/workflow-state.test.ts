@@ -37,6 +37,20 @@ describe('WorkflowRun state machine', () => {
     expect(transitionWorkflow(paused, { type: 'RESUME' }).status).toBe('EXECUTING')
   })
 
+  it('rejects a forged terminal resume target', () => {
+    expect(() => transitionWorkflow(
+      { status: 'PAUSED', blockingGates: 0, pausedFrom: 'COMPLETED' as never },
+      { type: 'RESUME' }
+    )).toThrow(/illegal/i)
+  })
+
+  it('rejects invalid blocking gate counts', () => {
+    expect(() => transitionWorkflow(
+      { status: 'VERIFYING', blockingGates: -1 },
+      { type: 'COMPLETE' }
+    )).toThrow(/nonnegative/i)
+  })
+
   it('rejects transitions out of terminal states', () => {
     expect(() => transitionWorkflow(
       { status: 'COMPLETED', blockingGates: 0 },

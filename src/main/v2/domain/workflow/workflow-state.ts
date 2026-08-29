@@ -1,9 +1,12 @@
-import type { WorkflowRunStatus } from '../../../../shared/v2/contracts/domain'
+import type {
+  WorkflowResumableStatus,
+  WorkflowRunStatus
+} from '../../../../shared/v2/contracts/domain'
 
 export interface WorkflowState {
   status: WorkflowRunStatus
   blockingGates: number
-  pausedFrom?: Exclude<WorkflowRunStatus, 'PAUSED'>
+  pausedFrom?: WorkflowResumableStatus
 }
 
 export type WorkflowEvent =
@@ -35,8 +38,27 @@ const transitions: Partial<Record<WorkflowRunStatus, Partial<Record<WorkflowEven
 }
 
 const terminalStatuses = new Set<WorkflowRunStatus>(['COMPLETED', 'CANCELLED'])
+const resumableStatuses = new Set<WorkflowRunStatus>([
+  'RECEIVED',
+  'ANALYZING',
+  'PLANNING',
+  'WAITING_APPROVAL',
+  'EXECUTING',
+  'INTEGRATING',
+  'REVIEWING',
+  'REWORKING',
+  'VERIFYING'
+])
+
+function isResumableStatus(status: WorkflowRunStatus): status is WorkflowResumableStatus {
+  return resumableStatuses.has(status)
+}
 
 export function transitionWorkflow(run: WorkflowState, event: WorkflowEvent): WorkflowState {
+  if (!Number.isInteger(run.blockingGates) || run.blockingGates < 0) {
+    throw new Error('blockingGates must be a nonnegative integer')
+  }
+
   if (terminalStatuses.has(run.status)) {
     throw new Error(`terminal workflow ${run.status} cannot transition`)
   }
@@ -45,11 +67,11 @@ export function transitionWorkflow(run: WorkflowState, event: WorkflowEvent): Wo
     throw new Error('blocking quality gates remain')
   }
 
-  if (event.type === 'PAUSE' && run.status !== 'PAUSED' && run.status !== 'BLOCKED' && run.status !== 'FAILED') {
+  if (event.type === 'PAUSE' && isResumableStatus(run.status)) {
     return { ...run, status: 'PAUSED', pausedFrom: run.status }
   }
 
-  if (event.type === 'RESUME' && run.status === 'PAUSED' && run.pausedFrom) {
+  if (event.type === 'RESUME' && run.status === 'PAUSED' && run.pausedFrom && isResumableStatus(run.pausedFrom)) {
     return { ...run, status: run.pausedFrom, pausedFrom: undefined }
   }
 
