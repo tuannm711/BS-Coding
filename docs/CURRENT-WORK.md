@@ -23,7 +23,9 @@ exists to say out loud.
   `steering-queue.test.ts`, and `compaction-policy.test.ts` are green
 - **Status:** P06 merged into `master` at `ab37a76`; typecheck, 11 targeted
   tests, production build and the full suite at 1288 passing are green after
-  merge. P08 prerequisites P04-P07 are merged; Task 1 is in progress.
+  merge. All four P08 tasks and review remediation landed; 12/12 P08 tests,
+  boundary guard, production build and full suite at 1300 passing are green.
+  **Awaiting review** before merge.
 - **Scope:** provider-neutral RuntimePort, V1 LLM adapter, AgentRun loop,
   cancellation/limits, steering boundaries and canonical compaction.
 - **Plan:** [`v2/implementation-plans/plans/08-agent-runtime-v2.md`](v2/implementation-plans/plans/08-agent-runtime-v2.md)

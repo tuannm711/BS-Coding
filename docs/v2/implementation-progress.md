@@ -18,6 +18,7 @@ plan be reviewed — that gate is tracked in `../CURRENT-WORK.md`, not here.
 | P05 | Provider, account, model and routing | `289b8d4` | `npm run typecheck` + 4 P05 unit test files + boundary guard + production build green; full suite 1267 passing |
 | P07 | Tool execution and protocol guard | `d66b0df` | `npm run typecheck` + 4 P07 unit test files + boundary guard + production build green; full suite 1279 passing |
 | P06 | Context compiler and RuntimeEpoch switching | `3bcd077` | `npm run typecheck` + 4 P06 unit test files + boundary guard + production build green; full suite 1288 passing |
+| P08 | Agent runtime V2 | `ce8256d` | `npm run typecheck` + 5 P08 unit test files + boundary guard + production build green; full suite 1300 passing |
 
 ## P01 notes
 
@@ -72,3 +73,10 @@ plan be reviewed — that gate is tracked in `../CURRENT-WORK.md`, not here.
 - RuntimeEpoch switching preserves WorkSession/AgentRun identity, closes the old epoch before starting the new target, emits ordered lifecycle records and runs inside an injected transaction boundary.
 - Native projection keeps structured ToolCall/ToolResult history when supported; otherwise it emits neutral factual user records, never assistant tool-shaped prose.
 - Task commits: `5f58955` (context policy), `63986df` (compiler), `5d2e013` (epoch switching), `0a70af4` (native projection), `3bcd077` (atomic switch remediation).
+
+## P08 notes
+
+- RuntimePort and stream parts are provider-neutral; the V1 LlmClient adapter structurally maps text/reasoning/tool/finish/error parts and drops provider thought signatures.
+- AgentRunner owns only AgentRun step execution/outcomes, propagates abort signals to runtime/tool callbacks, enforces step limits and depends on an application port rather than workflow state/runtime implementation.
+- Steering drains FIFO only at model step boundaries. Compaction produces an immutable canonical summary artifact/event plan without rewriting source history or provider-native state.
+- Task commits: `a00c4e0` (runtime port), `7726751` (V1 LLM adapter), `ddf6077` (AgentRunner/service), `e7d895d` (steering/compaction), `ce8256d` (steering integration remediation).
