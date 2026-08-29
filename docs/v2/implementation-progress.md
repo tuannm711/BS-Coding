@@ -22,6 +22,7 @@ plan be reviewed — that gate is tracked in `../CURRENT-WORK.md`, not here.
 | P09 | Workflow and task graph engine | `89f50ac` | `npm run typecheck` + 4 P09 unit test files + boundary guard + production build green; full suite 1313 passing |
 | P10 | Agent team and orchestrator | `e3d96d9` | `npm run typecheck` + 4 P10 unit test files + boundary guard + production build green; full suite 1323 passing |
 | P11 | Git worktree integration | `43edf01` | `npm run typecheck` + P11 integration/unit tests + boundary guard + production build green; full suite 1332 passing |
+| P12 | Review, rework and quality gates | `a8f05c1` | `npm run typecheck` + 14 P12/boundary tests + production build green; full suite 1344 passing |
 
 ## P01 notes
 
@@ -107,3 +108,12 @@ plan be reviewed — that gate is tracked in `../CURRENT-WORK.md`, not here.
 - IntegrationService merges approved branches in deterministic task order, models actual unmerged-file conflicts as explicit conflict tasks, propagates non-conflict Git failures and requests quality-gate reruns after successful integration.
 - Cleanup requires merged/archived state, recorded audit and zero active references; removal is never forced and failures surface as warnings.
 - Task commits: `1eabe7f` (WorkspacePort), `5824a6e` (worktree manager), `e022d7d` (integration), `02fdab5` (cleanup), `43edf01` (conflict classification/gate rerun remediation).
+
+## P12 notes
+
+- Review, Finding and QualityGate contracts are runtime-validated; blocking findings require evidence and specialist decisions remain explicit structured data.
+- Mechanical gates execute without a shell, derive PASS/FAIL only from process exit codes and preserve stdout, stderr, exit code and duration as artifact metadata.
+- Review ingestion validates before transactional persistence. Failed or blocked review decisions and open blocking findings both prevent progress.
+- Rework tasks and finding links persist transactionally before worker dispatch; required mechanical gates and failed specialist reviews rerun before final verification can emit completion.
+- Final verification rejects failed/blocked gates, open blocking findings, failed/blocked mandatory reviews and empty gate/review rerun results, so worker success cannot bypass quality policy.
+- Task commits: `5601a04` (contracts), `b353ac8` (mechanical gates), `080d5b3` (review ingestion), `e2689c5` (rework/final verification), `a8f05c1` (completion-bypass remediation).
