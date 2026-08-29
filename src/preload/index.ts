@@ -8,6 +8,7 @@ import type { RemoteStatus } from '../shared/remote-types'
 import type { ProviderAuthorizationRequest, ProviderAuthorizationSession, ProviderConnectRequest } from '../shared/providers'
 import type { AgentAssignmentSetRequest, AgentAssignmentSnapshot } from '../shared/provider-state'
 import type { ProviderSnapshot } from '../shared/provider-state'
+import { createV2Api } from './v2-api'
 
 function subscribe<T>(channel: string, cb: (e: T) => void): () => void {
   const listener = (_event: unknown, payload: T) => cb(payload)
@@ -216,3 +217,11 @@ const api: AgentApi = {
 }
 
 contextBridge.exposeInMainWorld('api', api)
+contextBridge.exposeInMainWorld('bs', {
+  v2: createV2Api({
+    invoke: (channel, payload) => ipcRenderer.invoke(channel, payload),
+    on: (channel, listener) => ipcRenderer.on(channel, listener),
+    removeListener: (channel, listener) => ipcRenderer.removeListener(channel, listener),
+    nextRequestId: () => crypto.randomUUID()
+  })
+})

@@ -5,21 +5,31 @@ import path from 'node:path'
 
 test('app launches with the V2 IPC bootstrap and keeps the V1 shell available', async () => {
   const userData = mkdtempSync(path.join(tmpdir(), 'bs-ud-launch-'))
+  let app: Awaited<ReturnType<typeof electron.launch>> | undefined
   try {
-    const app = await electron.launch({
+    app = await electron.launch({
       args: ['.'],
       env: { ...process.env as Record<string, string>, BS_USER_DATA: userData, BS_V2: '1' }
     })
     const window = await app.firstWindow()
     await expect(window).toHaveTitle(/BS Coding/)
     await expect(window.locator('.sidebar')).toBeVisible()
+    const v2Surface = await window.evaluate(() => {
+      const browser = globalThis as unknown as { bs: { v2: Record<string, unknown> } }
+      return {
+        namespaces: Object.keys(browser.bs.v2).sort(),
+        serialized: JSON.stringify(browser.bs.v2)
+      }
+    })
+    expect(v2Surface.namespaces).toEqual(['provider', 'workSession', 'workflow'])
+    expect(v2Surface.serialized).not.toMatch(/secret|token|filesystem|fshandle|process|ipcrenderer/i)
     // Version loads asynchronously via IPC; auto-wait for it to appear.
     const version = window.locator('.status-bar .sb-mono').last()
     await expect(version).toHaveText(/^v\d+\.\d+\.\d+$/)
     expect(await version.textContent()).not.toBe('v0.1.0')
-    await app.close()
   } finally {
-    rmSync(userData, { recursive: true, force: true })
+    await app?.close()
+    rmSync(userData, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   }
 })
 

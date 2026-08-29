@@ -16,6 +16,20 @@ export interface ProjectionEvent<T> {
   payload: T
 }
 
+export interface BsV2Api {
+  workSession: {
+    create(input: { projectId: string; goal: string }): Promise<unknown>
+    pause(id: string): Promise<unknown>
+  }
+  provider: {
+    listAccounts(): Promise<unknown>
+  }
+  workflow: {
+    get(id: string): Promise<unknown>
+    subscribe(callback: (event: ProjectionEvent<unknown>) => void): () => void
+  }
+}
+
 export const V2_IPC = Object.freeze({
   project: { get: 'bs.v2.project.get', list: 'bs.v2.project.list' },
   workSession: { create: 'bs.v2.workSession.create', pause: 'bs.v2.workSession.pause' },
