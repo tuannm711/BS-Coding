@@ -21,12 +21,12 @@ exists to say out loud.
 - **Gate:** `npm run typecheck` plus `database.test.ts`, `migrations.test.ts`,
   `sqlite-event-store.test.ts`, and `repositories.test.ts` are green
 - **Status:** P02 merged into `master` at `fd74386`; typecheck, 45/45 targeted
-  tests and the full suite at 1229 passing are green after merge. The P03 branch
-  is open with no implementation landed. **Awaiting SQLite dependency approval.**
+  tests and the full suite at 1229 passing are green after merge. SQLite
+  dependencies were approved; Task 1 (database bootstrap) is in progress.
 - **Scope:** SQLite/WAL bootstrap; transactional migrations; monotonic EventStore;
   domain repositories and filesystem artifact references.
-- **Dependency decision:** the locked plan specifies `better-sqlite3` plus
-  `@types/better-sqlite3`; the repository currently has no SQLite dependency.
+- **Dependency decision:** `better-sqlite3@13.0.3` plus
+  `@types/better-sqlite3@9.6.0`, with native load verification for Electron 41.
 - **Plan:** [`v2/implementation-plans/plans/03-sqlite-persistence-event-store.md`](v2/implementation-plans/plans/03-sqlite-persistence-event-store.md)
 
 ## Next
