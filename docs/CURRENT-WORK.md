@@ -23,7 +23,9 @@ exists to say out loud.
   `native-context-projector.test.ts` are green
 - **Status:** P07 merged into `master` at `94e10b2`; typecheck, 14 targeted
   tests, production build and the full suite at 1279 passing are green after
-  merge. P06 prerequisites P02-P05 are merged; Task 1 is in progress.
+  merge. All four P06 tasks and review remediation landed; 9/9 P06 tests,
+  boundary guard, production build and full suite at 1288 passing are green.
+  **Awaiting review** before merge.
 - **Scope:** provider-neutral ContextPacket/Compiler, canonical selection policy,
   explicit RuntimeEpoch switching and provider-native projection boundary.
 - **Plan:** [`v2/implementation-plans/plans/06-context-compiler-runtime-epoch.md`](v2/implementation-plans/plans/06-context-compiler-runtime-epoch.md)

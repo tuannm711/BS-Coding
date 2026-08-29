@@ -17,6 +17,7 @@ plan be reviewed — that gate is tracked in `../CURRENT-WORK.md`, not here.
 | P04 | Canonical event protocol | `a818fe3` | `npm run typecheck` + 3 P04 unit test files + EventStore/boundary regressions + production build green; full suite 1254 passing |
 | P05 | Provider, account, model and routing | `289b8d4` | `npm run typecheck` + 4 P05 unit test files + boundary guard + production build green; full suite 1267 passing |
 | P07 | Tool execution and protocol guard | `d66b0df` | `npm run typecheck` + 4 P07 unit test files + boundary guard + production build green; full suite 1279 passing |
+| P06 | Context compiler and RuntimeEpoch switching | `3bcd077` | `npm run typecheck` + 4 P06 unit test files + boundary guard + production build green; full suite 1288 passing |
 
 ## P01 notes
 
@@ -63,3 +64,11 @@ plan be reviewed — that gate is tracked in `../CURRENT-WORK.md`, not here.
 - ToolExecutor deduplicates concurrent calls and exposes a durable idempotency reservation port so restarts cannot replay completed side effects. Protocol reservations have explicit release lifecycle.
 - V1 tool adapter is structural, gives known tools explicit metadata, defaults unknown tools to destructive/artifact policy, and has a P13 deletion criterion.
 - Task commits: `8e6c234` (contracts/schemas), `f35bc76` (ProtocolGuard), `4816744` (permissions/approvals), `b35fb51` (executor/V1 adapter), `d66b0df` (durable idempotency remediation).
+
+## P06 notes
+
+- Context selection isolates TaskRun/AgentRun history and removes provider conversation IDs, native sessions, thought signatures and runtime context from cross-epoch state.
+- ContextCompiler rebuilds deterministic provider-neutral packets from durable canonical events, system rules and artifact references after restart.
+- RuntimeEpoch switching preserves WorkSession/AgentRun identity, closes the old epoch before starting the new target, emits ordered lifecycle records and runs inside an injected transaction boundary.
+- Native projection keeps structured ToolCall/ToolResult history when supported; otherwise it emits neutral factual user records, never assistant tool-shaped prose.
+- Task commits: `5f58955` (context policy), `63986df` (compiler), `5d2e013` (epoch switching), `0a70af4` (native projection), `3bcd077` (atomic switch remediation).
