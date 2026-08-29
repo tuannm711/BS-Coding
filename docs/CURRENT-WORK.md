@@ -21,8 +21,10 @@ exists to say out loud.
 - **Gate:** `npm run typecheck` plus `database.test.ts`, `migrations.test.ts`,
   `sqlite-event-store.test.ts`, and `repositories.test.ts` are green
 - **Status:** P02 merged into `master` at `fd74386`; typecheck, 45/45 targeted
-  tests and the full suite at 1229 passing are green after merge. SQLite
-  dependencies were approved; Task 1 (database bootstrap) is in progress.
+  tests and the full suite at 1229 passing are green after merge. All four P03
+  tasks and review remediation landed; 12/12 P03 tests, the boundary guard,
+  production build and the full suite at 1241 passing are green. **Awaiting
+  review** before merge.
 - **Scope:** SQLite/WAL bootstrap; transactional migrations; monotonic EventStore;
   domain repositories and filesystem artifact references.
 - **Dependency decision:** `better-sqlite3@13.0.3` plus
