@@ -21,7 +21,7 @@ exists to say out loud.
 - **Gate:** `npm run typecheck` plus `provider-contract.test.ts`,
   `v1-provider-compat.test.ts`, `capability-probe.test.ts`, and
   `account-router.test.ts` are green
-- **Status:** P04 merged into `master` at `e4a2f47`; typecheck, 19 targeted
+- **Status:** P04 merged into `master` at `4489bc7`; typecheck, 19 targeted
   tests, production build and the full suite at 1254 passing are green after
   merge. P05 is implicitly approved under the V2 default; Task 1 is in progress.
 - **Scope:** provider/account/model contracts, V1 compatibility adapter,
