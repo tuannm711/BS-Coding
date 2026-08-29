@@ -16,6 +16,7 @@ plan be reviewed — that gate is tracked in `../CURRENT-WORK.md`, not here.
 | P03 | SQLite persistence and event store | `fa246e7` | `npm run typecheck` + 4 P03 unit test files + production build green; full suite 1241 passing |
 | P04 | Canonical event protocol | `a818fe3` | `npm run typecheck` + 3 P04 unit test files + EventStore/boundary regressions + production build green; full suite 1254 passing |
 | P05 | Provider, account, model and routing | `289b8d4` | `npm run typecheck` + 4 P05 unit test files + boundary guard + production build green; full suite 1267 passing |
+| P07 | Tool execution and protocol guard | `d66b0df` | `npm run typecheck` + 4 P07 unit test files + boundary guard + production build green; full suite 1279 passing |
 
 ## P01 notes
 
@@ -54,3 +55,11 @@ plan be reviewed — that gate is tracked in `../CURRENT-WORK.md`, not here.
 - Capability probes trust only structured tool events; narrated tool-like prose is DEGRADED, never VERIFIED.
 - Router implements deterministic AUTO/PREFERRED/PINNED policy, capability filtering, quota/load scoring, frozen epoch-sticky targets and explicit epoch release.
 - Task commits: `8742a48` (contracts/port), `a7bb22c` (V1 adapter), `2dc526c` (capability probe), `87621e7` (router), `289b8d4` (review remediation).
+
+## P07 notes
+
+- Structured tool contracts require explicit call IDs, JSON object arguments and safety metadata. ProtocolGuard never parses AssistantText and rejects unknown tools, invalid args, duplicate calls and capability violations.
+- Permission resolution follows hard-security → WorkSession → AgentVersion → Project → Global precedence; ASK persists an approval request before returning.
+- ToolExecutor deduplicates concurrent calls and exposes a durable idempotency reservation port so restarts cannot replay completed side effects. Protocol reservations have explicit release lifecycle.
+- V1 tool adapter is structural, gives known tools explicit metadata, defaults unknown tools to destructive/artifact policy, and has a P13 deletion criterion.
+- Task commits: `8e6c234` (contracts/schemas), `f35bc76` (ProtocolGuard), `4816744` (permissions/approvals), `b35fb51` (executor/V1 adapter), `d66b0df` (durable idempotency remediation).

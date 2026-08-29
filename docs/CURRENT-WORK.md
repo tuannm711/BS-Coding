@@ -23,8 +23,9 @@ exists to say out loud.
   `tool-executor.test.ts` are green
 - **Status:** P05 merged into `master` at `7c1066b`; typecheck, 15 targeted
   tests, production build and the full suite at 1267 passing are green after
-  merge. P07 prerequisites P02/P04 are green and merged. Task 1 (structured
-  tool contracts/schemas) is in progress.
+  merge. All four P07 tasks and review remediation landed; 12/12 P07 tests,
+  boundary guard, production build and full suite at 1279 passing are green.
+  **Awaiting review** before merge.
 - **Scope:** tool definitions/executor, permission policy and protocol guard;
   narrated prose must never become an executable tool call.
 - **Plan:** [`v2/implementation-plans/plans/07-tool-execution-protocol-guard.md`](v2/implementation-plans/plans/07-tool-execution-protocol-guard.md)
