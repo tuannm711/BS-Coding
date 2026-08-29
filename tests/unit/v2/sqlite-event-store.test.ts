@@ -8,13 +8,18 @@ import type { CanonicalEventType } from '../../../src/shared/v2/contracts/events
 const occurredAt = '2026-08-29T00:00:00.000Z'
 
 function event(id: string, type: CanonicalEventType) {
+  const payload: unknown = type === 'USER_MESSAGE' || type === 'ASSISTANT_MESSAGE'
+    ? { text: id }
+    : type === 'TOOL_RESULT'
+      ? { callId: id, status: 'success', completedAt: occurredAt }
+      : { id }
   return {
     schemaVersion: 1 as const,
     id,
     type,
     timestamp: occurredAt, projectId: 'p', workSessionId: 'w', workflowRunId: 'r',
     correlationId: 'corr',
-    payload: { id }
+    payload
   }
 }
 
@@ -85,5 +90,16 @@ describe('SqliteEventStore', () => {
     } finally {
       db.close()
     }
+  })
+
+  it('rejects corrupted persisted canonical events on load', async () => {
+    const db = openV2Database(':memory:')
+    try {
+      migrate(db)
+      db.prepare(`INSERT INTO canonical_events VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+        .run('w', 1, 1, 'bad', 'TOOL_RESULT', occurredAt,
+          JSON.stringify({ projectId: 'p', correlationId: 'corr' }), JSON.stringify({ status: 'success' }))
+      await expect(new SqliteEventStore(db).load('w')).rejects.toThrow()
+    } finally { db.close() }
   })
 })

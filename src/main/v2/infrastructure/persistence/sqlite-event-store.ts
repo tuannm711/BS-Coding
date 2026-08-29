@@ -4,6 +4,7 @@ import type {
   EventToAppend,
   StoredEvent
 } from '../../application/ports/event-store'
+import { CanonicalEventSchema } from '../../../../shared/v2/schemas/canonical-event'
 
 interface SequenceRow {
   sequence: number
@@ -99,7 +100,7 @@ export class SqliteEventStore implements EventStore {
 
     return rows.map(row => {
       const correlation = JSON.parse(row.correlation_json) as Record<string, string | undefined>
-      return ({
+      const parsed = CanonicalEventSchema.parse({
       aggregateId: row.aggregate_id,
       sequence: row.sequence,
       schemaVersion: row.schema_version,
@@ -110,7 +111,9 @@ export class SqliteEventStore implements EventStore {
       taskRunId: correlation.taskRunId, agentRunId: correlation.agentRunId,
       runtimeEpochId: correlation.runtimeEpochId, causationId: correlation.causationId,
       correlationId: correlation.correlationId!,
-      payload: JSON.parse(row.payload_json) as unknown
-    }) as StoredEvent})
+        payload: JSON.parse(row.payload_json) as unknown
+      })
+      return { ...parsed, aggregateId: row.aggregate_id } as StoredEvent
+    })
   }
 }

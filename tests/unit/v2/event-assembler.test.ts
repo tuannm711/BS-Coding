@@ -32,4 +32,17 @@ describe('EventAssembler', () => {
     } })
     expect(assembler.finish()).toEqual([{ type: 'TOOL_CALL', payload: expect.objectContaining({ callId: 'c1' }) }])
   })
+
+  it('rejects duplicate call ids and orphan tool results', () => {
+    const assembler = new EventAssembler()
+    const call = { callId: 'c1', toolName: 'read', arguments: {}, origin: 'model' as const,
+      requestedAt: '2026-08-29T00:00:00.000Z' }
+    assembler.accept({ kind: 'tool.call.completed', call })
+    expect(() => assembler.accept({ kind: 'tool.call.completed', call })).toThrow(/duplicate/i)
+
+    const orphan = new EventAssembler()
+    expect(() => orphan.accept({ kind: 'tool.result.completed', result: {
+      callId: 'missing', status: 'success', completedAt: '2026-08-29T00:00:00.000Z'
+    } })).toThrow(/unknown callId/i)
+  })
 })
