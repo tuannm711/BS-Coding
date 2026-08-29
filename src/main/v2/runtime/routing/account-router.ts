@@ -18,8 +18,12 @@ export class AccountRouter {
     const selected = input.policy !== 'AUTO' && preferred ? preferred : selectBestAccount(eligible)
     const target: RuntimeTarget = Object.freeze({ providerId: selected.providerId,
       accountId: selected.id, modelId: selected.modelId,
-      capabilities: { structuredTools: selected.structuredTools } })
+      capabilities: Object.freeze({ structuredTools: selected.structuredTools }) })
     if (input.runtimeEpochId) this.sticky.set(input.runtimeEpochId, target)
     return target
+  }
+
+  releaseEpoch(runtimeEpochId: string): void {
+    this.sticky.delete(runtimeEpochId)
   }
 }
