@@ -18,12 +18,11 @@ exists to say out loud.
 **V2 plan 12 — review and quality gates.**
 
 - **Branch:** `v2/p12-review-gates`
-- **Gate:** `npm run typecheck` plus `review-contract.test.ts`,
-  `mechanical-gates.test.ts`, `review-service.test.ts`, and
-  `rework-lifecycle.test.ts` are green
-- **Status:** P11 merged into `master` at `6350109`; typecheck, 11 targeted
-  tests, production build and the full suite at 1332 passing are green after
-  merge. P12 prerequisites are merged; Task 1 is in progress.
+- **Gate:** `npm run typecheck`, 14 P12/boundary tests, production build and the
+  full suite at 1344 passing are green
+- **Status:** implementation and inline review complete at `a8f05c1`; review
+  remediation closed failed-decision and empty-rerun completion bypasses. P12
+  is awaiting approval to merge into `master`.
 - **Scope:** review/finding/gate contracts, mechanical gates, specialist review
   ingestion, rework and final verification completion invariant.
 - **Plan:** [`v2/implementation-plans/plans/12-review-quality-gates.md`](v2/implementation-plans/plans/12-review-quality-gates.md)
@@ -35,7 +34,8 @@ after it has been decided.
 
 | # | Work | Prerequisite |
 |---|---|---|
-| 1 | V2 plan 13 — skills, MCP and LSP | P07/P08 merged; scheduled after P12 |
+| 1 | Merge V2 plan 12 into `master` | P12 implementation/review complete; awaiting approval |
+| 2 | V2 plan 13 — skills, MCP and LSP | P07/P08 merged; scheduled after P12 merge |
 
 ## Blocked
 
