@@ -15,30 +15,28 @@ Last updated: 2026-08-29
 Exactly one entry. If two things are genuinely running, that is what this file
 exists to say out loud.
 
-**V2 plan 03 — SQLite persistence and event store.**
+**V2 plan 04 — canonical event protocol.**
 
-- **Branch:** `v2/p03-persistence`
-- **Gate:** `npm run typecheck` plus `database.test.ts`, `migrations.test.ts`,
-  `sqlite-event-store.test.ts`, and `repositories.test.ts` are green
-- **Status:** P02 merged into `master` at `fd74386`; typecheck, 45/45 targeted
-  tests and the full suite at 1229 passing are green after merge. All four P03
-  tasks and review remediation landed; 12/12 P03 tests, the boundary guard,
-  production build and the full suite at 1241 passing are green. **Awaiting
-  review** before merge.
-- **Scope:** SQLite/WAL bootstrap; transactional migrations; monotonic EventStore;
-  domain repositories and filesystem artifact references.
-- **Dependency decision:** `better-sqlite3@13.0.3` plus
-  `@types/better-sqlite3@9.6.0`, with native load verification for Electron 41.
-- **Plan:** [`v2/implementation-plans/plans/03-sqlite-persistence-event-store.md`](v2/implementation-plans/plans/03-sqlite-persistence-event-store.md)
+- **Branch:** `v2/p04-canonical-events`
+- **Gate:** `npm run typecheck` plus `canonical-event-schema.test.ts`,
+  `event-assembler.test.ts`, and `event-redaction.test.ts` are green
+- **Status:** P03 merged into `master` at `cfc46b2`; typecheck, 14 targeted
+  tests, production build and the full suite at 1241 passing are green after
+  merge. The P04 branch is open with no implementation landed. **Awaiting
+  execution approval.**
+- **Scope:** versioned canonical event schemas; transient-to-durable event
+  assembly; event factory, correlation enforcement and recursive redaction.
+- **Contract reconciliation:** P04 will finalize the architecture envelope
+  (`timestamp` and canonical correlation IDs) and adapt the P03 forward
+  EventStore contract/storage mapping without rewriting migration 002.
+- **Plan:** [`v2/implementation-plans/plans/04-canonical-event-protocol.md`](v2/implementation-plans/plans/04-canonical-event-protocol.md)
 
 ## Next
 
 Decided work, in order. Not an idea backlog — something reaches this list only
 after it has been decided.
 
-| # | Work | Prerequisite |
-|---|---|---|
-| 1 | V2 plan 04 — canonical event protocol | P03 merged |
+Nothing is decided beyond P04 yet.
 
 ## Blocked
 
