@@ -23,7 +23,9 @@ exists to say out loud.
   `admission-policy.test.ts` are green
 - **Status:** P09 merged into `master` at `7817226`; typecheck, 15 targeted
   tests, production build and the full suite at 1313 passing are green after
-  merge. P10 prerequisites are merged; Task 1 is in progress.
+  merge. All four P10 tasks and review remediation landed; 10/10 P10 tests,
+  boundary guard, production build and full suite at 1323 passing are green.
+  **Awaiting review** before merge.
 - **Scope:** standard project agent profiles, auditable assignments,
   Orchestrator non-writing policy and explicit concurrency/budget admission.
 - **Plan:** [`v2/implementation-plans/plans/10-agent-team-orchestrator.md`](v2/implementation-plans/plans/10-agent-team-orchestrator.md)
