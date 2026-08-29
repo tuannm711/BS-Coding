@@ -18,11 +18,13 @@ exists to say out loud.
 **V2 plan 07 — tool execution and protocol guard.**
 
 - **Branch:** `v2/p07-tool-guard`
-- **Gate:** defined by the P07 detailed plan and its focused tests, plus
-  `npm run typecheck`
+- **Gate:** `npm run typecheck` plus `tool-call-schema.test.ts`,
+  `protocol-guard.test.ts`, `permission-engine.test.ts`, and
+  `tool-executor.test.ts` are green
 - **Status:** P05 merged into `master` at `7c1066b`; typecheck, 15 targeted
   tests, production build and the full suite at 1267 passing are green after
-  merge. P07 prerequisites P02/P04 are green and merged. **Ready to execute.**
+  merge. P07 prerequisites P02/P04 are green and merged. Task 1 (structured
+  tool contracts/schemas) is in progress.
 - **Scope:** tool definitions/executor, permission policy and protocol guard;
   narrated prose must never become an executable tool call.
 - **Plan:** [`v2/implementation-plans/plans/07-tool-execution-protocol-guard.md`](v2/implementation-plans/plans/07-tool-execution-protocol-guard.md)
