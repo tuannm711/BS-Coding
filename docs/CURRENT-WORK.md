@@ -22,7 +22,9 @@ exists to say out loud.
   `integration-service.test.ts`, and `workspace-cleanup.test.ts` are green
 - **Status:** P10 merged into `master` at `214d4fc`; typecheck, 12 targeted
   tests, production build and the full suite at 1323 passing are green after
-  merge. P11 prerequisites are merged; Task 1 is in progress.
+  merge. All four P11 tasks and review remediation landed; 9/9 P11 tests,
+  boundary guard, production build and full suite at 1332 passing are green.
+  **Awaiting review** before merge.
 - **Scope:** WorkspacePort contracts, isolated task worktrees, deterministic
   integration/conflict outcomes and data-safe cleanup policy.
 - **Plan:** [`v2/implementation-plans/plans/11-git-worktree-integration.md`](v2/implementation-plans/plans/11-git-worktree-integration.md)
