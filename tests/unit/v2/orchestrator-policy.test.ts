@@ -11,6 +11,7 @@ describe('Orchestrator policy', () => {
       expect(policy.permissionFor(tool)).toBe('DENY')
     }
     expect(policy.permissionFor('read')).toBe('ALLOW')
+    expect(policy.permissionFor('brand_new_write_tool')).toBe('DENY')
   })
 
   it('routes plan/task proposals through the WorkflowEngine boundary', async () => {

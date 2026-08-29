@@ -5,6 +5,7 @@ export const ORCHESTRATOR_DENIED_TOOLS = Object.freeze([
 ] as const)
 
 const denied = new Set<string>(ORCHESTRATOR_DENIED_TOOLS)
+const allowed = new Set(['read', 'search', 'list_files', 'manage_plan', 'manage_tasks', 'assign_task'])
 
 export interface WorkflowProposal {
   type: string
@@ -16,7 +17,7 @@ export function createOrchestratorPolicy(deps: {
 }) {
   return {
     permissionFor(toolName: string): Permission {
-      return denied.has(toolName) ? 'DENY' : 'ALLOW'
+      return denied.has(toolName) || !allowed.has(toolName) ? 'DENY' : 'ALLOW'
     },
     propose(command: WorkflowProposal): Promise<unknown> {
       return deps.proposeWorkflowCommand(structuredClone(command))

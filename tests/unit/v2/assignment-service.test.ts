@@ -21,6 +21,10 @@ describe('assignment and dispatch', () => {
     expect(order).toEqual(['save', 'dispatch'])
     expect(saved).toEqual([assignment])
     expect(dispatched[0]).toMatchObject({ assignment, agentVersion: { id: 'av1', revision: 3 }, envelope })
+    const dispatchedEnvelope = (dispatched[0] as any).envelope
+    expect(Object.isFrozen(dispatchedEnvelope)).toBe(true)
+    expect(Object.isFrozen(dispatchedEnvelope.scope)).toBe(true)
+    expect(Object.isFrozen(dispatchedEnvelope.workspace)).toBe(true)
   })
 
   it('does not dispatch if assignment persistence fails', async () => {
