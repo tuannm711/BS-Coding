@@ -1,3 +1,4 @@
+import Database from 'better-sqlite3'
 import { describe, expect, it } from 'vitest'
 import { openV2Database } from '../../../src/main/v2/infrastructure/persistence/database'
 import { migrate } from '../../../src/main/v2/infrastructure/persistence/migration-runner'
@@ -17,6 +18,20 @@ function event(id: string, type: string) {
 }
 
 describe('SqliteEventStore', () => {
+  it('acquires the SQLite writer lock before checking aggregate sequence', async () => {
+    const statements: string[] = []
+    const db = new Database(':memory:', { verbose: sql => statements.push(String(sql)) })
+    try {
+      migrate(db)
+      const store = new SqliteEventStore(db)
+      await store.append('w', 0, [event('e1', 'USER_MESSAGE')])
+
+      expect(statements.some(sql => /^BEGIN IMMEDIATE$/i.test(sql))).toBe(true)
+    } finally {
+      db.close()
+    }
+  })
+
   it('assigns monotonic aggregate sequence and loads in order', async () => {
     const db = openV2Database(':memory:')
     try {

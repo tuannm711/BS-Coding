@@ -78,7 +78,7 @@ export class SqliteEventStore implements EventStore {
       return sequence
     })
 
-    return appendTransaction()
+    return appendTransaction.immediate()
   }
 
   async load(aggregateId: string, afterSequence = 0): Promise<StoredEvent[]> {

@@ -73,3 +73,5 @@ CREATE TABLE artifacts (
   size INTEGER NOT NULL CHECK (size >= 0),
   sha256 TEXT
 );
+
+CREATE INDEX artifacts_project_id_idx ON artifacts(project_id);

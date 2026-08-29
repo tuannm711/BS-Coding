@@ -69,6 +69,10 @@ describe('V2 repositories', () => {
       expect(await repositories.artifacts.get('a')).toEqual(artifact)
       const columns = db.prepare('PRAGMA table_info(artifacts)').all() as Array<{ name: string }>
       expect(columns.map(column => column.name)).not.toContain('artifact_bytes')
+      const queryPlan = db.prepare(
+        'EXPLAIN QUERY PLAN SELECT * FROM artifacts WHERE project_id = ? ORDER BY id'
+      ).all(project.id) as Array<{ detail: string }>
+      expect(queryPlan.some(row => /artifacts_project_id_idx/i.test(row.detail))).toBe(true)
     } finally {
       db.close()
     }
