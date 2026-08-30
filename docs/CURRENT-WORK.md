@@ -15,10 +15,10 @@ Last updated: 2026-08-30
 Exactly one entry. If two things are genuinely running, that is what this file
 exists to say out loud.
 
-**V2 P15 renderer UI — Task 4 implementation.**
+**V2 P15 renderer UI — Task 5 implementation.**
 
 - **Branch:** `v2/p15-renderer-ui-figma`
-- **Gate:** Task 4 TDD — Agents and Settings/Providers
+- **Gate:** Task 5 TDD — functional bottom panel and final V2 UI E2E paths
 - **Status:** P15 backend prerequisite merged locally into `master` at `c44cddc`
   and post-merge verified: typecheck pass, full Vitest 233 files / 1423 tests,
   production build pass and Playwright 16/16 pass. Continuous V2 execution rules
@@ -34,8 +34,10 @@ exists to say out loud.
   `workSession.runtimeTargets` query; its contract/adapter/route amendment passed
   typecheck, 235 files / 1428 Vitest, build and 16/16 E2E. Task 3 Work Session
   UI passed typecheck, 236 files / 1429 Vitest, build and Playwright 16/16.
-- **Scope:** Task 4 implements project Agents and global Settings/Providers from
-  safe Agent/provider/settings DTOs with global/project scope separation.
+  Task 4 Agents/Settings passed typecheck, 237 files / 1430 Vitest, build,
+  AgentPicker race regression 3/3 and Playwright 16/16.
+- **Scope:** Task 5 binds Terminal/Tests/Problems/Logs/Output bottom projections
+  and proves the locked V2 navigation/runtime/review flows in Electron.
 - **Plan:** [`v2/implementation-plans/plans/15-renderer-ui-figma-binding.md`](v2/implementation-plans/plans/15-renderer-ui-figma-binding.md)
 
 ## Next
@@ -45,8 +47,8 @@ after it has been decided.
 
 | # | Work | Prerequisite |
 |---|---|---|
-| 1 | P15 renderer Task 4 — Agents and Settings | Task 3 completion gate green |
-| 2 | P15 renderer Task 5 — Bottom panel and E2E paths | Requires Task 4 commit |
+| 1 | P15 renderer Task 5 — Bottom panel and E2E paths | Task 4 completion gate green |
+| 2 | P15 plan completion review and local merge | Requires Task 5 commit |
 
 ## Blocked
 

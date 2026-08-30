@@ -5,6 +5,8 @@ import HomeScreen from '../screens/HomeScreen'
 import ProjectScreen from '../screens/ProjectScreen'
 import type { ProviderAccountSummary } from '../../../../shared/v2/contracts/provider'
 import WorkSessionScreen, { type WorkSelection } from '../screens/WorkSessionScreen'
+import AgentsScreen from '../screens/AgentsScreen'
+import SettingsScreen from '../screens/SettingsScreen'
 import '../styles/tokens.css'
 
 const icons = { home: Home, projects: FolderKanban, work: Activity, agents: Bot, settings: Settings }
@@ -89,7 +91,9 @@ export default function V2App() {
               setWorkSelection({ projectId: nextProjectId, workSessionId }); setScreen('work')
             }} /> : null}
           {screen === 'work' ? <WorkSessionScreen selection={workSelection} onBack={() => setScreen('home')} /> : null}
-          {screen !== 'home' && screen !== 'projects' && screen !== 'work' ? <>
+          {screen === 'agents' ? <AgentsScreen projectId={projectId} /> : null}
+          {screen === 'settings' ? <SettingsScreen /> : null}
+          {screen !== 'home' && screen !== 'projects' && screen !== 'work' && screen !== 'agents' && screen !== 'settings' ? <>
             <header className="v2-main-header"><p className="v2-eyebrow">V2 workspace</p><h1>{active.label}</h1>
               <p className="v2-main-subtitle">Project work, agents and runtime state in one operational workspace.</p></header>
             <section className="v2-placeholder" aria-label={`${active.label} content`}>
