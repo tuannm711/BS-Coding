@@ -27,4 +27,14 @@ describe('V2 vault adapter', () => {
       ref: 'provider/openai/a', configured: false
     })
   })
+
+  it('rejects empty references and values before legacy writes', async () => {
+    let writes = 0
+    const adapter = new V1VaultAdapter({ getSecret: () => null,
+      saveSecret: () => { writes += 1 }, deleteSecret: () => {} })
+    await expect(adapter.set('', 'secret')).rejects.toThrow(/reference/i)
+    await expect(adapter.set('provider/a', '')).rejects.toThrow(/value/i)
+    await expect(adapter.get(' ')).rejects.toThrow(/reference/i)
+    expect(writes).toBe(0)
+  })
 })
