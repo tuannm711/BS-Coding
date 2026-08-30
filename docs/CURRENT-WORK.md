@@ -15,26 +15,20 @@ Last updated: 2026-08-30
 Exactly one entry. If two things are genuinely running, that is what this file
 exists to say out loud.
 
-**V2 P15 prerequisite — awaiting merge approval.**
+**V2 P15 renderer UI — ready for Task 1 implementation.**
 
-- **Branch:** `v2/p15-backend-projections`
-- **Gate:** Owner merge approval
-- **Status:** P16 merged into `master` at `806c792` and merged back into this
-  branch. P15 backend Tasks 1-5 are committed at `855a692`, `fecc97b`,
-  `5b7c384`, `22d8352` and `d17d760`; Task 6A typed IPC/preload contracts and
-  route parity are committed at `3864cc2`; Task 6B concrete composition, build
-  and focused Electron smoke are committed at `99b2c34`. Task 7 durable
-  project/lifecycle/runtime/rework persistence, projection publication and review remediation
-  are committed at `6b95ff4`. Inline review has no remaining P0-P2 findings.
-  Completion evidence: typecheck pass; focused 16 files / 50 tests; full Vitest
-  233 files / 1423 tests; production build pass; full Playwright 16/16 pass.
-  `docs/v2` remains unchanged under the documentation-pack lock. The approved UX source is
-  the local vendored Figma Make export, so no live Figma connector is required.
-- **Scope:** owner-scoped projection DTOs/services, real IPC/preload routes,
-  idempotent lifecycle commands and bottom-panel backend projections required
-  by P15 Tasks 2-5.
-- **Spec:** [`superpowers/specs/2026-08-30-p15-backend-projection-prerequisite-design.md`](superpowers/specs/2026-08-30-p15-backend-projection-prerequisite-design.md)
-- **Plan:** [`superpowers/plans/2026-08-30-p15-backend-projection-prerequisite.md`](superpowers/plans/2026-08-30-p15-backend-projection-prerequisite.md)
+- **Branch:** `v2/p15-renderer-ui-figma`
+- **Gate:** Owner approval to execute Task 1 RED/GREEN
+- **Status:** P15 backend prerequisite merged locally into `master` at `c44cddc`
+  and post-merge verified: typecheck pass, full Vitest 233 files / 1423 tests,
+  production build pass and Playwright 16/16 pass. This renderer branch is now
+  synchronized with that merge. The approved UX source is the local vendored
+  Figma Make export under `docs/v2/prototype/figma-make/`; no live URL or
+  connector is required.
+- **Scope:** Task 1 creates the V2 application shell, exactly five production
+  navigation items and design tokens under `src/renderer/src/v2`, preserving
+  the V1 renderer until cutover.
+- **Plan:** [`v2/implementation-plans/plans/15-renderer-ui-figma-binding.md`](v2/implementation-plans/plans/15-renderer-ui-figma-binding.md)
 
 ## Next
 
@@ -43,14 +37,12 @@ after it has been decided.
 
 | # | Work | Prerequisite |
 |---|---|---|
-| 1 | Merge `v2/p15-backend-projections` into `master` | Requires owner approval |
-| 2 | Resume locked P15 renderer plan | Requires merged backend prerequisite; uses vendored prototype |
+| 1 | P15 renderer Task 1 — shell/navigation/design tokens | Backend prerequisite merged and verified |
+| 2 | P15 renderer Task 2 — Home and Project screens | Requires Task 1 commit |
 
 ## Blocked
 
-- **Renderer implementation remains blocked:** backend projection/API branch must
-  pass the owner merge gate before locked P15 UI Task 1 begins. The
-  approved UX source is already vendored under `docs/v2/prototype/figma-make/`.
+- No technical blocker. Task 1 waits at the implementation gate.
 
 ## Standing rules
 
