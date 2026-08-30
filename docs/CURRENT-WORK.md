@@ -15,14 +15,15 @@ Last updated: 2026-08-30
 Exactly one entry. If two things are genuinely running, that is what this file
 exists to say out loud.
 
-**V2 P15 renderer UI — ready for Task 1 implementation.**
+**V2 P15 renderer UI — Task 1 implementation.**
 
 - **Branch:** `v2/p15-renderer-ui-figma`
-- **Gate:** Owner approval to execute Task 1 RED/GREEN
+- **Gate:** Task 1 RED/GREEN — shell, navigation and design tokens
 - **Status:** P15 backend prerequisite merged locally into `master` at `c44cddc`
   and post-merge verified: typecheck pass, full Vitest 233 files / 1423 tests,
-  production build pass and Playwright 16/16 pass. This renderer branch is now
-  synchronized with that merge. The approved UX source is the local vendored
+  production build pass and Playwright 16/16 pass. Continuous V2 execution rules
+  merged into `master` at `98f8a31` and this renderer branch is being synchronized
+  with both merges. The approved UX source is the local vendored
   Figma Make export under `docs/v2/prototype/figma-make/`; no live URL or
   connector is required.
 - **Scope:** Task 1 creates the V2 application shell, exactly five production
@@ -42,7 +43,7 @@ after it has been decided.
 
 ## Blocked
 
-- No technical blocker. Task 1 waits at the implementation gate.
+- No technical blocker.
 
 ## Standing rules
 
