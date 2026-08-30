@@ -15,17 +15,19 @@ Last updated: 2026-08-30
 Exactly one entry. If two things are genuinely running, that is what this file
 exists to say out loud.
 
-**V2 plan 15 — renderer UI and Figma binding.**
+**V2 P15 prerequisite — backend projections and APIs.**
 
-- **Branch:** `v2/p15-renderer-ui-figma`
-- **Gate:** `npm run typecheck`, P15 renderer unit tests, production build and
-  `v2-core-flow.spec.ts` + `v2-runtime-switch.spec.ts` are green
+- **Branch:** `v2/p15-backend-projections`
+- **Gate:** owner approves the written prerequisite spec before implementation
+  planning begins
 - **Status:** P14 merged into `master` at `a561a95`; typecheck, 17 targeted
   tests, production build, the full suite at 1374 passing and 15 Playwright
-  e2e tests are green after merge. P15 preflight is blocked before Task 1.
-- **Scope:** locked Figma navigation/shell, project/work-session screens,
-  agents/settings and functional bottom-panel flows backed by V2 DTOs.
-- **Plan:** [`v2/implementation-plans/plans/15-renderer-ui-figma-binding.md`](v2/implementation-plans/plans/15-renderer-ui-figma-binding.md)
+  e2e tests are green after merge. Backend-first direction is approved; the
+  prerequisite spec is written and awaiting owner review.
+- **Scope:** owner-scoped projection DTOs/services, real IPC/preload routes,
+  idempotent lifecycle commands and bottom-panel backend projections required
+  by P15 Tasks 2-5.
+- **Spec:** [`superpowers/specs/2026-08-30-p15-backend-projection-prerequisite-design.md`](superpowers/specs/2026-08-30-p15-backend-projection-prerequisite-design.md)
 
 ## Next
 
@@ -34,7 +36,8 @@ after it has been decided.
 
 | # | Work | Prerequisite |
 |---|---|---|
-| 1 | Resolve P15 Figma context and backend projection prerequisites | Required before Task 1 implementation |
+| 1 | Review/approve the P15 backend prerequisite spec | Required before writing its implementation plan |
+| 2 | Resume locked P15 renderer plan | Requires backend prerequisite and Figma context |
 
 ## Blocked
 
@@ -42,10 +45,9 @@ after it has been decided.
   this session exposes no `get_design_context` tool or Figma MCP resource. The
   mandatory design-to-code workflow forbids implementing from screenshots or
   assumptions.
-- **Backend projection/API gap:** P14 exposes only five preload methods and
-  registers no concrete V2 application routes; P15 Tasks 2-5 require project,
-  lifecycle, agent/settings and bottom-panel projections/commands that no
-  later plan is scheduled to provide.
+- **Renderer implementation remains blocked:** backend projection/API work must
+  pass spec → plan → implementation gates, and Figma context must be restored,
+  before locked P15 UI Task 1 begins.
 
 ## Standing rules
 
