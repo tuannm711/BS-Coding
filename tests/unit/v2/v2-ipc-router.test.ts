@@ -52,8 +52,8 @@ describe('V2 IPC router', () => {
 
     expect(() => registerV2Ipc({ registrar, routes: [route, route] })).toThrow(/duplicate/i)
     const runtime = await createV2Runtime({
-      enabled: true, userDataPath: 'C:/data',
-      registerIpc: () => registerV2Ipc({ registrar, routes: [route] })
+      enabled: true,
+      start: async () => ({ dispose: registerV2Ipc({ registrar, routes: [route] }) })
     })
     expect(handlers.has('bs.v2.project.get')).toBe(true)
     await runtime.dispose()

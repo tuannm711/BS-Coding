@@ -1,0 +1,259 @@
+import type {
+  AgentDefinition, Project, WorkflowRun, WorkSession
+} from '../../../shared/v2/contracts/domain'
+import type { RuntimeTarget } from '../../../shared/v2/contracts/provider'
+import type {
+  LogSummary, OutputSummary, SafeSettingsSummary, TerminalSummary, TestRunSummary
+} from '../../../shared/v2/contracts/ui-projections'
+import { transitionWorkflow } from '../domain/workflow/workflow-state'
+import type { StoredEvent } from './ports/event-store'
+import type { CommandIdempotencyPort } from './ports/command-idempotency-port'
+import type { ProjectionReadPort } from './ports/projection-read-port'
+import type { ProjectionSupportPort } from './ports/projection-support-port'
+import { createAgentSettingsCommands } from './commands/agent-settings-commands'
+import { createWorkSessionCommands } from './commands/work-session-commands'
+import { createAgentSettingsProjectionService } from './projections/agent-settings-projections'
+import { createBottomPanelProjectionService } from './projections/bottom-panel-projections'
+import { createProjectProjectionService } from './projections/project-projections'
+import { createWorkProjectionService } from './projections/work-projections'
+
+type JsonPatch = Readonly<Record<string, unknown>>
+
+export interface V2CompositionSupport extends ProjectionSupportPort {
+  credentialState(): Promise<SafeSettingsSummary['providerCredentials']>
+  listTerminals(projectId: string, workflowRunId: string, limit: number): Promise<readonly TerminalSummary[]>
+  listTests(projectId: string, workflowRunId: string, limit: number): Promise<readonly TestRunSummary[]>
+  listLogs(projectId: string, workflowRunId: string, limit: number): Promise<readonly LogSummary[]>
+  listOutput(projectId: string, workflowRunId: string, limit: number): Promise<readonly OutputSummary[]>
+  connectProvider(input: { scopeId: string; providerId: string; apiKey: string }): Promise<void>
+  refreshProvider(input: { scopeId: string; providerId: string }): Promise<void>
+  setProviderEnabled(input: { scopeId: string; accountId: string; enabled: boolean }): Promise<void>
+  probeProvider(input: { scopeId: string; providerId: string }): Promise<void>
+  updateSettings(input: { scopeId: string; patch: JsonPatch }): Promise<void>
+  switchRuntime(input: { workSessionId: string; agentRunId: string; target: RuntimeTarget; reason: string }): Promise<void>
+  createRework(input: { workflowRunId: string; findingIds: readonly string[]; title: string }): Promise<void>
+  remoteStatus(): Promise<{ enabled: boolean; status: string }>
+}
+
+export interface CreateV2ServicesInput {
+  repositories: V2ServiceRepositories
+  loadEvents(aggregateId: string): Promise<readonly StoredEvent[]>
+  support: V2CompositionSupport
+  now?: () => string
+  nextId?: () => string
+}
+
+interface Repository<T extends { id: string }> {
+  get(id: string): Promise<T | null>
+  save(value: T): Promise<void>
+}
+
+export interface V2ServiceRepositories {
+  projects: Repository<Project>
+  workSessions: Repository<WorkSession>
+  workflowRuns: Repository<WorkflowRun>
+  agentDefinitions: Repository<AgentDefinition>
+  projections: ProjectionReadPort
+  commandIdempotency: CommandIdempotencyPort
+}
+
+type Input = Record<string, unknown>
+
+function available<T>(section: Awaited<ReturnType<ProjectionSupportPort['getGitStatus']>> |
+  { status: 'AVAILABLE'; value: T } | { status: 'EMPTY' } | { status: 'UNAVAILABLE'; errorCode: string },
+  label: string): T {
+  if (section.status === 'AVAILABLE') return section.value as T
+  if (section.status === 'EMPTY') throw new Error(`${label} is empty`)
+  throw new Error(`${label} unavailable: ${section.errorCode}`)
+}
+
+function sessionStatus(status: WorkflowRun['status']): WorkSession['status'] {
+  if (status === 'PAUSED' || status === 'BLOCKED' || status === 'FAILED' || status === 'CANCELLED' ||
+      status === 'COMPLETED') return status
+  if (status === 'REVIEWING') return 'REVIEW'
+  if (status === 'REWORKING') return 'REWORK'
+  if (status === 'VERIFYING') return 'VERIFYING'
+  return status === 'EXECUTING' || status === 'INTEGRATING' ? 'EXECUTING' : 'PLANNING'
+}
+
+export function createV2Services(input: CreateV2ServicesInput) {
+  const repositories = input.repositories
+  const now = input.now ?? (() => new Date().toISOString())
+  const nextId = input.nextId ?? (() => crypto.randomUUID())
+  const revision = async (aggregateId: string) => {
+    const stored = await input.loadEvents(aggregateId)
+    return stored.at(-1)?.sequence ?? 0
+  }
+  const transaction = async <T>(operation: () => Promise<T>) => operation()
+  const projectProjections = createProjectProjectionService({
+    reads: repositories.projections, support: input.support, revision
+  })
+  const workProjections = createWorkProjectionService({
+    reads: repositories.projections, loadEvents: id => input.loadEvents(id), revision
+  })
+  const listAgents = async (projectId: string) =>
+    (await repositories.projections.listAgentDefinitionsByProject(projectId)).map(agent => ({
+      id: agent.id, name: agent.name, role: agent.role,
+      status: agent.archivedAt ? 'DISABLED' as const : 'READY' as const,
+      ...(agent.currentVersionId ? { currentVersionId: agent.currentVersionId } : {})
+    }))
+  const settings = createAgentSettingsProjectionService({ revision, listAgents,
+    listProviderAccounts: () => input.support.listProviderAccounts(),
+    credentialState: () => input.support.credentialState() })
+  const bottom = createBottomPanelProjectionService({ revision,
+    terminals: (projectId, workflowRunId, limit) => input.support.listTerminals(projectId, workflowRunId, limit),
+    tests: (projectId, workflowRunId, limit) => input.support.listTests(projectId, workflowRunId, limit),
+    problems: async (projectId, workflowRunId) => {
+      const section = await input.support.listDiagnostics(projectId, workflowRunId)
+      return section.status === 'AVAILABLE' ? section.value : []
+    },
+    logs: (projectId, workflowRunId, limit) => input.support.listLogs(projectId, workflowRunId, limit),
+    output: (projectId, workflowRunId, limit) => input.support.listOutput(projectId, workflowRunId, limit) })
+
+  const resolveWork = async (projectId: string, workSessionId: string) => {
+    const work = await repositories.projections.getWorkSessionOwnedByProject(projectId, workSessionId)
+    if (!work?.activeWorkflowRunId) return null
+    const activeRuns = await repositories.projections.listAgentRunsByWorkflow(work.activeWorkflowRunId)
+    return { workSessionId: work.id, workflowRunId: work.activeWorkflowRunId,
+      ...(activeRuns.find(run => run.status === 'RUNNING') ?
+        { agentRunId: activeRuns.find(run => run.status === 'RUNNING')!.id } : {}) }
+  }
+  const changeLifecycle = async (workflowRunId: string, event: 'PAUSE' | 'RESUME' | 'CANCEL' | 'APPROVE') => {
+    const run = await repositories.workflowRuns.get(workflowRunId)
+    if (!run) throw new Error(`unknown workflow run ${workflowRunId}`)
+    const state = transitionWorkflow(run, { type: event })
+    const timestamp = now()
+    const updated: WorkflowRun = { ...run, ...state, updatedAt: timestamp,
+      ...(state.status === 'CANCELLED' ? { cancelledAt: timestamp } : {}) }
+    await repositories.workflowRuns.save(updated)
+    const session = await repositories.workSessions.get(run.workSessionId)
+    if (session) await repositories.workSessions.save({ ...session,
+      status: sessionStatus(updated.status), updatedAt: timestamp,
+      ...(updated.status === 'CANCELLED' ? { cancelledAt: timestamp } : {}) })
+    return updated
+  }
+  const workCommands = createWorkSessionCommands({ idempotency: repositories.commandIdempotency,
+    transaction, resolve: resolveWork, lifecycle: {
+      pause: id => changeLifecycle(id, 'PAUSE'), resume: id => changeLifecycle(id, 'RESUME'),
+      cancel: id => changeLifecycle(id, 'CANCEL') },
+    switchRuntime: value => input.support.switchRuntime(value),
+    approvePlan: value => changeLifecycle(value.workflowRunId, 'APPROVE'),
+    createRework: value => input.support.createRework(value) })
+
+  const agentCommands = createAgentSettingsCommands({ idempotency: repositories.commandIdempotency,
+    transaction,
+    createAgent: async value => {
+      const timestamp = now()
+      const agent: AgentDefinition = { id: nextId(), projectId: String(value.scopeId),
+        name: String(value.name), role: String(value.role), createdAt: timestamp, updatedAt: timestamp }
+      if (!await repositories.projects.get(agent.projectId)) throw new Error('unknown project')
+      await repositories.agentDefinitions.save(agent)
+      return { ok: true, entityId: agent.id }
+    },
+    updateAgent: async value => {
+      const agent = await repositories.agentDefinitions.get(String(value.agentId))
+      if (!agent || agent.projectId !== value.scopeId) throw new Error('unknown agent')
+      const patch = value.patch as JsonPatch
+      const updated: AgentDefinition = { ...agent,
+        ...(typeof patch.name === 'string' ? { name: patch.name } : {}),
+        ...(typeof patch.role === 'string' ? { role: patch.role } : {}), updatedAt: now() }
+      await repositories.agentDefinitions.save(updated)
+      return { ok: true, entityId: agent.id }
+    },
+    removeAgent: async value => {
+      const agent = await repositories.agentDefinitions.get(String(value.agentId))
+      if (!agent || agent.projectId !== value.scopeId) throw new Error('unknown agent')
+      await repositories.agentDefinitions.save({ ...agent, archivedAt: now(), updatedAt: now() })
+      return { ok: true, entityId: agent.id }
+    },
+    connectProvider: async value => { await input.support.connectProvider(value as never); return { ok: true } },
+    refreshProvider: async value => { await input.support.refreshProvider(value as never); return { ok: true } },
+    setProviderEnabled: async value => { await input.support.setProviderEnabled(value as never); return { ok: true } },
+    probeProvider: async value => { await input.support.probeProvider(value as never); return { ok: true } },
+    updateSettings: async value => { await input.support.updateSettings(value as never); return { ok: true } }
+  })
+
+  const workProjection = (value: Input) => workProjections.getWorkProjection(
+    String(value.projectId), String(value.workSessionId), String(value.workflowRunId))
+  const ack = async (operation: Promise<unknown>) => { await operation; return { ok: true } }
+  const handlers: Record<string, (value: Input) => Promise<unknown>> = {
+    'project.list': () => projectProjections.listHomeProjection(),
+    'project.get': async value => (await projectProjections.getProjectDetail(String(value.id))).project,
+    'workSession.listByProject': async value => {
+      const detail = await projectProjections.getProjectDetail(String(value.projectId))
+      return detail.workSessions.status === 'AVAILABLE' ? detail.workSessions.value : []
+    },
+    'workSession.get': async value => {
+      const session = await repositories.workSessions.get(String(value.id))
+      if (!session) throw new Error('unknown work session')
+      return session
+    },
+    'workSession.create': async value => {
+      const envelope = value as { requestId: string; input: { projectId: string; goal: string; title?: string } }
+      const existing = await repositories.commandIdempotency.reserve(envelope.requestId, 'workSession.create')
+      if (existing.status === 'COMPLETED') return existing.result
+      if (existing.status === 'IN_PROGRESS') throw new Error('workSession.create is in progress')
+      try {
+        if (!await repositories.projects.get(envelope.input.projectId)) throw new Error('unknown project')
+        const timestamp = now(); const sessionId = nextId(); const workflowId = nextId()
+        const session: WorkSession = { id: sessionId, projectId: envelope.input.projectId,
+          title: envelope.input.title ?? envelope.input.goal, goal: envelope.input.goal,
+          status: 'PLANNING', activeWorkflowRunId: workflowId, createdAt: timestamp, updatedAt: timestamp }
+        const workflow: WorkflowRun = { id: workflowId, workSessionId: sessionId, status: 'RECEIVED',
+          blockingGates: 0, createdAt: timestamp, updatedAt: timestamp }
+        await repositories.workSessions.save(session); await repositories.workflowRuns.save(workflow)
+        await repositories.commandIdempotency.complete(envelope.requestId, 'workSession.create', session)
+        return session
+      } catch (error) {
+        await repositories.commandIdempotency.release(envelope.requestId, 'workSession.create')
+        throw error
+      }
+    },
+    'workSession.pause': value => ack(workCommands.pause(
+      { requestId: String(value.requestId), ...(value.input as object) } as never)),
+    'workSession.resume': value => ack(workCommands.resume({ requestId: String(value.requestId), ...(value.input as object) } as never)),
+    'workSession.cancel': value => ack(workCommands.cancel({ requestId: String(value.requestId), ...(value.input as object) } as never)),
+    'workSession.switchRuntime': value => ack(workCommands.switchRuntime({ requestId: String(value.requestId), ...(value.input as object) } as never)),
+    'workflow.get': async value => {
+      const workflow = await repositories.workflowRuns.get(String(value.id))
+      if (!workflow) throw new Error('unknown workflow run')
+      return workflow
+    },
+    'workflow.conversation': workProjection, 'workflow.plan': workProjection,
+    'workflow.tasks': workProjection, 'workflow.execution': workProjection,
+    'workflow.changes': workProjection, 'workflow.review': workProjection,
+    'workflow.runtimeHistory': workProjection,
+    'workflow.bottomPanel': value => bottom.get(String(value.projectId), String(value.workflowRunId),
+      typeof value.limit === 'number' ? value.limit : undefined),
+    'workflow.approvePlan': value => ack(workCommands.approvePlan({ requestId: String(value.requestId), ...(value.input as object) } as never)),
+    'workflow.createRework': value => ack(workCommands.createRework({ requestId: String(value.requestId), ...(value.input as object) } as never)),
+    'agent.list': async () => {
+      const project = (await repositories.projections.listProjects())[0]
+      return settings.get(project?.id ?? 'global')
+    },
+    'agent.listByProject': value => settings.get(String(value.projectId)),
+    'agent.get': async value => {
+      const agent = await repositories.agentDefinitions.get(String(value.id))
+      if (!agent) throw new Error('unknown agent')
+      return settings.get(agent.projectId)
+    },
+    'agent.create': value => agentCommands.createAgent({ requestId: String(value.requestId), ...(value.input as object) } as never),
+    'agent.update': value => agentCommands.updateAgent({ requestId: String(value.requestId), ...(value.input as object) } as never),
+    'agent.remove': value => agentCommands.removeAgent({ requestId: String(value.requestId), ...(value.input as object) } as never),
+    'provider.listAccounts': () => input.support.listProviderAccounts(),
+    'provider.connect': value => agentCommands.connectProvider({ requestId: String(value.requestId), ...(value.input as object) } as never),
+    'provider.refresh': value => agentCommands.refreshProvider({ requestId: String(value.requestId), ...(value.input as object) } as never),
+    'provider.setEnabled': value => agentCommands.setProviderEnabled({ requestId: String(value.requestId), ...(value.input as object) } as never),
+    'provider.probe': value => agentCommands.probeProvider({ requestId: String(value.requestId), ...(value.input as object) } as never),
+    'workspace.get': value => projectProjections.getProjectWorkspace(String(value.projectId)),
+    'git.status': async value => available(await input.support.getGitStatus(String(value.projectId)), 'git status'),
+    'skill.list': async value => available(await input.support.listSkillBindings(String(value.projectId)), 'skills'),
+    'mcp.listServers': async value => available(await input.support.listMcpServers(String(value.projectId)), 'MCP servers'),
+    'settings.get': value => settings.get(String(value.projectId)),
+    'settings.update': value => agentCommands.updateSettings({ requestId: String(value.requestId), ...(value.input as object) } as never),
+    'diagnostics.list': async value => available(await input.support.listDiagnostics(String(value.projectId),
+      typeof value.workflowRunId === 'string' ? value.workflowRunId : undefined), 'diagnostics'),
+    'remote.status': () => input.support.remoteStatus()
+  }
+  return { handlers: handlers as Readonly<Record<string, (value: unknown) => Promise<unknown>>> }
+}
