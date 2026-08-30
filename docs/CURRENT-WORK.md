@@ -15,10 +15,10 @@ Last updated: 2026-08-30
 Exactly one entry. If two things are genuinely running, that is what this file
 exists to say out loud.
 
-**V2 P15 renderer UI — completion and local merge.**
+**V2 P17 observability, usage and budget — Task 1 implementation.**
 
-- **Branch:** `v2/p15-renderer-ui-figma`
-- **Gate:** Final commit, local merge and post-merge verification
+- **Branch:** `v2/p17-observability-usage-budget`
+- **Gate:** Task 1 TDD — usage and explicit budget contracts
 - **Status:** P15 backend prerequisite merged locally into `master` at `c44cddc`
   and post-merge verified: typecheck pass, full Vitest 233 files / 1423 tests,
   production build pass and Playwright 16/16 pass. Continuous V2 execution rules
@@ -34,15 +34,12 @@ exists to say out loud.
   `workSession.runtimeTargets` query; its contract/adapter/route amendment passed
   typecheck, 235 files / 1428 Vitest, build and 16/16 E2E. Task 3 Work Session
   UI passed typecheck, 236 files / 1429 Vitest, build and Playwright 16/16.
-  Task 4 Agents/Settings passed typecheck, 237 files / 1430 Vitest, build,
-  AgentPicker race regression 3/3 and Playwright 16/16. Task 5 bottom panel and
-  two locked V2 Electron flows passed. Final review remediation added sequencing,
-  stale-panel invalidation, destructive confirmations and focus/form accessibility.
-  Plan completion evidence: typecheck, focused 5 files / 6 tests, full Vitest
-  237 files / 1430 tests, production build and Playwright 18/18 exit 0.
-- **Scope:** Commit the final task, merge P15 locally into `master`, verify the
-  merged result and move to the next dependency-ready detailed plan.
-- **Plan:** [`v2/implementation-plans/plans/15-renderer-ui-figma-binding.md`](v2/implementation-plans/plans/15-renderer-ui-figma-binding.md)
+  P15 renderer merged locally into `master` at `c4adc62` and post-merge passed
+  typecheck, 237 files / 1430 Vitest, production build and Playwright 18/18.
+  P17 dependencies P03-P05, P10 and P16 are complete.
+- **Scope:** Define serializable usage, quota, optional budget policy and
+  explainable decision contracts with no arbitrary hard defaults.
+- **Plan:** [`v2/implementation-plans/plans/17-observability-usage-budget.md`](v2/implementation-plans/plans/17-observability-usage-budget.md)
 
 ## Next
 
@@ -51,8 +48,8 @@ after it has been decided.
 
 | # | Work | Prerequisite |
 |---|---|---|
-| 1 | Merge `v2/p15-renderer-ui-figma` into local `master` | P15 completion gate green |
-| 2 | Continue the next dependency-ready V2 plan | Requires post-merge verification |
+| 1 | P17 Task 1 — usage/budget contracts | Dependencies complete |
+| 2 | P17 Task 2 — correlated usage ledger | Requires Task 1 commit |
 
 ## Blocked
 
