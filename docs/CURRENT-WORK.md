@@ -15,10 +15,10 @@ Last updated: 2026-08-30
 Exactly one entry. If two things are genuinely running, that is what this file
 exists to say out loud.
 
-**V2 P18 V1 data migration and cutover preparation — Task 2 implementation.**
+**V2 P18 V1 data migration and cutover preparation — Task 3 implementation.**
 
 - **Branch:** `v2/p18-v1-migration-cutover`
-- **Gate:** Task 2 TDD — approved V2 provider-account persistence amendment
+- **Gate:** Task 3 TDD — canonical session/transcript conversion
 - **Status:** P15 backend prerequisite merged locally into `master` at `c44cddc`
   and post-merge verified: typecheck pass, full Vitest 233 files / 1423 tests,
   production build pass and Playwright 16/16 pass. Continuous V2 execution rules
@@ -52,10 +52,11 @@ exists to say out loud.
   repository amendment. The owner approved the recommended amendment: add an
   immutable migration 006, a main-only provider-account metadata entity and a
   repository that preserves opaque vault references without exposing secret
-  bytes through shared/renderer DTOs.
-- **Scope:** Import V1 project/provider-account/agent metadata with stable source
-  keys, immutable AgentVersion snapshots and vault references only. The approved
-  amendment is now part of Task 2 implementation scope.
+  bytes through shared/renderer DTOs. Task 2 core imports are committed at
+  `d6fa88b`; typecheck and 3 focused files / 10 tests passed before commit.
+- **Scope:** Convert compatible V1 session/transcript history to canonical
+  messages and structured tool events, discard provider-native signatures and
+  retain ambiguous coordination sessions as read-only legacy archive.
 - **Plan:** [`v2/implementation-plans/plans/18-v1-migration-cutover.md`](v2/implementation-plans/plans/18-v1-migration-cutover.md)
 
 ## Next
@@ -65,8 +66,8 @@ after it has been decided.
 
 | # | Work | Prerequisite |
 |---|---|---|
-| 1 | P18 Task 2 — core V1 metadata imports | Task 1 committed at `6b4afbe` |
-| 2 | P18 Task 3 — canonical session/transcript conversion | Requires Task 2 commit |
+| 1 | P18 Task 3 — canonical session/transcript conversion | Task 2 committed at `d6fa88b` |
+| 2 | P18 Task 4 — resumable runner and validation | Requires Task 3 commit |
 
 ## Blocked
 
