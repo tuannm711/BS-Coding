@@ -18,14 +18,14 @@ exists to say out loud.
 **V2 P15 prerequisite — backend projections and APIs.**
 
 - **Branch:** `v2/p15-backend-projections`
-- **Gate:** Task 1 projection contract/schema/read-port tests and module
-  boundary guard pass with `npm run typecheck`
+- **Gate:** owner opens Task 2 scoped-read/idempotency implementation
 - **Status:** P14 merged into `master` at `a561a95`; typecheck, 17 targeted
   tests, production build, the full suite at 1374 passing and 15 Playwright
   e2e tests are green after merge. Backend-first direction is approved; the
   prerequisite spec and plan are approved; Task 1 projection DTO/schema/read
-  ports are in progress. The approved UX source is the local vendored Figma
-  Make export, so no live Figma connector is required.
+  ports are committed at `855a692` with focused tests, boundary guard and
+  typecheck green. Task 2 is awaiting continuation. The approved UX source is
+  the local vendored Figma Make export, so no live Figma connector is required.
 - **Scope:** owner-scoped projection DTOs/services, real IPC/preload routes,
   idempotent lifecycle commands and bottom-panel backend projections required
   by P15 Tasks 2-5.
