@@ -40,6 +40,16 @@ describe('ToolExecutor', () => {
     expect(await restarted.execute({ callId: 'durable' }, async () => ++effects)).toBe(1)
     expect(effects).toBe(1)
   })
+
+  it('redacts tool results before writing audit events', async () => {
+    const events: unknown[] = []
+    const executor = new ToolExecutor({ record: async event => { events.push(event) } })
+    await executor.execute({ callId: 'secret-result' }, async () => ({
+      accessToken: 'token-value', safe: 'ok'
+    }))
+    expect(events).toContainEqual({ type: 'TOOL_COMPLETED', callId: 'secret-result',
+      result: { accessToken: '[REDACTED]', safe: 'ok' } })
+  })
 })
 
 describe('V1 tool registry adapter', () => {

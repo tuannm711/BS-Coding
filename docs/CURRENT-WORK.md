@@ -15,18 +15,21 @@ Last updated: 2026-08-30
 Exactly one entry. If two things are genuinely running, that is what this file
 exists to say out loud.
 
-**V2 plan 14 — typed IPC and preload contracts.**
+**V2 plan 16 — security, permissions and secrets.**
 
-- **Branch:** `v2/p14-ipc-preload-contracts`
-- **Gate:** `npm run typecheck`, 17 P14/boundary tests, production build, the
-  full suite at 1374 passing and 15 Playwright e2e tests are green
-- **Status:** implementation and inline review complete at `f46f52f`; review
-  remediation added explicit public DTO schemas, sanitized service errors,
-  typed route construction and handled projection refetch failures. P14 is
-  awaiting approval to merge into `master`.
-- **Scope:** namespaced Zod IPC registry, validated main router, minimal
-  `window.bs.v2` preload API and gap-safe projection subscriptions.
-- **Plan:** [`v2/implementation-plans/plans/14-ipc-preload-contracts.md`](v2/implementation-plans/plans/14-ipc-preload-contracts.md)
+- **Branch:** `v2/p16-security-secrets`
+- **Gate:** P16 implementation/review complete; awaiting approval to merge into `master`
+- **Status:** P14 merged into `master` at `a561a95`. P15 backend Tasks 1-5 and
+  Task 6A are committed on paused branch `v2/p15-backend-projections`; owner
+  approved P16-first reorder because Task 6B provider/settings composition
+  requires V2 vault/security ports. P16 Task 1 vault adapter is committed at
+  `d325f92`; Task 2 layered permissions is committed at `86a0e79`; Task 3
+  redaction is committed at `6e13d28`; Task 4 security regression is committed
+  at `2548111`; review remediation completed at `8962fd3`. Typecheck, 21
+  focused tests, production build and the full suite at 1384 passing are green.
+- **Scope:** encrypted vault edge, layered permission profiles, recursive
+  event/log redaction and renderer security regression.
+- **Plan:** [`v2/implementation-plans/plans/16-security-permissions-secrets.md`](v2/implementation-plans/plans/16-security-permissions-secrets.md)
 
 ## Next
 
@@ -35,12 +38,14 @@ after it has been decided.
 
 | # | Work | Prerequisite |
 |---|---|---|
-| 1 | Merge V2 plan 14 into `master` | P14 implementation/review complete; awaiting approval |
-| 2 | V2 plan 15 — renderer UI and Figma binding | Requires P14 merge |
+| 1 | Merge V2 plan 16 into `master` | P16 implementation/review complete |
+| 2 | Resume P15 backend Task 6B + Task 7 | Requires P16 merge |
+| 3 | Resume locked P15 renderer plan | Requires backend prerequisite |
 
 ## Blocked
 
-Nothing.
+- **P15 backend composition:** paused on `v2/p15-backend-projections` until
+  P16 provides vault/security ports; no placeholder or direct legacy handler is allowed.
 
 ## Standing rules
 
