@@ -18,16 +18,15 @@ exists to say out loud.
 **V2 P15 prerequisite — backend projections and APIs.**
 
 - **Branch:** `v2/p15-backend-projections`
-- **Gate:** Task 4 Work projection/command tests, state-machine regressions and
-  `npm run typecheck` pass
+- **Gate:** Task 5 Agents/Settings/Bottom projection tests and `npm run typecheck` pass
 - **Status:** P14 merged into `master` at `a561a95`; typecheck, 17 targeted
   tests, production build, the full suite at 1374 passing and 15 Playwright
   e2e tests are green after merge. Backend-first direction is approved; the
   prerequisite spec and plan are approved; Task 1 projection DTO/schema/read
   ports are committed at `855a692` with focused tests, boundary guard and
   typecheck green. Task 2 scoped reads/idempotency is committed at `fecc97b`;
-  Task 3 Home/Project projections are committed at `5b7c384`; Task 4 Work
-  projections/commands are in progress. The approved UX source is
+  Tasks 3-4 are committed at `5b7c384` and `22d8352`; Task 5
+  Agents/Settings/Bottom projections is in progress. The approved UX source is
   the local vendored Figma Make export, so no live Figma connector is required.
 - **Scope:** owner-scoped projection DTOs/services, real IPC/preload routes,
   idempotent lifecycle commands and bottom-panel backend projections required
@@ -42,7 +41,7 @@ after it has been decided.
 
 | # | Work | Prerequisite |
 |---|---|---|
-| 1 | P15 backend prerequisite Task 5 — Agents/Settings/Bottom | Requires Task 4 commit |
+| 1 | P15 backend prerequisite Task 6 — IPC composition | Requires Task 5 commit |
 | 2 | Resume locked P15 renderer plan | Requires backend prerequisite; uses vendored prototype |
 
 ## Blocked
