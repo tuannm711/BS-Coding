@@ -70,6 +70,7 @@ test('context footer shows real token usage, persists across reload, resets on n
   ])
   const userData = mkdtempSync(path.join(tmpdir(), 'bs-ud-'))
   const project = mkdtempSync(path.join(tmpdir(), 'bs-e2e-'))
+  let app: Awaited<ReturnType<typeof electron.launch>> | undefined
   try {
     seedUserData(userData, project, {
       provider: { mock: { apiKey: 'test-key', baseUrl: `http://127.0.0.1:${port}`, models: ['mock-model'] } },
@@ -78,7 +79,7 @@ test('context footer shows real token usage, persists across reload, resets on n
       compaction: { auto: true, buffer: 20000, keepTokens: 8000, tailTurns: 2, toolOutputMaxChars: 2000, prune: true }
     })
 
-    let app = await electron.launch({
+    app = await electron.launch({
       args: ['.'],
       env: { ...process.env as Record<string, string>, BS_USER_DATA: userData }
     })
@@ -100,6 +101,7 @@ test('context footer shows real token usage, persists across reload, resets on n
     await expect(footer).not.toHaveClass(/warn|danger/)
 
     await app.close()
+    app = undefined
 
     // Relaunch against the same user data / session: footer must read the
     // persisted ChatMessage.tokens, not reset to the placeholder.
@@ -112,15 +114,16 @@ test('context footer shows real token usage, persists across reload, resets on n
     await expect(window.locator('.context-footer')).toContainText('4,231')
 
     // New session -> back to placeholder.
-    await window.locator('.session-trigger').click()
-    await window.locator('.session-new').click()
+    await window.locator('.project-sessions').getByRole('button', { name: 'New session' }).click()
     await expect(window.locator('.context-footer')).toContainText('—')
 
     await app.close()
+    app = undefined
   } finally {
+    await app?.close()
+    await new Promise<void>(resolve => server.close(() => resolve()))
     cleanupDir(userData)
     cleanupDir(project)
-    server.close()
   }
 })
 
