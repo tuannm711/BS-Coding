@@ -15,10 +15,10 @@ Last updated: 2026-08-30
 Exactly one entry. If two things are genuinely running, that is what this file
 exists to say out loud.
 
-**V2 P18 V1 data migration and cutover preparation — Task 1 implementation.**
+**V2 P18 V1 data migration and cutover preparation — Task 2 implementation.**
 
 - **Branch:** `v2/p18-v1-migration-cutover`
-- **Gate:** Task 1 TDD — backup manifest and migration dry-run
+- **Gate:** Task 2 TDD — idempotent project/provider/agent metadata imports
 - **Status:** P15 backend prerequisite merged locally into `master` at `c44cddc`
   and post-merge verified: typecheck pass, full Vitest 233 files / 1423 tests,
   production build pass and Playwright 16/16 pass. Continuous V2 execution rules
@@ -44,8 +44,9 @@ exists to say out loud.
   amendment now connects runtime finish usage → canonical USAGE → atomic ledger
   → budget admission → scoped IPC → Work/Providers UI. P17 merged at `3cbb772`
   and post-merge passed typecheck, 243 files / 1441 Vitest, build and 18/18 E2E.
-- **Scope:** Create a timestamped, SHA-256 verified backup and dry-run report
-  before any V1 import mutates V2 persistence.
+  P18 Task 1 backup manifest is committed at `6b4afbe`.
+- **Scope:** Import V1 project/provider-account/agent metadata with stable source
+  keys, immutable AgentVersion snapshots and vault references only.
 - **Plan:** [`v2/implementation-plans/plans/18-v1-migration-cutover.md`](v2/implementation-plans/plans/18-v1-migration-cutover.md)
 
 ## Next
@@ -55,8 +56,8 @@ after it has been decided.
 
 | # | Work | Prerequisite |
 |---|---|---|
-| 1 | P18 Task 1 — backup manifest and dry-run | P17 post-merge verified |
-| 2 | P18 Task 2 — core V1 metadata imports | Requires Task 1 commit |
+| 1 | P18 Task 2 — core V1 metadata imports | Task 1 committed at `6b4afbe` |
+| 2 | P18 Task 3 — canonical session/transcript conversion | Requires Task 2 commit |
 
 ## Blocked
 
