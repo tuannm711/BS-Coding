@@ -688,6 +688,7 @@ function createWindow(): void {
     ...getWindowChromeOptions(process.platform),
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.js'),
+      additionalArguments: [`--bs-v2-enabled=${process.env.BS_V2 === '1' ? '1' : '0'}`],
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false
@@ -1014,7 +1015,12 @@ app.whenReady().then(async () => {
           getGitStatus: projectPath => mainApp.git.get(projectPath)
         })
         const providers = new V1ProviderAccountAdapter({
-          listConnections: () => mainApp.providerManager.list(),
+          listConnections: () => {
+            const names = new Map(mainApp.providerManager.listCapabilities()
+              .map(provider => [provider.id, provider.displayName]))
+            return mainApp.providerManager.list().map(connection => ({ ...connection,
+              providerName: names.get(connection.providerId) ?? connection.providerId }))
+          },
           connectMethod: request => mainApp.providerManager.connectMethod(request),
           refreshAccount: (providerId, accountId) => mainApp.providerManager.refreshAccount(providerId, accountId),
           setEnabled: (accountId, enabled) => mainApp.providerManager.setEnabled(accountId, enabled)
@@ -1032,6 +1038,7 @@ app.whenReady().then(async () => {
           getWorkspace: id => workspaceGit.getWorkspace(id),
           getGitStatus: id => workspaceGit.getGitStatus(id),
           listProviderAccounts: () => providers.listAccounts(),
+          listRuntimeTargets: () => providers.listRuntimeTargets(),
           listSkillBindings: async () => ({ status: 'EMPTY' as const }),
           listMcpServers: async () => {
             const servers = mainApp.bsAgent.getMcpStatus().map(server => ({ id: server.name,

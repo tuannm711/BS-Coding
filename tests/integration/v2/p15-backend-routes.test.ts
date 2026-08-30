@@ -62,7 +62,11 @@ it('switches runtime through durable RuntimeEpoch state', async () => {
       now: () => '2026-08-30T01:00:00.000Z', nextId: () => ids.shift()!, support: {
         getWorkspace: async () => ({ status: 'EMPTY' }), getGitStatus: async () => ({ status: 'EMPTY' }),
         listProviderAccounts: async () => [], listSkillBindings: async () => ({ status: 'EMPTY' }),
-        listMcpServers: async () => ({ status: 'EMPTY' }), listDiagnostics: async () => ({ status: 'EMPTY' })
+        listMcpServers: async () => ({ status: 'EMPTY' }), listDiagnostics: async () => ({ status: 'EMPTY' }),
+        listRuntimeTargets: async () => [{ id: 'openai/new/model', providerName: 'OpenAI',
+          accountLabel: 'New', modelName: 'Model', accountStatus: 'HEALTHY', selectable: true,
+          target: { providerId: 'openai', accountId: 'new', modelId: 'model',
+            capabilities: { structuredTools: 'UNKNOWN' } } }]
       } } as never)
     const createdAt = '2026-08-30T00:00:00.000Z'
     await repositories.projects.save({ id: 'p1', name: 'PMS', repoPath: 'C:/PMS',
@@ -85,15 +89,26 @@ it('switches runtime through durable RuntimeEpoch state', async () => {
       status: 'ACTIVE', providerId: 'openai', accountId: 'old', modelId: 'old', reason: 'INITIAL',
       startedAt: createdAt } satisfies PersistedRuntimeEpoch)
 
+    await expect(services.handlers['workSession.runtimeTargets']({ projectId: 'p1',
+      workSessionId: 'ws1' })).resolves.toMatchObject([{ target: { modelId: 'model' } }])
+    await expect(services.handlers['workSession.runtimeTargets']({ projectId: 'foreign',
+      workSessionId: 'ws1' })).rejects.toMatchObject({ code: 'PROJECTION_NOT_FOUND' })
+
+    await expect(services.handlers['workSession.switchRuntime']({ requestId: 'request-rogue', input: {
+      projectId: 'p1', workSessionId: 'ws1', target: { providerId: 'rogue', accountId: 'rogue',
+        modelId: 'rogue', capabilities: { structuredTools: 'VERIFIED' } }, reason: 'tampered'
+    } })).rejects.toThrow('runtime target is unavailable')
+    expect(await repositories.runtimeEpochs.get('epoch-old')).toMatchObject({ status: 'ACTIVE' })
+
     await services.handlers['workSession.switchRuntime']({ requestId: 'request-switch', input: {
       projectId: 'p1', workSessionId: 'ws1', target: { providerId: 'openai', accountId: 'new',
-        modelId: 'new', capabilities: { structuredTools: 'VERIFIED' } }, reason: 'fallback' } })
+        modelId: 'model', capabilities: { structuredTools: 'UNKNOWN' } }, reason: 'fallback' } })
 
     expect(await repositories.runtimeEpochs.get('epoch-old')).toMatchObject({
       status: 'CLOSED', reason: 'INITIAL', endReason: 'fallback',
       endedAt: '2026-08-30T01:00:00.000Z' })
     expect(await repositories.runtimeEpochs.get('epoch-new')).toMatchObject({
-      status: 'ACTIVE', accountId: 'new', modelId: 'new' })
+      status: 'ACTIVE', accountId: 'new', modelId: 'model' })
     expect(publishWorkflow).toHaveBeenLastCalledWith(expect.objectContaining({ id: 'wf1' }), 2)
 
     await repositories.reviews.save({ id: 'review-1', workflowRunId: 'wf1',

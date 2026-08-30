@@ -26,6 +26,7 @@ export interface WorkSessionCreateInput {
 }
 
 export interface BsV2Api {
+  readonly enabled: boolean
   workSession: {
     create(input: WorkSessionCreateInput): Promise<WorkSession>
     pause(id: string): Promise<WorkSession>

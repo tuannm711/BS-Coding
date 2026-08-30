@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3'
-import { mkdirSync, readFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import type { Project, WorkflowRun, WorkSession } from '../../src/shared/v2/contracts/domain'
 
@@ -15,6 +15,14 @@ function migrations(): Array<{ version: number; sql: string }> {
 export function seedV2Backend(userData: string, projectPath: string) {
   const stateDir = path.join(userData, 'v2')
   mkdirSync(stateDir, { recursive: true })
+  const connectionsDir = path.join(userData, 'connections')
+  mkdirSync(connectionsDir, { recursive: true })
+  writeFileSync(path.join(connectionsDir, 'accounts.json'), JSON.stringify({ version: 1,
+    connections: [{ providerId: 'openai', activeAccountId: 'account-ui', accounts: [{
+      id: 'account-ui', providerId: 'openai', label: 'UI test account', authMode: 'api-key',
+      status: 'active', createdAt: 1, lastUsedAt: 1, models: ['model-ui'],
+      modelCatalog: [{ id: 'model-ui', name: 'UI Model', capabilities: { supportsTools: true } }]
+    }] }] }, null, 2))
   const db = new Database(path.join(stateDir, 'state.sqlite'))
   const ids = { projectId: 'project-pms', workSessionId: 'work-p15', workflowRunId: 'workflow-p15',
     taskId: 'task-implementation', taskRunId: 'task-run-1', agentDefinitionId: 'agent-worker',

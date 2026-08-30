@@ -15,6 +15,12 @@ it('has one registry channel and schema for every P15 backend public method', ()
   expect(P15PublicIpcSchemas['git.status'].response.safeParse({
     project: { id: 'p1' }, revision: 1
   }).success).toBe(false)
+  expect(P15PublicIpcSchemas['workSession.runtimeTargets'].response.safeParse([{
+    id: 'openai/account/model', providerName: 'OpenAI', accountLabel: 'Work', modelName: 'Model',
+    accountStatus: 'HEALTHY', selectable: true,
+    target: { providerId: 'openai', accountId: 'account', modelId: 'model',
+      capabilities: { structuredTools: 'UNKNOWN' } }, rawSecret: 'forbidden'
+  }]).success).toBe(false)
 })
 
 it('exposes every invoke contract as a validated named preload method', async () => {

@@ -3,7 +3,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync, mkdirSync } from 'nod
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 
-test('app launches with the V2 IPC bootstrap and keeps the V1 shell available', async () => {
+test('V2 bootstrap selects the locked V2 shell and real backend API', async () => {
   const userData = mkdtempSync(path.join(tmpdir(), 'bs-ud-launch-'))
   let app: Awaited<ReturnType<typeof electron.launch>> | undefined
   try {
@@ -13,7 +13,14 @@ test('app launches with the V2 IPC bootstrap and keeps the V1 shell available', 
     })
     const window = await app.firstWindow()
     await expect(window).toHaveTitle(/BS Coding/)
-    await expect(window.locator('.sidebar')).toBeVisible()
+    await expect(window.getByTestId('v2-app-shell')).toBeVisible()
+    await expect(window.getByTestId('v2-titlebar')).toBeVisible()
+    await expect(window.locator('.sidebar')).toHaveCount(0)
+    await expect(window.locator('.v2-primary-nav button')).toHaveCount(5)
+    await expect(window.getByRole('navigation', { name: 'Primary navigation' })
+      .getByRole('button', { name: 'States' })).toHaveCount(0)
+    await window.getByRole('button', { name: 'Expand navigation' }).click()
+    await expect(window.getByRole('button', { name: 'Home' })).toContainText('Home')
     const v2Surface = await window.evaluate(() => {
       const browser = globalThis as unknown as { bs: { v2: Record<string, unknown> & {
         'project.list'(request: Record<string, never>): Promise<unknown>
@@ -34,16 +41,14 @@ test('app launches with the V2 IPC bootstrap and keeps the V1 shell available', 
       }
     })
     expect(v2Surface.namespaces).toEqual(expect.arrayContaining([
-      'provider', 'workSession', 'workflow', 'project.list', 'settings.get', 'remote.status'
+      'enabled', 'provider', 'workSession', 'workflow', 'project.list',
+      'workSession.runtimeTargets', 'settings.get', 'remote.status'
     ]))
     expect(v2Surface.serialized).not.toMatch(/secret|token|filesystem|fshandle|process|ipcrenderer/i)
     if (!projectResult.ok) throw new Error(JSON.stringify(projectResult))
     expect(projectResult).toMatchObject({ ok: true, value: { projects: [] } })
     expect(JSON.stringify(projectResult)).not.toMatch(/secret|token|filesystem|fshandle|process|ipcrenderer/i)
-    // Version loads asynchronously via IPC; auto-wait for it to appear.
-    const version = window.locator('.status-bar .sb-mono').last()
-    await expect(version).toHaveText(/^v\d+\.\d+\.\d+$/)
-    expect(await version.textContent()).not.toBe('v0.1.0')
+    expect((v2Surface as { namespaces: string[] }).namespaces).toContain('enabled')
   } finally {
     await app?.close()
     rmSync(userData, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })

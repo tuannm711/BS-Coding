@@ -9,3 +9,14 @@ export const RuntimeTargetSchema = z.object({
   modelId: z.string().min(1),
   capabilities: z.object({ structuredTools: CapabilityHealthSchema })
 }).strip()
+
+export const RuntimeTargetCandidateSummarySchema = z.object({
+  id: z.string().min(1),
+  providerName: z.string().min(1),
+  accountLabel: z.string().min(1),
+  modelName: z.string().min(1),
+  accountStatus: z.enum(['HEALTHY', 'COOLDOWN', 'EXPIRED', 'ERROR', 'UNKNOWN']),
+  selectable: z.boolean(),
+  unavailableReason: z.string().min(1).optional(),
+  target: RuntimeTargetSchema.strict()
+}).strict()

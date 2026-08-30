@@ -156,7 +156,10 @@ export default function AgentPicker({ agents, value, onChange, disabled = false,
         type="button"
         onClick={() => disabled ? undefined : (open ? close(false) : show())}
         onKeyDown={event => {
-          if (!open && ['ArrowDown', 'ArrowUp', 'Enter', ' '].includes(event.key)) {
+          if (open && event.key === 'Escape') {
+            event.preventDefault()
+            close(true)
+          } else if (!open && ['ArrowDown', 'ArrowUp', 'Enter', ' '].includes(event.key)) {
             event.preventDefault()
             show()
           }

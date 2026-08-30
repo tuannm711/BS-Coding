@@ -1,4 +1,12 @@
-import type { ProviderAccountSummary } from '../../../../shared/v2/contracts/provider'
+import type {
+  ProviderAccountSummary, RuntimeTargetCandidateSummary
+} from '../../../../shared/v2/contracts/provider'
+
+interface LegacyModel {
+  id: string
+  name?: string
+  capabilities?: { supportsTools?: boolean }
+}
 
 interface LegacyAccount {
   id: string
@@ -6,10 +14,14 @@ interface LegacyAccount {
   enabled?: boolean
   status?: string
   keyRef?: string
+  label?: string
+  models?: readonly string[]
+  modelCatalog?: readonly LegacyModel[]
 }
 
 interface LegacyProviderAccountEdge {
-  listConnections(): readonly { providerId: string; accounts: readonly LegacyAccount[] }[]
+  listConnections(): readonly { providerId: string; providerName?: string;
+    accounts: readonly LegacyAccount[] }[]
   connectMethod(input: { providerId: string; methodId: string;
     fields: Readonly<Record<string, string>> }): Promise<unknown>
   refreshAccount(providerId: string, accountId: string): Promise<unknown>
@@ -32,6 +44,30 @@ export class V1ProviderAccountAdapter {
       id: account.id, providerId: account.providerId || connection.providerId,
       enabled: account.enabled ?? account.status !== 'disabled', status: status(account.status)
     })))
+  }
+
+  async listRuntimeTargets(): Promise<RuntimeTargetCandidateSummary[]> {
+    return this.legacy.listConnections().flatMap(connection => connection.accounts.flatMap(account => {
+      const accountStatus = status(account.status)
+      const enabled = account.enabled ?? account.status !== 'disabled'
+      const selectable = enabled && accountStatus === 'HEALTHY'
+      const unavailableReason = !enabled ? 'Account disabled'
+        : accountStatus !== 'HEALTHY' ? `Account status: ${accountStatus}` : undefined
+      const catalog = account.modelCatalog?.length ? account.modelCatalog
+        : (account.models ?? []).map((id): LegacyModel => ({ id, name: id }))
+      return catalog.map(model => ({
+        id: `${connection.providerId}/${account.id}/${model.id}`,
+        providerName: connection.providerName ?? connection.providerId,
+        accountLabel: account.label ?? account.id,
+        modelName: model.name ?? model.id,
+        accountStatus, selectable, ...(unavailableReason ? { unavailableReason } : {}),
+        target: { providerId: connection.providerId, accountId: account.id, modelId: model.id,
+          capabilities: { structuredTools: model.capabilities?.supportsTools === false
+            ? 'UNSUPPORTED' as const : 'UNKNOWN' as const } }
+      }))
+    })).sort((left, right) => left.providerName.localeCompare(right.providerName) ||
+      left.accountLabel.localeCompare(right.accountLabel) || left.modelName.localeCompare(right.modelName) ||
+      left.id.localeCompare(right.id))
   }
 
   async connect(input: { providerId: string; apiKey: string }): Promise<void> {

@@ -15,18 +15,34 @@ Last updated: 2026-08-30
 Exactly one entry. If two things are genuinely running, that is what this file
 exists to say out loud.
 
-**Project workflow rules — V2 priority and problem reporting.**
+**V2 P15 renderer UI — completion and local merge.**
 
-- **Branch:** `codex/v2-priority-problem-report-rules`
-- **Gate:** Implement the owner-approved bounded rules update
-- **Status:** P15 backend prerequisite is merged locally into `master` at
-  `c44cddc` and post-merge verified. The owner approved new standing rules for
-  continuous execution and automatic local merge of detailed V2 plans. The
-  owner additionally clarified that V2 is always preferred, safely replaceable
-  V1 should be removed incrementally, and every blocker report uses a mandatory
-  three-part structure.
-- **Scope:** Update the process and working-style rules in root `AGENTS.md`;
-  preserve explicit approval for plan changes, external push and release.
+- **Branch:** `v2/p15-renderer-ui-figma`
+- **Gate:** Final commit, local merge and post-merge verification
+- **Status:** P15 backend prerequisite merged locally into `master` at `c44cddc`
+  and post-merge verified: typecheck pass, full Vitest 233 files / 1423 tests,
+  production build pass and Playwright 16/16 pass. Continuous V2 execution rules
+  merged into `master` at `98f8a31` and this renderer branch is being synchronized
+  with both merges. The approved UX source is the local vendored
+  Figma Make export under `docs/v2/prototype/figma-make/`; no live URL or
+  connector is required. The owner approved a safe immutable
+  `window.bs.v2.enabled` flag sourced from main/BrowserWindow arguments so the
+  renderer selects V1/V2 synchronously without exposing process or environment.
+  Task 1 shell/navigation/tokens is committed at `c15d574`. Task 2 Home/Project
+  projection screens is committed at `5d68125` with typecheck, 235 files / 1427
+  Vitest, build and 16/16 E2E green. The owner approved a main-resolved
+  `workSession.runtimeTargets` query; its contract/adapter/route amendment passed
+  typecheck, 235 files / 1428 Vitest, build and 16/16 E2E. Task 3 Work Session
+  UI passed typecheck, 236 files / 1429 Vitest, build and Playwright 16/16.
+  Task 4 Agents/Settings passed typecheck, 237 files / 1430 Vitest, build,
+  AgentPicker race regression 3/3 and Playwright 16/16. Task 5 bottom panel and
+  two locked V2 Electron flows passed. Final review remediation added sequencing,
+  stale-panel invalidation, destructive confirmations and focus/form accessibility.
+  Plan completion evidence: typecheck, focused 5 files / 6 tests, full Vitest
+  237 files / 1430 tests, production build and Playwright 18/18 exit 0.
+- **Scope:** Commit the final task, merge P15 locally into `master`, verify the
+  merged result and move to the next dependency-ready detailed plan.
+- **Plan:** [`v2/implementation-plans/plans/15-renderer-ui-figma-binding.md`](v2/implementation-plans/plans/15-renderer-ui-figma-binding.md)
 
 ## Next
 
@@ -35,12 +51,12 @@ after it has been decided.
 
 | # | Work | Prerequisite |
 |---|---|---|
-| 1 | Resume P15 renderer Task 1 on `v2/p15-renderer-ui-figma` | Requires rules update merged locally |
-| 2 | Continue detailed plans through P20 | Follow master plan dependencies |
+| 1 | Merge `v2/p15-renderer-ui-figma` into local `master` | P15 completion gate green |
+| 2 | Continue the next dependency-ready V2 plan | Requires post-merge verification |
 
 ## Blocked
 
-- No technical blocker. P15 renderer resumes after this bounded rules update.
+- No technical blocker.
 
 ## Standing rules
 

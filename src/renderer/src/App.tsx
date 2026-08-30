@@ -19,6 +19,8 @@ import InstallGuideDialog from './components/InstallGuideDialog'
 import UpdateDialog from './components/UpdateDialog'
 import { migrateBrandStorage } from './brand-storage'
 import { projectVisiblePanes, resolveSelectedNativeAgent } from './shared-chat-selection'
+import V2App from './v2/app/V2App'
+import { rendererMode } from './v2/app/navigation'
 
 migrateBrandStorage(window.localStorage)
 
@@ -29,6 +31,10 @@ export interface PaneModel {
 }
 
 export default function App() {
+  return rendererMode(window.bs.v2.enabled) === 'v2' ? <V2App /> : <LegacyApp />
+}
+
+function LegacyApp() {
   const [workspaces, setWorkspaces] = useState<WorkspaceSummary[]>([])
   const [templates, setTemplates] = useState<Template[]>([])
   const [showSettings, setShowSettings] = useState(false)

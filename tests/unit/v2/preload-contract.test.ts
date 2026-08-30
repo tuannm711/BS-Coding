@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   createV2Api,
-  PUBLIC_V2_API_KEYS
+  PUBLIC_V2_API_KEYS,
+  resolveV2Enabled
 } from '../../../src/preload/v2-api'
 
 const workSession = {
@@ -15,6 +16,12 @@ const workflow = {
 }
 
 describe('secure V2 preload API', () => {
+  it('derives one immutable renderer cutover flag from the main bootstrap argument', () => {
+    expect(resolveV2Enabled(['electron', '--bs-v2-enabled=1'])).toBe(true)
+    expect(resolveV2Enabled(['electron', '--bs-v2-enabled=0'])).toBe(false)
+    expect(resolveV2Enabled(['electron'])).toBe(false)
+  })
+
   it('exposes only the approved DTO surface', () => {
     expect(PUBLIC_V2_API_KEYS).toEqual([
       'provider.listAccounts',
