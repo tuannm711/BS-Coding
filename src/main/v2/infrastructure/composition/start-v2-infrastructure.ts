@@ -11,6 +11,8 @@ import { SqliteUnitOfWork } from '../persistence/sqlite-unit-of-work'
 import { createProjectionPublisher } from '../../ipc/projection-publisher'
 import type { WorkflowRun } from '../../../../shared/v2/contracts/domain'
 import type { ProjectionEvent } from '../../../../shared/v2/contracts/ipc'
+import { createBudgetPolicyRepository, createUsageRepository } from '../persistence/usage-repository'
+import { UsageLedger } from '../../application/observability/usage-ledger'
 
 export async function startV2Infrastructure(input: {
   databasePath: string
@@ -24,9 +26,11 @@ export async function startV2Infrastructure(input: {
     const repositories = createRepositories(db)
     const events = new SqliteEventStore(db)
     const unitOfWork = new SqliteUnitOfWork(db)
+    const usage = new UsageLedger(createUsageRepository(db))
+    const budgets = createBudgetPolicyRepository(db)
     const support = typeof input.support === 'function' ? input.support({ repositories }) : input.support
     const publisher = input.sendProjection ? createProjectionPublisher({ send: input.sendProjection }) : undefined
-    const services = createV2Services({ repositories, events, support,
+    const services = createV2Services({ repositories, events, support, usage, budgets,
       transaction: operation => unitOfWork.run(operation),
       publishWorkflow: publisher ? (workflow, revision) => { publisher.publish(revision, workflow) } : undefined })
     const unregister = registerV2Ipc({ registrar: input.registrar, routes: createV2Routes(services) })

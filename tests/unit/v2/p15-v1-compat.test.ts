@@ -79,3 +79,14 @@ it('resolves secret-free runtime candidates without promoting declared tool supp
       capabilities: { structuredTools: 'UNKNOWN' } } }])
   expect(JSON.stringify(candidates)).not.toContain('secret-ref')
 })
+
+it('maps provider quota snapshots without exposing raw usage/account objects', async () => {
+  const adapter = new V1ProviderAccountAdapter({ listConnections: () => [{ providerId: 'openai',
+    accounts: [{ id: 'a1', providerId: 'openai', status: 'active', usage: {
+      status: 'ok', primaryUsedPercent: 25, resetAt: Date.parse('2026-09-01T00:00:00.000Z'),
+      refreshedAt: Date.parse('2026-08-31T00:00:00.000Z'), rawProvider: 'forbidden'
+    } }] }], connectMethod: async () => {}, refreshAccount: async () => {}, setEnabled: () => {} })
+  expect(await adapter.listQuotaSnapshots()).toEqual([{ providerId: 'openai', accountId: 'a1',
+    status: 'AVAILABLE', remainingPercent: 75, resetAt: '2026-09-01T00:00:00.000Z',
+    capturedAt: '2026-08-31T00:00:00.000Z' }])
+})

@@ -8,7 +8,8 @@ type LegacyPart =
   | { kind: 'reasoning'; text?: string; thoughtSignature?: string }
   | { kind: 'tool-call'; toolCallId?: string; toolName?: string;
       toolInput?: Record<string, unknown>; thoughtSignature?: string }
-  | { kind: 'finish'; finishReason?: string }
+  | { kind: 'finish'; finishReason?: string; tokens?: { input: number; output: number;
+      cacheRead?: number; cacheWrite?: number }; cost?: number }
   | { kind: 'error'; error?: string }
 
 interface LegacyClient {
@@ -39,7 +40,10 @@ export class V1LlmRuntimeAdapter implements RuntimePort {
         callId: part.toolCallId ?? '', toolName: part.toolName ?? '',
         arguments: structuredClone(part.toolInput ?? {}), origin: 'model', requestedAt: this.clock.now()
       } }
-      else if (part.kind === 'finish') yield { kind: 'finish', reason: part.finishReason ?? 'unknown' }
+      else if (part.kind === 'finish') yield { kind: 'finish', reason: part.finishReason ?? 'unknown',
+        ...(part.tokens ? { usage: { inputTokens: part.tokens.input, outputTokens: part.tokens.output,
+          cacheReadTokens: part.tokens.cacheRead, cacheWriteTokens: part.tokens.cacheWrite,
+          ...(part.cost != null ? { costUsd: part.cost } : {}) } } : {}) }
       else yield { kind: 'error', error: {
         code: 'LEGACY_RUNTIME_ERROR', message: part.error ?? 'unknown legacy runtime error'
       } }

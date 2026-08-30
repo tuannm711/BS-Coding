@@ -239,6 +239,7 @@ button.v2-work-row:hover, button.v2-project-row:hover, button.v2-attention-row:h
 .v2-work-title-line > span:first-child { color: var(--v2-color-faint); }
 .v2-work-title-line h1 { margin: 0; font-family: 'Bricolage Grotesque Variable', sans-serif; font-size: 20px; }
 .v2-work-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+.v2-usage-summary { display: flex; align-items: center; gap: 7px; padding: 0 8px; color: var(--v2-color-dim); font-size: 10px; font-variant-numeric: tabular-nums; }
 .v2-work-actions select { max-width: 250px; height: 36px; border: 1px solid var(--v2-color-line); border-radius: var(--v2-radius-sm); color: var(--v2-color-fore); background: var(--v2-color-elevated); padding: 0 8px; }
 .v2-btn { display: inline-flex; min-height: 36px; align-items: center; justify-content: center; gap: 6px; padding: 0 10px; border: 1px solid var(--v2-color-line); border-radius: var(--v2-radius-sm); color: var(--v2-color-dim); background: transparent; cursor: pointer; }
 .v2-btn:hover:not(:disabled) { color: var(--v2-color-fore); background: var(--v2-color-hover); }

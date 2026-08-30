@@ -13,6 +13,17 @@ describe('AgentRunner', () => {
     expect(result).not.toHaveProperty('workflowStatus')
   })
 
+  it('preserves runtime token usage and unknown cost on finish', async () => {
+    const result = await new AgentRunner().run({ maxSteps: 1, nextStep: async () => [{
+      kind: 'finish', reason: 'stop', usage: { inputTokens: 10, outputTokens: 2,
+        cacheReadTokens: 3 }
+    }], executeTool: async () => ({}) })
+    expect(result).toMatchObject({ status: 'SUCCEEDED', usage: {
+      inputTokens: 10, outputTokens: 2, cacheReadTokens: 3
+    } })
+    expect(result).not.toHaveProperty('usage.costUsd')
+  })
+
   it('executes structured calls at step boundaries then continues', async () => {
     const calls: string[] = []
     const runner = new AgentRunner()
@@ -60,10 +71,16 @@ describe('AgentRunner', () => {
 describe('AgentRunService', () => {
   it('persists running and terminal AgentRun status only', async () => {
     const statuses: string[] = []
+    const usage: unknown[] = []
     const service = createAgentRunService({ saveStatus: async (_id, status) => { statuses.push(status) },
-      runner: new AgentRunner() })
+      runner: new AgentRunner(), recordUsage: async value => { usage.push(value) } })
     await service.runAssignment({ agentRunId: 'a', maxSteps: 1,
-      nextStep: async () => [{ kind: 'finish', reason: 'stop' }], executeTool: async () => ({}) })
+      usageContext: { projectId: 'p', workSessionId: 'w', workflowRunId: 'wf', taskRunId: 'tr',
+        providerId: 'openai', accountId: 'acc', modelId: 'm', correlationId: 'corr' },
+      nextStep: async () => [{ kind: 'finish', reason: 'stop',
+        usage: { inputTokens: 4, outputTokens: 1 } }], executeTool: async () => ({}) })
     expect(statuses).toEqual(['RUNNING', 'SUCCEEDED'])
+    expect(usage).toEqual([expect.objectContaining({ agentRunId: 'a', inputTokens: 4 })])
+    expect(usage[0]).not.toHaveProperty('costUsd')
   })
 })

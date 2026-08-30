@@ -1,29 +1,20 @@
+import type { BudgetMetric, BudgetPolicy, BudgetUsage } from '../../../../shared/v2/contracts/usage'
+import { evaluateBudget } from '../observability/budget-evaluator'
+
 export type AdmissionDecision =
   | { decision: 'ALLOW' }
-  | { decision: 'ASK'; reason: 'PROJECTED_BUDGET'; projectedSpend: number }
-  | { decision: 'BLOCK'; reason: 'CONCURRENCY_LIMIT' | 'HARD_BUDGET' }
+  | { decision: 'ASK'; reason: 'PROJECTED_BUDGET'; metric: BudgetMetric; current: number; limit: number;
+    unknown?: boolean }
+  | { decision: 'BLOCK'; reason: 'CONCURRENCY_LIMIT' | 'HARD_BUDGET'; metric: BudgetMetric;
+    current: number; limit: number }
 
-export function canDispatch(input: {
-  maxConcurrentAgents?: number
-  activeAgents: number
-  hardBudget?: number
-  warningBudget?: number
-  spent: number
-  projectedCost?: number
-}): AdmissionDecision {
-  if (input.maxConcurrentAgents != null &&
-    (!Number.isInteger(input.maxConcurrentAgents) || input.maxConcurrentAgents <= 0)) {
-    throw new RangeError('maxConcurrentAgents must be a positive integer')
-  }
-  if (input.maxConcurrentAgents != null && input.activeAgents >= input.maxConcurrentAgents) {
-    return { decision: 'BLOCK', reason: 'CONCURRENCY_LIMIT' }
-  }
-  if (input.hardBudget != null && input.spent >= input.hardBudget) {
-    return { decision: 'BLOCK', reason: 'HARD_BUDGET' }
-  }
-  const projectedSpend = input.spent + (input.projectedCost ?? 0)
-  if (input.warningBudget != null && projectedSpend >= input.warningBudget) {
-    return { decision: 'ASK', reason: 'PROJECTED_BUDGET', projectedSpend }
-  }
-  return { decision: 'ALLOW' }
+export function canDispatch(input: { policy: BudgetPolicy; usage: BudgetUsage }): AdmissionDecision {
+  const result = evaluateBudget(input.policy, input.usage)
+  if (result.decision === 'OK') return { decision: 'ALLOW' }
+  if (result.decision === 'SOFT_WARNING') return { decision: 'ASK', reason: 'PROJECTED_BUDGET',
+    metric: result.metric, current: result.current, limit: result.limit,
+    ...(result.unknown ? { unknown: true } : {}) }
+  return { decision: 'BLOCK',
+    reason: result.metric === 'concurrentAgents' ? 'CONCURRENCY_LIMIT' : 'HARD_BUDGET',
+    metric: result.metric, current: result.current, limit: result.limit }
 }

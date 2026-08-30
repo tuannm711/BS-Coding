@@ -63,6 +63,7 @@ it('switches runtime through durable RuntimeEpoch state', async () => {
         getWorkspace: async () => ({ status: 'EMPTY' }), getGitStatus: async () => ({ status: 'EMPTY' }),
         listProviderAccounts: async () => [], listSkillBindings: async () => ({ status: 'EMPTY' }),
         listMcpServers: async () => ({ status: 'EMPTY' }), listDiagnostics: async () => ({ status: 'EMPTY' }),
+        listTerminals: async () => [], listTests: async () => [], listOutput: async () => [],
         listRuntimeTargets: async () => [{ id: 'openai/new/model', providerName: 'OpenAI',
           accountLabel: 'New', modelName: 'Model', accountStatus: 'HEALTHY', selectable: true,
           target: { providerId: 'openai', accountId: 'new', modelId: 'model',
@@ -110,6 +111,10 @@ it('switches runtime through durable RuntimeEpoch state', async () => {
     expect(await repositories.runtimeEpochs.get('epoch-new')).toMatchObject({
       status: 'ACTIVE', accountId: 'new', modelId: 'model' })
     expect(publishWorkflow).toHaveBeenLastCalledWith(expect.objectContaining({ id: 'wf1' }), 2)
+    await expect(services.handlers['workflow.bottomPanel']({ projectId: 'p1', workSessionId: 'ws1',
+      workflowRunId: 'wf1', limit: 10 })).resolves.toMatchObject({ logs: { status: 'AVAILABLE',
+      value: [expect.objectContaining({ message: expect.stringContaining('RUNTIME_EPOCH_CLOSED') }),
+        expect.objectContaining({ message: expect.stringContaining('RUNTIME_EPOCH_STARTED') })] } })
 
     await repositories.reviews.save({ id: 'review-1', workflowRunId: 'wf1',
       reviewerAgentVersionId: 'av1', scope: ['Task 7'], decision: 'FAIL',

@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { createAssignmentService } from '../../../src/main/v2/application/agent/assignment-service'
 
 describe('assignment and dispatch', () => {
+  const budget = { policy: {}, usage: { costUsd: 0, costKnown: false,
+    inputTokens: 0, requests: 0, concurrentAgents: 0, elapsedMs: 0 } }
   it('persists an auditable assignment before dispatch with self-contained envelope', async () => {
     const order: string[] = []
     const saved: unknown[] = []
@@ -17,7 +19,7 @@ describe('assignment and dispatch', () => {
       workspace: { path: 'C:/worktree', mode: 'ISOLATED_WRITE' as const },
       reportingContract: 'Return summary and commit' }
     const assignment = await service.assignAndDispatch({ taskRunId: 'tr1',
-      agentVersionId: 'av1', envelope })
+      agentVersionId: 'av1', envelope, budget })
     expect(order).toEqual(['save', 'dispatch'])
     expect(saved).toEqual([assignment])
     expect(dispatched[0]).toMatchObject({ assignment, agentVersion: { id: 'av1', revision: 3 }, envelope })
@@ -35,7 +37,20 @@ describe('assignment and dispatch', () => {
       dispatch: async () => { dispatched = true } })
     await expect(service.assignAndDispatch({ taskRunId: 'tr', agentVersionId: 'av', envelope: {
       objective: 'x', scope: [], acceptanceCriteria: [], dependencies: [], artifactIds: [],
-      workspace: { path: 'p', mode: 'READ_ONLY' }, reportingContract: 'report' } })).rejects.toThrow('db down')
+      workspace: { path: 'p', mode: 'READ_ONLY' }, reportingContract: 'report' }, budget })).rejects.toThrow('db down')
     expect(dispatched).toBe(false)
+  })
+
+  it('does not persist or dispatch when explicit budget admission blocks', async () => {
+    let sideEffects = 0
+    const service = createAssignmentService({ nextId: () => 'a', now: () => 'now',
+      loadAgentVersion: async () => { sideEffects += 1; return { id: 'av', revision: 1 } },
+      save: async () => { sideEffects += 1 }, dispatch: async () => { sideEffects += 1 } })
+    await expect(service.assignAndDispatch({ taskRunId: 'tr', agentVersionId: 'av', envelope: {
+      objective: 'x', scope: [], acceptanceCriteria: [], dependencies: [], artifactIds: [],
+      workspace: { path: 'p', mode: 'READ_ONLY' }, reportingContract: 'report' },
+      budget: { policy: { maxRequests: 1 }, usage: { ...budget.usage, requests: 1 } } }))
+      .rejects.toMatchObject({ code: 'DISPATCH_BLOCKED', metric: 'requests' })
+    expect(sideEffects).toBe(0)
   })
 })

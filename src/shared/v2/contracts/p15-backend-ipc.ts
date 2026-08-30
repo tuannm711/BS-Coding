@@ -6,6 +6,7 @@ const names = [
   'workflow.approvePlan','workflow.createRework','workflow.projection','agent.list',
   'agent.listByProject','agent.get','agent.create','agent.update','agent.remove',
   'provider.listAccounts','provider.connect','provider.refresh','provider.setEnabled','provider.probe',
+  'provider.quota','usage.get','usage.updateBudget',
   'workspace.get','git.status','skill.list','mcp.listServers','settings.get','settings.update',
   'diagnostics.list','remote.status'
 ] as const

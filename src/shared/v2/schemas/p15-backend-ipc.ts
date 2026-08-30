@@ -9,6 +9,7 @@ import {
 import { ProviderAccountSummarySchema, WorkflowProjectionEventSchema, WorkflowRunSchema,
   WorkSessionSchema } from './ipc'
 import { RuntimeTargetCandidateSummarySchema } from './provider'
+import { BudgetPolicySchema, QuotaSnapshotSchema, UsageOverviewSchema } from './usage'
 
 const id = z.string().min(1)
 const empty = z.object({}).strict()
@@ -57,6 +58,9 @@ const entries = {
   'provider.refresh': { request: envelope(scope.extend({ providerId: id })), response: ack },
   'provider.setEnabled': { request: envelope(scope.extend({ accountId: id, enabled: z.boolean() })), response: ack },
   'provider.probe': { request: envelope(scope.extend({ providerId: id })), response: ack },
+  'provider.quota': { request: empty, response: z.array(QuotaSnapshotSchema) },
+  'usage.get': { request: byWork, response: UsageOverviewSchema },
+  'usage.updateBudget': { request: envelope(byWork.extend({ policy: BudgetPolicySchema })), response: ack },
   'workspace.get': { request: byProject, response: ProjectWorkspaceProjectionSchema },
   'git.status': { request: byProject, response: GitSummarySchema },
   'skill.list': { request: byProject, response: z.array(SkillBindingSummarySchema) },

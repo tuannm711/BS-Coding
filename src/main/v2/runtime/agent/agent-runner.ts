@@ -22,7 +22,10 @@ export class AgentRunner implements AgentRunExecutor {
           toolResults.push(await input.executeTool(part.call, input.signal))
         }
         if (calls.length === 0 && parts.some(part => part.kind === 'finish')) {
-          return { status: 'SUCCEEDED', steps: step + 1 }
+          const finish = parts.find((part): part is Extract<RuntimeStreamPart, { kind: 'finish' }> =>
+            part.kind === 'finish')
+          return { status: 'SUCCEEDED', steps: step + 1,
+            ...(finish?.usage ? { usage: structuredClone(finish.usage) } : {}) }
         }
       } catch (error) {
         if (input.signal?.aborted) return { status: 'CANCELLED', steps: step + 1 }

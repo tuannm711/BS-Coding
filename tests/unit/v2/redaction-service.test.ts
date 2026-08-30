@@ -3,10 +3,11 @@ import { redactObject } from '../../../src/main/v2/application/security/redactio
 
 it('redacts nested secret keys, bearer values and known secret values without mutation', () => {
   const input = { nested: { accessToken: 'abc' }, safe: 'ok',
-    header: 'Bearer bearer-token', text: 'prefix known-secret suffix', list: ['env-secret'] }
+    header: 'Bearer bearer-token', text: 'prefix known-secret suffix', assignment: 'apiKey=secret-value',
+    list: ['env-secret'] }
   expect(redactObject(input, { knownValues: ['known-secret', 'env-secret'] })).toEqual({
     nested: { accessToken: '[REDACTED]' }, safe: 'ok', header: '[REDACTED]',
-    text: 'prefix [REDACTED] suffix', list: ['[REDACTED]']
+    text: 'prefix [REDACTED] suffix', assignment: '[REDACTED]', list: ['[REDACTED]']
   })
   expect(input.nested.accessToken).toBe('abc')
 })
