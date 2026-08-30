@@ -15,10 +15,10 @@ Last updated: 2026-08-30
 Exactly one entry. If two things are genuinely running, that is what this file
 exists to say out loud.
 
-**V2 P17 observability, usage and budget — Task 4 implementation.**
+**V2 P17 observability, usage and budget — integration amendment decision.**
 
 - **Branch:** `v2/p17-observability-usage-budget`
-- **Gate:** Task 4 TDD — redacted correlated diagnostics/log projections
+- **Gate:** Owner decision on composing ledger/budget/diagnostics into runtime, admission and UI
 - **Status:** P15 backend prerequisite merged locally into `master` at `c44cddc`
   and post-merge verified: typecheck pass, full Vitest 233 files / 1423 tests,
   production build pass and Playwright 16/16 pass. Continuous V2 execution rules
@@ -36,11 +36,13 @@ exists to say out loud.
   UI passed typecheck, 236 files / 1429 Vitest, build and Playwright 16/16.
   P15 renderer merged locally into `master` at `c4adc62` and post-merge passed
   typecheck, 237 files / 1430 Vitest, production build and Playwright 18/18.
-  P17 dependencies P03-P05, P10 and P16 are complete. Task 1 usage/budget
-  contracts is committed at `46e1378`. Task 2 usage ledger/migration passed
-  typecheck, idempotency, aggregation, migration and boundary tests.
-- **Scope:** Convert canonical lifecycle/tool/task/gate events into timestamped,
-  correlated and redacted diagnostic/log DTOs for renderer projections.
+  P17 Task 1 is committed at `46e1378`, Task 2 at `b9e71d7`, and Task 3 at
+  `6d757bc`. Task 4 diagnostics/redaction/bottom-log integration is green.
+  Completion review found the plan's minimal tasks do not wire canonical USAGE
+  events into the ledger, do not call budget admission from real dispatch, and
+  do not expose usage/budget projections to Work/Providers UI.
+- **Scope:** Decide whether to add a P17 composition amendment, accept a partial
+  projector-only integration, or defer the missing acceptance with explicit debt.
 - **Plan:** [`v2/implementation-plans/plans/17-observability-usage-budget.md`](v2/implementation-plans/plans/17-observability-usage-budget.md)
 
 ## Next
@@ -50,12 +52,13 @@ after it has been decided.
 
 | # | Work | Prerequisite |
 |---|---|---|
-| 1 | P17 Task 4 — structured diagnostics/log projections | Task 3 completion gate green |
-| 2 | P17 plan completion review and local merge | Requires Task 4 commit |
+| 1 | Resolve P17 integration amendment | Required for stated P17 acceptance |
+| 2 | Complete P17 review and local merge | Requires chosen integration path |
 
 ## Blocked
 
-- No technical blocker.
+- **Decision required:** P17's unit-level services are not connected to all
+  acceptance consumers (runtime usage, real admission and UI projections).
 
 ## Standing rules
 
