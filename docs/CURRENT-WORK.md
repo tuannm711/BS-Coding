@@ -15,10 +15,10 @@ Last updated: 2026-08-30
 Exactly one entry. If two things are genuinely running, that is what this file
 exists to say out loud.
 
-**V2 P17 observability, usage and budget — completion and local merge.**
+**V2 P18 V1 data migration and cutover preparation — Task 1 implementation.**
 
-- **Branch:** `v2/p17-observability-usage-budget`
-- **Gate:** Final commit, local merge and post-merge verification
+- **Branch:** `v2/p18-v1-migration-cutover`
+- **Gate:** Task 1 TDD — backup manifest and migration dry-run
 - **Status:** P15 backend prerequisite merged locally into `master` at `c44cddc`
   and post-merge verified: typecheck pass, full Vitest 233 files / 1423 tests,
   production build pass and Playwright 16/16 pass. Continuous V2 execution rules
@@ -42,12 +42,11 @@ exists to say out loud.
   events into the ledger, do not call budget admission from real dispatch, and
   do not expose usage/budget projections to Work/Providers UI. The approved
   amendment now connects runtime finish usage → canonical USAGE → atomic ledger
-  → budget admission → scoped IPC → Work/Providers UI; unknown cost stays
-  explicit. Completion evidence: focused 11 files / 27 tests, full Vitest 243
-  files / 1441 tests, build and Playwright 18/18 exit 0. No P0-P2 remain.
-- **Scope:** Commit P17 completion, merge locally, verify merged result and move
-  to the next dependency-ready detailed plan.
-- **Plan:** [`v2/implementation-plans/plans/17-observability-usage-budget.md`](v2/implementation-plans/plans/17-observability-usage-budget.md)
+  → budget admission → scoped IPC → Work/Providers UI. P17 merged at `3cbb772`
+  and post-merge passed typecheck, 243 files / 1441 Vitest, build and 18/18 E2E.
+- **Scope:** Create a timestamped, SHA-256 verified backup and dry-run report
+  before any V1 import mutates V2 persistence.
+- **Plan:** [`v2/implementation-plans/plans/18-v1-migration-cutover.md`](v2/implementation-plans/plans/18-v1-migration-cutover.md)
 
 ## Next
 
@@ -56,8 +55,8 @@ after it has been decided.
 
 | # | Work | Prerequisite |
 |---|---|---|
-| 1 | Merge `v2/p17-observability-usage-budget` locally | Completion gate green |
-| 2 | Continue next dependency-ready V2 plan | Requires post-merge verification |
+| 1 | P18 Task 1 — backup manifest and dry-run | P17 post-merge verified |
+| 2 | P18 Task 2 — core V1 metadata imports | Requires Task 1 commit |
 
 ## Blocked
 
