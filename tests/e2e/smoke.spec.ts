@@ -15,14 +15,31 @@ test('app launches with the V2 IPC bootstrap and keeps the V1 shell available', 
     await expect(window).toHaveTitle(/BS Coding/)
     await expect(window.locator('.sidebar')).toBeVisible()
     const v2Surface = await window.evaluate(() => {
-      const browser = globalThis as unknown as { bs: { v2: Record<string, unknown> } }
-      return {
-        namespaces: Object.keys(browser.bs.v2).sort(),
-        serialized: JSON.stringify(browser.bs.v2)
+      const browser = globalThis as unknown as { bs: { v2: Record<string, unknown> & {
+        'project.list'(request: Record<string, never>): Promise<unknown>
+      } } }
+      return { namespaces: Object.keys(browser.bs.v2).sort(), serialized: JSON.stringify(browser.bs.v2) }
+    })
+    const projectResult = await window.evaluate(() => {
+      const api = (globalThis as unknown as { bs: { v2: {
+        'project.list'(request: Record<string, never>): Promise<unknown>
+      } } }).bs.v2
+      try {
+        return api['project.list']({}).then(value => ({ ok: true as const, value }), error => ({
+          ok: false as const, error: String(error), stack: error instanceof Error ? error.stack : undefined
+        }))
+      } catch (error) {
+        return { ok: false as const, error: String(error),
+          stack: error instanceof Error ? error.stack : undefined }
       }
     })
-    expect(v2Surface.namespaces).toEqual(['provider', 'workSession', 'workflow'])
+    expect(v2Surface.namespaces).toEqual(expect.arrayContaining([
+      'provider', 'workSession', 'workflow', 'project.list', 'settings.get', 'remote.status'
+    ]))
     expect(v2Surface.serialized).not.toMatch(/secret|token|filesystem|fshandle|process|ipcrenderer/i)
+    if (!projectResult.ok) throw new Error(JSON.stringify(projectResult))
+    expect(projectResult).toMatchObject({ ok: true, value: { projects: [] } })
+    expect(JSON.stringify(projectResult)).not.toMatch(/secret|token|filesystem|fshandle|process|ipcrenderer/i)
     // Version loads asynchronously via IPC; auto-wait for it to appear.
     const version = window.locator('.status-bar .sb-mono').last()
     await expect(version).toHaveText(/^v\d+\.\d+\.\d+$/)

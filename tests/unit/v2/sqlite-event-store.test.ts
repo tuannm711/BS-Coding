@@ -102,4 +102,17 @@ describe('SqliteEventStore', () => {
       await expect(new SqliteEventStore(db).load('w')).rejects.toThrow()
     } finally { db.close() }
   })
+
+  it('loads a bounded recent window in chronological order and reads revision directly', async () => {
+    const db = openV2Database(':memory:')
+    try {
+      migrate(db)
+      const store = new SqliteEventStore(db)
+      await store.append('w', 0, [event('e1', 'USER_MESSAGE'),
+        event('e2', 'ASSISTANT_MESSAGE'), event('e3', 'LIFECYCLE')])
+      expect((await store.loadRecent('w', 2)).map(item => item.id)).toEqual(['e2', 'e3'])
+      expect(await store.latestSequence('w')).toBe(3)
+      expect(await store.latestSequence('missing')).toBe(0)
+    } finally { db.close() }
+  })
 })

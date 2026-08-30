@@ -14,4 +14,6 @@ export interface EventStore {
     events: readonly EventToAppend[]
   ): Promise<number>
   load(aggregateId: string, afterSequence?: number): Promise<StoredEvent[]>
+  loadRecent(aggregateId: string, limit: number): Promise<StoredEvent[]>
+  latestSequence(aggregateId: string): Promise<number>
 }

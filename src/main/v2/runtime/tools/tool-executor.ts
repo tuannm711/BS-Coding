@@ -48,7 +48,8 @@ export class ToolExecutor {
       try {
         const result = await run()
         await this.idempotency.complete(call.callId, result)
-        await this.audit.record({ type: 'TOOL_COMPLETED', callId: call.callId, result })
+        await this.audit.record({ type: 'TOOL_COMPLETED', callId: call.callId,
+          result: redactObject(result) })
         return result
       } catch (error) {
         const normalized = error instanceof Error ? error : new Error(String(error))
@@ -62,3 +63,4 @@ export class ToolExecutor {
     return execution
   }
 }
+import { redactObject } from '../../application/security/redaction-service'

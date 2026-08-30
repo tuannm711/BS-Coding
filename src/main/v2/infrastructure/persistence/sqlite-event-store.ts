@@ -21,6 +21,20 @@ interface EventRow {
   payload_json: string
 }
 
+function storedEvent(row: EventRow): StoredEvent {
+  const correlation = JSON.parse(row.correlation_json) as Record<string, string | undefined>
+  const parsed = CanonicalEventSchema.parse({
+    aggregateId: row.aggregate_id, sequence: row.sequence, schemaVersion: row.schema_version,
+    id: row.event_id, type: row.event_type, timestamp: row.occurred_at,
+    projectId: correlation.projectId!, workSessionId: correlation.workSessionId,
+    workflowRunId: correlation.workflowRunId, taskRunId: correlation.taskRunId,
+    agentRunId: correlation.agentRunId, runtimeEpochId: correlation.runtimeEpochId,
+    causationId: correlation.causationId, correlationId: correlation.correlationId!,
+    payload: JSON.parse(row.payload_json) as unknown
+  })
+  return { ...parsed, aggregateId: row.aggregate_id } as StoredEvent
+}
+
 export class OptimisticConcurrencyError extends Error {
   constructor(aggregateId: string, expected: number, actual: number) {
     super(`event sequence conflict for ${aggregateId}: expected ${expected}, actual ${actual}`)
@@ -98,22 +112,25 @@ export class SqliteEventStore implements EventStore {
       ORDER BY sequence ASC
     `).all(aggregateId, afterSequence) as EventRow[]
 
-    return rows.map(row => {
-      const correlation = JSON.parse(row.correlation_json) as Record<string, string | undefined>
-      const parsed = CanonicalEventSchema.parse({
-      aggregateId: row.aggregate_id,
-      sequence: row.sequence,
-      schemaVersion: row.schema_version,
-      id: row.event_id,
-      type: row.event_type,
-      timestamp: row.occurred_at, projectId: correlation.projectId!,
-      workSessionId: correlation.workSessionId, workflowRunId: correlation.workflowRunId,
-      taskRunId: correlation.taskRunId, agentRunId: correlation.agentRunId,
-      runtimeEpochId: correlation.runtimeEpochId, causationId: correlation.causationId,
-      correlationId: correlation.correlationId!,
-        payload: JSON.parse(row.payload_json) as unknown
-      })
-      return { ...parsed, aggregateId: row.aggregate_id } as StoredEvent
-    })
+    return rows.map(storedEvent)
+  }
+
+  async loadRecent(aggregateId: string, limit: number): Promise<StoredEvent[]> {
+    if (!Number.isInteger(limit) || limit <= 0) throw new RangeError('limit must be a positive integer')
+    const rows = this.db.prepare(`
+      SELECT * FROM (
+        SELECT aggregate_id, sequence, schema_version, event_id, event_type,
+               occurred_at, correlation_json, payload_json
+        FROM canonical_events WHERE aggregate_id = ?
+        ORDER BY sequence DESC LIMIT ?
+      ) ORDER BY sequence ASC
+    `).all(aggregateId, limit) as EventRow[]
+    return rows.map(storedEvent)
+  }
+
+  async latestSequence(aggregateId: string): Promise<number> {
+    const row = this.db.prepare(`SELECT COALESCE(MAX(sequence), 0) AS sequence
+      FROM canonical_events WHERE aggregate_id = ?`).get(aggregateId) as SequenceRow
+    return row.sequence
   }
 }

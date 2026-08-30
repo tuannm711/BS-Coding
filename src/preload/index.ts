@@ -1,3 +1,4 @@
+import './zod-jitless'
 import { contextBridge, ipcRenderer } from 'electron'
 import { Channels } from '../shared/ipc'
 import type { ArtifactsChangedEvent } from '../shared/ipc'
@@ -9,6 +10,7 @@ import type { ProviderAuthorizationRequest, ProviderAuthorizationSession, Provid
 import type { AgentAssignmentSetRequest, AgentAssignmentSnapshot } from '../shared/provider-state'
 import type { ProviderSnapshot } from '../shared/provider-state'
 import { createV2Api } from './v2-api'
+import { createP15BackendApi } from './p15-backend-api'
 
 function subscribe<T>(channel: string, cb: (e: T) => void): () => void {
   const listener = (_event: unknown, payload: T) => cb(payload)
@@ -218,10 +220,13 @@ const api: AgentApi = {
 
 contextBridge.exposeInMainWorld('api', api)
 contextBridge.exposeInMainWorld('bs', {
-  v2: createV2Api({
+  v2: Object.freeze({ ...createV2Api({
     invoke: (channel, payload) => ipcRenderer.invoke(channel, payload),
     on: (channel, listener) => ipcRenderer.on(channel, listener),
     removeListener: (channel, listener) => ipcRenderer.removeListener(channel, listener),
     nextRequestId: () => crypto.randomUUID()
-  })
+  }), ...createP15BackendApi({
+    invoke: (channel, payload) => ipcRenderer.invoke(channel, payload),
+    nextRequestId: () => crypto.randomUUID()
+  }) })
 })

@@ -15,17 +15,26 @@ Last updated: 2026-08-30
 Exactly one entry. If two things are genuinely running, that is what this file
 exists to say out loud.
 
-**V2 plan 15 — renderer UI and Figma binding.**
+**V2 P15 prerequisite — awaiting merge approval.**
 
-- **Branch:** `v2/p15-renderer-ui-figma`
-- **Gate:** `npm run typecheck`, P15 renderer unit tests, production build and
-  `v2-core-flow.spec.ts` + `v2-runtime-switch.spec.ts` are green
-- **Status:** P14 merged into `master` at `a561a95`; typecheck, 17 targeted
-  tests, production build, the full suite at 1374 passing and 15 Playwright
-  e2e tests are green after merge. P15 preflight is blocked before Task 1.
-- **Scope:** locked Figma navigation/shell, project/work-session screens,
-  agents/settings and functional bottom-panel flows backed by V2 DTOs.
-- **Plan:** [`v2/implementation-plans/plans/15-renderer-ui-figma-binding.md`](v2/implementation-plans/plans/15-renderer-ui-figma-binding.md)
+- **Branch:** `v2/p15-backend-projections`
+- **Gate:** Owner merge approval
+- **Status:** P16 merged into `master` at `806c792` and merged back into this
+  branch. P15 backend Tasks 1-5 are committed at `855a692`, `fecc97b`,
+  `5b7c384`, `22d8352` and `d17d760`; Task 6A typed IPC/preload contracts and
+  route parity are committed at `3864cc2`; Task 6B concrete composition, build
+  and focused Electron smoke are committed at `99b2c34`. Task 7 durable
+  project/lifecycle/runtime/rework persistence, projection publication and review remediation
+  are committed at `6b95ff4`. Inline review has no remaining P0-P2 findings.
+  Completion evidence: typecheck pass; focused 16 files / 50 tests; full Vitest
+  233 files / 1423 tests; production build pass; full Playwright 16/16 pass.
+  `docs/v2` remains unchanged under the documentation-pack lock. The approved UX source is
+  the local vendored Figma Make export, so no live Figma connector is required.
+- **Scope:** owner-scoped projection DTOs/services, real IPC/preload routes,
+  idempotent lifecycle commands and bottom-panel backend projections required
+  by P15 Tasks 2-5.
+- **Spec:** [`superpowers/specs/2026-08-30-p15-backend-projection-prerequisite-design.md`](superpowers/specs/2026-08-30-p15-backend-projection-prerequisite-design.md)
+- **Plan:** [`superpowers/plans/2026-08-30-p15-backend-projection-prerequisite.md`](superpowers/plans/2026-08-30-p15-backend-projection-prerequisite.md)
 
 ## Next
 
@@ -34,18 +43,14 @@ after it has been decided.
 
 | # | Work | Prerequisite |
 |---|---|---|
-| 1 | Resolve P15 Figma context and backend projection prerequisites | Required before Task 1 implementation |
+| 1 | Merge `v2/p15-backend-projections` into `master` | Requires owner approval |
+| 2 | Resume locked P15 renderer plan | Requires merged backend prerequisite; uses vendored prototype |
 
 ## Blocked
 
-- **Figma context unavailable:** the approved Figma Make URL has no `node-id`;
-  this session exposes no `get_design_context` tool or Figma MCP resource. The
-  mandatory design-to-code workflow forbids implementing from screenshots or
-  assumptions.
-- **Backend projection/API gap:** P14 exposes only five preload methods and
-  registers no concrete V2 application routes; P15 Tasks 2-5 require project,
-  lifecycle, agent/settings and bottom-panel projections/commands that no
-  later plan is scheduled to provide.
+- **Renderer implementation remains blocked:** backend projection/API branch must
+  pass the owner merge gate before locked P15 UI Task 1 begins. The
+  approved UX source is already vendored under `docs/v2/prototype/figma-make/`.
 
 ## Standing rules
 

@@ -1,6 +1,6 @@
 import { app, BrowserWindow, dialog, ipcMain, Notification, shell } from 'electron'
 import { spawn } from 'node:child_process'
-import { existsSync, rmSync } from 'node:fs'
+import { existsSync, mkdirSync, rmSync } from 'node:fs'
 import { stat } from 'node:fs/promises'
 import { randomUUID } from 'node:crypto'
 import os from 'node:os'
@@ -53,8 +53,13 @@ import { RemoteSettingsStore } from './remote/remote-settings'
 import { RemotePairing } from './remote/remote-pairing'
 import { migrateLegacyUserData, resolveUserDataDir } from './bs-migration'
 import { createV2Runtime, type V2Runtime } from './v2/application/v2-bootstrap'
-import { registerV2Ipc } from './v2/ipc/register-v2-ipc'
+import { startV2Infrastructure } from './v2/infrastructure/composition/start-v2-infrastructure'
+import { V1WorkspaceGitAdapter } from './v2/infrastructure/workspace/v1-workspace-git-adapter'
+import { V1ProviderAccountAdapter } from './v2/infrastructure/providers/v1-provider-account-adapter'
+import { V1SettingsVaultAdapter } from './v2/infrastructure/settings/v1-settings-vault-adapter'
+import { V1RemoteStatusAdapter } from './v2/infrastructure/remote/v1-remote-status-adapter'
 import { Channels } from '../shared/ipc'
+import { P15_IPC } from '../shared/v2/contracts/p15-backend-ipc'
 import type { AgentState, Command, FileViewerPayload, ImageAttachment, BsSettings, NewAgentInput, PromptResponse, Template, TerminalInfo, Workspace, WorkspaceRuntime } from '../shared/types'
 
 let win: BrowserWindow | null = null
@@ -996,12 +1001,57 @@ app.whenReady().then(async () => {
   await migrateLegacyUserData(userDataDir, {
     legacyDir: path.join(path.dirname(userDataDir), 'BS Coding')
   })
-  v2Runtime = await createV2Runtime({
-    enabled: process.env.BS_V2 === '1',
-    userDataPath: userDataDir,
-    registerIpc: () => registerV2Ipc({ registrar: ipcMain, routes: [] })
-  })
   mainApp = new MainApp()
+  v2Runtime = await createV2Runtime({ enabled: process.env.BS_V2 === '1', start: async () => {
+    const stateDir = path.join(userDataDir, 'v2')
+    mkdirSync(stateDir, { recursive: true })
+    return startV2Infrastructure({ databasePath: path.join(stateDir, 'state.sqlite'), registrar: ipcMain,
+      sendProjection: event => win?.webContents.send(P15_IPC['workflow.projection'], event),
+      support: ({ repositories }) => {
+        const workspaceGit = new V1WorkspaceGitAdapter({
+          resolveProjectPath: async id => (await repositories.projects.get(id))?.repoPath ?? null,
+          getWorkspace: projectPath => mainApp.workspaces.get(projectPath),
+          getGitStatus: projectPath => mainApp.git.get(projectPath)
+        })
+        const providers = new V1ProviderAccountAdapter({
+          listConnections: () => mainApp.providerManager.list(),
+          connectMethod: request => mainApp.providerManager.connectMethod(request),
+          refreshAccount: (providerId, accountId) => mainApp.providerManager.refreshAccount(providerId, accountId),
+          setEnabled: (accountId, enabled) => mainApp.providerManager.setEnabled(accountId, enabled)
+        })
+        const settings = new V1SettingsVaultAdapter({
+          listCredentialRefs: () => mainApp.providerManager.list().flatMap(connection =>
+            connection.accounts.flatMap(account => account.keyRef
+              ? [{ providerId: connection.providerId, ref: account.keyRef }] : [])),
+          hasSecret: ref => mainApp.vault.getSecret(ref) !== null,
+          getSettings: () => mainApp.bsAgent.getSettings() as unknown as Readonly<Record<string, unknown>>,
+          saveSettings: value => mainApp.saveSettings(value as unknown as BsSettings)
+        })
+        const remote = new V1RemoteStatusAdapter({ getStatus: () => mainApp.remote.getStatus() })
+        return {
+          getWorkspace: id => workspaceGit.getWorkspace(id),
+          getGitStatus: id => workspaceGit.getGitStatus(id),
+          listProviderAccounts: () => providers.listAccounts(),
+          listSkillBindings: async () => ({ status: 'EMPTY' as const }),
+          listMcpServers: async () => {
+            const servers = mainApp.bsAgent.getMcpStatus().map(server => ({ id: server.name,
+              name: server.name, status: server.status === 'connected' ? 'CONNECTED' as const : 'ERROR' as const,
+              toolNames: server.tools }))
+            return servers.length ? { status: 'AVAILABLE' as const, value: servers } : { status: 'EMPTY' as const }
+          },
+          listDiagnostics: async () => ({ status: 'EMPTY' as const }),
+          credentialState: () => settings.credentialState(),
+          listTerminals: async () => mainApp.pty.terminalIds().map(id => ({ id, title: id, status: 'RUNNING' as const })),
+          listTests: async () => [], listLogs: async () => [], listOutput: async () => [],
+          connectProvider: value => providers.connect(value),
+          refreshProvider: value => providers.refresh(value),
+          setProviderEnabled: value => providers.setEnabled(value),
+          probeProvider: value => providers.probe(value),
+          updateSettings: value => settings.update(value),
+          remoteStatus: () => remote.get()
+        }
+      } })
+  } })
   mainApp.bsAgent.truncationCleanup()
   await mainApp.browserBridge.start().catch(err => {
     console.error('[bs] browser bridge start failed:', err)
