@@ -35,6 +35,14 @@ export interface BudgetPolicy {
   softWarningPercent?: number
 }
 
+export interface BudgetUsage {
+  costUsd: number
+  inputTokens: number
+  requests: number
+  concurrentAgents: number
+  elapsedMs: number
+}
+
 export type BudgetMetric = 'costUsd' | 'inputTokens' | 'requests' | 'concurrentAgents' | 'elapsedMs'
 export type BudgetDecision = { decision: 'OK' } | {
   decision: 'SOFT_WARNING' | 'HARD_BLOCK'
