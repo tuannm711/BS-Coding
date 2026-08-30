@@ -15,13 +15,16 @@ Last updated: 2026-08-30
 Exactly one entry. If two things are genuinely running, that is what this file
 exists to say out loud.
 
-**Project workflow rules — V1 to V2 transition execution.**
+**Project workflow rules — V2 priority and problem reporting.**
 
-- **Branch:** `codex/v2-transition-workflow-rules`
+- **Branch:** `codex/v2-priority-problem-report-rules`
 - **Gate:** Implement the owner-approved bounded rules update
 - **Status:** P15 backend prerequisite is merged locally into `master` at
   `c44cddc` and post-merge verified. The owner approved new standing rules for
-  continuous execution and automatic local merge of detailed V2 plans.
+  continuous execution and automatic local merge of detailed V2 plans. The
+  owner additionally clarified that V2 is always preferred, safely replaceable
+  V1 should be removed incrementally, and every blocker report uses a mandatory
+  three-part structure.
 - **Scope:** Update the process and working-style rules in root `AGENTS.md`;
   preserve explicit approval for plan changes, external push and release.
 
@@ -43,9 +46,9 @@ after it has been decided.
 
 Constraints that will expire, so they are not in `AGENTS.md`.
 
-- V2 is built beside V1 under `src/main/v2`, `src/shared/v2` and
-  `src/renderer/src/v2` until the plan 20 cutover. `BsAgentManager` never
-  becomes a V2 dependency.
+- V2 is built under `src/main/v2`, `src/shared/v2` and `src/renderer/src/v2`.
+  V1 remains beside it only for consumers not yet migrated; safely replaced V1
+  is removed incrementally. `BsAgentManager` never becomes a V2 dependency.
 - The V2 documentation pack is placed whole. Nothing under `docs/v2/` is edited,
   moved or renamed.
 
