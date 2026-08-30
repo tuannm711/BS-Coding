@@ -35,6 +35,14 @@ Trong giai đoạn chuyển đổi V1 → V2:
 - Mục tiêu thực thi là hoàn thành liên tục toàn bộ 20 detailed plan P01-P20 theo dependency và thứ tự
   trong master plan. Không dừng để xin duyệt ở các task, checkpoint, review hoặc local-merge thông
   thường đã được plan mô tả.
+- V2 là kiến trúc đích và luôn được ưu tiên. Mọi hành vi/chức năng mới hoặc thay đổi phải được xây trên
+  V2; không mở rộng V1, trừ bridge tạm thời thực sự cần để giữ consumer chưa migrate hoạt động.
+- Chủ động loại bỏ từng phần V1 ngay trong plan hiện tại khi V2 đã thay thế hành vi đó, mọi consumer đã
+  chuyển sang V2, dữ liệu/cutover cần thiết đã xử lý và verification liên quan đã xanh. Không giữ code,
+  IPC, preload API, UI hay adapter V1 chỉ để chờ plan 18/20 nếu đã đủ điều kiện xóa an toàn.
+- Việc xóa V1 đã được V2 thay thế trực tiếp thuộc phạm vi thực thi mặc định, không cần hỏi lại. Nếu xóa
+  sẽ chạm chức năng chưa có V2 thay thế, làm đổi dependency/contract của plan hoặc không chứng minh
+  được cutover an toàn thì dừng và báo vấn đề theo format ở mục K.
 - Khi một detailed plan đạt completion gate và review không còn finding P0-P2, tự merge nhánh plan về
   `master` local, chạy post-merge verification phù hợp rồi xoá nhánh đã merge; không cần hỏi lại chủ
   dự án. Quy tắc này không cho phép push remote hay release.
@@ -81,9 +89,10 @@ Trong giai đoạn chuyển đổi V1 → V2:
   (`src/preload/index.ts`), renderer (`window.api`) và `tests/unit/ipc-contract.test.ts`. Đổi contract
   V2 phải cập nhật registry/schema shared, router main, `window.bs.v2`, renderer type và các test
   `tests/unit/v2/*ipc*`/`preload-contract.test.ts` tương ứng.
-- IPC V1 tiếp tục dùng `Channels` + `AgentApi`, `registerIpcHandlers` và preload implementation cho
-  tới cutover. IPC V2 dùng command/query/subscription contract namespaced, request/response/event đều
-  runtime-validate bằng Zod tại external boundary; consequential command mang `requestId`.
+- IPC V1 dùng `Channels` + `AgentApi`, `registerIpcHandlers` và preload implementation chỉ khi vẫn còn
+  consumer V1 chưa migrate; xóa từng contract V1 ngay sau khi consumer tương ứng đã chuyển sang V2 và
+  verification xanh. IPC V2 dùng command/query/subscription contract namespaced, request/response/event
+  đều runtime-validate bằng Zod tại external boundary; consequential command mang `requestId`.
 - Event push V1 dùng `win.webContents.send(Channels.Event*)` và payload contract V1. Projection event
   V2 dùng channel từ registry, mang monotonic `sequence` + `revision`; renderer bỏ duplicate/out-of-order
   event và refetch khi phát hiện gap.
@@ -216,6 +225,9 @@ Rút ra từ một buổi debug lag ô chat input thật (đo bằng Chromium tr
   hoặc khi cần chủ dự án review, duyệt hay quyết định.
 - Khi bước kế tiếp cần chủ dự án review/duyệt, phải nói rõ sau khi được duyệt sẽ thực hiện hành động
   nào; không chỉ ghi chung chung là "chờ duyệt".
+- Khi gặp vấn đề phải báo đúng ba phần: **(1) Thực trạng** — hoặc plan trước thay đổi nếu đang đề nghị
+  đổi plan; **(2) Các phương án**; **(3) Tác động cụ thể của từng phương án** — chọn phương án đó sẽ
+  thay đổi thực trạng ra sao. Kèm khuyến nghị và nói rõ hành động sẽ làm sau khi được duyệt.
 
 ## Công nghệ
 
@@ -268,6 +280,6 @@ Dữ liệu bền: `userData/templates.json`, `userData/workspaces.json`; log m�
   V1.3.2 trở về trước. Tham chiếu, không phải việc phải làm: V2 không kế thừa nợ của V1.
 - `docs/release-notes/` — ở nguyên ngoài `v1/`: job publish đọc `docs/release-notes/<tag>.md`
   theo đúng tên tag.
-- Code V1 ở nguyên `src/`. Theo `docs/v2/implementation-plans/plans/01-foundation-module-boundaries.md`,
-  V2 dựng **bên cạnh** tại `src/main/v2`, `src/shared/v2`, `src/renderer/src/v2`, và cutover nằm ở
-  plan 18 và 20.
+- V2 dựng tại `src/main/v2`, `src/shared/v2`, `src/renderer/src/v2`. Code V1 còn ở `src/` chỉ trong
+  thời gian consumer tương ứng chưa migrate; xóa tăng dần ngay khi V2 thay thế và verification xanh,
+  không mặc định giữ toàn bộ tới plan 18/20.
