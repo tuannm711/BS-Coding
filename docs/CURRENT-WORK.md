@@ -15,16 +15,20 @@ Last updated: 2026-08-30
 Exactly one entry. If two things are genuinely running, that is what this file
 exists to say out loud.
 
-**V2 P15 prerequisite — backend projections and APIs.**
+**V2 P15 prerequisite — awaiting merge approval.**
 
 - **Branch:** `v2/p15-backend-projections`
-- **Gate:** Task 6B concrete service composition, build and focused Electron
-  e2e pass
+- **Gate:** Owner merge approval
 - **Status:** P16 merged into `master` at `806c792` and merged back into this
   branch. P15 backend Tasks 1-5 are committed at `855a692`, `fecc97b`,
   `5b7c384`, `22d8352` and `d17d760`; Task 6A typed IPC/preload contracts and
-  route parity are committed at `3864cc2`. Task 6B concrete composition is
-  resumed with V2 vault/security ports available. The approved UX source is
+  route parity are committed at `3864cc2`; Task 6B concrete composition, build
+  and focused Electron smoke are committed at `99b2c34`. Task 7 durable
+  project/lifecycle/runtime/rework persistence, projection publication and review remediation
+  are committed at `6b95ff4`. Inline review has no remaining P0-P2 findings.
+  Completion evidence: typecheck pass; focused 16 files / 50 tests; full Vitest
+  233 files / 1423 tests; production build pass; full Playwright 16/16 pass.
+  `docs/v2` remains unchanged under the documentation-pack lock. The approved UX source is
   the local vendored Figma Make export, so no live Figma connector is required.
 - **Scope:** owner-scoped projection DTOs/services, real IPC/preload routes,
   idempotent lifecycle commands and bottom-panel backend projections required
@@ -39,13 +43,13 @@ after it has been decided.
 
 | # | Work | Prerequisite |
 |---|---|---|
-| 1 | P15 backend prerequisite Task 7 — Electron E2E | Requires Task 6B commit |
-| 2 | Resume locked P15 renderer plan | Requires backend prerequisite; uses vendored prototype |
+| 1 | Merge `v2/p15-backend-projections` into `master` | Requires owner approval |
+| 2 | Resume locked P15 renderer plan | Requires merged backend prerequisite; uses vendored prototype |
 
 ## Blocked
 
-- **Renderer implementation remains blocked:** backend projection/API work must
-  pass plan → implementation gates before locked P15 UI Task 1 begins. The
+- **Renderer implementation remains blocked:** backend projection/API branch must
+  pass the owner merge gate before locked P15 UI Task 1 begins. The
   approved UX source is already vendored under `docs/v2/prototype/figma-make/`.
 
 ## Standing rules
