@@ -18,15 +18,15 @@ exists to say out loud.
 **V2 P15 prerequisite — backend projections and APIs.**
 
 - **Branch:** `v2/p15-backend-projections`
-- **Gate:** Task 5 Agents/Settings/Bottom projection tests and `npm run typecheck` pass
+- **Gate:** Task 6 typed IPC/preload parity, real-route integration, build and focused e2e pass
 - **Status:** P14 merged into `master` at `a561a95`; typecheck, 17 targeted
   tests, production build, the full suite at 1374 passing and 15 Playwright
   e2e tests are green after merge. Backend-first direction is approved; the
   prerequisite spec and plan are approved; Task 1 projection DTO/schema/read
   ports are committed at `855a692` with focused tests, boundary guard and
   typecheck green. Task 2 scoped reads/idempotency is committed at `fecc97b`;
-  Tasks 3-4 are committed at `5b7c384` and `22d8352`; Task 5
-  Agents/Settings/Bottom projections is in progress. The approved UX source is
+  Tasks 3-5 are committed at `5b7c384`, `22d8352` and `d17d760`; Task 6
+  typed IPC/preload composition is in progress. The approved UX source is
   the local vendored Figma Make export, so no live Figma connector is required.
 - **Scope:** owner-scoped projection DTOs/services, real IPC/preload routes,
   idempotent lifecycle commands and bottom-panel backend projections required
@@ -41,7 +41,7 @@ after it has been decided.
 
 | # | Work | Prerequisite |
 |---|---|---|
-| 1 | P15 backend prerequisite Task 6 — IPC composition | Requires Task 5 commit |
+| 1 | P15 backend prerequisite Task 7 — Electron E2E | Requires Task 6 commit |
 | 2 | Resume locked P15 renderer plan | Requires backend prerequisite; uses vendored prototype |
 
 ## Blocked
