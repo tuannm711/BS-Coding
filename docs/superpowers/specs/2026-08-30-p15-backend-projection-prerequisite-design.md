@@ -2,7 +2,7 @@
 
 Date: 2026-08-30  
 Branch: `v2/p15-backend-projections`  
-Status: design direction approved; written spec awaiting owner review
+Status: approved by owner
 
 ## 1. Problem
 
@@ -215,10 +215,12 @@ commit. No renderer code starts until its required slice is green.
 - Completion requires `npm run typecheck`, focused prerequisite tests,
   production build, full `npm test` and full `npm run e2e`.
 
-## 10. Relationship to P15 and remaining blocker
+## 10. Relationship to P15 and local UX reference
 
 After this prerequisite is implemented, P15 screens may consume only the
-public APIs defined here. Figma design-to-code remains independently blocked:
-before any renderer implementation, the task still needs a node-specific Figma
-Design URL and an available `get_design_context` tool. The existing Figma Make
-file-only link is insufficient and is not replaced by screenshots or guesses.
+public APIs defined here. Renderer work uses the already-vendored approved UX
+contract at `docs/v2/prototype/figma-make/`, beginning with
+`docs/v2/prototype/README.md` and
+`figma-make/src/imports/pasted_text/bs-coding-ux-ui-redesign.md`. It does not
+need a live Figma URL or connector. The vendored prototype remains reference
+material and is not copied wholesale into production renderer code.

@@ -18,16 +18,19 @@ exists to say out loud.
 **V2 P15 prerequisite — backend projections and APIs.**
 
 - **Branch:** `v2/p15-backend-projections`
-- **Gate:** owner approves the written prerequisite spec before implementation
-  planning begins
+- **Gate:** owner approves the written prerequisite implementation plan before
+  code execution begins
 - **Status:** P14 merged into `master` at `a561a95`; typecheck, 17 targeted
   tests, production build, the full suite at 1374 passing and 15 Playwright
   e2e tests are green after merge. Backend-first direction is approved; the
-  prerequisite spec is written and awaiting owner review.
+  prerequisite spec is approved; the implementation plan is written,
+  self-reviewed and awaiting owner review. The approved UX source is the local
+  vendored Figma Make export, so no live Figma connector is required.
 - **Scope:** owner-scoped projection DTOs/services, real IPC/preload routes,
   idempotent lifecycle commands and bottom-panel backend projections required
   by P15 Tasks 2-5.
 - **Spec:** [`superpowers/specs/2026-08-30-p15-backend-projection-prerequisite-design.md`](superpowers/specs/2026-08-30-p15-backend-projection-prerequisite-design.md)
+- **Plan:** [`superpowers/plans/2026-08-30-p15-backend-projection-prerequisite.md`](superpowers/plans/2026-08-30-p15-backend-projection-prerequisite.md)
 
 ## Next
 
@@ -36,18 +39,14 @@ after it has been decided.
 
 | # | Work | Prerequisite |
 |---|---|---|
-| 1 | Review/approve the P15 backend prerequisite spec | Required before writing its implementation plan |
-| 2 | Resume locked P15 renderer plan | Requires backend prerequisite and Figma context |
+| 1 | Review/approve the P15 backend prerequisite plan | Required before code execution |
+| 2 | Resume locked P15 renderer plan | Requires backend prerequisite; uses vendored prototype |
 
 ## Blocked
 
-- **Figma context unavailable:** the approved Figma Make URL has no `node-id`;
-  this session exposes no `get_design_context` tool or Figma MCP resource. The
-  mandatory design-to-code workflow forbids implementing from screenshots or
-  assumptions.
 - **Renderer implementation remains blocked:** backend projection/API work must
-  pass spec → plan → implementation gates, and Figma context must be restored,
-  before locked P15 UI Task 1 begins.
+  pass plan → implementation gates before locked P15 UI Task 1 begins. The
+  approved UX source is already vendored under `docs/v2/prototype/figma-make/`.
 
 ## Standing rules
 
