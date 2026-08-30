@@ -18,7 +18,7 @@ exists to say out loud.
 **V2 P18 V1 data migration and cutover preparation — Task 2 implementation.**
 
 - **Branch:** `v2/p18-v1-migration-cutover`
-- **Gate:** Task 2 TDD — idempotent project/provider/agent metadata imports
+- **Gate:** Task 2 TDD — approved V2 provider-account persistence amendment
 - **Status:** P15 backend prerequisite merged locally into `master` at `c44cddc`
   and post-merge verified: typecheck pass, full Vitest 233 files / 1423 tests,
   production build pass and Playwright 16/16 pass. Continuous V2 execution rules
@@ -44,9 +44,18 @@ exists to say out loud.
   amendment now connects runtime finish usage → canonical USAGE → atomic ledger
   → budget admission → scoped IPC → Work/Providers UI. P17 merged at `3cbb772`
   and post-merge passed typecheck, 243 files / 1441 Vitest, build and 18/18 E2E.
-  P18 Task 1 backup manifest is committed at `6b4afbe`.
+  P18 Task 1 backup manifest is committed at `6b4afbe`. Task 2 preflight found
+  that P05 intentionally exposes provider accounts through a V1 compatibility
+  port, while the V2 schema/repositories contain no durable provider-account
+  metadata store or vault-reference contract. P18 cannot import provider
+  metadata durably or complete provider cutover without an approved schema and
+  repository amendment. The owner approved the recommended amendment: add an
+  immutable migration 006, a main-only provider-account metadata entity and a
+  repository that preserves opaque vault references without exposing secret
+  bytes through shared/renderer DTOs.
 - **Scope:** Import V1 project/provider-account/agent metadata with stable source
-  keys, immutable AgentVersion snapshots and vault references only.
+  keys, immutable AgentVersion snapshots and vault references only. The approved
+  amendment is now part of Task 2 implementation scope.
 - **Plan:** [`v2/implementation-plans/plans/18-v1-migration-cutover.md`](v2/implementation-plans/plans/18-v1-migration-cutover.md)
 
 ## Next
