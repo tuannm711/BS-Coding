@@ -6,7 +6,7 @@ export function needsRefetch(lastSequence: number, nextSequence: number): boolea
 
 export function createProjectionSubscription<T>(deps: {
   subscribe(callback: (event: ProjectionEvent<T>) => void): () => void
-  refetch(): Promise<ProjectionEvent<T>>
+  refetch(gapEvent: ProjectionEvent<T>): Promise<ProjectionEvent<T>>
   apply(event: ProjectionEvent<T>): void
   onError(error: Error): void
 }) {
@@ -17,7 +17,7 @@ export function createProjectionSubscription<T>(deps: {
   const onEvent = (event: ProjectionEvent<T>): void => {
     if (disposed || refetching || event.sequence <= lastSequence) return
     if (needsRefetch(lastSequence, event.sequence)) {
-      refetching = deps.refetch().then(snapshot => {
+      refetching = deps.refetch(event).then(snapshot => {
         if (disposed) return
         lastSequence = snapshot.sequence
         deps.apply(snapshot)

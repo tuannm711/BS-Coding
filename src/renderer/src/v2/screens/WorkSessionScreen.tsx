@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ArrowLeft, Clock3, History, Pause, Play, RotateCcw, Square } from 'lucide-react'
-import type { WorkSession, WorkSessionStatus } from '../../../../shared/v2/contracts/domain'
+import type { WorkflowRun, WorkSession, WorkSessionStatus } from '../../../../shared/v2/contracts/domain'
 import type { RuntimeTargetCandidateSummary } from '../../../../shared/v2/contracts/provider'
 import type { ProjectSummary, WorkProjection } from '../../../../shared/v2/contracts/ui-projections'
 import ConversationView from './work/ConversationView'
@@ -10,6 +10,8 @@ import ExecutionView from './work/ExecutionView'
 import ChangesView from './work/ChangesView'
 import ReviewView from './work/ReviewView'
 import RuntimeHistory from './work/RuntimeHistory'
+import BottomPanel from '../components/BottomPanel'
+import { createProjectionSubscription } from '../state/projection-subscription'
 
 export const WORK_SESSION_TABS = [
   { id: 'conversation', label: 'Conversation' }, { id: 'plan', label: 'Plan' },
@@ -40,6 +42,8 @@ export default function WorkSessionScreen({ selection, onBack }: Props) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [commandBusy, setCommandBusy] = useState(false)
+  const [panelRefreshKey, setPanelRefreshKey] = useState(0)
+  const [confirmCancel, setConfirmCancel] = useState(false)
 
   const scope = useMemo(() => session?.activeWorkflowRunId && selection ? {
     projectId: selection.projectId, workSessionId: selection.workSessionId,
@@ -64,6 +68,7 @@ export default function WorkSessionScreen({ selection, onBack }: Props) {
             : requestedTab === 'changes' ? window.bs.v2['workflow.changes']
               : window.bs.v2['workflow.review']
     setProjection(await query(scope))
+    setPanelRefreshKey(value => value + 1)
   }, [scope, tab])
 
   useEffect(() => {
@@ -97,17 +102,24 @@ export default function WorkSessionScreen({ selection, onBack }: Props) {
 
   useEffect(() => {
     if (!scope) return
-    return window.bs.v2.workflow.subscribe(scope.workflowRunId, () => {
-      void Promise.all([refreshIdentity(), refreshProjection(tab)]).catch(() => {
-        setError('Work projection refresh failed.')
-      })
+    const subscription = createProjectionSubscription<WorkflowRun>({
+      subscribe: callback => window.bs.v2.workflow.subscribe(scope.workflowRunId, callback),
+      refetch: async event => ({ ...event,
+        payload: await window.bs.v2.workflow.get(scope.workflowRunId) }),
+      apply: () => {
+        void Promise.all([refreshIdentity(), refreshProjection(tab)]).catch(() => {
+          setError('Work projection refresh failed.')
+        })
+      },
+      onError: () => { setError('Work projection refetch failed after an event gap.') }
     })
+    return () => subscription.dispose()
   }, [refreshIdentity, refreshProjection, scope, tab])
 
   const runCommand = useCallback(async (operation: () => Promise<unknown>) => {
     setCommandBusy(true); setError('')
     try { await operation(); await refreshIdentity(); await refreshProjection(tab) }
-    catch { setError('The Work Session command failed.') }
+    catch { setError('The Work Session command failed. Reload the projection and retry.') }
     finally { setCommandBusy(false) }
   }, [refreshIdentity, refreshProjection, tab])
 
@@ -115,6 +127,7 @@ export default function WorkSessionScreen({ selection, onBack }: Props) {
   if (loading) return <WorkMessage title="Loading Work Session" detail="Reading authoritative workflow state…" />
   if (!session || !project) return <WorkMessage title="Work Session unavailable" detail={error || 'No identity projection was returned.'} action={onBack} />
   if (!session.activeWorkflowRunId) return <WorkMessage title={session.title} detail="This Work Session has no active WorkflowRun." action={onBack} />
+  if (!scope) return <WorkMessage title={session.title} detail="Work Session scope is unavailable." action={onBack} />
 
   const primary = sessionPrimaryAction(session.status)
   const selectedCandidate = candidates.find(item => item.id === candidateId)
@@ -152,7 +165,7 @@ export default function WorkSessionScreen({ selection, onBack }: Props) {
             : window.bs.v2['workSession.pause'](selection))}>
           {primary === 'Resume' ? <Play size={14} /> : <Pause size={14} />}{primary}</button> : null}
         {session.status !== 'CANCELLED' && session.status !== 'COMPLETED' ? <button type="button" className="v2-btn v2-btn-danger"
-          disabled={commandBusy} onClick={() => void runCommand(() => window.bs.v2['workSession.cancel'](selection))}>
+          disabled={commandBusy} onClick={() => setConfirmCancel(true)}>
           <Square size={13} />Cancel</button> : null}
       </div>
     </header>
@@ -175,10 +188,23 @@ export default function WorkSessionScreen({ selection, onBack }: Props) {
           ...selection, findingIds: [findingId], title
         }))} /> : null}
     </div>
+    <BottomPanel projectId={scope.projectId} workSessionId={scope.workSessionId}
+      workflowRunId={scope.workflowRunId} refreshKey={panelRefreshKey} />
     {historyOpen && projection ? <RuntimeHistory section={projection.runtimeHistory} onClose={() => setHistoryOpen(false)} /> : null}
+    {confirmCancel ? <ConfirmationModal title="Cancel Work Session?"
+      detail="Running AgentRuns will be cancelled. Completed task results remain in V2 persistence."
+      confirmLabel="Cancel Work Session" busy={commandBusy} onClose={() => setConfirmCancel(false)}
+      onConfirm={() => runCommand(async () => { await window.bs.v2['workSession.cancel'](selection); setConfirmCancel(false) })} /> : null}
   </div>
 }
 
 function WorkMessage({ title, detail, action }: { title: string; detail: string; action?: () => void }) {
   return <div className="v2-screen-message" role="status"><strong>{title}</strong><span>{detail}</span>{action ? <button type="button" onClick={action}>Back to Home</button> : null}</div>
+}
+
+function ConfirmationModal({ title, detail, confirmLabel, busy, onClose, onConfirm }: { title: string; detail: string;
+  confirmLabel: string; busy: boolean; onClose(): void; onConfirm(): Promise<unknown> }) {
+  return <div className="v2-modal-backdrop" role="presentation" onClick={onClose}><div className="v2-modal" role="dialog" aria-modal="true" aria-labelledby="v2-confirm-title" onClick={event => event.stopPropagation()}>
+    <header><h2 id="v2-confirm-title">{title}</h2></header><p>{detail}</p><footer><button type="button" className="v2-btn" onClick={onClose}>Keep Working</button>
+      <button type="button" className="v2-btn v2-btn-danger" disabled={busy} onClick={() => void onConfirm()}>{confirmLabel}</button></footer></div></div>
 }

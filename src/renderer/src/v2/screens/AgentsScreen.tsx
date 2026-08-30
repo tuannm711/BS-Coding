@@ -17,7 +17,7 @@ export default function AgentsScreen({ projectId }: { projectId: string | null }
 
   const run = useCallback(async (operation: () => Promise<unknown>) => {
     setBusy(true); setError('')
-    try { await operation(); await refresh() } catch { setError('Agent command failed.') }
+    try { await operation(); await refresh() } catch { setError('Agent command failed. Refresh the Agent list and retry.') }
     finally { setBusy(false) }
   }, [refresh])
 
@@ -45,13 +45,16 @@ export default function AgentsScreen({ projectId }: { projectId: string | null }
 function AgentInspector({ agent, busy, onClose, onUpdate, onRemove }: { agent: AgentSummary; busy: boolean;
   onClose(): void; onUpdate(name: string, role: string): Promise<unknown>; onRemove(): Promise<unknown> }) {
   const [editing, setEditing] = useState(false)
+  const [confirmingRemove, setConfirmingRemove] = useState(false)
   if (editing) return <AgentEditor title="Edit Agent" initial={agent} busy={busy} onClose={() => setEditing(false)} onSave={onUpdate} />
   return <div className="v2-drawer-backdrop" onClick={onClose}><aside className="v2-runtime-drawer" aria-label="Agent inspector" onClick={event => event.stopPropagation()}>
     <header><h2>{agent.name}</h2><button type="button" aria-label="Close Agent inspector" onClick={onClose}><X size={16} /></button></header>
     <div className="v2-agent-inspector"><p className="v2-kicker">Role</p><h3>{agent.role}</h3><p>Status: {agent.status}</p>
       {agent.currentVersionId ? <p className="v2-mono">Version {agent.currentVersionId}</p> : null}
       <button type="button" className="v2-btn" onClick={() => setEditing(true)}><Pencil size={14} />Edit Agent</button>
-      <button type="button" className="v2-btn v2-btn-danger" disabled={busy} onClick={() => void onRemove()}><Trash2 size={14} />Remove Agent</button></div>
+      {confirmingRemove ? <div className="v2-inline-confirm" role="alert"><span>Remove this Agent definition?</span><div><button type="button" className="v2-btn" onClick={() => setConfirmingRemove(false)}>Keep Agent</button>
+        <button type="button" className="v2-btn v2-btn-danger" disabled={busy} onClick={() => void onRemove()}>Confirm Remove</button></div></div>
+        : <button type="button" className="v2-btn v2-btn-danger" disabled={busy} onClick={() => setConfirmingRemove(true)}><Trash2 size={14} />Remove Agent</button>}</div>
   </aside></div>
 }
 
@@ -62,8 +65,8 @@ function AgentEditor({ title, initial, busy, onClose, onSave }: { title: string;
   return <div className="v2-modal-backdrop" onClick={onClose}><form className="v2-modal" aria-label={title} onClick={event => event.stopPropagation()}
     onSubmit={event => { event.preventDefault(); if (name.trim() && role.trim()) void onSave(name.trim(), role.trim()) }}>
     <header><h2>{title}</h2><button type="button" aria-label={`Close ${title}`} onClick={onClose}><X size={16} /></button></header>
-    <label>Name<input value={name} onChange={event => setName(event.target.value)} required /></label>
-    <label>Role<input value={role} onChange={event => setRole(event.target.value)} required /></label>
+    <label>Name<input name="agentName" autoComplete="off" spellCheck={false} value={name} onChange={event => setName(event.target.value)} required /></label>
+    <label>Role<input name="agentRole" autoComplete="off" spellCheck={false} value={role} onChange={event => setRole(event.target.value)} required /></label>
     <footer><button type="button" className="v2-btn" onClick={onClose}>Cancel</button><button className="v2-btn v2-btn-primary" disabled={busy || !name.trim() || !role.trim()}>Save Agent</button></footer>
   </form></div>
 }

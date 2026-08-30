@@ -11,7 +11,7 @@ export default function ProvidersPanel({ projection, onRefresh }: Props) {
   const [error, setError] = useState('')
   const run = async (key: string, operation: () => Promise<unknown>) => {
     setBusy(key); setError('')
-    try { await operation(); await onRefresh() } catch { setError('Provider command failed.') }
+    try { await operation(); await onRefresh() } catch { setError('Provider command failed. Check the account state and retry.') }
     finally { setBusy('') }
   }
   if (!projection) return <div className="v2-panel-state" role="status">Loading Providers…</div>
@@ -26,8 +26,8 @@ export default function ProvidersPanel({ projection, onRefresh }: Props) {
     {error ? <div className="v2-command-error" role="alert">{error}</div> : null}
     <form className="v2-provider-connect" onSubmit={event => { event.preventDefault(); const secret = apiKey; setApiKey('');
       void run('connect', () => window.bs.v2['provider.connect']({ scopeId, providerId: providerId.trim(), apiKey: secret })) }}>
-      <KeyRound size={15} aria-hidden="true" /><label>Provider ID<input value={providerId} onChange={event => setProviderId(event.target.value)} required /></label>
-      <label>API key<input type="password" value={apiKey} autoComplete="off" onChange={event => setApiKey(event.target.value)} required /></label>
+      <KeyRound size={15} aria-hidden="true" /><label>Provider ID<input name="providerId" autoComplete="off" spellCheck={false} value={providerId} onChange={event => setProviderId(event.target.value)} required /></label>
+      <label>API key<input name="apiKey" type="password" value={apiKey} autoComplete="off" spellCheck={false} onChange={event => setApiKey(event.target.value)} required /></label>
       <button className="v2-btn v2-btn-primary" disabled={busy !== '' || !providerId.trim() || !apiKey}>Connect account</button>
     </form>
     {groups.size === 0 ? <div className="v2-panel-state">No provider accounts are connected.</div>

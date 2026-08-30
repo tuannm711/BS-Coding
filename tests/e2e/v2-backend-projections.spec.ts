@@ -39,6 +39,11 @@ test('V2 backend projections and lifecycle commands survive restart', async () =
     await homeWindow.getByLabel('Role').fill('REVIEWER')
     await homeWindow.getByRole('button', { name: 'Save Agent' }).click()
     await expect(homeWindow.getByText('Reviewer', { exact: true })).toBeVisible()
+    await homeWindow.getByRole('button', { name: /Reviewer/ }).click()
+    await homeWindow.getByRole('button', { name: 'Remove Agent' }).click()
+    await expect(homeWindow.getByRole('button', { name: 'Confirm Remove' })).toBeVisible()
+    await homeWindow.getByRole('button', { name: 'Keep Agent' }).click()
+    await homeWindow.getByRole('button', { name: 'Close Agent inspector' }).click()
 
     await homeWindow.getByRole('button', { name: 'Settings', exact: true }).click()
     await expect(homeWindow.getByRole('heading', { name: 'Settings' })).toBeVisible()

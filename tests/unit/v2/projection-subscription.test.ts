@@ -40,12 +40,14 @@ describe('projection publication and subscription sequencing', () => {
 
     listener?.({ sequence: 1, revision: 1, payload: { status: 'RUNNING' } })
     listener?.({ sequence: 1, revision: 1, payload: { status: 'DUPLICATE' } })
-    listener?.({ sequence: 3, revision: 2, payload: { status: 'GAP' } })
+    const gap = { sequence: 3, revision: 2, payload: { status: 'GAP' } }
+    listener?.(gap)
     listener?.({ sequence: 4, revision: 3, payload: { status: 'SAME_GAP' } })
     await subscription.whenIdle()
     listener?.({ sequence: 21, revision: 9, payload: { status: 'CONTIGUOUS' } })
 
     expect(refetch).toHaveBeenCalledOnce()
+    expect(refetch).toHaveBeenCalledWith(gap)
     expect(applied).toEqual([
       { sequence: 1, revision: 1, payload: { status: 'RUNNING' } },
       { sequence: 20, revision: 8, payload: { status: 'REFETCHED' } },
