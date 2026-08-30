@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { V2_IPC, V2_IPC_FAMILIES } from '../../../src/shared/v2/contracts/ipc'
 import {
   ProjectionEventSchema,
-  V2CommandEnvelopeSchema
+  V2CommandEnvelopeSchema,
+  V2PublicIpcSchemas
 } from '../../../src/shared/v2/schemas/ipc'
 
 describe('V2 typed IPC contracts', () => {
@@ -10,6 +11,17 @@ describe('V2 typed IPC contracts', () => {
     expect(V2CommandEnvelopeSchema.safeParse({ input: { id: 'ws1' } }).success).toBe(false)
     expect(V2CommandEnvelopeSchema.parse({ requestId: 'r1', input: { id: 'ws1' } }))
       .toEqual({ requestId: 'r1', input: { id: 'ws1' } })
+  })
+
+  it('defines explicit request and response schemas for every public preload method', () => {
+    expect(Object.keys(V2PublicIpcSchemas).sort()).toEqual([
+      'provider.listAccounts', 'workSession.create', 'workSession.pause',
+      'workflow.get', 'workflow.projection'
+    ])
+    expect(V2PublicIpcSchemas['workSession.create'].request.safeParse({
+      requestId: 'r1', input: { projectId: 'p1', goal: 'Ship V2' }
+    }).success).toBe(true)
+    expect(V2PublicIpcSchemas['workflow.get'].response.safeParse({ raw: true }).success).toBe(false)
   })
 
   it('requires monotonic sequence and revision metadata on projection events', () => {

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 import { createV2Runtime } from '../../../src/main/v2/application/v2-bootstrap'
-import { registerV2Ipc } from '../../../src/main/v2/ipc/register-v2-ipc'
+import { defineV2IpcRoute, registerV2Ipc } from '../../../src/main/v2/ipc/register-v2-ipc'
 import { validatedHandler } from '../../../src/main/v2/ipc/validated-handler'
 
 describe('V2 IPC router', () => {
@@ -21,7 +21,7 @@ describe('V2 IPC router', () => {
   it('normalizes service and response contract failures without leaking stack data', async () => {
     const serviceFailure = validatedHandler({
       input: z.object({ id: z.string() }), output: z.object({ ok: z.boolean() }),
-      service: async () => { throw new Error('database offline') }
+      service: async () => { throw new Error('database offline apiKey=secret') }
     })
     const responseFailure = validatedHandler({
       input: z.object({ id: z.string() }), output: z.object({ ok: z.boolean() }),
@@ -29,7 +29,7 @@ describe('V2 IPC router', () => {
     })
 
     await expect(serviceFailure({}, { id: 'ws1' })).rejects.toMatchObject({
-      code: 'INTERNAL_ERROR', message: 'database offline'
+      code: 'INTERNAL_ERROR', message: 'V2 IPC service failed'
     })
     await expect(responseFailure({}, { id: 'ws1' })).rejects.toMatchObject({
       code: 'INVALID_RESPONSE'
@@ -45,10 +45,10 @@ describe('V2 IPC router', () => {
       },
       removeHandler: (channel: string) => { handlers.delete(channel) }
     }
-    const route = {
+    const route = defineV2IpcRoute({
       channel: 'bs.v2.project.get', input: z.object({ id: z.string() }),
       output: z.object({ id: z.string() }), service: async (input: { id: string }) => input
-    }
+    })
 
     expect(() => registerV2Ipc({ registrar, routes: [route, route] })).toThrow(/duplicate/i)
     const runtime = await createV2Runtime({

@@ -34,7 +34,8 @@ describe('projection publication and subscription sequencing', () => {
     const subscription = createProjectionSubscription<{ status: string }>({
       subscribe: callback => { listener = callback; return unsubscribe },
       refetch,
-      apply: event => { applied.push(event) }
+      apply: event => { applied.push(event) },
+      onError: () => {}
     })
 
     listener?.({ sequence: 1, revision: 1, payload: { status: 'RUNNING' } })
@@ -52,5 +53,27 @@ describe('projection publication and subscription sequencing', () => {
     ])
     subscription.dispose()
     expect(unsubscribe).toHaveBeenCalledOnce()
+  })
+
+  it('reports refetch failures and permits the next event to retry', async () => {
+    let listener: ((event: ProjectionEvent<{ status: string }>) => void) | undefined
+    const onError = vi.fn()
+    const refetch = vi.fn()
+      .mockRejectedValueOnce(new Error('offline'))
+      .mockResolvedValueOnce({ sequence: 5, revision: 2, payload: { status: 'RECOVERED' } })
+    const subscription = createProjectionSubscription<{ status: string }>({
+      subscribe: callback => { listener = callback; return () => {} },
+      refetch,
+      apply: () => {},
+      onError
+    })
+
+    listener?.({ sequence: 2, revision: 1, payload: { status: 'GAP' } })
+    await subscription.whenIdle()
+    listener?.({ sequence: 3, revision: 2, payload: { status: 'RETRY' } })
+    await subscription.whenIdle()
+
+    expect(onError).toHaveBeenCalledWith(expect.objectContaining({ message: 'offline' }))
+    expect(refetch).toHaveBeenCalledTimes(2)
   })
 })

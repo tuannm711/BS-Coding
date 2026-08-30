@@ -1,3 +1,6 @@
+import type { WorkSession, WorkflowRun } from './domain'
+import type { ProviderAccountSummary } from './provider'
+
 export const V2_IPC_FAMILIES = [
   'project', 'workSession', 'workflow', 'task', 'agent', 'provider', 'workspace',
   'git', 'skill', 'mcp', 'settings', 'diagnostics', 'remote'
@@ -16,17 +19,23 @@ export interface ProjectionEvent<T> {
   payload: T
 }
 
+export interface WorkSessionCreateInput {
+  projectId: string
+  goal: string
+  title?: string
+}
+
 export interface BsV2Api {
   workSession: {
-    create(input: { projectId: string; goal: string }): Promise<unknown>
-    pause(id: string): Promise<unknown>
+    create(input: WorkSessionCreateInput): Promise<WorkSession>
+    pause(id: string): Promise<WorkSession>
   }
   provider: {
-    listAccounts(): Promise<unknown>
+    listAccounts(): Promise<readonly ProviderAccountSummary[]>
   }
   workflow: {
-    get(id: string): Promise<unknown>
-    subscribe(callback: (event: ProjectionEvent<unknown>) => void): () => void
+    get(id: string): Promise<WorkflowRun>
+    subscribe(workflowRunId: string, callback: (event: ProjectionEvent<WorkflowRun>) => void): () => void
   }
 }
 

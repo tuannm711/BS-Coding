@@ -9,9 +9,16 @@ export interface V2IpcRegistrar {
 
 export interface V2IpcRoute {
   channel: string
-  input: z.ZodType<unknown>
-  output: z.ZodType<unknown>
-  service(input: never): Promise<unknown>
+  handler(event: unknown, raw: unknown): unknown
+}
+
+export function defineV2IpcRoute<TInput, TOutput>(route: {
+  channel: string
+  input: z.ZodType<TInput>
+  output: z.ZodType<TOutput>
+  service(input: TInput): Promise<unknown>
+}): V2IpcRoute {
+  return { channel: route.channel, handler: validatedHandler(route) }
 }
 
 const registeredChannels = new Set<string>(
@@ -29,11 +36,7 @@ export function registerV2Ipc(input: {
     seen.add(route.channel)
   }
   for (const route of input.routes) {
-    input.registrar.handle(route.channel, validatedHandler({
-      input: route.input,
-      output: route.output,
-      service: value => route.service(value as never)
-    }))
+    input.registrar.handle(route.channel, route.handler)
   }
   return () => {
     for (const channel of seen) input.registrar.removeHandler(channel)

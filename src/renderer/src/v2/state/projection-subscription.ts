@@ -8,6 +8,7 @@ export function createProjectionSubscription<T>(deps: {
   subscribe(callback: (event: ProjectionEvent<T>) => void): () => void
   refetch(): Promise<ProjectionEvent<T>>
   apply(event: ProjectionEvent<T>): void
+  onError(error: Error): void
 }) {
   let lastSequence = 0
   let disposed = false
@@ -20,6 +21,8 @@ export function createProjectionSubscription<T>(deps: {
         if (disposed) return
         lastSequence = snapshot.sequence
         deps.apply(snapshot)
+      }).catch(error => {
+        deps.onError(error instanceof Error ? error : new Error(String(error)))
       }).finally(() => { refetching = undefined })
       return
     }

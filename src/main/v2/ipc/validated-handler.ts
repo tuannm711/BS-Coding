@@ -20,7 +20,7 @@ export function validatedHandler<TInput, TOutput>(contract: {
       result = await contract.service(input.data)
     } catch (error) {
       if (error instanceof V2IpcError) throw error
-      throw new V2IpcError('INTERNAL_ERROR', error instanceof Error ? error.message : 'V2 IPC service failed')
+      throw new V2IpcError('INTERNAL_ERROR', 'V2 IPC service failed')
     }
     const output = contract.output.safeParse(result)
     if (!output.success) throw new V2IpcError('INVALID_RESPONSE', 'Invalid V2 IPC response')
