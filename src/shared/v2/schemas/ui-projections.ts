@@ -43,20 +43,20 @@ export const HomeProjectionSchema = z.object({
   providerAccounts: section(z.array(ProviderAccountSchema))
 }).strict() satisfies z.ZodType<HomeProjection>
 
-const WorkspaceSummarySchema = z.object({
+export const WorkspaceSummarySchema = z.object({
   id, path: id, mode: z.enum(['READ_ONLY', 'ISOLATED_WRITE']),
   fileCount: z.number().int().nonnegative()
 }).strict()
-const GitSummarySchema = z.object({ branch: id, dirty: z.boolean(), changedFiles: z.array(id) }).strict()
-const AgentSummarySchema = z.object({
+export const GitSummarySchema = z.object({ branch: id, dirty: z.boolean(), changedFiles: z.array(id) }).strict()
+export const AgentSummarySchema = z.object({
   id, name: id, role: id, status: z.enum(['READY', 'RUNNING', 'DISABLED', 'ERROR']),
   currentVersionId: id.optional()
 }).strict()
-const SkillBindingSummarySchema = z.object({
+export const SkillBindingSummarySchema = z.object({
   id, name: id, version: id, source: z.enum(['BUILTIN', 'MARKETPLACE', 'USER', 'PROJECT']),
   contentHash: z.string().regex(/^[a-f0-9]{64}$/), enabled: z.boolean()
 }).strict()
-const McpServerSummarySchema = z.object({
+export const McpServerSummarySchema = z.object({
   id, name: id, status: z.enum(['CONNECTED', 'ERROR']), toolNames: z.array(id)
 }).strict()
 
@@ -134,7 +134,7 @@ const TerminalSchema = z.object({
 const TestRunSchema = z.object({
   id, status: z.enum(['PASS', 'FAIL', 'RUNNING']), artifactId: id.optional()
 }).strict()
-const ProblemSchema = z.object({
+export const ProblemSummarySchema = z.object({
   id, kind: z.enum(['LSP_DIAGNOSTIC', 'REVIEW_FINDING']),
   severity: z.enum(['INFO', 'WARNING', 'ERROR']), message: z.string(), evidenceRefs: z.array(id)
 }).strict()
@@ -146,6 +146,6 @@ const OutputSchema = z.object({ id, preview: z.string(), artifactId: id.optional
 export const BottomPanelProjectionSchema = z.object({
   projectId: id, workflowRunId: id, revision,
   terminals: section(z.array(TerminalSchema)), tests: section(z.array(TestRunSchema)),
-  problems: section(z.array(ProblemSchema)), logs: section(z.array(LogSchema)),
+  problems: section(z.array(ProblemSummarySchema)), logs: section(z.array(LogSchema)),
   output: section(z.array(OutputSchema))
 }).strict() satisfies z.ZodType<BottomPanelProjection>

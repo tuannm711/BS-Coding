@@ -1,5 +1,6 @@
 import type { z } from 'zod'
 import { V2_IPC } from '../../../shared/v2/contracts/ipc'
+import { P15_IPC } from '../../../shared/v2/contracts/p15-backend-ipc'
 import { validatedHandler } from './validated-handler'
 
 export interface V2IpcRegistrar {
@@ -22,7 +23,7 @@ export function defineV2IpcRoute<TInput, TOutput>(route: {
 }
 
 const registeredChannels = new Set<string>(
-  Object.values(V2_IPC).flatMap(family => Object.values(family))
+  [...Object.values(V2_IPC).flatMap(family => Object.values(family)), ...Object.values(P15_IPC)]
 )
 
 export function registerV2Ipc(input: {
