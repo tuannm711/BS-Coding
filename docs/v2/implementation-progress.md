@@ -24,6 +24,7 @@ plan be reviewed — that gate is tracked in `../CURRENT-WORK.md`, not here.
 | P11 | Git worktree integration | `43edf01` | `npm run typecheck` + P11 integration/unit tests + boundary guard + production build green; full suite 1332 passing |
 | P12 | Review, rework and quality gates | `a8f05c1` | `npm run typecheck` + 14 P12/boundary tests + production build green; full suite 1344 passing |
 | P13 | Skills, MCP and LSP integration | `7682c61` | `npm run typecheck` + 17 P13/boundary tests + production build green; full suite 1359 passing |
+| P14 | Typed IPC and preload contracts | `f46f52f` | `npm run typecheck` + 17 P14/boundary tests + production build green; full suite 1374 passing; 15 Playwright e2e passing |
 
 ## P01 notes
 
@@ -126,3 +127,12 @@ plan be reviewed — that gate is tracked in `../CURRENT-WORK.md`, not here.
 - The structural V1 MCP adapter exposes conservative V2 ToolDefinitions without invoking bindings during discovery; only connected, registered tools can reach the explicit call port and descriptors expose no environment secrets.
 - The structural V1 LSP adapter enforces lexical workspace scope, normalizes legacy positions/severity and returns evidence-only diagnostics with no workflow mutation fields.
 - Task commits: `a7ddb79` (contracts), `492a7d9` (skill snapshots), `3de9ecf` (MCP adapter), `76f116e` (LSP adapter), `7682c61` (registered-tool remediation).
+
+## P14 notes
+
+- Project IPC rules now explicitly preserve V1 `Channels`/`window.api` until cutover while requiring V2 namespaced contracts and the minimal `window.bs.v2` DTO surface.
+- The shared registry covers every locked contract family; implemented public methods have explicit request/response/event Zod schemas and consequential commands carry request IDs.
+- Main registers only known routes through typed route factories, validates both sides of every handler, sanitizes service failures and removes handlers when the V2 runtime disposes.
+- Preload exposes no raw secret, filesystem, provider, process or `ipcRenderer` handle; public responses and workflow-scoped projection events are runtime-validated before reaching renderer code.
+- Projection publication is monotonic; renderer subscriptions ignore stale events, refetch once on gaps, report refetch failures and reset their baseline from the authoritative snapshot.
+- Task commits: `34fefa1` (contracts), `7069c36` (main router), `45e8b5e` (preload API), `e545ec5` (projection sequencing), `54d7d29` (e2e harness remediation), `f46f52f` (typed-boundary review remediation).

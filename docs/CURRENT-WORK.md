@@ -8,24 +8,25 @@ It belongs to no version. `docs/v1/` is the past and `docs/v2/` is the target;
 this is the present. V1.3.2 is the shipped product and V2.0.0 is being built
 beside it, so both appear here.
 
-Last updated: 2026-08-29
+Last updated: 2026-08-30
 
 ## Now
 
 Exactly one entry. If two things are genuinely running, that is what this file
 exists to say out loud.
 
-**V2 plan 13 — skills, MCP and LSP integration.**
+**V2 plan 14 — typed IPC and preload contracts.**
 
-- **Branch:** `v2/p13-skills-mcp-lsp`
-- **Gate:** `npm run typecheck`, 17 P13/boundary tests, production build and the
-  full suite at 1359 passing are green
-- **Status:** implementation and inline review complete at `7682c61`; review
-  remediation prevents hidden/stale MCP bindings from bypassing the registered
-  tool set. P13 is awaiting approval to merge into `master`.
-- **Scope:** serializable Skill/MCP/LSP contracts, immutable skill resolution
-  snapshots, guarded MCP tool normalization and evidence-only LSP diagnostics.
-- **Plan:** [`v2/implementation-plans/plans/13-skills-mcp-lsp.md`](v2/implementation-plans/plans/13-skills-mcp-lsp.md)
+- **Branch:** `v2/p14-ipc-preload-contracts`
+- **Gate:** `npm run typecheck`, 17 P14/boundary tests, production build, the
+  full suite at 1374 passing and 15 Playwright e2e tests are green
+- **Status:** implementation and inline review complete at `f46f52f`; review
+  remediation added explicit public DTO schemas, sanitized service errors,
+  typed route construction and handled projection refetch failures. P14 is
+  awaiting approval to merge into `master`.
+- **Scope:** namespaced Zod IPC registry, validated main router, minimal
+  `window.bs.v2` preload API and gap-safe projection subscriptions.
+- **Plan:** [`v2/implementation-plans/plans/14-ipc-preload-contracts.md`](v2/implementation-plans/plans/14-ipc-preload-contracts.md)
 
 ## Next
 
@@ -34,8 +35,8 @@ after it has been decided.
 
 | # | Work | Prerequisite |
 |---|---|---|
-| 1 | Merge V2 plan 13 into `master` | P13 implementation/review complete; awaiting approval |
-| 2 | V2 plan 14 — IPC and preload contracts | Scheduled after P13 merge |
+| 1 | Merge V2 plan 14 into `master` | P14 implementation/review complete; awaiting approval |
+| 2 | V2 plan 15 — renderer UI and Figma binding | Requires P14 merge |
 
 ## Blocked
 

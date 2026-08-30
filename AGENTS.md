@@ -29,16 +29,20 @@ duyệt. Luật không bao giờ bị âm thầm bỏ đi vì code đã dời.
 
 ### B. Ranh giới tiến trình
 
-- Chỉ main process được spawn/kill process. Renderer truy cập mọi thứ qua `window.api`.
-- Renderer **không** import `electron` hay `node:*`. Dùng `window.api` (kiểu `AgentApi` từ shared).
-- Preload **không** expose `ipcRenderer` ra window; chỉ expose đúng tập method trong `AgentApi`, và
-  không import thư viện Node ngoài `electron`.
+- Chỉ main process được spawn/kill process. Renderer V1 truy cập mọi thứ qua `window.api`; renderer
+  V2 truy cập qua `window.bs.v2`.
+- Renderer **không** import `electron` hay `node:*`. V1 dùng `window.api` (kiểu `AgentApi` từ shared);
+  V2 dùng API DTO typed tại `window.bs.v2`.
+- Preload **không** expose `ipcRenderer` ra window; V1 chỉ expose đúng tập method trong `AgentApi`,
+  V2 chỉ expose API DTO typed dưới `window.bs.v2`, và preload không import thư viện Node ngoài
+  `electron`.
 - `src/shared` chỉ chứa thứ JSON-serializable: không class, không function, không import
   Node/Electron. File ở đây dùng cho cả build main, preload, renderer và test → không kéo dependency
   bên ngoài. Ngoại lệ V2 duy nhất: `src/shared/v2/schemas` được import `zod` để runtime-validate
   contract tại external boundary; `contracts`/`dto` và phần shared còn lại không có ngoại lệ này.
 - Service thuần (PtyManager, các store/service) không import Electron UI — để test được với Vitest.
-- Toàn bộ logic agent nằm ở main process; renderer chỉ thấy `ChatEvent` qua IPC.
+- Toàn bộ logic agent nằm ở main process; renderer V1 chỉ thấy `ChatEvent` qua IPC, renderer V2 chỉ
+  thấy DTO projection/event đã runtime-validate.
 - LSP và MCP chỉ chạy ở main; renderer không nói chuyện trực tiếp với chúng. Lỗi được nuốt theo từng
   client (offline / ngôn ngữ không hỗ trợ → không có diagnostics, không crash); server MCP lỗi thì
   đánh dấu `error` trong status chứ không làm sập app.
@@ -54,20 +58,24 @@ duyệt. Luật không bao giờ bị âm thầm bỏ đi vì code đã dời.
 
 ### C. Hợp đồng IPC
 
-- **Không hardcode** channel string ở bất kỳ đâu; chỉ dùng `Channels` từ `src/shared/ipc.ts`.
-- Đổi contract phải cập nhật đồng bộ bốn chỗ: handler main (`src/main/index.ts`), preload
-  (`src/preload/index.ts`), renderer (`window.api`), và test `tests/unit/ipc-contract.test.ts`.
-- Thêm IPC: thêm channel vào `Channels` + method vào `AgentApi` (`src/shared/ipc.ts`), handler trong
-  `registerIpcHandlers`, triển khai tương ứng trong preload.
-- Thêm event push mới: thêm channel `Event*` + interface payload + method subscribe trong `AgentApi`,
-  rồi triển khai trong preload và forward trong main.
-- Event push ra renderer qua `win.webContents.send(Channels.Event*)`; payload phải khớp contract
-  trong `src/shared/ipc.ts`.
-- Preload gọi method bằng `ipcRenderer.invoke(Channels.X, ...args)`. Event đăng ký qua helper
-  `subscribe`, trả về hàm huỷ để renderer gọi trong cleanup. Renderer dùng cùng kiểu `window.api`
-  (khai báo trong `src/renderer/src/env.d.ts`) nên tự đồng bộ.
-- Trạng thái agent chỉ đổi qua `MainApp.setState`; renderer chỉ được notify khi có field "visible"
-  thay đổi (status/exitCode/alert).
+- **Không hardcode** channel string ở bất kỳ đâu. V1 chỉ dùng `Channels` từ `src/shared/ipc.ts`; V2
+  chỉ dùng registry namespaced trong `src/shared/v2/contracts/ipc.ts`.
+- Đổi contract V1 phải cập nhật đồng bộ handler main (`src/main/index.ts`), preload
+  (`src/preload/index.ts`), renderer (`window.api`) và `tests/unit/ipc-contract.test.ts`. Đổi contract
+  V2 phải cập nhật registry/schema shared, router main, `window.bs.v2`, renderer type và các test
+  `tests/unit/v2/*ipc*`/`preload-contract.test.ts` tương ứng.
+- IPC V1 tiếp tục dùng `Channels` + `AgentApi`, `registerIpcHandlers` và preload implementation cho
+  tới cutover. IPC V2 dùng command/query/subscription contract namespaced, request/response/event đều
+  runtime-validate bằng Zod tại external boundary; consequential command mang `requestId`.
+- Event push V1 dùng `win.webContents.send(Channels.Event*)` và payload contract V1. Projection event
+  V2 dùng channel từ registry, mang monotonic `sequence` + `revision`; renderer bỏ duplicate/out-of-order
+  event và refetch khi phát hiện gap.
+- Preload V1 gọi `ipcRenderer.invoke(Channels.X, ...)`; V2 gọi channel registry qua API DTO typed tại
+  `window.bs.v2`. Subscription của cả hai trả về hàm huỷ để renderer cleanup. Không API nào expose raw
+  secret, filesystem handle, provider client, `process` hay `ipcRenderer`.
+- Trạng thái agent V1 chỉ đổi qua `MainApp.setState` và renderer chỉ được notify khi field visible đổi
+  (status/exitCode/alert). Trạng thái V2 đổi qua application/domain service và renderer chỉ nhận DTO
+  projection/event; renderer không tự mutate state authoritative.
 
 ### D. Bẫy nền tảng
 
