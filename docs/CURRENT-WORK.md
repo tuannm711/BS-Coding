@@ -18,13 +18,13 @@ exists to say out loud.
 **V2 plan 16 — security, permissions and secrets.**
 
 - **Branch:** `v2/p16-security-secrets`
-- **Gate:** Task 3 recursive redaction tests and `npm run typecheck` pass
+- **Gate:** Task 4 renderer security boundary tests and P16 completion gate pass
 - **Status:** P14 merged into `master` at `a561a95`. P15 backend Tasks 1-5 and
   Task 6A are committed on paused branch `v2/p15-backend-projections`; owner
   approved P16-first reorder because Task 6B provider/settings composition
   requires V2 vault/security ports. P16 Task 1 vault adapter is committed at
   `d325f92`; Task 2 layered permissions is committed at `86a0e79`; Task 3
-  event/log redaction is in progress.
+  redaction is committed at `6e13d28`; Task 4 renderer security regression is in progress.
 - **Scope:** encrypted vault edge, layered permission profiles, recursive
   event/log redaction and renderer security regression.
 - **Plan:** [`v2/implementation-plans/plans/16-security-permissions-secrets.md`](v2/implementation-plans/plans/16-security-permissions-secrets.md)
