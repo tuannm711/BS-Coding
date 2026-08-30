@@ -15,10 +15,10 @@ Last updated: 2026-08-30
 Exactly one entry. If two things are genuinely running, that is what this file
 exists to say out loud.
 
-**V2 P17 observability, usage and budget — Task 1 implementation.**
+**V2 P17 observability, usage and budget — Task 3 implementation.**
 
 - **Branch:** `v2/p17-observability-usage-budget`
-- **Gate:** Task 1 TDD — usage and explicit budget contracts
+- **Gate:** Task 3 TDD — explicit budget evaluator and admission integration
 - **Status:** P15 backend prerequisite merged locally into `master` at `c44cddc`
   and post-merge verified: typecheck pass, full Vitest 233 files / 1423 tests,
   production build pass and Playwright 16/16 pass. Continuous V2 execution rules
@@ -36,9 +36,11 @@ exists to say out loud.
   UI passed typecheck, 236 files / 1429 Vitest, build and Playwright 16/16.
   P15 renderer merged locally into `master` at `c4adc62` and post-merge passed
   typecheck, 237 files / 1430 Vitest, production build and Playwright 18/18.
-  P17 dependencies P03-P05, P10 and P16 are complete.
-- **Scope:** Define serializable usage, quota, optional budget policy and
-  explainable decision contracts with no arbitrary hard defaults.
+  P17 dependencies P03-P05, P10 and P16 are complete. Task 1 usage/budget
+  contracts is committed at `46e1378`. Task 2 usage ledger/migration passed
+  typecheck, idempotency, aggregation, migration and boundary tests.
+- **Scope:** Evaluate only configured limits into explainable OK/SOFT_WARNING/
+  HARD_BLOCK decisions and feed them into Agent admission.
 - **Plan:** [`v2/implementation-plans/plans/17-observability-usage-budget.md`](v2/implementation-plans/plans/17-observability-usage-budget.md)
 
 ## Next
@@ -48,8 +50,8 @@ after it has been decided.
 
 | # | Work | Prerequisite |
 |---|---|---|
-| 1 | P17 Task 1 — usage/budget contracts | Dependencies complete |
-| 2 | P17 Task 2 — correlated usage ledger | Requires Task 1 commit |
+| 1 | P17 Task 3 — budget evaluator/admission | Task 2 completion gate green |
+| 2 | P17 Task 4 — structured diagnostics/log projections | Requires Task 3 commit |
 
 ## Blocked
 
