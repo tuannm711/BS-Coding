@@ -18,7 +18,8 @@ exists to say out loud.
 **V2 P15 prerequisite — backend projections and APIs.**
 
 - **Branch:** `v2/p15-backend-projections`
-- **Gate:** Task 6 typed IPC/preload parity, real-route integration, build and focused e2e pass
+- **Gate:** owner approves the P16-first dependency reorder needed to complete
+  Task 6 concrete secret-bearing routes
 - **Status:** P14 merged into `master` at `a561a95`; typecheck, 17 targeted
   tests, production build, the full suite at 1374 passing and 15 Playwright
   e2e tests are green after merge. Backend-first direction is approved; the
@@ -26,7 +27,8 @@ exists to say out loud.
   ports are committed at `855a692` with focused tests, boundary guard and
   typecheck green. Task 2 scoped reads/idempotency is committed at `fecc97b`;
   Tasks 3-5 are committed at `5b7c384`, `22d8352` and `d17d760`; Task 6
-  typed IPC/preload composition is in progress. The approved UX source is
+  typed IPC/preload contracts and route parity are green, but concrete
+  composition is blocked on P16 vault/security ports. The approved UX source is
   the local vendored Figma Make export, so no live Figma connector is required.
 - **Scope:** owner-scoped projection DTOs/services, real IPC/preload routes,
   idempotent lifecycle commands and bottom-panel backend projections required
@@ -41,14 +43,19 @@ after it has been decided.
 
 | # | Work | Prerequisite |
 |---|---|---|
-| 1 | P15 backend prerequisite Task 7 — Electron E2E | Requires Task 6 commit |
-| 2 | Resume locked P15 renderer plan | Requires backend prerequisite; uses vendored prototype |
+| 1 | P16 security/vault implementation | Required by provider/settings commands in Task 6 |
+| 2 | Resume P15 backend Task 6 composition + Task 7 E2E | Requires P16 vault ports |
+| 3 | Resume locked P15 renderer plan | Requires backend prerequisite; uses vendored prototype |
 
 ## Blocked
 
 - **Renderer implementation remains blocked:** backend projection/API work must
   pass plan → implementation gates before locked P15 UI Task 1 begins. The
   approved UX source is already vendored under `docs/v2/prototype/figma-make/`.
+- **P15 backend Task 6 composition:** P16 owns the missing `SecretVaultPort`,
+  safeStorage adapter and secure secret-command boundary required by
+  `provider.connect`/settings commands. Direct V1 calls or placeholder handlers
+  are not permitted.
 
 ## Standing rules
 
