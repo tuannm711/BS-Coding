@@ -88,7 +88,7 @@ const ReviewSchema = z.object({
     description: z.string(), linkedReworkTaskId: id.optional()
   }).strict())
 }).strict()
-const RuntimeEpochSchema = z.object({
+export const RuntimeEpochSummarySchema = z.object({
   id, status: z.enum(['STARTING', 'ACTIVE', 'CLOSING', 'CLOSED']), providerId: id,
   accountId: id, modelId: id, startedAt: timestamp, endedAt: timestamp.optional()
 }).strict()
@@ -98,7 +98,7 @@ export const WorkProjectionSchema = z.object({
   conversation: section(z.array(ConversationItemSchema)), plan: section(PlanSchema),
   tasks: section(z.array(TaskSchema)), execution: section(z.array(ExecutionSchema)),
   changes: section(z.array(ChangeSchema)), review: section(ReviewSchema),
-  runtimeHistory: section(z.array(RuntimeEpochSchema))
+  runtimeHistory: section(z.array(RuntimeEpochSummarySchema))
 }).strict() satisfies z.ZodType<WorkProjection>
 
 const CredentialStateSchema = z.object({ configured: z.boolean() }).strict()

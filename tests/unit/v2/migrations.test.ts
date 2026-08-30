@@ -12,13 +12,19 @@ describe('V2 database migrations', () => {
       const applied = db.prepare('SELECT version FROM schema_migrations ORDER BY version').all()
       const tables = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all()
 
-      expect(applied).toEqual([{ version: 1 }, { version: 2 }])
+      expect(applied).toEqual([{ version: 1 }, { version: 2 }, { version: 3 }])
       expect(tables).toEqual(expect.arrayContaining([
         { name: 'projects' },
         { name: 'work_sessions' },
         { name: 'workflow_runs' },
         { name: 'canonical_events' },
-        { name: 'import_history' }
+        { name: 'import_history' },
+        { name: 'command_idempotency' }
+      ]))
+      const indexes = db.prepare("SELECT name FROM sqlite_master WHERE type = 'index'").all()
+      expect(indexes).toEqual(expect.arrayContaining([
+        { name: 'work_sessions_project_updated_idx' },
+        { name: 'tasks_workflow_run_idx' }
       ]))
     } finally {
       db.close()

@@ -13,6 +13,14 @@ import type {
   WorkSession
 } from '../../../../shared/v2/contracts/domain'
 import type { ArtifactRef, ArtifactStore } from '../../application/ports/artifact-store'
+import type { CommandIdempotencyPort } from '../../application/ports/command-idempotency-port'
+import type { ProjectionReadPort } from '../../application/ports/projection-read-port'
+import type { ReviewFinding, ReviewRecord } from '../../../../shared/v2/contracts/review'
+import type { RuntimeEpochSummary } from '../../../../shared/v2/contracts/ui-projections'
+import { z } from 'zod'
+import { WorkSessionSchema, WorkflowRunSchema } from '../../../../shared/v2/schemas/ipc'
+import { FindingSchema, ReviewSchema } from '../../../../shared/v2/schemas/review'
+import { RuntimeEpochSummarySchema } from '../../../../shared/v2/schemas/ui-projections'
 
 interface Entity {
   id: string
@@ -26,6 +34,43 @@ export interface Repository<T extends Entity> {
 interface PayloadRow {
   payload_json: string
 }
+
+function payload<T>(row: PayloadRow, schema: z.ZodType<T>): T {
+  return schema.parse(JSON.parse(row.payload_json))
+}
+
+function listPayloads<T>(db: BetterSqlite3.Database, schema: z.ZodType<T>, sql: string,
+  ...params: readonly unknown[]): T[] {
+  return (db.prepare(sql).all(...params) as PayloadRow[]).map(row => payload(row, schema))
+}
+
+const timestamp = z.iso.datetime({ offset: true })
+const id = z.string().min(1)
+const ProjectSchema: z.ZodType<Project> = z.object({
+  id, name: id, repoPath: id, defaultBranch: id, instructionsRef: id,
+  createdAt: timestamp, updatedAt: timestamp, archivedAt: timestamp.optional()
+}).strict()
+const TaskSchema: z.ZodType<Task> = z.object({
+  id, workflowRunId: id, title: z.string(), dependsOn: z.array(id),
+  createdAt: timestamp, updatedAt: timestamp
+}).strict()
+const TaskRunSchema: z.ZodType<TaskRun> = z.object({
+  id, taskId: id, workflowRunId: id, attempt: z.number().int().positive(),
+  status: z.enum(['QUEUED', 'READY', 'RUNNING', 'WAITING_APPROVAL', 'BLOCKED', 'FAILED',
+    'CANCELLED', 'REVIEW_FAILED', 'REWORK', 'COMPLETED']),
+  provenanceTaskRunId: id.optional(), createdAt: timestamp, updatedAt: timestamp,
+  completedAt: timestamp.optional()
+}).strict()
+const AgentDefinitionSchema: z.ZodType<AgentDefinition> = z.object({
+  id, projectId: id, name: id, role: id, currentVersionId: id.optional(),
+  createdAt: timestamp, updatedAt: timestamp, archivedAt: timestamp.optional()
+}).strict()
+const AgentRunSchema: z.ZodType<AgentRun> = z.object({
+  id, taskRunId: id, agentVersionId: id,
+  status: z.enum(['CREATED', 'STARTING', 'RUNNING', 'SUCCEEDED', 'FAILED', 'BLOCKED',
+    'CANCELLED', 'DEGRADED']), createdAt: timestamp, updatedAt: timestamp,
+  completedAt: timestamp.optional()
+}).strict()
 
 function createJsonRepository<T extends Entity>(
   db: BetterSqlite3.Database,
@@ -111,9 +156,113 @@ export interface V2Repositories {
   reviews: Repository<Review>
   findings: Repository<Finding>
   artifacts: ArtifactStore
+  projections: ProjectionReadPort
+  commandIdempotency: CommandIdempotencyPort
+}
+
+function createProjectionReads(db: BetterSqlite3.Database,
+  artifacts: ArtifactStore): ProjectionReadPort {
+  return {
+    async getProject(id) {
+      const row = db.prepare('SELECT payload_json FROM projects WHERE id = ?').get(id) as PayloadRow | undefined
+      return row ? payload(row, ProjectSchema) : null
+    },
+    async listProjects() {
+      return listPayloads(db, ProjectSchema, 'SELECT payload_json FROM projects')
+        .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt) || a.id.localeCompare(b.id))
+    },
+    async getWorkSessionOwnedByProject(projectId, workSessionId) {
+      const row = db.prepare(`SELECT payload_json FROM work_sessions
+        WHERE id = ? AND project_id = ?`).get(workSessionId, projectId) as PayloadRow | undefined
+      return row ? payload(row, WorkSessionSchema) : null
+    },
+    async listWorkSessionsByProject(projectId) {
+      return listPayloads(db, WorkSessionSchema,
+        'SELECT payload_json FROM work_sessions WHERE project_id = ?', projectId)
+        .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt) || a.id.localeCompare(b.id))
+    },
+    async getWorkflowOwnedByProject(projectId, workflowRunId) {
+      const row = db.prepare(`SELECT wr.payload_json FROM workflow_runs wr
+        JOIN work_sessions ws ON ws.id = wr.work_session_id
+        WHERE wr.id = ? AND ws.project_id = ?`).get(workflowRunId, projectId) as PayloadRow | undefined
+      return row ? payload(row, WorkflowRunSchema) : null
+    },
+    async listTasksByWorkflow(workflowRunId) {
+      return listPayloads(db, TaskSchema,
+        'SELECT payload_json FROM tasks WHERE workflow_run_id = ? ORDER BY id', workflowRunId)
+    },
+    async listTaskRunsByWorkflow(workflowRunId) {
+      return listPayloads(db, TaskRunSchema,
+        'SELECT payload_json FROM task_runs WHERE workflow_run_id = ? ORDER BY id', workflowRunId)
+    },
+    async listAgentDefinitionsByProject(projectId) {
+      return listPayloads(db, AgentDefinitionSchema,
+        'SELECT payload_json FROM agent_definitions WHERE project_id = ? ORDER BY id', projectId)
+    },
+    async listAgentRunsByWorkflow(workflowRunId) {
+      return listPayloads(db, AgentRunSchema, `SELECT ar.payload_json FROM agent_runs ar
+        JOIN task_runs tr ON tr.id = ar.task_run_id
+        WHERE tr.workflow_run_id = ? ORDER BY ar.id`, workflowRunId)
+    },
+    async listRuntimeEpochsByWorkflow(workflowRunId) {
+      return listPayloads(db, RuntimeEpochSummarySchema, `SELECT re.payload_json FROM runtime_epochs re
+        JOIN agent_runs ar ON ar.id = re.agent_run_id
+        JOIN task_runs tr ON tr.id = ar.task_run_id
+        WHERE tr.workflow_run_id = ? ORDER BY re.id`, workflowRunId)
+    },
+    async listReviewsByWorkflow(workflowRunId) {
+      return listPayloads(db, ReviewSchema as z.ZodType<ReviewRecord>,
+        'SELECT payload_json FROM reviews WHERE workflow_run_id = ? ORDER BY id', workflowRunId)
+    },
+    async listFindingsByWorkflow(workflowRunId) {
+      return listPayloads(db, FindingSchema as z.ZodType<ReviewFinding>, `SELECT f.payload_json FROM findings f
+        JOIN reviews r ON r.id = f.review_id
+        WHERE r.workflow_run_id = ? ORDER BY f.id`, workflowRunId)
+    },
+    async listArtifactsByProject(projectId) { return artifacts.listByProject(projectId) }
+  }
+}
+
+function json(value: unknown): string {
+  const serialized = JSON.stringify(value)
+  if (serialized === undefined) throw new TypeError('command result must be JSON-serializable')
+  return serialized
+}
+
+function createCommandIdempotency(db: BetterSqlite3.Database): CommandIdempotencyPort {
+  return {
+    async reserve(requestId, commandName) {
+      const row = db.prepare(`SELECT status, result_json FROM command_idempotency
+        WHERE request_id = ? AND command_name = ?`).get(requestId, commandName) as
+        | { status: 'IN_PROGRESS' | 'COMPLETED'; result_json: string | null }
+        | undefined
+      if (row?.status === 'COMPLETED') {
+        return { status: 'COMPLETED', result: JSON.parse(row.result_json!) }
+      }
+      if (row) return { status: 'IN_PROGRESS' }
+      db.prepare(`INSERT INTO command_idempotency(
+        request_id, command_name, status, result_json, created_at
+      ) VALUES (?, ?, 'IN_PROGRESS', NULL, ?)`)
+        .run(requestId, commandName, new Date().toISOString())
+      return { status: 'RESERVED' }
+    },
+    async complete(requestId, commandName, result) {
+      const changed = db.prepare(`UPDATE command_idempotency
+        SET status = 'COMPLETED', result_json = ?, completed_at = ?
+        WHERE request_id = ? AND command_name = ? AND status = 'IN_PROGRESS'`)
+        .run(json(result), new Date().toISOString(), requestId, commandName)
+      if (changed.changes !== 1) throw new Error('command reservation is not in progress')
+    },
+    async release(requestId, commandName) {
+      db.prepare(`DELETE FROM command_idempotency
+        WHERE request_id = ? AND command_name = ? AND status = 'IN_PROGRESS'`)
+        .run(requestId, commandName)
+    }
+  }
 }
 
 export function createRepositories(db: BetterSqlite3.Database): V2Repositories {
+  const artifacts = createArtifactRepository(db)
   return {
     projects: createJsonRepository(db, 'projects', () => ({})),
     workSessions: createJsonRepository(db, 'work_sessions', value => ({
@@ -148,6 +297,8 @@ export function createRepositories(db: BetterSqlite3.Database): V2Repositories {
     findings: createJsonRepository(db, 'findings', value => ({
       review_id: value.reviewId
     })),
-    artifacts: createArtifactRepository(db)
+    artifacts,
+    projections: createProjectionReads(db, artifacts),
+    commandIdempotency: createCommandIdempotency(db)
   }
 }
