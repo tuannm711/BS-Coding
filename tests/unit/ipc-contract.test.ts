@@ -5,6 +5,7 @@ import type { BrowserStatusInfo } from '../../src/shared/browser-types'
 import type { AgentConfig, ChatEvent, ChatMessage, BsSettings } from '../../src/shared/types'
 import type { ProviderSnapshot } from '../../src/shared/provider-state'
 import { configToSettings, DEFAULT_BS_CONFIG } from '../../src/main/agent/config'
+import { V2_IPC } from '../../src/shared/v2/contracts/ipc'
 
 // A stub standing in for the real API must return what the real API returns,
 // or the contract it claims to check is looser than the contract itself.
@@ -12,6 +13,11 @@ const settings = (): BsSettings => configToSettings(DEFAULT_BS_CONFIG)
 const emptySnapshot: ProviderSnapshot = { revision: 0, providers: [], accounts: [], assignments: [], updatedAt: 0 }
 
 describe('IPC contract', () => {
+  it('keeps V2 channels namespaced without privileged raw-handle names', () => {
+    const channels = Object.values(V2_IPC).flatMap(family => Object.values(family))
+    expect(channels.every(channel => channel.startsWith('bs.v2.'))).toBe(true)
+    expect(channels.join(' ')).not.toMatch(/raw-secret|process|fs-handle|ipc-renderer|provider-client/i)
+  })
   it('defines all channels used by the preload api', () => {
     const required: (keyof AgentApi)[] = [
       'listWorkspaces', 'addWorkspace', 'removeWorkspace', 'openWorkspace', 'openInEditor',

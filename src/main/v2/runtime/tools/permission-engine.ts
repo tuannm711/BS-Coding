@@ -1,15 +1,10 @@
 import type { Permission } from '../../../../shared/v2/contracts/tools'
+import type { PermissionProfileLayers } from '../../../../shared/v2/contracts/permissions'
+import { resolvePermissionPolicy } from '../../domain/security/permission-policy'
 export type { Permission } from '../../../../shared/v2/contracts/tools'
 
-export interface PermissionLayers {
-  hardSecurity?: Permission
-  workSession?: Permission
-  agent?: Permission
-  project?: Permission
-  global?: Permission
-}
+export interface PermissionLayers extends PermissionProfileLayers {}
 
 export function resolvePermission(layers: PermissionLayers): Permission {
-  if (layers.hardSecurity === 'DENY') return 'DENY'
-  return layers.workSession ?? layers.agent ?? layers.project ?? layers.global ?? 'ASK'
+  return resolvePermissionPolicy(layers)
 }

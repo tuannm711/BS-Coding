@@ -25,6 +25,7 @@ plan be reviewed — that gate is tracked in `../CURRENT-WORK.md`, not here.
 | P12 | Review, rework and quality gates | `a8f05c1` | `npm run typecheck` + 14 P12/boundary tests + production build green; full suite 1344 passing |
 | P13 | Skills, MCP and LSP integration | `7682c61` | `npm run typecheck` + 17 P13/boundary tests + production build green; full suite 1359 passing |
 | P14 | Typed IPC and preload contracts | `f46f52f` | `npm run typecheck` + 17 P14/boundary tests + production build green; full suite 1374 passing; 15 Playwright e2e passing |
+| P16 | Security, permissions and secrets | `8962fd3` | `npm run typecheck` + 21 P16/security/boundary tests + production build green; full suite 1384 passing |
 
 ## P01 notes
 
@@ -136,3 +137,11 @@ plan be reviewed — that gate is tracked in `../CURRENT-WORK.md`, not here.
 - Preload exposes no raw secret, filesystem, provider, process or `ipcRenderer` handle; public responses and workflow-scoped projection events are runtime-validated before reaching renderer code.
 - Projection publication is monotonic; renderer subscriptions ignore stale events, refetch once on gaps, report refetch failures and reset their baseline from the authoritative snapshot.
 - Task commits: `34fefa1` (contracts), `7069c36` (main router), `45e8b5e` (preload API), `e545ec5` (projection sequencing), `54d7d29` (e2e harness remediation), `f46f52f` (typed-boundary review remediation).
+
+## P16 notes
+
+- `VaultPort` terminates raw secret access in main; the structural legacy safeStorage adapter exposes only `{ref, configured}` metadata outside the port and validates references/values.
+- Permission precedence has one pure domain truth source; hard security denies remain absolute while application projections include source/reason for UI and audit.
+- Recursive redaction covers secret-like keys, bearer strings and known secret values without mutating input; canonical events and ToolExecutor audit results share that sanitizer.
+- Renderer security regressions verify neither V1 nor V2 preload surfaces expose raw secret/process/filesystem/provider-client handles.
+- Task commits: `d325f92` (vault), `86a0e79` (permission profiles), `6e13d28` (redaction), `2548111` (renderer boundary), `8962fd3` (audit/vault review remediation).
