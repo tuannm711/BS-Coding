@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import type {
-  AgentSettingsProjection, BottomPanelProjection, ProjectDetailProjection,
-  ProjectSummary, WorkProjection, WorkSessionSummary
+  AgentSettingsProjection, BottomPanelProjection, HomeProjection, ProjectDetailProjection,
+  ProjectSummary, ProjectWorkspaceProjection, WorkProjection, WorkSessionSummary
 } from '../contracts/ui-projections'
 
 const id = z.string().min(1)
@@ -29,6 +29,20 @@ export const WorkSessionSummarySchema = z.object({
   attentionCount: z.number().int().nonnegative(), updatedAt: timestamp, revision
 }).strict() satisfies z.ZodType<WorkSessionSummary>
 
+const ProviderAccountSchema = z.object({
+  id, providerId: id, enabled: z.boolean(),
+  status: z.enum(['HEALTHY', 'COOLDOWN', 'EXPIRED', 'ERROR', 'UNKNOWN'])
+}).strict()
+export const HomeProjectionSchema = z.object({
+  revision, projects: z.array(ProjectSummarySchema),
+  activeWorkSessions: z.array(WorkSessionSummarySchema),
+  needsAttention: z.array(z.object({
+    id, projectId: id, workSessionId: id,
+    kind: z.enum(['BLOCKED', 'FAILED', 'REVIEW']), title: z.string()
+  }).strict()),
+  providerAccounts: section(z.array(ProviderAccountSchema))
+}).strict() satisfies z.ZodType<HomeProjection>
+
 const WorkspaceSummarySchema = z.object({
   id, path: id, mode: z.enum(['READ_ONLY', 'ISOLATED_WRITE']),
   fileCount: z.number().int().nonnegative()
@@ -53,6 +67,10 @@ export const ProjectDetailProjectionSchema = z.object({
   agents: section(z.array(AgentSummarySchema)), skills: section(z.array(SkillBindingSummarySchema)),
   mcp: section(z.array(McpServerSummarySchema))
 }).strict() satisfies z.ZodType<ProjectDetailProjection>
+
+export const ProjectWorkspaceProjectionSchema = z.object({
+  projectId: id, revision, workspace: section(WorkspaceSummarySchema), git: section(GitSummarySchema)
+}).strict() satisfies z.ZodType<ProjectWorkspaceProjection>
 
 const ConversationItemSchema = z.object({
   id, kind: z.enum(['MESSAGE', 'RUNTIME_CHANGED', 'TOOL', 'SYSTEM']), occurredAt: timestamp,
@@ -104,10 +122,7 @@ export const WorkProjectionSchema = z.object({
 const CredentialStateSchema = z.object({ configured: z.boolean() }).strict()
 export const AgentSettingsProjectionSchema = z.object({
   projectId: id, revision, agents: z.array(AgentSummarySchema),
-  providerAccounts: z.array(z.object({
-    id, providerId: id, enabled: z.boolean(),
-    status: z.enum(['HEALTHY', 'COOLDOWN', 'EXPIRED', 'ERROR', 'UNKNOWN'])
-  }).strict()),
+  providerAccounts: z.array(ProviderAccountSchema),
   globalSettings: z.object({
     providerCredentials: z.record(z.string(), CredentialStateSchema)
   }).strict()

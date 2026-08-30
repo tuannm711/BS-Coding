@@ -31,6 +31,25 @@ export interface WorkSessionSummary {
   revision: number
 }
 
+export interface AttentionSummary {
+  id: string
+  projectId: string
+  workSessionId: string
+  kind: 'BLOCKED' | 'FAILED' | 'REVIEW'
+  title: string
+}
+
+export interface HomeProjection {
+  revision: number
+  projects: readonly ProjectSummary[]
+  activeWorkSessions: readonly WorkSessionSummary[]
+  needsAttention: readonly AttentionSummary[]
+  providerAccounts: ProjectionSection<readonly {
+    id: string; providerId: string; enabled: boolean
+    status: 'HEALTHY' | 'COOLDOWN' | 'EXPIRED' | 'ERROR' | 'UNKNOWN'
+  }[]>
+}
+
 export interface WorkspaceSummary {
   id: string
   path: string
@@ -77,6 +96,13 @@ export interface ProjectDetailProjection {
   agents: ProjectionSection<readonly AgentSummary[]>
   skills: ProjectionSection<readonly SkillBindingSummary[]>
   mcp: ProjectionSection<readonly McpServerSummary[]>
+}
+
+export interface ProjectWorkspaceProjection {
+  projectId: string
+  revision: number
+  workspace: ProjectionSection<WorkspaceSummary>
+  git: ProjectionSection<GitSummary>
 }
 
 export interface ConversationItemSummary {
