@@ -24,7 +24,7 @@ exists to say out loud.
 - **Status:** P13 merged into `master` at `fc61c04`; typecheck, 17 targeted
   tests, production build and the full suite at 1359 passing are green after
   merge. P14 prerequisites are merged; project IPC rules are reconciled,
-  Tasks 1-2 are committed and Task 3 is in progress.
+  Tasks 1-3 are committed and Task 4 is in progress.
 - **Scope:** namespaced Zod IPC registry, validated main router, minimal
   `window.bs.v2` preload API and gap-safe projection subscriptions.
 - **Plan:** [`v2/implementation-plans/plans/14-ipc-preload-contracts.md`](v2/implementation-plans/plans/14-ipc-preload-contracts.md)
