@@ -15,26 +15,15 @@ Last updated: 2026-08-30
 Exactly one entry. If two things are genuinely running, that is what this file
 exists to say out loud.
 
-**V2 P15 prerequisite — awaiting merge approval.**
+**Project workflow rules — V1 to V2 transition execution.**
 
-- **Branch:** `v2/p15-backend-projections`
-- **Gate:** Owner merge approval
-- **Status:** P16 merged into `master` at `806c792` and merged back into this
-  branch. P15 backend Tasks 1-5 are committed at `855a692`, `fecc97b`,
-  `5b7c384`, `22d8352` and `d17d760`; Task 6A typed IPC/preload contracts and
-  route parity are committed at `3864cc2`; Task 6B concrete composition, build
-  and focused Electron smoke are committed at `99b2c34`. Task 7 durable
-  project/lifecycle/runtime/rework persistence, projection publication and review remediation
-  are committed at `6b95ff4`. Inline review has no remaining P0-P2 findings.
-  Completion evidence: typecheck pass; focused 16 files / 50 tests; full Vitest
-  233 files / 1423 tests; production build pass; full Playwright 16/16 pass.
-  `docs/v2` remains unchanged under the documentation-pack lock. The approved UX source is
-  the local vendored Figma Make export, so no live Figma connector is required.
-- **Scope:** owner-scoped projection DTOs/services, real IPC/preload routes,
-  idempotent lifecycle commands and bottom-panel backend projections required
-  by P15 Tasks 2-5.
-- **Spec:** [`superpowers/specs/2026-08-30-p15-backend-projection-prerequisite-design.md`](superpowers/specs/2026-08-30-p15-backend-projection-prerequisite-design.md)
-- **Plan:** [`superpowers/plans/2026-08-30-p15-backend-projection-prerequisite.md`](superpowers/plans/2026-08-30-p15-backend-projection-prerequisite.md)
+- **Branch:** `codex/v2-transition-workflow-rules`
+- **Gate:** Implement the owner-approved bounded rules update
+- **Status:** P15 backend prerequisite is merged locally into `master` at
+  `c44cddc` and post-merge verified. The owner approved new standing rules for
+  continuous execution and automatic local merge of detailed V2 plans.
+- **Scope:** Update the process and working-style rules in root `AGENTS.md`;
+  preserve explicit approval for plan changes, external push and release.
 
 ## Next
 
@@ -43,14 +32,12 @@ after it has been decided.
 
 | # | Work | Prerequisite |
 |---|---|---|
-| 1 | Merge `v2/p15-backend-projections` into `master` | Requires owner approval |
-| 2 | Resume locked P15 renderer plan | Requires merged backend prerequisite; uses vendored prototype |
+| 1 | Resume P15 renderer Task 1 on `v2/p15-renderer-ui-figma` | Requires rules update merged locally |
+| 2 | Continue detailed plans through P20 | Follow master plan dependencies |
 
 ## Blocked
 
-- **Renderer implementation remains blocked:** backend projection/API branch must
-  pass the owner merge gate before locked P15 UI Task 1 begins. The
-  approved UX source is already vendored under `docs/v2/prototype/figma-make/`.
+- No technical blocker. P15 renderer resumes after this bounded rules update.
 
 ## Standing rules
 

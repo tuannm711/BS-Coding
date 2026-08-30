@@ -15,10 +15,13 @@ duyệt. Luật không bao giờ bị âm thầm bỏ đi vì code đã dời.
 
 ### A. Quy trình
 
-- Quy trình: brainstorm → spec → plan → thực thi → review → merge → release. Mỗi bước là một gate,
-  phải được duyệt trước khi sang bước sau.
-- "Thực hiện" chỉ mở đúng gate kế tiếp. Không tự quyết định gộp bước, hoãn việc hay bỏ việc.
-- Mỗi task một nhánh riêng. Không commit thẳng vào `master`.
+- Quy trình: brainstorm → spec → plan → thực thi → review → merge → release. Mỗi bước là một gate.
+  Công việc chưa được duyệt phải được duyệt trước khi sang gate kế tiếp; các detailed plan V2 P01-P20
+  đã được duyệt để thực hiện liên tục theo các quy tắc chuyển đổi bên dưới.
+- Ngoài chuỗi detailed plan V2 đã duyệt, "Thực hiện" chỉ mở đúng gate kế tiếp. Không tự quyết định
+  gộp bước, hoãn việc hay bỏ việc.
+- Mỗi detailed plan một nhánh riêng; các task thuộc cùng plan ở trên cùng nhánh đó. Không commit thẳng
+  vào `master`. Chỉ tách plan thành nhiều nhánh/prerequisite khi thật sự cần và phải xin ý kiến trước.
 - Đọc spec của vùng và `git log` của file trước khi sửa nó.
 - Chỉ sửa đúng thứ được yêu cầu. Thứ khác mà thay đổi chạm tới cần hỏi trước.
 - Điều tra đủ rồi hỏi gộp một lượt, không hỏi rải rác từng câu.
@@ -26,6 +29,20 @@ duyệt. Luật không bao giờ bị âm thầm bỏ đi vì code đã dời.
   phát hiện, ghi vào `docs/DEBT.md` — không ghi thì nó thành TODO bị quên.
 - Tên file lưu trữ quy trình: `YYYY-MM-DD-slug.md`, đặt trong `docs/superpowers/specs/`,
   `docs/superpowers/plans/`.
+
+Trong giai đoạn chuyển đổi V1 → V2:
+
+- Mục tiêu thực thi là hoàn thành liên tục toàn bộ 20 detailed plan P01-P20 theo dependency và thứ tự
+  trong master plan. Không dừng để xin duyệt ở các task, checkpoint, review hoặc local-merge thông
+  thường đã được plan mô tả.
+- Khi một detailed plan đạt completion gate và review không còn finding P0-P2, tự merge nhánh plan về
+  `master` local, chạy post-merge verification phù hợp rồi xoá nhánh đã merge; không cần hỏi lại chủ
+  dự án. Quy tắc này không cho phép push remote hay release.
+- Chỉ dừng để xin ý kiến khi cần thay đổi plan/contract/phạm vi, cần tách hoặc thêm prerequisite/plan,
+  plan có mâu thuẫn hoặc thiếu quyết định, có blocker cần lựa chọn của chủ dự án, hoặc hành động vượt
+  thẩm quyền đã duyệt. Điều tra đủ và hỏi gộp một lần.
+- Sau khi merge và verify một plan, cập nhật `docs/CURRENT-WORK.md`, chuyển sang plan đủ dependency
+  kế tiếp trên nhánh riêng và tiếp tục thực hiện.
 
 ### B. Ranh giới tiến trình
 
@@ -195,6 +212,10 @@ Rút ra từ một buổi debug lag ô chat input thật (đo bằng Chromium tr
 
 - Không spawn subagent; làm inline.
 - Dùng superpowers skills cho phần việc chúng bao phủ.
+- Không lặp `Next step` trong từng dòng cập nhật inline. Chỉ nêu `Next step` tại checkpoint có ý nghĩa
+  hoặc khi cần chủ dự án review, duyệt hay quyết định.
+- Khi bước kế tiếp cần chủ dự án review/duyệt, phải nói rõ sau khi được duyệt sẽ thực hiện hành động
+  nào; không chỉ ghi chung chung là "chờ duyệt".
 
 ## Công nghệ
 
