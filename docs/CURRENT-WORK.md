@@ -15,18 +15,17 @@ Last updated: 2026-08-30
 Exactly one entry. If two things are genuinely running, that is what this file
 exists to say out loud.
 
-**V2 plan 14 — typed IPC and preload contracts.**
+**V2 plan 15 — renderer UI and Figma binding.**
 
-- **Branch:** `v2/p14-ipc-preload-contracts`
-- **Gate:** `npm run typecheck`, 17 P14/boundary tests, production build, the
-  full suite at 1374 passing and 15 Playwright e2e tests are green
-- **Status:** implementation and inline review complete at `f46f52f`; review
-  remediation added explicit public DTO schemas, sanitized service errors,
-  typed route construction and handled projection refetch failures. P14 is
-  awaiting approval to merge into `master`.
-- **Scope:** namespaced Zod IPC registry, validated main router, minimal
-  `window.bs.v2` preload API and gap-safe projection subscriptions.
-- **Plan:** [`v2/implementation-plans/plans/14-ipc-preload-contracts.md`](v2/implementation-plans/plans/14-ipc-preload-contracts.md)
+- **Branch:** `v2/p15-renderer-ui-figma`
+- **Gate:** `npm run typecheck`, P15 renderer unit tests, production build and
+  `v2-core-flow.spec.ts` + `v2-runtime-switch.spec.ts` are green
+- **Status:** P14 merged into `master` at `a561a95`; typecheck, 17 targeted
+  tests, production build, the full suite at 1374 passing and 15 Playwright
+  e2e tests are green after merge. P15 preflight is blocked before Task 1.
+- **Scope:** locked Figma navigation/shell, project/work-session screens,
+  agents/settings and functional bottom-panel flows backed by V2 DTOs.
+- **Plan:** [`v2/implementation-plans/plans/15-renderer-ui-figma-binding.md`](v2/implementation-plans/plans/15-renderer-ui-figma-binding.md)
 
 ## Next
 
@@ -35,12 +34,18 @@ after it has been decided.
 
 | # | Work | Prerequisite |
 |---|---|---|
-| 1 | Merge V2 plan 14 into `master` | P14 implementation/review complete; awaiting approval |
-| 2 | V2 plan 15 — renderer UI and Figma binding | Requires P14 merge |
+| 1 | Resolve P15 Figma context and backend projection prerequisites | Required before Task 1 implementation |
 
 ## Blocked
 
-Nothing.
+- **Figma context unavailable:** the approved Figma Make URL has no `node-id`;
+  this session exposes no `get_design_context` tool or Figma MCP resource. The
+  mandatory design-to-code workflow forbids implementing from screenshots or
+  assumptions.
+- **Backend projection/API gap:** P14 exposes only five preload methods and
+  registers no concrete V2 application routes; P15 Tasks 2-5 require project,
+  lifecycle, agent/settings and bottom-panel projections/commands that no
+  later plan is scheduled to provide.
 
 ## Standing rules
 
