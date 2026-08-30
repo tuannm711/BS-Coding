@@ -1,6 +1,7 @@
 import type {
   ProviderAccountSummary, RuntimeTargetCandidateSummary
 } from '../../../../shared/v2/contracts/provider'
+import type { QuotaSnapshot } from '../../../../shared/v2/contracts/usage'
 
 interface LegacyModel {
   id: string
@@ -17,6 +18,8 @@ interface LegacyAccount {
   label?: string
   models?: readonly string[]
   modelCatalog?: readonly LegacyModel[]
+  usage?: { status?: string; primaryUsedPercent?: number; resetAt?: number;
+    refreshedAt?: number }
 }
 
 interface LegacyProviderAccountEdge {
@@ -68,6 +71,20 @@ export class V1ProviderAccountAdapter {
     })).sort((left, right) => left.providerName.localeCompare(right.providerName) ||
       left.accountLabel.localeCompare(right.accountLabel) || left.modelName.localeCompare(right.modelName) ||
       left.id.localeCompare(right.id))
+  }
+
+  async listQuotaSnapshots(): Promise<QuotaSnapshot[]> {
+    return this.legacy.listConnections().flatMap(connection => connection.accounts.map(account => {
+      const usage = account.usage
+      const capturedAt = new Date(typeof usage?.refreshedAt === 'number'
+        ? usage.refreshedAt : Date.now()).toISOString()
+      return { providerId: connection.providerId, accountId: account.id,
+        status: usage?.status === 'ok' ? 'AVAILABLE' as const : 'UNAVAILABLE' as const,
+        ...(typeof usage?.primaryUsedPercent === 'number'
+          ? { remainingPercent: Math.max(0, Math.min(100, 100 - usage.primaryUsedPercent)) } : {}),
+        ...(typeof usage?.resetAt === 'number' ? { resetAt: new Date(usage.resetAt).toISOString() } : {}),
+        capturedAt }
+    }))
   }
 
   async connect(input: { providerId: string; apiKey: string }): Promise<void> {

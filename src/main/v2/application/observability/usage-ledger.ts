@@ -11,12 +11,14 @@ export interface UsageScope {
 }
 
 export interface UsageRepositoryPort {
+  has(id: string): Promise<boolean>
   insert(record: UsageRecord): Promise<boolean>
   totals(scope: UsageScope): Promise<UsageTotals>
 }
 
 export class UsageLedger {
   constructor(private readonly repository: UsageRepositoryPort) {}
+  has(id: string): Promise<boolean> { return this.repository.has(id) }
   record(record: UsageRecord): Promise<boolean> { return this.repository.insert(record) }
   totals(scope: UsageScope): Promise<UsageTotals> { return this.repository.totals(scope) }
 }

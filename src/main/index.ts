@@ -1038,6 +1038,7 @@ app.whenReady().then(async () => {
           getWorkspace: id => workspaceGit.getWorkspace(id),
           getGitStatus: id => workspaceGit.getGitStatus(id),
           listProviderAccounts: () => providers.listAccounts(),
+          listQuotaSnapshots: () => providers.listQuotaSnapshots(),
           listRuntimeTargets: () => providers.listRuntimeTargets(),
           listSkillBindings: async () => ({ status: 'EMPTY' as const }),
           listMcpServers: async () => {
@@ -1049,7 +1050,7 @@ app.whenReady().then(async () => {
           listDiagnostics: async () => ({ status: 'EMPTY' as const }),
           credentialState: () => settings.credentialState(),
           listTerminals: async () => mainApp.pty.terminalIds().map(id => ({ id, title: id, status: 'RUNNING' as const })),
-          listTests: async () => [], listLogs: async () => [], listOutput: async () => [],
+          listTests: async () => [], listOutput: async () => [],
           connectProvider: value => providers.connect(value),
           refreshProvider: value => providers.refresh(value),
           setProviderEnabled: value => providers.setEnabled(value),

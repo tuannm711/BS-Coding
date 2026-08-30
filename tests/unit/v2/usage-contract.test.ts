@@ -7,4 +7,7 @@ it('allows omitted limits and rejects invalid usage values', () => {
   expect(UsageRecordSchema.safeParse({ id: 'u1', projectId: 'p1', providerId: 'openai',
     accountId: 'a1', requests: 1, inputTokens: -1, outputTokens: 0,
     costUsd: 0, occurredAt: '2026-08-30T00:00:00.000Z' }).success).toBe(false)
+  expect(UsageRecordSchema.safeParse({ id: 'u2', projectId: 'p1', providerId: 'openai',
+    accountId: 'a1', requests: 1, inputTokens: 10, outputTokens: 2,
+    occurredAt: '2026-08-30T00:00:00.000Z' }).success).toBe(true)
 })

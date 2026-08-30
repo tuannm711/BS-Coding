@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { UsageEventPayloadSchema } from './usage'
 
 const timestamp = z.iso.datetime({ offset: true })
 const envelope = z.object({
@@ -29,6 +30,6 @@ export const CanonicalEventSchema = z.discriminatedUnion('type', [
   variant('APPROVAL', z.record(z.string(), z.unknown())),
   variant('FINDING', z.record(z.string(), z.unknown())),
   variant('ARTIFACT', z.record(z.string(), z.unknown())),
-  variant('USAGE', z.record(z.string(), z.unknown())),
+  variant('USAGE', UsageEventPayloadSchema),
   variant('ERROR', z.object({ code: z.string().min(1), message: z.string() }))
 ])

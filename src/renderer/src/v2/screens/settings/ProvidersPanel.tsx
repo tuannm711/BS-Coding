@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { KeyRound, RefreshCw } from 'lucide-react'
 import type { AgentSettingsProjection } from '../../../../../shared/v2/contracts/ui-projections'
+import type { QuotaSnapshot } from '../../../../../shared/v2/contracts/usage'
+import { useEffect } from 'react'
 
 interface Props { projection: AgentSettingsProjection | null; onRefresh(): Promise<void> }
 
@@ -9,9 +11,12 @@ export default function ProvidersPanel({ projection, onRefresh }: Props) {
   const [apiKey, setApiKey] = useState('')
   const [busy, setBusy] = useState('')
   const [error, setError] = useState('')
+  const [quotas, setQuotas] = useState<readonly QuotaSnapshot[]>([])
+  const refreshQuotas = async () => { setQuotas(await window.bs.v2['provider.quota']({})) }
+  useEffect(() => { void refreshQuotas().catch(() => setError('Provider quota is unavailable. Refresh to retry.')) }, [])
   const run = async (key: string, operation: () => Promise<unknown>) => {
     setBusy(key); setError('')
-    try { await operation(); await onRefresh() } catch { setError('Provider command failed. Check the account state and retry.') }
+    try { await operation(); await Promise.all([onRefresh(), refreshQuotas()]) } catch { setError('Provider command failed. Check the account state and retry.') }
     finally { setBusy('') }
   }
   if (!projection) return <div className="v2-panel-state" role="status">Loading Providers…</div>
@@ -33,9 +38,9 @@ export default function ProvidersPanel({ projection, onRefresh }: Props) {
     {groups.size === 0 ? <div className="v2-panel-state">No provider accounts are connected.</div>
       : [...groups].map(([id, accounts]) => <section className="v2-provider-card" key={id}><div className="v2-provider-card-header"><div><strong>{id}</strong><span>{accounts.length} accounts</span></div>
         <button type="button" className="v2-btn" disabled={busy !== ''} onClick={() => void run(`refresh-${id}`, () => window.bs.v2['provider.refresh']({ scopeId, providerId: id }))}><RefreshCw size={13} />Refresh</button></div>
-        {accounts.map(account => <div className="v2-provider-account" key={account.id}><span><strong>{account.id}</strong><small>{account.status}</small></span><span className="v2-status-pill">{account.enabled ? 'Enabled' : 'Disabled'}</span>
+        {accounts.map(account => { const quota = quotas.find(item => item.providerId === id && item.accountId === account.id); return <div className="v2-provider-account" key={account.id}><span><strong>{account.id}</strong><small>{account.status}{quota?.remainingPercent != null ? ` · ${quota.remainingPercent}% remaining` : ' · Quota unavailable'}</small></span><span className="v2-status-pill">{account.enabled ? 'Enabled' : 'Disabled'}</span>
           <button type="button" className="v2-btn" disabled={busy !== ''} onClick={() => void run(account.id, () => window.bs.v2['provider.setEnabled']({ scopeId,
             accountId: account.id, enabled: !account.enabled }))}>{account.enabled ? 'Disable' : 'Enable'}</button>
-          <button type="button" className="v2-btn" disabled={busy !== ''} onClick={() => void run(`probe-${account.id}`, () => window.bs.v2['provider.probe']({ scopeId, providerId: id }))}>Probe</button></div>)}</section>)}
+          <button type="button" className="v2-btn" disabled={busy !== ''} onClick={() => void run(`probe-${account.id}`, () => window.bs.v2['provider.probe']({ scopeId, providerId: id }))}>Probe</button></div> })}</section>)}
   </div>
 }

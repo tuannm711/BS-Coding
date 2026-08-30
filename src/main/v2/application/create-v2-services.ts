@@ -3,8 +3,7 @@ import type {
 } from '../../../shared/v2/contracts/domain'
 import type { RuntimeTarget, RuntimeTargetCandidateSummary } from '../../../shared/v2/contracts/provider'
 import type { ReviewFinding, ReviewRecord } from '../../../shared/v2/contracts/review'
-import type {
-  LogSummary, OutputSummary, SafeSettingsSummary, TerminalSummary, TestRunSummary
+import type { OutputSummary, SafeSettingsSummary, TerminalSummary, TestRunSummary
 } from '../../../shared/v2/contracts/ui-projections'
 import { transitionWorkflow } from '../domain/workflow/workflow-state'
 import type { EventStore } from './ports/event-store'
@@ -20,6 +19,10 @@ import { createProjectProjectionService, ProjectionNotFoundError } from './proje
 import { createWorkProjectionService } from './projections/work-projections'
 import { createRuntimeEpochService } from './runtime/runtime-epoch-service'
 import { createReworkRequestService } from './review/rework-service'
+import { createDiagnosticsService } from './observability/diagnostics-service'
+import type { UsageLedger } from './observability/usage-ledger'
+import type { QuotaSnapshot } from '../../../shared/v2/contracts/usage'
+import { evaluateBudget, type BudgetPolicyPort } from './observability/budget-evaluator'
 
 type JsonPatch = Readonly<Record<string, unknown>>
 const PROJECTION_EVENT_LIMIT = 1000
@@ -28,7 +31,6 @@ export interface V2CompositionSupport extends ProjectionSupportPort {
   credentialState(): Promise<SafeSettingsSummary['providerCredentials']>
   listTerminals(projectId: string, workflowRunId: string, limit: number): Promise<readonly TerminalSummary[]>
   listTests(projectId: string, workflowRunId: string, limit: number): Promise<readonly TestRunSummary[]>
-  listLogs(projectId: string, workflowRunId: string, limit: number): Promise<readonly LogSummary[]>
   listOutput(projectId: string, workflowRunId: string, limit: number): Promise<readonly OutputSummary[]>
   connectProvider(input: { scopeId: string; providerId: string; apiKey: string }): Promise<void>
   refreshProvider(input: { scopeId: string; providerId: string }): Promise<void>
@@ -37,6 +39,7 @@ export interface V2CompositionSupport extends ProjectionSupportPort {
   updateSettings(input: { scopeId: string; patch: JsonPatch }): Promise<void>
   listRuntimeTargets(projectId: string,
     workSessionId: string): Promise<readonly RuntimeTargetCandidateSummary[]>
+  listQuotaSnapshots(): Promise<readonly QuotaSnapshot[]>
   remoteStatus(): Promise<{ enabled: boolean; status: string }>
 }
 
@@ -44,6 +47,8 @@ export interface CreateV2ServicesInput {
   repositories: V2ServiceRepositories
   events: EventStore
   support: V2CompositionSupport
+  usage: UsageLedger
+  budgets: BudgetPolicyPort
   transaction<T>(operation: () => Promise<T>): Promise<T>
   publishWorkflow?(workflow: WorkflowRun, revision: number): Promise<void> | void
   now?: () => string
@@ -129,6 +134,7 @@ export function createV2Services(input: CreateV2ServicesInput) {
   const settings = createAgentSettingsProjectionService({ revision, listAgents,
     listProviderAccounts: () => input.support.listProviderAccounts(),
     credentialState: () => input.support.credentialState() })
+  const diagnostics = createDiagnosticsService()
   const bottom = createBottomPanelProjectionService({ revision,
     terminals: (projectId, workflowRunId, limit) => input.support.listTerminals(projectId, workflowRunId, limit),
     tests: (projectId, workflowRunId, limit) => input.support.listTests(projectId, workflowRunId, limit),
@@ -136,7 +142,10 @@ export function createV2Services(input: CreateV2ServicesInput) {
       const section = await input.support.listDiagnostics(projectId, workflowRunId)
       return section.status === 'AVAILABLE' ? section.value : []
     },
-    logs: (projectId, workflowRunId, limit) => input.support.listLogs(projectId, workflowRunId, limit),
+    logs: async (_projectId, workflowRunId, limit) => diagnostics
+      .project(await input.events.loadRecent(workflowRunId, limit)).map(entry => ({ id: entry.id,
+        occurredAt: entry.timestamp, level: entry.level === 'WARN' ? 'WARNING' as const : entry.level,
+        message: `[${entry.code}] ${entry.message}` })),
     output: (projectId, workflowRunId, limit) => input.support.listOutput(projectId, workflowRunId, limit) })
 
   const resolveWork = async (projectId: string, workSessionId: string) => {
@@ -356,6 +365,35 @@ export function createV2Services(input: CreateV2ServicesInput) {
     'provider.refresh': value => agentCommands.refreshProvider({ requestId: String(value.requestId), ...(value.input as object) } as never),
     'provider.setEnabled': value => agentCommands.setProviderEnabled({ requestId: String(value.requestId), ...(value.input as object) } as never),
     'provider.probe': value => agentCommands.probeProvider({ requestId: String(value.requestId), ...(value.input as object) } as never),
+    'provider.quota': () => input.support.listQuotaSnapshots(),
+    'usage.get': async value => {
+      const projectId = String(value.projectId); const workSessionId = String(value.workSessionId)
+      const workflowRunId = String(value.workflowRunId)
+      const session = await repositories.projections.getWorkSessionOwnedByProject(projectId, workSessionId)
+      const workflow = await repositories.projections.getWorkflowOwnedByProject(projectId, workflowRunId)
+      if (!session || !workflow || workflow.workSessionId !== session.id) throw new ProjectionNotFoundError()
+      const [totals, policy, agentRuns] = await Promise.all([input.usage.totals({ workflowRunId }),
+        input.budgets.get(workflowRunId), repositories.projections.listAgentRunsByWorkflow(workflowRunId)])
+      const budgetUsage = { costUsd: totals.costUsd, costKnown: totals.costKnown,
+        inputTokens: totals.inputTokens, requests: totals.requests,
+        concurrentAgents: agentRuns.filter(run => run.status === 'RUNNING').length,
+        elapsedMs: Math.max(0, Date.parse(now()) - Date.parse(session.createdAt)) }
+      return { projectId, workSessionId, workflowRunId, totals, policy,
+        decision: evaluateBudget(policy, budgetUsage) }
+    },
+    'usage.updateBudget': async value => {
+      const envelope = value as { requestId: string; input: { projectId: string; workSessionId: string;
+        workflowRunId: string; policy: import('../../../shared/v2/contracts/usage').BudgetPolicy } }
+      const owned = await repositories.projections.getWorkflowOwnedByProject(
+        envelope.input.projectId, envelope.input.workflowRunId)
+      if (!owned || owned.workSessionId !== envelope.input.workSessionId) throw new ProjectionNotFoundError()
+      await runIdempotentCommand({ idempotency: repositories.commandIdempotency, transaction },
+        envelope.requestId, 'usage.updateBudget', async () => {
+          await input.budgets.save(envelope.input.workflowRunId, envelope.input.policy, now())
+          return { ok: true }
+        })
+      return { ok: true }
+    },
     'workspace.get': value => projectProjections.getProjectWorkspace(String(value.projectId)),
     'git.status': async value => available(await input.support.getGitStatus(String(value.projectId)), 'git status'),
     'skill.list': async value => available(await input.support.listSkillBindings(String(value.projectId)), 'skills'),

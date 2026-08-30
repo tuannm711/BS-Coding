@@ -3,6 +3,7 @@ import coreSql from './migrations/001-core.sql?raw'
 import eventsSql from './migrations/002-events.sql?raw'
 import projectionsSql from './migrations/003-projections-idempotency.sql?raw'
 import usageSql from './migrations/004-usage.sql?raw'
+import budgetSql from './migrations/005-budget-cost-known.sql?raw'
 
 export interface Migration {
   version: number
@@ -13,7 +14,8 @@ export const defaultMigrations: readonly Migration[] = [
   { version: 1, sql: coreSql },
   { version: 2, sql: eventsSql },
   { version: 3, sql: projectionsSql },
-  { version: 4, sql: usageSql }
+  { version: 4, sql: usageSql },
+  { version: 5, sql: budgetSql }
 ]
 
 export function migrate(

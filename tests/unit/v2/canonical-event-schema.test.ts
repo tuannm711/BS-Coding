@@ -34,4 +34,14 @@ describe('CanonicalEventSchema', () => {
       ...envelope, type: 'PROVIDER_NATIVE_OBJECT', payload: {}
     }).success).toBe(false)
   })
+
+  it('validates strict usage payloads while allowing unknown cost', () => {
+    expect(CanonicalEventSchema.safeParse({ ...envelope, type: 'USAGE', payload: {
+      providerId: 'openai', accountId: 'a1', requests: 1, inputTokens: 10, outputTokens: 2
+    } }).success).toBe(true)
+    expect(CanonicalEventSchema.safeParse({ ...envelope, type: 'USAGE', payload: {
+      providerId: 'openai', accountId: 'a1', requests: 1, inputTokens: 10, outputTokens: 2,
+      secret: 'forbidden'
+    } }).success).toBe(false)
+  })
 })

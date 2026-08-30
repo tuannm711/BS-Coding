@@ -21,7 +21,8 @@ it('persists usage idempotently and aggregates by correlation/provider scope', a
       workflowRunId: 'wf2', providerId: 'google', accountId: 'account-2', costUsd: 9 })
 
     await expect(ledger.totals({ workflowRunId: 'wf1' })).resolves.toEqual({ requests: 2,
-      inputTokens: 150, outputTokens: 40, cacheReadTokens: 20, cacheWriteTokens: 0, costUsd: 0.35 })
+      inputTokens: 150, outputTokens: 40, cacheReadTokens: 20, cacheWriteTokens: 0,
+      costUsd: 0.35, costKnown: true })
     await expect(ledger.totals({ providerId: 'openai', accountId: 'account-1' }))
       .resolves.toMatchObject({ requests: 2, costUsd: 0.35 })
   } finally { db.close() }

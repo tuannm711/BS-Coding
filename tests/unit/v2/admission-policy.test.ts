@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { canDispatch } from '../../../src/main/v2/application/agent/admission-policy'
 
 describe('agent dispatch admission', () => {
-  const usage = { costUsd: 999999, inputTokens: 0, requests: 0, concurrentAgents: 999, elapsedMs: 0 }
+  const usage = { costUsd: 999999, costKnown: true, inputTokens: 0, requests: 0, concurrentAgents: 999, elapsedMs: 0 }
   it('does not invent concurrency or budget limits', () => {
     expect(canDispatch({ policy: {}, usage })).toEqual({ decision: 'ALLOW' })
   })

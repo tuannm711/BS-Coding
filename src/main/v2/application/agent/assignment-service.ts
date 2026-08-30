@@ -28,6 +28,14 @@ interface AgentVersionRef {
   readonly revision: number
 }
 
+export class DispatchAdmissionError extends Error {
+  constructor(readonly code: 'DISPATCH_BLOCKED' | 'DISPATCH_APPROVAL_REQUIRED',
+    readonly metric: string, readonly current: number, readonly limit: number) {
+    super(code === 'DISPATCH_BLOCKED' ? 'dispatch blocked by explicit budget' : 'dispatch requires budget approval')
+    this.name = 'DispatchAdmissionError'
+  }
+}
+
 export function createAssignmentService(deps: {
   nextId(): string
   now(): string
@@ -38,7 +46,12 @@ export function createAssignmentService(deps: {
 }) {
   return {
     async assignAndDispatch(input: { taskRunId: string; agentVersionId: string;
-      envelope: TaskEnvelope }): Promise<Assignment> {
+      envelope: TaskEnvelope; budget: { policy: BudgetPolicy; usage: BudgetUsage } }): Promise<Assignment> {
+      const admission = canDispatch(input.budget)
+      if (admission.decision !== 'ALLOW') {
+        throw new DispatchAdmissionError(admission.decision === 'BLOCK' ? 'DISPATCH_BLOCKED'
+          : 'DISPATCH_APPROVAL_REQUIRED', admission.metric, admission.current, admission.limit)
+      }
       const agentVersion = await deps.loadAgentVersion(input.agentVersionId)
       const assignment: Assignment = Object.freeze({
         id: deps.nextId(), taskRunId: input.taskRunId,
@@ -51,3 +64,5 @@ export function createAssignmentService(deps: {
     }
   }
 }
+import type { BudgetPolicy, BudgetUsage } from '../../../../shared/v2/contracts/usage'
+import { canDispatch } from './admission-policy'

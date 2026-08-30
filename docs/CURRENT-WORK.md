@@ -15,10 +15,10 @@ Last updated: 2026-08-30
 Exactly one entry. If two things are genuinely running, that is what this file
 exists to say out loud.
 
-**V2 P17 observability, usage and budget — integration amendment decision.**
+**V2 P17 observability, usage and budget — completion and local merge.**
 
 - **Branch:** `v2/p17-observability-usage-budget`
-- **Gate:** Owner decision on composing ledger/budget/diagnostics into runtime, admission and UI
+- **Gate:** Final commit, local merge and post-merge verification
 - **Status:** P15 backend prerequisite merged locally into `master` at `c44cddc`
   and post-merge verified: typecheck pass, full Vitest 233 files / 1423 tests,
   production build pass and Playwright 16/16 pass. Continuous V2 execution rules
@@ -40,9 +40,13 @@ exists to say out loud.
   `6d757bc`. Task 4 diagnostics/redaction/bottom-log integration is green.
   Completion review found the plan's minimal tasks do not wire canonical USAGE
   events into the ledger, do not call budget admission from real dispatch, and
-  do not expose usage/budget projections to Work/Providers UI.
-- **Scope:** Decide whether to add a P17 composition amendment, accept a partial
-  projector-only integration, or defer the missing acceptance with explicit debt.
+  do not expose usage/budget projections to Work/Providers UI. The approved
+  amendment now connects runtime finish usage → canonical USAGE → atomic ledger
+  → budget admission → scoped IPC → Work/Providers UI; unknown cost stays
+  explicit. Completion evidence: focused 11 files / 27 tests, full Vitest 243
+  files / 1441 tests, build and Playwright 18/18 exit 0. No P0-P2 remain.
+- **Scope:** Commit P17 completion, merge locally, verify merged result and move
+  to the next dependency-ready detailed plan.
 - **Plan:** [`v2/implementation-plans/plans/17-observability-usage-budget.md`](v2/implementation-plans/plans/17-observability-usage-budget.md)
 
 ## Next
@@ -52,13 +56,12 @@ after it has been decided.
 
 | # | Work | Prerequisite |
 |---|---|---|
-| 1 | Resolve P17 integration amendment | Required for stated P17 acceptance |
-| 2 | Complete P17 review and local merge | Requires chosen integration path |
+| 1 | Merge `v2/p17-observability-usage-budget` locally | Completion gate green |
+| 2 | Continue next dependency-ready V2 plan | Requires post-merge verification |
 
 ## Blocked
 
-- **Decision required:** P17's unit-level services are not connected to all
-  acceptance consumers (runtime usage, real admission and UI projections).
+- No technical blocker.
 
 ## Standing rules
 

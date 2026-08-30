@@ -3,6 +3,7 @@ import { ArrowLeft, Clock3, History, Pause, Play, RotateCcw, Square } from 'luci
 import type { WorkflowRun, WorkSession, WorkSessionStatus } from '../../../../shared/v2/contracts/domain'
 import type { RuntimeTargetCandidateSummary } from '../../../../shared/v2/contracts/provider'
 import type { ProjectSummary, WorkProjection } from '../../../../shared/v2/contracts/ui-projections'
+import type { BudgetPolicy, UsageOverview } from '../../../../shared/v2/contracts/usage'
 import ConversationView from './work/ConversationView'
 import PlanView from './work/PlanView'
 import TasksView from './work/TasksView'
@@ -44,6 +45,8 @@ export default function WorkSessionScreen({ selection, onBack }: Props) {
   const [commandBusy, setCommandBusy] = useState(false)
   const [panelRefreshKey, setPanelRefreshKey] = useState(0)
   const [confirmCancel, setConfirmCancel] = useState(false)
+  const [usage, setUsage] = useState<UsageOverview | null>(null)
+  const [budgetOpen, setBudgetOpen] = useState(false)
 
   const scope = useMemo(() => session?.activeWorkflowRunId && selection ? {
     projectId: selection.projectId, workSessionId: selection.workSessionId,
@@ -71,6 +74,10 @@ export default function WorkSessionScreen({ selection, onBack }: Props) {
     setPanelRefreshKey(value => value + 1)
   }, [scope, tab])
 
+  const refreshUsage = useCallback(async () => {
+    if (scope) setUsage(await window.bs.v2['usage.get'](scope))
+  }, [scope])
+
   useEffect(() => {
     if (!selection) { setLoading(false); return }
     let current = true
@@ -87,6 +94,7 @@ export default function WorkSessionScreen({ selection, onBack }: Props) {
     refreshProjection(tab).catch(() => { if (current) setError('Work projection is unavailable.') })
     return () => { current = false }
   }, [refreshProjection, scope, tab])
+  useEffect(() => { void refreshUsage().catch(() => setError('Usage projection is unavailable.')) }, [refreshUsage])
 
   useEffect(() => {
     if (!selection || !session) return
@@ -107,21 +115,21 @@ export default function WorkSessionScreen({ selection, onBack }: Props) {
       refetch: async event => ({ ...event,
         payload: await window.bs.v2.workflow.get(scope.workflowRunId) }),
       apply: () => {
-        void Promise.all([refreshIdentity(), refreshProjection(tab)]).catch(() => {
+        void Promise.all([refreshIdentity(), refreshProjection(tab), refreshUsage()]).catch(() => {
           setError('Work projection refresh failed.')
         })
       },
       onError: () => { setError('Work projection refetch failed after an event gap.') }
     })
     return () => subscription.dispose()
-  }, [refreshIdentity, refreshProjection, scope, tab])
+  }, [refreshIdentity, refreshProjection, refreshUsage, scope, tab])
 
   const runCommand = useCallback(async (operation: () => Promise<unknown>) => {
     setCommandBusy(true); setError('')
-    try { await operation(); await refreshIdentity(); await refreshProjection(tab) }
+    try { await operation(); await refreshIdentity(); await refreshProjection(tab); await refreshUsage() }
     catch { setError('The Work Session command failed. Reload the projection and retry.') }
     finally { setCommandBusy(false) }
-  }, [refreshIdentity, refreshProjection, tab])
+  }, [refreshIdentity, refreshProjection, refreshUsage, tab])
 
   if (!selection) return <WorkMessage title="Choose a Work Session" detail="Open active work from Home or a Project." action={onBack} />
   if (loading) return <WorkMessage title="Loading Work Session" detail="Reading authoritative workflow state…" />
@@ -147,6 +155,10 @@ export default function WorkSessionScreen({ selection, onBack }: Props) {
         <div className="v2-project-meta"><span><Clock3 size={13} />Started {new Date(session.createdAt).toLocaleString()}</span>
           <span>{activeRuns} agents active</span><span>{completedTasks}/{tasks.length} tasks</span><span>{project.defaultBranch}</span></div></div>
       <div className="v2-work-actions">
+        {usage ? <div className="v2-usage-summary"><span>{usage.totals.inputTokens} input tokens</span>
+          <span>{usage.totals.costKnown ? `$${usage.totals.costUsd.toFixed(4)}` : 'Cost unknown'}</span>
+          <span className="v2-status-pill">{usage.decision.decision}</span></div> : null}
+        <button type="button" className="v2-btn" onClick={() => setBudgetOpen(true)}>Budget</button>
         <select aria-label="Runtime target" value={candidateId} disabled={commandBusy || !candidates.some(item => item.selectable)}
           onChange={event => setCandidateId(event.target.value)}>
           {!candidates.length ? <option value="">No runtime targets</option> : null}
@@ -195,7 +207,29 @@ export default function WorkSessionScreen({ selection, onBack }: Props) {
       detail="Running AgentRuns will be cancelled. Completed task results remain in V2 persistence."
       confirmLabel="Cancel Work Session" busy={commandBusy} onClose={() => setConfirmCancel(false)}
       onConfirm={() => runCommand(async () => { await window.bs.v2['workSession.cancel'](selection); setConfirmCancel(false) })} /> : null}
+    {budgetOpen ? <BudgetModal initial={usage?.policy ?? {}} busy={commandBusy}
+      onClose={() => setBudgetOpen(false)} onSave={policy => runCommand(async () => {
+        await window.bs.v2['usage.updateBudget']({ ...scope, policy }); setBudgetOpen(false)
+      })} /> : null}
   </div>
+}
+
+function BudgetModal({ initial, busy, onClose, onSave }: { initial: BudgetPolicy; busy: boolean;
+  onClose(): void; onSave(policy: BudgetPolicy): Promise<unknown> }) {
+  const [cost, setCost] = useState(initial.maxCostUsd?.toString() ?? '')
+  const [tokens, setTokens] = useState(initial.maxInputTokens?.toString() ?? '')
+  const [requests, setRequests] = useState(initial.maxRequests?.toString() ?? '')
+  const policy = (): BudgetPolicy => ({ ...(cost ? { maxCostUsd: Number(cost) } : {}),
+    ...(tokens ? { maxInputTokens: Number(tokens) } : {}),
+    ...(requests ? { maxRequests: Number(requests) } : {}) })
+  return <div className="v2-modal-backdrop" onClick={onClose}><form className="v2-modal" aria-label="Budget policy"
+    onClick={event => event.stopPropagation()} onSubmit={event => { event.preventDefault(); void onSave(policy()) }}>
+    <header><h2>Work Session Budget</h2></header><p>Limits are optional. Empty fields do not create defaults.</p>
+    <label>Maximum cost (USD)<input name="maxCostUsd" type="number" min="0.0001" step="0.0001" value={cost} onChange={event => setCost(event.target.value)} /></label>
+    <label>Maximum input tokens<input name="maxInputTokens" type="number" min="1" step="1" value={tokens} onChange={event => setTokens(event.target.value)} /></label>
+    <label>Maximum requests<input name="maxRequests" type="number" min="1" step="1" value={requests} onChange={event => setRequests(event.target.value)} /></label>
+    <footer><button type="button" className="v2-btn" onClick={onClose}>Cancel</button><button className="v2-btn v2-btn-primary" disabled={busy}>Save Budget</button></footer>
+  </form></div>
 }
 
 function WorkMessage({ title, detail, action }: { title: string; detail: string; action?: () => void }) {

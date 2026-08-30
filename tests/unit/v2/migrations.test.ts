@@ -12,7 +12,8 @@ describe('V2 database migrations', () => {
       const applied = db.prepare('SELECT version FROM schema_migrations ORDER BY version').all()
       const tables = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all()
 
-      expect(applied).toEqual([{ version: 1 }, { version: 2 }, { version: 3 }, { version: 4 }])
+      expect(applied).toEqual([{ version: 1 }, { version: 2 }, { version: 3 }, { version: 4 },
+        { version: 5 }])
       expect(tables).toEqual(expect.arrayContaining([
         { name: 'projects' },
         { name: 'work_sessions' },
@@ -20,7 +21,8 @@ describe('V2 database migrations', () => {
         { name: 'canonical_events' },
         { name: 'import_history' },
         { name: 'command_idempotency' },
-        { name: 'usage_records' }
+        { name: 'usage_records' },
+        { name: 'budget_policies' }
       ]))
       const indexes = db.prepare("SELECT name FROM sqlite_master WHERE type = 'index'").all()
       expect(indexes).toEqual(expect.arrayContaining([

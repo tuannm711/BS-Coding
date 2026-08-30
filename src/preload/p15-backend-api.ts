@@ -18,7 +18,7 @@ const commandKeys = new Set<InvokeKey>([
   'workSession.create','workSession.pause','workSession.resume','workSession.cancel',
   'workSession.switchRuntime','workflow.approvePlan','workflow.createRework','agent.create',
   'agent.update','agent.remove','provider.connect','provider.refresh','provider.setEnabled',
-  'provider.probe','settings.update'
+  'provider.probe','settings.update','usage.updateBudget'
 ])
 
 export function createP15BackendApi(deps: {

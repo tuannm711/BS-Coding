@@ -7,9 +7,10 @@ const timestamp = '2026-08-30T00:00:00.000Z'
 
 function migrations(): Array<{ version: number; sql: string }> {
   const root = path.join(process.cwd(), 'src', 'main', 'v2', 'infrastructure', 'persistence', 'migrations')
-  return [1, 2, 3].map(version => ({ version,
-    sql: readFileSync(path.join(root, `00${version}-${version === 1 ? 'core' : version === 2
-      ? 'events' : 'projections-idempotency'}.sql`), 'utf8') }))
+  const files = ['001-core.sql', '002-events.sql', '003-projections-idempotency.sql',
+    '004-usage.sql', '005-budget-cost-known.sql']
+  return files.map((file, index) => ({ version: index + 1,
+    sql: readFileSync(path.join(root, file), 'utf8') }))
 }
 
 export function seedV2Backend(userData: string, projectPath: string) {
@@ -21,7 +22,9 @@ export function seedV2Backend(userData: string, projectPath: string) {
     connections: [{ providerId: 'openai', activeAccountId: 'account-ui', accounts: [{
       id: 'account-ui', providerId: 'openai', label: 'UI test account', authMode: 'api-key',
       status: 'active', createdAt: 1, lastUsedAt: 1, models: ['model-ui'],
-      modelCatalog: [{ id: 'model-ui', name: 'UI Model', capabilities: { supportsTools: true } }]
+      modelCatalog: [{ id: 'model-ui', name: 'UI Model', capabilities: { supportsTools: true } }],
+      usage: { accountId: 'account-ui', refreshedAt: Date.parse(timestamp), source: 'provider',
+        status: 'ok', primaryUsedPercent: 25 }
     }] }] }, null, 2))
   const db = new Database(path.join(stateDir, 'state.sqlite'))
   const ids = { projectId: 'project-pms', workSessionId: 'work-p15', workflowRunId: 'workflow-p15',
@@ -85,6 +88,18 @@ export function seedV2Backend(userData: string, projectPath: string) {
       reviewId: 'review-1', severity: 'HIGH', blocking: true, category: 'correctness',
       description: 'Needs rework', evidenceRefs: ['artifact-1'], affectedFiles: ['src/a.ts'],
       reviewerAgentVersionId: ids.agentVersionId, status: 'OPEN' }))
+    const usagePayload = { id: 'usage-seed', projectId: ids.projectId,
+      workSessionId: ids.workSessionId, workflowRunId: ids.workflowRunId,
+      providerId: 'openai', accountId: 'account-ui', modelId: 'model-ui', requests: 1,
+      inputTokens: 10, outputTokens: 2, occurredAt: timestamp }
+    db.prepare(`INSERT INTO usage_records(id, project_id, work_session_id, workflow_run_id,
+      task_run_id, agent_run_id, provider_id, account_id, requests, input_tokens, output_tokens,
+      cache_read_tokens, cache_write_tokens, cost_usd, occurred_at, payload_json, cost_known)
+      VALUES (?, ?, ?, ?, NULL, NULL, ?, ?, ?, ?, ?, 0, 0, 0, ?, ?, 0)`)
+      .run(usagePayload.id, usagePayload.projectId, usagePayload.workSessionId,
+        usagePayload.workflowRunId, usagePayload.providerId, usagePayload.accountId,
+        usagePayload.requests, usagePayload.inputTokens, usagePayload.outputTokens,
+        usagePayload.occurredAt, JSON.stringify(usagePayload))
     return ids
   } finally {
     db.close()

@@ -1,5 +1,6 @@
 const secretKey = /authorization|api[-_]?key|access[-_]?token|refresh[-_]?token|secret|password/i
 const bearer = /^Bearer\s+\S+/i
+const secretAssignment = /(?:authorization|api[-_]?key|access[-_]?token|refresh[-_]?token|secret|password)\s*[:=]\s*\S+/gi
 
 export function redactObject<T>(value: T, options: {
   knownValues?: readonly string[]
@@ -10,7 +11,8 @@ export function redactObject<T>(value: T, options: {
   const visit = (current: unknown): unknown => {
     if (typeof current === 'string') {
       if (bearer.test(current)) return '[REDACTED]'
-      return known.reduce((text, secret) => text.replaceAll(secret, '[REDACTED]'), current)
+      const scrubbed = current.replace(secretAssignment, '[REDACTED]')
+      return known.reduce((text, secret) => text.replaceAll(secret, '[REDACTED]'), scrubbed)
     }
     if (current === null || typeof current !== 'object') return current
     const existing = seen.get(current)

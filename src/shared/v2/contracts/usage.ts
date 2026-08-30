@@ -13,8 +13,20 @@ export interface UsageRecord {
   outputTokens: number
   cacheReadTokens?: number
   cacheWriteTokens?: number
-  costUsd: number
+  costUsd?: number
   occurredAt: string
+}
+
+export interface UsageEventPayload {
+  providerId: string
+  accountId: string
+  modelId?: string
+  requests: number
+  inputTokens: number
+  outputTokens: number
+  cacheReadTokens?: number
+  cacheWriteTokens?: number
+  costUsd?: number
 }
 
 export interface QuotaSnapshot {
@@ -37,6 +49,7 @@ export interface BudgetPolicy {
 
 export interface BudgetUsage {
   costUsd: number
+  costKnown: boolean
   inputTokens: number
   requests: number
   concurrentAgents: number
@@ -49,6 +62,7 @@ export type BudgetDecision = { decision: 'OK' } | {
   metric: BudgetMetric
   current: number
   limit: number
+  unknown?: boolean
 }
 
 export interface UsageTotals {
@@ -58,4 +72,14 @@ export interface UsageTotals {
   cacheReadTokens: number
   cacheWriteTokens: number
   costUsd: number
+  costKnown: boolean
+}
+
+export interface UsageOverview {
+  projectId: string
+  workSessionId: string
+  workflowRunId: string
+  totals: UsageTotals
+  policy: BudgetPolicy
+  decision: BudgetDecision
 }
