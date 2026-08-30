@@ -15,17 +15,19 @@ Last updated: 2026-08-30
 Exactly one entry. If two things are genuinely running, that is what this file
 exists to say out loud.
 
-**V2 P15 renderer UI — Task 1 implementation.**
+**V2 P15 renderer UI — Task 1 bootstrap flag decision.**
 
 - **Branch:** `v2/p15-renderer-ui-figma`
-- **Gate:** Task 1 RED/GREEN — shell, navigation and design tokens
+- **Gate:** Owner decision on the renderer-visible V2 bootstrap flag
 - **Status:** P15 backend prerequisite merged locally into `master` at `c44cddc`
   and post-merge verified: typecheck pass, full Vitest 233 files / 1423 tests,
   production build pass and Playwright 16/16 pass. Continuous V2 execution rules
   merged into `master` at `98f8a31` and this renderer branch is being synchronized
   with both merges. The approved UX source is the local vendored
   Figma Make export under `docs/v2/prototype/figma-make/`; no live URL or
-  connector is required.
+  connector is required. Preflight found that `BS_V2` currently terminates in
+  main while preload always exposes `window.bs.v2`, so renderer cannot reliably
+  select the V1 or V2 shell as P15 requires.
 - **Scope:** Task 1 creates the V2 application shell, exactly five production
   navigation items and design tokens under `src/renderer/src/v2`, preserving
   the V1 renderer until cutover.
@@ -38,12 +40,13 @@ after it has been decided.
 
 | # | Work | Prerequisite |
 |---|---|---|
-| 1 | P15 renderer Task 1 — shell/navigation/design tokens | Backend prerequisite merged and verified |
+| 1 | Resolve renderer-visible bootstrap flag | Required by P15 Task 1 cutover branch |
 | 2 | P15 renderer Task 2 — Home and Project screens | Requires Task 1 commit |
 
 ## Blocked
 
-- No technical blocker.
+- **Decision required:** expose a safe immutable V2-enabled boolean, use an
+  asynchronous API capability probe, or defer all App integration to P20.
 
 ## Standing rules
 
