@@ -15,21 +15,26 @@ Last updated: 2026-08-30
 Exactly one entry. If two things are genuinely running, that is what this file
 exists to say out loud.
 
-**V2 plan 16 — security, permissions and secrets.**
+**V2 P15 prerequisite — awaiting merge approval.**
 
-- **Branch:** `v2/p16-security-secrets`
-- **Gate:** P16 implementation/review complete; awaiting approval to merge into `master`
-- **Status:** P14 merged into `master` at `a561a95`. P15 backend Tasks 1-5 and
-  Task 6A are committed on paused branch `v2/p15-backend-projections`; owner
-  approved P16-first reorder because Task 6B provider/settings composition
-  requires V2 vault/security ports. P16 Task 1 vault adapter is committed at
-  `d325f92`; Task 2 layered permissions is committed at `86a0e79`; Task 3
-  redaction is committed at `6e13d28`; Task 4 security regression is committed
-  at `2548111`; review remediation completed at `8962fd3`. Typecheck, 21
-  focused tests, production build and the full suite at 1384 passing are green.
-- **Scope:** encrypted vault edge, layered permission profiles, recursive
-  event/log redaction and renderer security regression.
-- **Plan:** [`v2/implementation-plans/plans/16-security-permissions-secrets.md`](v2/implementation-plans/plans/16-security-permissions-secrets.md)
+- **Branch:** `v2/p15-backend-projections`
+- **Gate:** Owner merge approval
+- **Status:** P16 merged into `master` at `806c792` and merged back into this
+  branch. P15 backend Tasks 1-5 are committed at `855a692`, `fecc97b`,
+  `5b7c384`, `22d8352` and `d17d760`; Task 6A typed IPC/preload contracts and
+  route parity are committed at `3864cc2`; Task 6B concrete composition, build
+  and focused Electron smoke are committed at `99b2c34`. Task 7 durable
+  project/lifecycle/runtime/rework persistence, projection publication and review remediation
+  are committed at `6b95ff4`. Inline review has no remaining P0-P2 findings.
+  Completion evidence: typecheck pass; focused 16 files / 50 tests; full Vitest
+  233 files / 1423 tests; production build pass; full Playwright 16/16 pass.
+  `docs/v2` remains unchanged under the documentation-pack lock. The approved UX source is
+  the local vendored Figma Make export, so no live Figma connector is required.
+- **Scope:** owner-scoped projection DTOs/services, real IPC/preload routes,
+  idempotent lifecycle commands and bottom-panel backend projections required
+  by P15 Tasks 2-5.
+- **Spec:** [`superpowers/specs/2026-08-30-p15-backend-projection-prerequisite-design.md`](superpowers/specs/2026-08-30-p15-backend-projection-prerequisite-design.md)
+- **Plan:** [`superpowers/plans/2026-08-30-p15-backend-projection-prerequisite.md`](superpowers/plans/2026-08-30-p15-backend-projection-prerequisite.md)
 
 ## Next
 
@@ -38,14 +43,14 @@ after it has been decided.
 
 | # | Work | Prerequisite |
 |---|---|---|
-| 1 | Merge V2 plan 16 into `master` | P16 implementation/review complete |
-| 2 | Resume P15 backend Task 6B + Task 7 | Requires P16 merge |
-| 3 | Resume locked P15 renderer plan | Requires backend prerequisite |
+| 1 | Merge `v2/p15-backend-projections` into `master` | Requires owner approval |
+| 2 | Resume locked P15 renderer plan | Requires merged backend prerequisite; uses vendored prototype |
 
 ## Blocked
 
-- **P15 backend composition:** paused on `v2/p15-backend-projections` until
-  P16 provides vault/security ports; no placeholder or direct legacy handler is allowed.
+- **Renderer implementation remains blocked:** backend projection/API branch must
+  pass the owner merge gate before locked P15 UI Task 1 begins. The
+  approved UX source is already vendored under `docs/v2/prototype/figma-make/`.
 
 ## Standing rules
 
