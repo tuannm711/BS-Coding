@@ -59,6 +59,7 @@ import { V1ProviderAccountAdapter } from './v2/infrastructure/providers/v1-provi
 import { V1SettingsVaultAdapter } from './v2/infrastructure/settings/v1-settings-vault-adapter'
 import { V1RemoteStatusAdapter } from './v2/infrastructure/remote/v1-remote-status-adapter'
 import { Channels } from '../shared/ipc'
+import { P15_IPC } from '../shared/v2/contracts/p15-backend-ipc'
 import type { AgentState, Command, FileViewerPayload, ImageAttachment, BsSettings, NewAgentInput, PromptResponse, Template, TerminalInfo, Workspace, WorkspaceRuntime } from '../shared/types'
 
 let win: BrowserWindow | null = null
@@ -1005,6 +1006,7 @@ app.whenReady().then(async () => {
     const stateDir = path.join(userDataDir, 'v2')
     mkdirSync(stateDir, { recursive: true })
     return startV2Infrastructure({ databasePath: path.join(stateDir, 'state.sqlite'), registrar: ipcMain,
+      sendProjection: event => win?.webContents.send(P15_IPC['workflow.projection'], event),
       support: ({ repositories }) => {
         const workspaceGit = new V1WorkspaceGitAdapter({
           resolveProjectPath: async id => (await repositories.projects.get(id))?.repoPath ?? null,
@@ -1046,10 +1048,6 @@ app.whenReady().then(async () => {
           setProviderEnabled: value => providers.setEnabled(value),
           probeProvider: value => providers.probe(value),
           updateSettings: value => settings.update(value),
-          switchRuntime: async value => { mainApp.bsAgent.setAgentAssignmentSnapshot({
-            agentId: value.agentRunId, providerId: value.target.providerId,
-            accountId: value.target.accountId, modelId: value.target.modelId, speed: 'standard' }) },
-          createRework: async () => { throw new Error('rework worker capability is unavailable') },
           remoteStatus: () => remote.get()
         }
       } })

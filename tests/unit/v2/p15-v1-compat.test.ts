@@ -21,15 +21,23 @@ it('maps workspace and Git state without exposing V1 handles', async () => {
 })
 
 it('reports credential metadata without reading secret values', async () => {
+  let saved: Readonly<Record<string, unknown>> | undefined
   const adapter = new V1SettingsVaultAdapter({
     listCredentialRefs: () => [{ providerId: 'openai', ref: 'account:key' }],
     hasSecret: ref => ref === 'account:key',
-    getSettings: () => ({ maxSteps: 20, trace: { enabled: false } }),
-    saveSettings: async () => {}
+    getSettings: () => ({ maxSteps: 20, trace: { enabled: false },
+      lsp: { enabled: true, diagnosticsTimeoutMs: 3000 } }),
+    saveSettings: async value => { saved = value }
   })
 
   await expect(adapter.credentialState()).resolves.toEqual({ openai: { configured: true } })
   await expect(adapter.update({ patch: { maxSteps: 30 } })).resolves.toBeUndefined()
+  await adapter.update({ patch: { lsp: { enabled: false } } })
+  expect(saved).toMatchObject({ lsp: { enabled: false, diagnosticsTimeoutMs: 3000 } })
+  await expect(adapter.update({ patch: { maxSteps: 'many' } }))
+    .rejects.toThrow('type mismatch')
+  await expect(adapter.update({ patch: { unknownSetting: true } }))
+    .rejects.toThrow('unknown setting')
   await expect(adapter.update({ patch: { apiKey: 'must-not-cross' } }))
     .rejects.toThrow('secret-bearing setting')
 })

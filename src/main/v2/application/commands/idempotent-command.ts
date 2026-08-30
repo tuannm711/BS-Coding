@@ -28,3 +28,20 @@ export async function runIdempotentCommand<T>(deps: {
     }
   })
 }
+
+export async function runIdempotentExternalCommand<T>(deps: {
+  idempotency: CommandIdempotencyPort
+  transaction<R>(operation: () => Promise<R>): Promise<R>
+}, requestId: string, commandName: string, operation: () => Promise<T>): Promise<T> {
+  const reservation = await deps.transaction(() => deps.idempotency.reserve(requestId, commandName))
+  if (reservation.status === 'COMPLETED') return reservation.result as T
+  if (reservation.status === 'IN_PROGRESS') throw new CommandInProgressError(requestId, commandName)
+  let result: T
+  try {
+    result = await operation()
+  } catch (error) {
+    throw error
+  }
+  await deps.transaction(() => deps.idempotency.complete(requestId, commandName, result))
+  return result
+}

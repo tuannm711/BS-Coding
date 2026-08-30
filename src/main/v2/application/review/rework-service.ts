@@ -14,6 +14,33 @@ interface ReviewRerunResult {
   findings: readonly ReviewFinding[]
 }
 
+interface ReworkRequestDependencies {
+  nextId(): string
+  now(): string
+  transaction<T>(operation: () => Promise<T>): Promise<T>
+  saveReworkTask(task: ReworkTaskRecord): Promise<void>
+  linkFinding(findingId: string, taskId: string): Promise<void>
+}
+
+function makeReworkTask(deps: Pick<ReworkRequestDependencies, 'nextId' | 'now'>, input: {
+  workflowRunId: string; findingIds: readonly string[]; title: string
+}): ReworkTaskRecord {
+  if (input.findingIds.length === 0) throw new Error('rework requires at least one finding')
+  return { id: deps.nextId(), workflowRunId: input.workflowRunId, title: input.title,
+    findingIds: [...input.findingIds], createdAt: deps.now() }
+}
+
+export function createReworkRequestService(deps: ReworkRequestDependencies) {
+  return { async request(input: { workflowRunId: string; findingIds: readonly string[]; title: string }) {
+    const task = makeReworkTask(deps, input)
+    await deps.transaction(async () => {
+      await deps.saveReworkTask(task)
+      for (const findingId of task.findingIds) await deps.linkFinding(findingId, task.id)
+    })
+    return { task, completed: false as const }
+  } }
+}
+
 export function createReworkService(deps: {
   nextId(): string
   now(): string
@@ -27,14 +54,7 @@ export function createReworkService(deps: {
 }) {
   return {
     async rework(input: { workflowRunId: string; findingIds: readonly string[]; title: string }) {
-      if (input.findingIds.length === 0) throw new Error('rework requires at least one finding')
-      const task: ReworkTaskRecord = {
-        id: deps.nextId(),
-        workflowRunId: input.workflowRunId,
-        title: input.title,
-        findingIds: [...input.findingIds],
-        createdAt: deps.now()
-      }
+      const task = makeReworkTask(deps, input)
       await deps.transaction(async () => {
         await deps.saveReworkTask(task)
         for (const findingId of task.findingIds) await deps.linkFinding(findingId, task.id)

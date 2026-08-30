@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
-import { runIdempotentCommand } from '../../../src/main/v2/application/commands/idempotent-command'
+import {
+  runIdempotentCommand, runIdempotentExternalCommand
+} from '../../../src/main/v2/application/commands/idempotent-command'
 import type { CommandIdempotencyPort } from '../../../src/main/v2/application/ports/command-idempotency-port'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -80,5 +82,27 @@ describe('durable command idempotency orchestration', () => {
       db?.close()
       rmSync(dir, { recursive: true, force: true })
     }
+  })
+
+  it('commits an external reservation before the side effect and result afterward', async () => {
+    const order: string[] = []
+    const deps = { idempotency: memoryPort(), transaction: async <T>(fn: () => Promise<T>) => {
+      order.push('transaction:start'); const result = await fn(); order.push('transaction:commit'); return result
+    } }
+    const result = await runIdempotentExternalCommand(deps, 'request-external', 'provider.connect',
+      async () => { order.push('external:side-effect'); return { ok: true } })
+    expect(result).toEqual({ ok: true })
+    expect(order).toEqual(['transaction:start', 'transaction:commit', 'external:side-effect',
+      'transaction:start', 'transaction:commit'])
+  })
+
+  it('does not automatically repeat an external side effect after an ambiguous failure', async () => {
+    const operation = vi.fn(async () => { throw new Error('provider failed after write') })
+    const deps = { idempotency: memoryPort(), transaction: async <T>(fn: () => Promise<T>) => fn() }
+    await expect(runIdempotentExternalCommand(deps, 'request-ambiguous', 'provider.connect', operation))
+      .rejects.toThrow('provider failed after write')
+    await expect(runIdempotentExternalCommand(deps, 'request-ambiguous', 'provider.connect', operation))
+      .rejects.toMatchObject({ code: 'COMMAND_IN_PROGRESS' })
+    expect(operation).toHaveBeenCalledOnce()
   })
 })

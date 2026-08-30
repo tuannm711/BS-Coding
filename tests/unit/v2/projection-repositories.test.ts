@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { openV2Database } from '../../../src/main/v2/infrastructure/persistence/database'
 import { migrate } from '../../../src/main/v2/infrastructure/persistence/migration-runner'
-import { createRepositories } from '../../../src/main/v2/infrastructure/persistence/repositories'
+import {
+  createRepositories, PROJECTION_LIST_LIMIT, type PersistedRuntimeEpoch
+} from '../../../src/main/v2/infrastructure/persistence/repositories'
 import type { Project, WorkSession, WorkflowRun } from '../../../src/shared/v2/contracts/domain'
 
 const older = '2026-08-29T00:00:00.000Z'
@@ -69,6 +71,58 @@ describe('owner-scoped projection repositories', () => {
         .run('broken', JSON.stringify({ id: 'broken', updatedAt: newer }))
 
       await expect(repositories.projections.listProjects()).rejects.toThrow()
+    } finally {
+      db.close()
+    }
+  })
+
+  it('persists RuntimeEpoch ownership while projecting only safe runtime fields', async () => {
+    const db = openV2Database(':memory:')
+    try {
+      migrate(db)
+      const repositories = createRepositories(db)
+      db.exec(`
+        INSERT INTO projects VALUES ('p1', '{"id":"p1"}');
+        INSERT INTO work_sessions VALUES ('ws1', 'p1', '{"id":"ws1"}');
+        INSERT INTO workflow_runs VALUES ('wf1', 'ws1', '{"id":"wf1"}');
+        INSERT INTO tasks VALUES ('t1', 'wf1', '{"id":"t1"}');
+        INSERT INTO task_runs VALUES ('tr1', 't1', 'wf1', '{"id":"tr1"}');
+        INSERT INTO agent_definitions VALUES ('ad1', 'p1', '{"id":"ad1"}');
+        INSERT INTO agent_versions VALUES ('av1', 'ad1', '{"id":"av1"}');
+        INSERT INTO agent_runs VALUES ('ar1', 'tr1', 'av1', '{"id":"ar1"}');
+      `)
+      const epoch: PersistedRuntimeEpoch = { id: 'epoch-1', agentRunId: 'ar1',
+        workSessionId: 'ws1', status: 'ACTIVE', providerId: 'openai', accountId: 'account-1',
+        modelId: 'model-1', reason: 'INITIAL', startedAt: newer }
+      await repositories.runtimeEpochs.save(epoch)
+
+      expect(await repositories.runtimeEpochs.get(epoch.id)).toEqual(epoch)
+      expect(await repositories.projections.listRuntimeEpochsByWorkflow('wf1')).toEqual([{
+        id: 'epoch-1', status: 'ACTIVE', providerId: 'openai', accountId: 'account-1',
+        modelId: 'model-1', startedAt: newer
+      }])
+    } finally {
+      db.close()
+    }
+  })
+
+  it('bounds project projections while preserving deterministic recency order', async () => {
+    const db = openV2Database(':memory:')
+    try {
+      migrate(db)
+      const repositories = createRepositories(db)
+      const insert = db.prepare('INSERT INTO projects(id, payload_json) VALUES (?, ?)')
+      const seed = db.transaction(() => {
+        for (let index = 0; index < PROJECTION_LIST_LIMIT + 2; index += 1) {
+          const id = `project-${String(index).padStart(4, '0')}`
+          insert.run(id, JSON.stringify(project(id,
+            new Date(Date.parse(older) + index * 1000).toISOString())))
+        }
+      })
+      seed()
+      const values = await repositories.projections.listProjects()
+      expect(values).toHaveLength(PROJECTION_LIST_LIMIT)
+      expect(values[0].id).toBe(`project-${String(PROJECTION_LIST_LIMIT + 1).padStart(4, '0')}`)
     } finally {
       db.close()
     }

@@ -3,10 +3,7 @@ import type {
   AgentDefinition,
   AgentRun,
   AgentVersion,
-  Finding,
   Project,
-  Review,
-  RuntimeEpoch,
   Task,
   TaskRun,
   WorkflowRun,
@@ -70,6 +67,23 @@ const AgentRunSchema: z.ZodType<AgentRun> = z.object({
   status: z.enum(['CREATED', 'STARTING', 'RUNNING', 'SUCCEEDED', 'FAILED', 'BLOCKED',
     'CANCELLED', 'DEGRADED']), createdAt: timestamp, updatedAt: timestamp,
   completedAt: timestamp.optional()
+}).strict()
+
+export interface PersistedRuntimeEpoch extends RuntimeEpochSummary {
+  agentRunId: string
+  workSessionId: string
+  reason: string
+  endReason?: string
+}
+
+export const PROJECTION_LIST_LIMIT = 1000
+
+export interface RuntimeEpochRepository extends Repository<PersistedRuntimeEpoch> {
+  findActiveByAgentRun(agentRunId: string): Promise<PersistedRuntimeEpoch | null>
+}
+
+const PersistedRuntimeEpochSchema: z.ZodType<PersistedRuntimeEpoch> = RuntimeEpochSummarySchema.extend({
+  agentRunId: id, workSessionId: id, reason: id, endReason: id.optional()
 }).strict()
 
 function createJsonRepository<T extends Entity>(
@@ -136,8 +150,8 @@ function createArtifactRepository(db: BetterSqlite3.Database): ArtifactStore {
     },
     async listByProject(projectId) {
       const rows = db.prepare(
-        'SELECT * FROM artifacts WHERE project_id = ? ORDER BY id'
-      ).all(projectId) as Array<Record<string, unknown>>
+        'SELECT * FROM artifacts WHERE project_id = ? ORDER BY id LIMIT ?'
+      ).all(projectId, PROJECTION_LIST_LIMIT) as Array<Record<string, unknown>>
       return rows.map(fromRow)
     }
   }
@@ -152,9 +166,9 @@ export interface V2Repositories {
   agentDefinitions: Repository<AgentDefinition>
   agentVersions: Repository<AgentVersion>
   agentRuns: Repository<AgentRun>
-  runtimeEpochs: Repository<RuntimeEpoch>
-  reviews: Repository<Review>
-  findings: Repository<Finding>
+  runtimeEpochs: RuntimeEpochRepository
+  reviews: Repository<ReviewRecord>
+  findings: Repository<ReviewFinding>
   artifacts: ArtifactStore
   projections: ProjectionReadPort
   commandIdempotency: CommandIdempotencyPort
@@ -168,7 +182,8 @@ function createProjectionReads(db: BetterSqlite3.Database,
       return row ? payload(row, ProjectSchema) : null
     },
     async listProjects() {
-      return listPayloads(db, ProjectSchema, 'SELECT payload_json FROM projects')
+      return listPayloads(db, ProjectSchema, `SELECT payload_json FROM projects
+        ORDER BY json_extract(payload_json, '$.updatedAt') DESC, id ASC LIMIT ?`, PROJECTION_LIST_LIMIT)
         .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt) || a.id.localeCompare(b.id))
     },
     async getWorkSessionOwnedByProject(projectId, workSessionId) {
@@ -178,7 +193,9 @@ function createProjectionReads(db: BetterSqlite3.Database,
     },
     async listWorkSessionsByProject(projectId) {
       return listPayloads(db, WorkSessionSchema,
-        'SELECT payload_json FROM work_sessions WHERE project_id = ?', projectId)
+        `SELECT payload_json FROM work_sessions WHERE project_id = ?
+          ORDER BY json_extract(payload_json, '$.updatedAt') DESC, id ASC LIMIT ?`,
+        projectId, PROJECTION_LIST_LIMIT)
         .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt) || a.id.localeCompare(b.id))
     },
     async getWorkflowOwnedByProject(projectId, workflowRunId) {
@@ -189,35 +206,44 @@ function createProjectionReads(db: BetterSqlite3.Database,
     },
     async listTasksByWorkflow(workflowRunId) {
       return listPayloads(db, TaskSchema,
-        'SELECT payload_json FROM tasks WHERE workflow_run_id = ? ORDER BY id', workflowRunId)
+        'SELECT payload_json FROM tasks WHERE workflow_run_id = ? ORDER BY id LIMIT ?',
+        workflowRunId, PROJECTION_LIST_LIMIT)
     },
     async listTaskRunsByWorkflow(workflowRunId) {
       return listPayloads(db, TaskRunSchema,
-        'SELECT payload_json FROM task_runs WHERE workflow_run_id = ? ORDER BY id', workflowRunId)
+        'SELECT payload_json FROM task_runs WHERE workflow_run_id = ? ORDER BY id LIMIT ?',
+        workflowRunId, PROJECTION_LIST_LIMIT)
     },
     async listAgentDefinitionsByProject(projectId) {
       return listPayloads(db, AgentDefinitionSchema,
-        'SELECT payload_json FROM agent_definitions WHERE project_id = ? ORDER BY id', projectId)
+        'SELECT payload_json FROM agent_definitions WHERE project_id = ? ORDER BY id LIMIT ?',
+        projectId, PROJECTION_LIST_LIMIT)
     },
     async listAgentRunsByWorkflow(workflowRunId) {
       return listPayloads(db, AgentRunSchema, `SELECT ar.payload_json FROM agent_runs ar
         JOIN task_runs tr ON tr.id = ar.task_run_id
-        WHERE tr.workflow_run_id = ? ORDER BY ar.id`, workflowRunId)
+        WHERE tr.workflow_run_id = ? ORDER BY ar.id LIMIT ?`, workflowRunId, PROJECTION_LIST_LIMIT)
     },
     async listRuntimeEpochsByWorkflow(workflowRunId) {
-      return listPayloads(db, RuntimeEpochSummarySchema, `SELECT re.payload_json FROM runtime_epochs re
+      return listPayloads(db, PersistedRuntimeEpochSchema, `SELECT re.payload_json FROM runtime_epochs re
         JOIN agent_runs ar ON ar.id = re.agent_run_id
         JOIN task_runs tr ON tr.id = ar.task_run_id
-        WHERE tr.workflow_run_id = ? ORDER BY re.id`, workflowRunId)
+        WHERE tr.workflow_run_id = ? ORDER BY re.id LIMIT ?`, workflowRunId,
+      PROJECTION_LIST_LIMIT).map(epoch => ({
+          id: epoch.id, status: epoch.status, providerId: epoch.providerId,
+          accountId: epoch.accountId, modelId: epoch.modelId, startedAt: epoch.startedAt,
+          ...(epoch.endedAt ? { endedAt: epoch.endedAt } : {})
+        }))
     },
     async listReviewsByWorkflow(workflowRunId) {
       return listPayloads(db, ReviewSchema as z.ZodType<ReviewRecord>,
-        'SELECT payload_json FROM reviews WHERE workflow_run_id = ? ORDER BY id', workflowRunId)
+        'SELECT payload_json FROM reviews WHERE workflow_run_id = ? ORDER BY id LIMIT ?',
+        workflowRunId, PROJECTION_LIST_LIMIT)
     },
     async listFindingsByWorkflow(workflowRunId) {
       return listPayloads(db, FindingSchema as z.ZodType<ReviewFinding>, `SELECT f.payload_json FROM findings f
         JOIN reviews r ON r.id = f.review_id
-        WHERE r.workflow_run_id = ? ORDER BY f.id`, workflowRunId)
+        WHERE r.workflow_run_id = ? ORDER BY f.id LIMIT ?`, workflowRunId, PROJECTION_LIST_LIMIT)
     },
     async listArtifactsByProject(projectId) { return artifacts.listByProject(projectId) }
   }
@@ -263,6 +289,17 @@ function createCommandIdempotency(db: BetterSqlite3.Database): CommandIdempotenc
 
 export function createRepositories(db: BetterSqlite3.Database): V2Repositories {
   const artifacts = createArtifactRepository(db)
+  const runtimeEpochBase = createJsonRepository<PersistedRuntimeEpoch>(db, 'runtime_epochs', value => ({
+    agent_run_id: value.agentRunId
+  }))
+  const runtimeEpochs: RuntimeEpochRepository = { ...runtimeEpochBase,
+    async findActiveByAgentRun(agentRunId) {
+      const row = db.prepare(`SELECT payload_json FROM runtime_epochs
+        WHERE agent_run_id = ? AND json_extract(payload_json, '$.status') = 'ACTIVE'
+        ORDER BY id DESC LIMIT 1`).all(agentRunId) as PayloadRow[]
+      return row.map(item => payload(item, PersistedRuntimeEpochSchema))
+        .find(epoch => epoch.status === 'ACTIVE') ?? null
+    } }
   return {
     projects: createJsonRepository(db, 'projects', () => ({})),
     workSessions: createJsonRepository(db, 'work_sessions', value => ({
@@ -288,9 +325,7 @@ export function createRepositories(db: BetterSqlite3.Database): V2Repositories {
       task_run_id: value.taskRunId,
       agent_version_id: value.agentVersionId
     })),
-    runtimeEpochs: createJsonRepository(db, 'runtime_epochs', value => ({
-      agent_run_id: value.agentRunId
-    })),
+    runtimeEpochs,
     reviews: createJsonRepository(db, 'reviews', value => ({
       workflow_run_id: value.workflowRunId
     })),

@@ -4,7 +4,7 @@ export interface EpochRecord {
   id: string; workSessionId: string; agentRunId: string
   status: 'STARTING' | 'ACTIVE' | 'CLOSING' | 'CLOSED'
   target: RuntimeTarget | { providerId: string; accountId: string; modelId: string }
-  startedAt?: string; endedAt?: string; endReason?: string
+  reason?: string; startedAt?: string; endedAt?: string; endReason?: string
 }
 
 interface EpochDependencies {
@@ -33,7 +33,7 @@ export function createRuntimeEpochService(deps: EpochDependencies) {
           workSessionId: input.workSessionId, agentRunId: input.agentRunId })
         const next: EpochRecord = { id: deps.nextId(), workSessionId: input.workSessionId,
           agentRunId: input.agentRunId, status: 'ACTIVE', target: structuredClone(input.target),
-          startedAt: timestamp }
+          reason: input.reason, startedAt: timestamp }
         await deps.save(next)
         await deps.appendLifecycle({ type: 'RUNTIME_EPOCH_STARTED', epochId: next.id,
           workSessionId: input.workSessionId, agentRunId: input.agentRunId })

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { canFinalize } from '../../../src/main/v2/application/review/final-verifier'
 import {
+  createReworkRequestService,
   createReworkService,
   type ReworkTaskRecord
 } from '../../../src/main/v2/application/review/rework-service'
@@ -40,6 +41,21 @@ const passedReview: ReviewRecord = {
 }
 
 describe('rework and final verification lifecycle', () => {
+  it('requests durable rework without claiming worker or verification completion', async () => {
+    const order: string[] = []
+    const service = createReworkRequestService({
+      nextId: () => 'rework-request-1', now: () => '2026-08-29T00:01:00.000Z',
+      transaction: async operation => { order.push('transaction:start'); const value = await operation();
+        order.push('transaction:commit'); return value },
+      saveReworkTask: async () => { order.push('task:save') },
+      linkFinding: async () => { order.push('finding:link') }
+    })
+    const result = await service.request({ workflowRunId: 'workflow-1', findingIds: ['finding-1'],
+      title: 'Fix finding' })
+    expect(result).toMatchObject({ task: { id: 'rework-request-1' }, completed: false })
+    expect(order).toEqual(['transaction:start', 'task:save', 'finding:link', 'transaction:commit'])
+  })
+
   it('rejects worker success while a blocking gate or finding remains open', () => {
     expect(canFinalize({
       gates: [{ ...passedGate, status: 'FAIL' }],
