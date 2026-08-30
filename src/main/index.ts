@@ -688,6 +688,7 @@ function createWindow(): void {
     ...getWindowChromeOptions(process.platform),
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.js'),
+      additionalArguments: [`--bs-v2-enabled=${process.env.BS_V2 === '1' ? '1' : '0'}`],
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false

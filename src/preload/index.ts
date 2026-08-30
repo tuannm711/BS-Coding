@@ -9,7 +9,7 @@ import type { RemoteStatus } from '../shared/remote-types'
 import type { ProviderAuthorizationRequest, ProviderAuthorizationSession, ProviderConnectRequest } from '../shared/providers'
 import type { AgentAssignmentSetRequest, AgentAssignmentSnapshot } from '../shared/provider-state'
 import type { ProviderSnapshot } from '../shared/provider-state'
-import { createV2Api } from './v2-api'
+import { createV2Api, resolveV2Enabled } from './v2-api'
 import { createP15BackendApi } from './p15-backend-api'
 
 function subscribe<T>(channel: string, cb: (e: T) => void): () => void {
@@ -224,7 +224,8 @@ contextBridge.exposeInMainWorld('bs', {
     invoke: (channel, payload) => ipcRenderer.invoke(channel, payload),
     on: (channel, listener) => ipcRenderer.on(channel, listener),
     removeListener: (channel, listener) => ipcRenderer.removeListener(channel, listener),
-    nextRequestId: () => crypto.randomUUID()
+    nextRequestId: () => crypto.randomUUID(),
+    enabled: resolveV2Enabled(process.argv)
   }), ...createP15BackendApi({
     invoke: (channel, payload) => ipcRenderer.invoke(channel, payload),
     nextRequestId: () => crypto.randomUUID()

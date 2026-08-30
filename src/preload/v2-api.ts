@@ -21,15 +21,21 @@ export const PUBLIC_V2_API_KEYS = Object.freeze([
   'workSession.pause'
 ] as const)
 
+export function resolveV2Enabled(argv: readonly string[]): boolean {
+  return argv.includes('--bs-v2-enabled=1')
+}
+
 export function createV2Api(deps: {
   invoke(channel: string, payload: unknown): Promise<unknown>
   on(channel: string, listener: Listener): void
   removeListener(channel: string, listener: Listener): void
   nextRequestId(): string
+  enabled?: boolean
 }): BsV2Api {
   const invoke = async <T>(channel: string, request: unknown, response: z.ZodType<T>): Promise<T> =>
     response.parse(await deps.invoke(channel, request))
   return Object.freeze({
+    enabled: deps.enabled === true,
     workSession: Object.freeze({
       create: (input: WorkSessionCreateInput) => {
         const request = V2PublicIpcSchemas['workSession.create'].request.parse({
