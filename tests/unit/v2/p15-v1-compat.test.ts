@@ -61,3 +61,21 @@ it('projects provider accounts without key references or raw credentials', async
     status: 'HEALTHY' }])
   expect(JSON.stringify(accounts)).not.toContain('secret-ref')
 })
+
+it('resolves secret-free runtime candidates without promoting declared tool support', async () => {
+  const adapter = new V1ProviderAccountAdapter({
+    listConnections: () => [{ providerId: 'openai', providerName: 'OpenAI', accounts: [{
+      id: 'account-1', providerId: 'openai', label: 'Work account', enabled: true,
+      status: 'active', keyRef: 'secret-ref', modelCatalog: [{ id: 'codex', name: 'Codex',
+        capabilities: { supportsTools: true } }]
+    }] }], connectMethod: async () => {}, refreshAccount: async () => {}, setEnabled: () => {}
+  })
+
+  const candidates = await adapter.listRuntimeTargets()
+
+  expect(candidates).toEqual([{ id: 'openai/account-1/codex', providerName: 'OpenAI',
+    accountLabel: 'Work account', modelName: 'Codex', accountStatus: 'HEALTHY', selectable: true,
+    target: { providerId: 'openai', accountId: 'account-1', modelId: 'codex',
+      capabilities: { structuredTools: 'UNKNOWN' } } }])
+  expect(JSON.stringify(candidates)).not.toContain('secret-ref')
+})

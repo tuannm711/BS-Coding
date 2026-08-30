@@ -1,5 +1,5 @@
 const names = [
-  'project.list','project.get','workSession.listByProject','workSession.get','workSession.create',
+  'project.list','project.get','workSession.listByProject','workSession.get','workSession.runtimeTargets','workSession.create',
   'workSession.pause','workSession.resume','workSession.cancel','workSession.switchRuntime',
   'workflow.get','workflow.conversation','workflow.plan','workflow.tasks','workflow.execution',
   'workflow.changes','workflow.review','workflow.runtimeHistory','workflow.bottomPanel',

@@ -8,6 +8,7 @@ import {
 } from './ui-projections'
 import { ProviderAccountSummarySchema, WorkflowProjectionEventSchema, WorkflowRunSchema,
   WorkSessionSchema } from './ipc'
+import { RuntimeTargetCandidateSummarySchema } from './provider'
 
 const id = z.string().min(1)
 const empty = z.object({}).strict()
@@ -27,6 +28,7 @@ const entries = {
   'project.get': { request: byId, response: ProjectSummarySchema },
   'workSession.listByProject': { request: byProject, response: z.array(WorkSessionSummarySchema) },
   'workSession.get': { request: byId, response: WorkSessionSchema },
+  'workSession.runtimeTargets': { request: workScope, response: z.array(RuntimeTargetCandidateSummarySchema) },
   'workSession.create': { request: envelope(z.object({ projectId: id, goal: id, title: id.optional() }).strict()), response: WorkSessionSchema },
   'workSession.pause': { request: envelope(workScope), response: ack },
   'workSession.resume': { request: envelope(workScope), response: ack },

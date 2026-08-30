@@ -1,7 +1,7 @@
 import type {
   AgentDefinition, Project, Task, WorkflowRun, WorkSession
 } from '../../../shared/v2/contracts/domain'
-import type { RuntimeTarget } from '../../../shared/v2/contracts/provider'
+import type { RuntimeTarget, RuntimeTargetCandidateSummary } from '../../../shared/v2/contracts/provider'
 import type { ReviewFinding, ReviewRecord } from '../../../shared/v2/contracts/review'
 import type {
   LogSummary, OutputSummary, SafeSettingsSummary, TerminalSummary, TestRunSummary
@@ -16,7 +16,7 @@ import { createWorkSessionCommands } from './commands/work-session-commands'
 import { runIdempotentCommand, runIdempotentExternalCommand } from './commands/idempotent-command'
 import { createAgentSettingsProjectionService } from './projections/agent-settings-projections'
 import { createBottomPanelProjectionService } from './projections/bottom-panel-projections'
-import { createProjectProjectionService } from './projections/project-projections'
+import { createProjectProjectionService, ProjectionNotFoundError } from './projections/project-projections'
 import { createWorkProjectionService } from './projections/work-projections'
 import { createRuntimeEpochService } from './runtime/runtime-epoch-service'
 import { createReworkRequestService } from './review/rework-service'
@@ -35,6 +35,8 @@ export interface V2CompositionSupport extends ProjectionSupportPort {
   setProviderEnabled(input: { scopeId: string; accountId: string; enabled: boolean }): Promise<void>
   probeProvider(input: { scopeId: string; providerId: string }): Promise<void>
   updateSettings(input: { scopeId: string; patch: JsonPatch }): Promise<void>
+  listRuntimeTargets(projectId: string,
+    workSessionId: string): Promise<readonly RuntimeTargetCandidateSummary[]>
   remoteStatus(): Promise<{ enabled: boolean; status: string }>
 }
 
@@ -278,6 +280,13 @@ export function createV2Services(input: CreateV2ServicesInput) {
       const session = await repositories.workSessions.get(String(value.id))
       if (!session) throw new Error('unknown work session')
       return session
+    },
+    'workSession.runtimeTargets': async value => {
+      const projectId = String(value.projectId); const workSessionId = String(value.workSessionId)
+      if (!await repositories.projections.getWorkSessionOwnedByProject(projectId, workSessionId)) {
+        throw new ProjectionNotFoundError()
+      }
+      return input.support.listRuntimeTargets(projectId, workSessionId)
     },
     'workSession.create': async value => {
       const envelope = value as { requestId: string; input: { projectId: string; goal: string; title?: string } }

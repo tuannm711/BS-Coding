@@ -40,6 +40,9 @@ test('V2 backend projections and lifecycle commands survive restart', async () =
     await expect(homeWindow.getByText('P15 backend', { exact: true })).toBeVisible()
     await expect(invoke<{ name: string }>(app, 'project.get', { id: ids.projectId }))
       .resolves.toMatchObject({ name: 'PMS' })
+    await expect(invoke<unknown[]>(app, 'workSession.runtimeTargets', {
+      projectId: ids.projectId, workSessionId: ids.workSessionId
+    })).resolves.toEqual([])
     const firstWindow = await app.firstWindow()
     await firstWindow.evaluate(workflowRunId => {
       const scope = globalThis as unknown as { bs: { v2: { workflow: { subscribe(id: string,

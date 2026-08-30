@@ -15,10 +15,10 @@ Last updated: 2026-08-30
 Exactly one entry. If two things are genuinely running, that is what this file
 exists to say out loud.
 
-**V2 P15 renderer UI — Task 3 runtime-target contract decision.**
+**V2 P15 renderer UI — Task 3 implementation.**
 
 - **Branch:** `v2/p15-renderer-ui-figma`
-- **Gate:** Owner decision on a main-resolved runtime-target query
+- **Gate:** Task 3 TDD — Work Session tabs and lifecycle controls
 - **Status:** P15 backend prerequisite merged locally into `master` at `c44cddc`
   and post-merge verified: typecheck pass, full Vitest 233 files / 1423 tests,
   production build pass and Playwright 16/16 pass. Continuous V2 execution rules
@@ -30,8 +30,9 @@ exists to say out loud.
   renderer selects V1/V2 synchronously without exposing process or environment.
   Task 1 shell/navigation/tokens is committed at `c15d574`. Task 2 Home/Project
   projection screens is committed at `5d68125` with typecheck, 235 files / 1427
-  Vitest, build and 16/16 E2E green. Task 3 preflight found that the public V2 API
-  accepts `switchRuntime(target)` but exposes no model/runtime-target query.
+  Vitest, build and 16/16 E2E green. The owner approved a main-resolved
+  `workSession.runtimeTargets` query; its contract/adapter/route amendment passed
+  typecheck, 235 files / 1428 Vitest, build and 16/16 E2E.
 - **Scope:** Task 3 implements Work Session tabs and lifecycle controls from
   authoritative WorkSession/Workflow projections, including runtime history and rework state.
 - **Plan:** [`v2/implementation-plans/plans/15-renderer-ui-figma-binding.md`](v2/implementation-plans/plans/15-renderer-ui-figma-binding.md)
@@ -43,13 +44,12 @@ after it has been decided.
 
 | # | Work | Prerequisite |
 |---|---|---|
-| 1 | Resolve main-owned runtime-target candidate query | Required for Task 3 switchRuntime UI |
+| 1 | P15 renderer Task 3 — Work Session experience | Runtime-target query amendment green |
 | 2 | P15 renderer Task 4 — Agents and Settings | Requires Task 3 commit |
 
 ## Blocked
 
-- **Decision required:** extend the V2 contract with main-resolved runtime target
-  candidates, limit switching to historical targets, or defer the selector.
+- No technical blocker.
 
 ## Standing rules
 

@@ -35,3 +35,14 @@ export interface RuntimeTarget {
   modelId: string
   capabilities: Pick<ModelCapabilities, 'structuredTools'>
 }
+
+export interface RuntimeTargetCandidateSummary {
+  id: string
+  providerName: string
+  accountLabel: string
+  modelName: string
+  accountStatus: ProviderAccountSummary['status']
+  selectable: boolean
+  unavailableReason?: string
+  target: RuntimeTarget
+}

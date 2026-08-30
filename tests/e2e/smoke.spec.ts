@@ -41,7 +41,8 @@ test('V2 bootstrap selects the locked V2 shell and real backend API', async () =
       }
     })
     expect(v2Surface.namespaces).toEqual(expect.arrayContaining([
-      'enabled', 'provider', 'workSession', 'workflow', 'project.list', 'settings.get', 'remote.status'
+      'enabled', 'provider', 'workSession', 'workflow', 'project.list',
+      'workSession.runtimeTargets', 'settings.get', 'remote.status'
     ]))
     expect(v2Surface.serialized).not.toMatch(/secret|token|filesystem|fshandle|process|ipcrenderer/i)
     if (!projectResult.ok) throw new Error(JSON.stringify(projectResult))
