@@ -18,8 +18,7 @@ exists to say out loud.
 **V2 P15 prerequisite — backend projections and APIs.**
 
 - **Branch:** `v2/p15-backend-projections`
-- **Gate:** owner approves the P16-first dependency reorder needed to complete
-  Task 6 concrete secret-bearing routes
+- **Gate:** P16 security/vault plan lands before Task 6B composition resumes
 - **Status:** P14 merged into `master` at `a561a95`; typecheck, 17 targeted
   tests, production build, the full suite at 1374 passing and 15 Playwright
   e2e tests are green after merge. Backend-first direction is approved; the
@@ -27,8 +26,9 @@ exists to say out loud.
   ports are committed at `855a692` with focused tests, boundary guard and
   typecheck green. Task 2 scoped reads/idempotency is committed at `fecc97b`;
   Tasks 3-5 are committed at `5b7c384`, `22d8352` and `d17d760`; Task 6
-  typed IPC/preload contracts and route parity are green, but concrete
-  composition is blocked on P16 vault/security ports. The approved UX source is
+  Task 6A typed IPC/preload contracts and route parity are committed at
+  `3864cc2`; Task 6B concrete composition is paused for P16 vault/security
+  ports. The approved UX source is
   the local vendored Figma Make export, so no live Figma connector is required.
 - **Scope:** owner-scoped projection DTOs/services, real IPC/preload routes,
   idempotent lifecycle commands and bottom-panel backend projections required
