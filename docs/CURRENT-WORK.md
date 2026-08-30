@@ -15,10 +15,10 @@ Last updated: 2026-08-30
 Exactly one entry. If two things are genuinely running, that is what this file
 exists to say out loud.
 
-**V2 P15 renderer UI — Task 3 implementation.**
+**V2 P15 renderer UI — Task 4 implementation.**
 
 - **Branch:** `v2/p15-renderer-ui-figma`
-- **Gate:** Task 3 TDD — Work Session tabs and lifecycle controls
+- **Gate:** Task 4 TDD — Agents and Settings/Providers
 - **Status:** P15 backend prerequisite merged locally into `master` at `c44cddc`
   and post-merge verified: typecheck pass, full Vitest 233 files / 1423 tests,
   production build pass and Playwright 16/16 pass. Continuous V2 execution rules
@@ -32,9 +32,10 @@ exists to say out loud.
   projection screens is committed at `5d68125` with typecheck, 235 files / 1427
   Vitest, build and 16/16 E2E green. The owner approved a main-resolved
   `workSession.runtimeTargets` query; its contract/adapter/route amendment passed
-  typecheck, 235 files / 1428 Vitest, build and 16/16 E2E.
-- **Scope:** Task 3 implements Work Session tabs and lifecycle controls from
-  authoritative WorkSession/Workflow projections, including runtime history and rework state.
+  typecheck, 235 files / 1428 Vitest, build and 16/16 E2E. Task 3 Work Session
+  UI passed typecheck, 236 files / 1429 Vitest, build and Playwright 16/16.
+- **Scope:** Task 4 implements project Agents and global Settings/Providers from
+  safe Agent/provider/settings DTOs with global/project scope separation.
 - **Plan:** [`v2/implementation-plans/plans/15-renderer-ui-figma-binding.md`](v2/implementation-plans/plans/15-renderer-ui-figma-binding.md)
 
 ## Next
@@ -44,8 +45,8 @@ after it has been decided.
 
 | # | Work | Prerequisite |
 |---|---|---|
-| 1 | P15 renderer Task 3 — Work Session experience | Runtime-target query amendment green |
-| 2 | P15 renderer Task 4 — Agents and Settings | Requires Task 3 commit |
+| 1 | P15 renderer Task 4 — Agents and Settings | Task 3 completion gate green |
+| 2 | P15 renderer Task 5 — Bottom panel and E2E paths | Requires Task 4 commit |
 
 ## Blocked
 

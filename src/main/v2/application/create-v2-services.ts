@@ -264,6 +264,16 @@ export function createV2Services(input: CreateV2ServicesInput) {
   }
   const commandInput = (value: Input) => ({ requestId: String(value.requestId),
     ...(value.input as object) }) as { requestId: string; projectId: string; workSessionId: string }
+  const switchRuntime = async (data: { requestId: string; projectId: string; workSessionId: string;
+    target: RuntimeTarget; reason: string }) => {
+    const candidates = await input.support.listRuntimeTargets(data.projectId, data.workSessionId)
+    const candidate = candidates.find(item => item.selectable &&
+      item.target.providerId === data.target.providerId && item.target.accountId === data.target.accountId &&
+      item.target.modelId === data.target.modelId &&
+      item.target.capabilities.structuredTools === data.target.capabilities.structuredTools)
+    if (!candidate) throw new Error('runtime target is unavailable')
+    return workCommands.switchRuntime({ ...data, target: candidate.target })
+  }
   const ack = async (operation: Promise<unknown>, after?: () => Promise<void>) => {
     await operation
     await after?.()
@@ -312,7 +322,7 @@ export function createV2Services(input: CreateV2ServicesInput) {
     'workSession.cancel': value => { const data = commandInput(value); return ack(
       workCommands.cancel(data), () => publishForWork(data.projectId, data.workSessionId)) },
     'workSession.switchRuntime': value => { const data = commandInput(value); return ack(
-      workCommands.switchRuntime(data as never), () => publishForWork(data.projectId, data.workSessionId)) },
+      switchRuntime(data as never), () => publishForWork(data.projectId, data.workSessionId)) },
     'workflow.get': async value => {
       const workflow = await repositories.workflowRuns.get(String(value.id))
       if (!workflow) throw new Error('unknown workflow run')

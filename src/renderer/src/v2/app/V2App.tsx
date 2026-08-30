@@ -4,6 +4,7 @@ import { V2_NAV_ITEMS, type V2ScreenId } from './navigation'
 import HomeScreen from '../screens/HomeScreen'
 import ProjectScreen from '../screens/ProjectScreen'
 import type { ProviderAccountSummary } from '../../../../shared/v2/contracts/provider'
+import WorkSessionScreen, { type WorkSelection } from '../screens/WorkSessionScreen'
 import '../styles/tokens.css'
 
 const icons = { home: Home, projects: FolderKanban, work: Activity, agents: Bot, settings: Settings }
@@ -12,7 +13,7 @@ export default function V2App() {
   const [screen, setScreen] = useState<V2ScreenId>('home')
   const [expanded, setExpanded] = useState(false)
   const [projectId, setProjectId] = useState<string | null>(null)
-  const [, setWorkSelection] = useState<{ projectId: string; workSessionId: string } | null>(null)
+  const [workSelection, setWorkSelection] = useState<WorkSelection | null>(null)
   const [providerAccounts, setProviderAccounts] = useState<readonly ProviderAccountSummary[] | null>(null)
   const [providerError, setProviderError] = useState(false)
   const active = V2_NAV_ITEMS.find(item => item.id === screen) ?? V2_NAV_ITEMS[0]
@@ -87,7 +88,8 @@ export default function V2App() {
             onOpenWork={(nextProjectId, workSessionId) => {
               setWorkSelection({ projectId: nextProjectId, workSessionId }); setScreen('work')
             }} /> : null}
-          {screen !== 'home' && screen !== 'projects' ? <>
+          {screen === 'work' ? <WorkSessionScreen selection={workSelection} onBack={() => setScreen('home')} /> : null}
+          {screen !== 'home' && screen !== 'projects' && screen !== 'work' ? <>
             <header className="v2-main-header"><p className="v2-eyebrow">V2 workspace</p><h1>{active.label}</h1>
               <p className="v2-main-subtitle">Project work, agents and runtime state in one operational workspace.</p></header>
             <section className="v2-placeholder" aria-label={`${active.label} content`}>
