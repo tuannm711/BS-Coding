@@ -18,13 +18,15 @@ exists to say out loud.
 **V2 plan 16 — security, permissions and secrets.**
 
 - **Branch:** `v2/p16-security-secrets`
-- **Gate:** Task 4 renderer security boundary tests and P16 completion gate pass
+- **Gate:** P16 implementation/review complete; awaiting approval to merge into `master`
 - **Status:** P14 merged into `master` at `a561a95`. P15 backend Tasks 1-5 and
   Task 6A are committed on paused branch `v2/p15-backend-projections`; owner
   approved P16-first reorder because Task 6B provider/settings composition
   requires V2 vault/security ports. P16 Task 1 vault adapter is committed at
   `d325f92`; Task 2 layered permissions is committed at `86a0e79`; Task 3
-  redaction is committed at `6e13d28`; Task 4 renderer security regression is in progress.
+  redaction is committed at `6e13d28`; Task 4 security regression is committed
+  at `2548111`; review remediation completed at `8962fd3`. Typecheck, 21
+  focused tests, production build and the full suite at 1384 passing are green.
 - **Scope:** encrypted vault edge, layered permission profiles, recursive
   event/log redaction and renderer security regression.
 - **Plan:** [`v2/implementation-plans/plans/16-security-permissions-secrets.md`](v2/implementation-plans/plans/16-security-permissions-secrets.md)
@@ -36,8 +38,9 @@ after it has been decided.
 
 | # | Work | Prerequisite |
 |---|---|---|
-| 1 | Resume P15 backend Task 6B + Task 7 | Requires P16 merge |
-| 2 | Resume locked P15 renderer plan | Requires backend prerequisite |
+| 1 | Merge V2 plan 16 into `master` | P16 implementation/review complete |
+| 2 | Resume P15 backend Task 6B + Task 7 | Requires P16 merge |
+| 3 | Resume locked P15 renderer plan | Requires backend prerequisite |
 
 ## Blocked
 
