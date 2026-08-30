@@ -15,10 +15,10 @@ Last updated: 2026-08-30
 Exactly one entry. If two things are genuinely running, that is what this file
 exists to say out loud.
 
-**V2 P15 renderer UI — Task 1 implementation.**
+**V2 P15 renderer UI — Task 3 implementation.**
 
 - **Branch:** `v2/p15-renderer-ui-figma`
-- **Gate:** Task 1 TDD — bootstrap flag, shell, navigation and design tokens
+- **Gate:** Task 3 TDD — Work Session tabs and lifecycle controls
 - **Status:** P15 backend prerequisite merged locally into `master` at `c44cddc`
   and post-merge verified: typecheck pass, full Vitest 233 files / 1423 tests,
   production build pass and Playwright 16/16 pass. Continuous V2 execution rules
@@ -28,9 +28,10 @@ exists to say out loud.
   connector is required. The owner approved a safe immutable
   `window.bs.v2.enabled` flag sourced from main/BrowserWindow arguments so the
   renderer selects V1/V2 synchronously without exposing process or environment.
-- **Scope:** Task 1 creates the V2 application shell, exactly five production
-  navigation items and design tokens under `src/renderer/src/v2`, preserving
-  the V1 renderer until cutover.
+  Task 1 shell/navigation/tokens is committed at `c15d574`. Task 2 Home/Project
+  projection screens passed typecheck, 235 files / 1427 Vitest, build and 16/16 E2E.
+- **Scope:** Task 3 implements Work Session tabs and lifecycle controls from
+  authoritative WorkSession/Workflow projections, including runtime history and rework state.
 - **Plan:** [`v2/implementation-plans/plans/15-renderer-ui-figma-binding.md`](v2/implementation-plans/plans/15-renderer-ui-figma-binding.md)
 
 ## Next
@@ -40,8 +41,8 @@ after it has been decided.
 
 | # | Work | Prerequisite |
 |---|---|---|
-| 1 | P15 renderer Task 1 — shell/navigation/design tokens | Bootstrap flag decision approved |
-| 2 | P15 renderer Task 2 — Home and Project screens | Requires Task 1 commit |
+| 1 | P15 renderer Task 3 — Work Session experience | Task 2 completion gate green |
+| 2 | P15 renderer Task 4 — Agents and Settings | Requires Task 3 commit |
 
 ## Blocked
 
