@@ -22,10 +22,11 @@ test('V2 bootstrap selects the locked V2 shell and real backend API', async () =
     await window.getByRole('button', { name: 'Expand navigation' }).click()
     await expect(window.getByRole('button', { name: 'Home' })).toContainText('Home')
     const v2Surface = await window.evaluate(() => {
-      const browser = globalThis as unknown as { bs: { v2: Record<string, unknown> & {
+      const browser = globalThis as unknown as { api?: unknown; bs: { v2: Record<string, unknown> & {
         'project.list'(request: Record<string, never>): Promise<unknown>
       } } }
-      return { namespaces: Object.keys(browser.bs.v2).sort(), serialized: JSON.stringify(browser.bs.v2) }
+      return { legacyApiExposed: browser.api !== undefined,
+        namespaces: Object.keys(browser.bs.v2).sort(), serialized: JSON.stringify(browser.bs.v2) }
     })
     const projectResult = await window.evaluate(() => {
       const api = (globalThis as unknown as { bs: { v2: {
@@ -44,6 +45,7 @@ test('V2 bootstrap selects the locked V2 shell and real backend API', async () =
       'enabled', 'provider', 'workSession', 'workflow', 'project.list',
       'workSession.runtimeTargets', 'settings.get', 'remote.status'
     ]))
+    expect(v2Surface.legacyApiExposed).toBe(false)
     expect(v2Surface.serialized).not.toMatch(/secret|token|filesystem|fshandle|process|ipcrenderer/i)
     if (!projectResult.ok) throw new Error(JSON.stringify(projectResult))
     expect(projectResult).toMatchObject({ ok: true, value: { projects: [] } })

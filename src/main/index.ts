@@ -53,7 +53,9 @@ import { RemoteSettingsStore } from './remote/remote-settings'
 import { RemotePairing } from './remote/remote-pairing'
 import { migrateLegacyUserData, resolveUserDataDir } from './bs-migration'
 import { createV2Runtime, type V2Runtime } from './v2/application/v2-bootstrap'
+import { readOnlyArchiveStore, resolveWriterConfiguration } from './v2/application/cutover'
 import { startV2Infrastructure } from './v2/infrastructure/composition/start-v2-infrastructure'
+import { runProductionV1Migration } from './v2/infrastructure/migration/production-migration'
 import { V1WorkspaceGitAdapter } from './v2/infrastructure/workspace/v1-workspace-git-adapter'
 import { V1ProviderAccountAdapter } from './v2/infrastructure/providers/v1-provider-account-adapter'
 import { V1SettingsVaultAdapter } from './v2/infrastructure/settings/v1-settings-vault-adapter'
@@ -66,8 +68,12 @@ import type { AgentState, Command, FileViewerPayload, ImageAttachment, BsSetting
 let win: BrowserWindow | null = null
 let isQuitting = false
 let tray: TrayManager | null = null
-// Side-by-side V2 core. Disabled unless BS_V2=1, so V1 behavior is unchanged.
+// V1 remains available only for 1.x/dev rollback; 2.x selects V2 exclusively.
 let v2Runtime: V2Runtime | null = null
+
+function writerConfiguration() {
+  return resolveWriterConfiguration(app.getVersion(), { forceV2: process.env.BS_V2 === '1' })
+}
 
 if (process.env.BS_USER_DATA) app.setPath('userData', process.env.BS_USER_DATA)
 
@@ -152,7 +158,10 @@ class MainApp {
   bsAgent = new BsAgentManager({
     configPath: path.join(app.getPath('userData'), 'bs.json'),
     vault: this.vault,
-    store: new SessionStore(createJsonStore<StoredSession>(path.join(app.getPath('userData'), 'sessions.json'))),
+    store: new SessionStore((() => {
+      const store = createJsonStore<StoredSession>(path.join(app.getPath('userData'), 'sessions.json'))
+      return writerConfiguration().v1Writable ? store : readOnlyArchiveStore(store)
+    })()),
     trace: this.traces,
     tools: createDefaultTools({
       getUserSkillsDir: () => path.join(app.getPath('userData'), 'skills'),
@@ -208,7 +217,7 @@ class MainApp {
       workspaceStore: this.workspaces,
       isEnabled: () => this.remoteStore.load().enabled
     },
-    ...(process.env.BS_V2 === '1' ? { dispatch: async () => ({ ok: false,
+    ...(writerConfiguration().v2Writable ? { dispatch: async () => ({ ok: false,
       error: 'V2 remote services are not ready' }) } : {})
   })
 
@@ -694,7 +703,7 @@ function createWindow(): void {
     ...getWindowChromeOptions(process.platform),
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.js'),
-      additionalArguments: [`--bs-v2-enabled=${process.env.BS_V2 === '1' ? '1' : '0'}`],
+      additionalArguments: [`--bs-v2-enabled=${writerConfiguration().v2Writable ? '1' : '0'}`],
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false
@@ -1008,8 +1017,16 @@ app.whenReady().then(async () => {
   await migrateLegacyUserData(userDataDir, {
     legacyDir: path.join(path.dirname(userDataDir), 'BS Coding')
   })
+  const writers = writerConfiguration()
+  if (writers.v2Writable) {
+    const stateDir = path.join(userDataDir, 'v2')
+    const migration = await runProductionV1Migration({ userDataPath: userDataDir,
+      databasePath: path.join(stateDir, 'state.sqlite'),
+      backupRoot: path.join(userDataDir, 'v1-backups') })
+    if (!migration.validated) throw new Error('[bs] V2 migration validation failed')
+  }
   mainApp = new MainApp()
-  v2Runtime = await createV2Runtime({ enabled: process.env.BS_V2 === '1', start: async () => {
+  v2Runtime = await createV2Runtime({ enabled: writers.v2Writable, start: async () => {
     const stateDir = path.join(userDataDir, 'v2')
     mkdirSync(stateDir, { recursive: true })
     let remoteAdapter: V1RemoteAdapter | null = null
@@ -1094,7 +1111,7 @@ app.whenReady().then(async () => {
       await infrastructure.dispose()
     } }
   } })
-  mainApp.bsAgent.truncationCleanup()
+  if (writers.v1Writable) mainApp.bsAgent.truncationCleanup()
   await mainApp.browserBridge.start().catch(err => {
     console.error('[bs] browser bridge start failed:', err)
   })
@@ -1113,7 +1130,7 @@ app.whenReady().then(async () => {
     rmSync(path.join(app.getPath('userData'), 'traces'), { recursive: true, force: true })
   }
   if (process.platform === 'win32') app.setAppUserModelId(APP_USER_MODEL_ID)
-  registerIpcHandlers()
+  if (writers.v1Writable) registerIpcHandlers()
   createWindow()
   mainApp.startUsagePoll()
   tray = TrayManager.create({

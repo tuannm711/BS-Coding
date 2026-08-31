@@ -8,6 +8,7 @@ import providerAccountsSql from './migrations/006-provider-accounts.sql?raw'
 import historicalQuotaSql from './migrations/007-historical-quota.sql?raw'
 import remoteAuditSql from './migrations/008-remote-audit.sql?raw'
 import updatePreferencesSql from './migrations/009-update-preferences.sql?raw'
+import cutoverStateSql from './migrations/010-cutover-state.sql?raw'
 
 export interface Migration {
   version: number
@@ -23,7 +24,8 @@ export const defaultMigrations: readonly Migration[] = [
   { version: 6, sql: providerAccountsSql },
   { version: 7, sql: historicalQuotaSql },
   { version: 8, sql: remoteAuditSql },
-  { version: 9, sql: updatePreferencesSql }
+  { version: 9, sql: updatePreferencesSql },
+  { version: 10, sql: cutoverStateSql }
 ]
 
 export function migrate(

@@ -31,7 +31,10 @@ export default function UpdatesPanel({ initialStatus }: Props) {
     if (busy) return
     setBusy(name)
     setError('')
-    try { setStatus(await operation()) } catch (error) { setError(String(error)) } finally { setBusy('') }
+    try { setStatus(await operation()) } catch (error) {
+      setError(String(error))
+      await refresh().catch(() => {})
+    } finally { setBusy('') }
   }
 
   if (!status) return <section className="v2-control-panel"><p className="v2-panel-state">Loading update status…</p></section>
@@ -46,8 +49,10 @@ export default function UpdatesPanel({ initialStatus }: Props) {
     <fieldset className="v2-setting-card v2-channel-field"><legend>Update channel</legend>
       <div role="radiogroup" aria-label="Update channel">
         {(['STABLE', 'BETA'] as const).map(channel => <label key={channel}><input type="radio" name="update-channel"
-          checked={status.channel === channel} disabled={Boolean(busy)} onChange={() => void run('channel',
-            () => window.bs.v2['update.setChannel']({ channel }))} />{channel === 'STABLE' ? 'Stable' : 'Beta'}</label>)}
+          checked={status.channel === channel} disabled={Boolean(busy)} onChange={() => {
+            setStatus(current => current ? { ...current, channel } : current)
+            void run('channel', () => window.bs.v2['update.setChannel']({ channel }))
+          }} />{channel === 'STABLE' ? 'Stable' : 'Beta'}</label>)}
       </div><p>{status.channel === 'BETA' ? 'Preview builds with the latest features.' : 'Fully tested stable releases.'}</p>
     </fieldset>
     {status.version ? <div className="v2-setting-card"><div><h3>v{status.version} is available</h3>

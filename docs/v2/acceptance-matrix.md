@@ -22,7 +22,7 @@ manual/package checks are added by P20 Task 4.
 | `AC-WF-04` | PASS | `tests/integration/v2/work-session-lifecycle.test.ts`, `tests/integration/v2/rework-lifecycle.test.ts` |
 | `AC-SEC-01` | PASS | `tests/unit/v2/renderer-security-boundary.test.ts`, `tests/unit/v2/event-redaction.test.ts`, `tests/unit/v2/preload-contract.test.ts` |
 | `AC-SEC-02` | PASS | `tests/unit/v2/tool-executor.test.ts`, `tests/unit/v2/v1-mcp-adapter.test.ts`, `tests/integration/v2/remote-adapter.test.ts` |
-| `AC-DATA-01` | PASS | `tests/unit/v2/backup-service.test.ts`, `tests/integration/v2/migration-idempotency.test.ts` |
+| `AC-DATA-01` | PASS | `tests/unit/v2/backup-service.test.ts`, `tests/integration/v2/migration-idempotency.test.ts`, `tests/integration/v2/production-migration.test.ts` |
 | `AC-UX-01` | PASS | `tests/unit/v2/renderer-navigation.test.tsx`, `tests/e2e/smoke.spec.ts` |
 | `AC-UX-02` | PASS | `tests/unit/v2/work-session-screen.test.tsx`, `tests/e2e/v2-core-flow.spec.ts` |
 | `AC-UX-03` | PASS | `tests/unit/v2/workflow-lifecycle.test.ts`, `tests/unit/v2/retry-policy.test.ts`, `tests/e2e/v2-runtime-switch.spec.ts` |
@@ -38,5 +38,5 @@ manual/package checks are added by P20 Task 4.
 | `TEST-REG-04` | PASS | `tests/integration/v2/work-session-lifecycle.test.ts`, `tests/integration/v2/rework-lifecycle.test.ts` |
 | `TEST-REG-05` | PASS | `tests/unit/v2/workflow-lifecycle.test.ts`, `tests/e2e/v2-runtime-switch.spec.ts` |
 | `TEST-REG-06` | PASS | `tests/integration/v2/worktree-manager.test.ts`, `tests/integration/v2/integration-service.test.ts` |
-| `TEST-REG-07` | PASS | `tests/unit/v2/preload-contract.test.ts`, `tests/unit/v2/renderer-security-boundary.test.ts` |
+| `TEST-REG-07` | PASS | `tests/unit/v2/preload-contract.test.ts`, `tests/unit/v2/renderer-security-boundary.test.ts`, `tests/e2e/smoke.spec.ts` |
 | `TEST-REG-08` | PASS | `tests/unit/v2/backup-service.test.ts`, `tests/integration/v2/migration-idempotency.test.ts` |

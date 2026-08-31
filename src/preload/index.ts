@@ -218,14 +218,15 @@ const api: AgentApi = {
     subscribe(Channels.EventAgentBackground, cb)
 }
 
-contextBridge.exposeInMainWorld('api', api)
+const v2Enabled = resolveV2Enabled(process.argv)
+if (!v2Enabled) contextBridge.exposeInMainWorld('api', api)
 contextBridge.exposeInMainWorld('bs', {
   v2: Object.freeze({ ...createV2Api({
     invoke: (channel, payload) => ipcRenderer.invoke(channel, payload),
     on: (channel, listener) => ipcRenderer.on(channel, listener),
     removeListener: (channel, listener) => ipcRenderer.removeListener(channel, listener),
     nextRequestId: () => crypto.randomUUID(),
-    enabled: resolveV2Enabled(process.argv)
+    enabled: v2Enabled
   }), ...createP15BackendApi({
     invoke: (channel, payload) => ipcRenderer.invoke(channel, payload),
     nextRequestId: () => crypto.randomUUID()

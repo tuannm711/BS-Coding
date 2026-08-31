@@ -11,7 +11,7 @@ const params = new URLSearchParams(window.location.search)
 const fileParam = params.get('file')
 const rootParam = params.get('root') ?? ''
 
-if (!window.api) {
+if (!window.api && !window.bs?.v2.enabled) {
   createRoot(rootEl).render(
     <div className="empty-state">
       <p className="subtitle">
@@ -20,7 +20,7 @@ if (!window.api) {
       </p>
     </div>
   )
-} else if (fileParam) {
+} else if (fileParam && window.api) {
   // File-viewer popup window (opened by main via ?file=...&root=...).
   createRoot(rootEl).render(
     <React.StrictMode>

@@ -13,7 +13,8 @@ describe('V2 database migrations', () => {
       const tables = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all()
 
       expect(applied).toEqual([{ version: 1 }, { version: 2 }, { version: 3 }, { version: 4 },
-        { version: 5 }, { version: 6 }, { version: 7 }, { version: 8 }, { version: 9 }])
+        { version: 5 }, { version: 6 }, { version: 7 }, { version: 8 }, { version: 9 },
+        { version: 10 }])
       expect(tables).toEqual(expect.arrayContaining([
         { name: 'projects' },
         { name: 'work_sessions' },
@@ -25,6 +26,7 @@ describe('V2 database migrations', () => {
         { name: 'historical_quota_snapshots' },
         { name: 'remote_audit_events' },
         { name: 'update_preferences' },
+        { name: 'cutover_state' },
         { name: 'usage_records' },
         { name: 'budget_policies' }
       ]))
