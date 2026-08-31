@@ -15,6 +15,8 @@ export interface UsageRecord {
   cacheWriteTokens?: number
   costUsd?: number
   occurredAt: string
+  source?: 'runtime' | 'v1-session'
+  confidence?: 'EXACT' | 'ATTRIBUTED' | 'UNKNOWN'
 }
 
 export interface UsageEventPayload {
@@ -36,6 +38,8 @@ export interface QuotaSnapshot {
   remainingPercent?: number
   resetAt?: string
   capturedAt: string
+  source?: 'runtime' | 'v1-provider'
+  confidence?: 'EXACT' | 'ATTRIBUTED' | 'UNKNOWN'
 }
 
 export interface BudgetPolicy {

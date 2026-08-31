@@ -5,6 +5,7 @@ import projectionsSql from './migrations/003-projections-idempotency.sql?raw'
 import usageSql from './migrations/004-usage.sql?raw'
 import budgetSql from './migrations/005-budget-cost-known.sql?raw'
 import providerAccountsSql from './migrations/006-provider-accounts.sql?raw'
+import historicalQuotaSql from './migrations/007-historical-quota.sql?raw'
 
 export interface Migration {
   version: number
@@ -17,7 +18,8 @@ export const defaultMigrations: readonly Migration[] = [
   { version: 3, sql: projectionsSql },
   { version: 4, sql: usageSql },
   { version: 5, sql: budgetSql },
-  { version: 6, sql: providerAccountsSql }
+  { version: 6, sql: providerAccountsSql },
+  { version: 7, sql: historicalQuotaSql }
 ]
 
 export function migrate(

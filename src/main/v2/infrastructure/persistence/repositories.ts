@@ -14,6 +14,7 @@ import type { CommandIdempotencyPort } from '../../application/ports/command-ide
 import type { ProjectionReadPort } from '../../application/ports/projection-read-port'
 import type { ReviewFinding, ReviewRecord } from '../../../../shared/v2/contracts/review'
 import type { RuntimeEpochSummary } from '../../../../shared/v2/contracts/ui-projections'
+import type { QuotaSnapshot } from '../../../../shared/v2/contracts/usage'
 import { z } from 'zod'
 import { WorkSessionSchema, WorkflowRunSchema } from '../../../../shared/v2/schemas/ipc'
 import { FindingSchema, ReviewSchema } from '../../../../shared/v2/schemas/review'
@@ -43,6 +44,11 @@ export interface ProviderAccountRecord extends Entity {
 export interface ImportHistoryRepository {
   get(sourceType: string, sourceKey: string): Promise<string | null>
   record(sourceType: string, sourceKey: string, importedId: string): Promise<void>
+}
+
+export interface HistoricalQuotaSnapshotRecord extends QuotaSnapshot, Entity {
+  source: 'v1-provider'
+  confidence: 'EXACT' | 'ATTRIBUTED' | 'UNKNOWN'
 }
 
 interface PayloadRow {
@@ -185,6 +191,7 @@ export interface V2Repositories {
   agentRuns: Repository<AgentRun>
   providerAccounts: Repository<ProviderAccountRecord>
   importHistory: ImportHistoryRepository
+  historicalQuotaSnapshots: Repository<HistoricalQuotaSnapshotRecord>
   runtimeEpochs: RuntimeEpochRepository
   reviews: Repository<ReviewRecord>
   findings: Repository<ReviewFinding>
@@ -369,6 +376,11 @@ export function createRepositories(db: BetterSqlite3.Database): V2Repositories {
       vault_ref: value.vaultRef ?? null
     })),
     importHistory: createImportHistory(db),
+    historicalQuotaSnapshots: createJsonRepository(db, 'historical_quota_snapshots', value => ({
+      provider_id: value.providerId,
+      account_id: value.accountId,
+      captured_at: value.capturedAt
+    })),
     runtimeEpochs,
     reviews: createJsonRepository(db, 'reviews', value => ({
       workflow_run_id: value.workflowRunId
