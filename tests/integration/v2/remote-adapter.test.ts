@@ -16,6 +16,7 @@ function remoteEdge() {
     edge: {
       getStatus,
       setEnabled: vi.fn((enabled: boolean) => { status = { ...status, enabled } }),
+      setRelayUrl: vi.fn(),
       startPairing: vi.fn(() => ({ code: '482731', expiresAt: Date.parse('2026-09-01T00:05:00.000Z') })),
       revokeDevice: vi.fn((id: string) => id === status.mobileDeviceId),
       onStatusChange: vi.fn((callback: typeof listener) => { listener = callback; return () => { listener = null } })

@@ -7,6 +7,7 @@ import budgetSql from './migrations/005-budget-cost-known.sql?raw'
 import providerAccountsSql from './migrations/006-provider-accounts.sql?raw'
 import historicalQuotaSql from './migrations/007-historical-quota.sql?raw'
 import remoteAuditSql from './migrations/008-remote-audit.sql?raw'
+import updatePreferencesSql from './migrations/009-update-preferences.sql?raw'
 
 export interface Migration {
   version: number
@@ -21,7 +22,8 @@ export const defaultMigrations: readonly Migration[] = [
   { version: 5, sql: budgetSql },
   { version: 6, sql: providerAccountsSql },
   { version: 7, sql: historicalQuotaSql },
-  { version: 8, sql: remoteAuditSql }
+  { version: 8, sql: remoteAuditSql },
+  { version: 9, sql: updatePreferencesSql }
 ]
 
 export function migrate(

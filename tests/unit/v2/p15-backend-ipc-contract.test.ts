@@ -21,6 +21,15 @@ it('has one registry channel and schema for every P15 backend public method', ()
     target: { providerId: 'openai', accountId: 'account', modelId: 'model',
       capabilities: { structuredTools: 'UNKNOWN' } }, rawSecret: 'forbidden'
   }]).success).toBe(false)
+  expect(P15_PUBLIC_API_KEYS).toEqual(expect.arrayContaining([
+    'update.status', 'update.setChannel', 'update.check', 'update.download', 'update.apply',
+    'remote.status', 'remote.setRelayUrl', 'remote.setEnabled', 'remote.startPairing',
+    'remote.revokeDevice'
+  ]))
+  const remote = P15PublicIpcSchemas['remote.status'].response.parse({
+    enabled: true, state: 'CONNECTED', devices: [], token: 'secret'
+  })
+  expect(remote).toEqual({ enabled: true, state: 'CONNECTED', devices: [] })
 })
 
 it('exposes every invoke contract as a validated named preload method', async () => {

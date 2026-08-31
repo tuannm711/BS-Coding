@@ -22,11 +22,11 @@ describe('V1 updater adapter', () => {
       install: () => { calls.push('install') },
       setChannel: channel => { calls.push(`channel:${channel}`) }
     })
+    adapter.setChannel('BETA')
     const statuses: unknown[] = []
     const unsubscribe = adapter.subscribe(status => statuses.push(status))
 
     adapter.accept({ type: 'checking' })
-    adapter.setChannel('BETA')
     await adapter.check()
     adapter.download()
     adapter.apply()
@@ -34,6 +34,7 @@ describe('V1 updater adapter', () => {
     adapter.accept({ type: 'downloaded', version: '2.0.1' })
 
     expect(calls).toEqual(['channel:beta', 'check:true', 'install', 'install'])
-    expect(statuses).toEqual([{ state: 'CHECKING' }])
+    expect(statuses).toEqual([{ state: 'CHECKING', channel: 'BETA' }])
+    expect(adapter.getStatus()).toEqual({ state: 'READY', channel: 'BETA', version: '2.0.1' })
   })
 })

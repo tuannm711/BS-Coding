@@ -1,5 +1,6 @@
 import type { UpdaterStatusEvent } from '../../../../shared/types'
-import type { UpdateChannel, UpdatePort, UpdateStatus } from '../../application/ports/update-port'
+import type { UpdateChannel, UpdateSnapshot, UpdateStatus } from '../../../../shared/v2/contracts/update'
+import type { UpdatePort } from '../../application/ports/update-port'
 
 interface LegacyUpdaterEdge {
   check(manual: boolean): Promise<void>
@@ -24,24 +25,33 @@ export function mapUpdaterStatus(status: UpdaterStatusEvent): UpdateStatus {
 }
 
 export class V1UpdaterAdapter implements UpdatePort {
-  private readonly listeners = new Set<(status: UpdateStatus) => void>()
+  private readonly listeners = new Set<(status: UpdateSnapshot) => void>()
+  private channel: UpdateChannel = 'STABLE'
+  private status: UpdateStatus
 
-  constructor(private readonly legacy: LegacyUpdaterEdge) {}
+  constructor(private readonly legacy: LegacyUpdaterEdge,
+    initial: Pick<UpdateStatus, 'currentVersion'> = {}) {
+    this.status = { state: 'IDLE', ...initial }
+  }
+
+  getStatus(): UpdateSnapshot { return { ...this.status, channel: this.channel } }
 
   setChannel(channel: UpdateChannel): void {
+    this.channel = channel
     this.legacy.setChannel(channel === 'STABLE' ? 'stable' : 'beta')
   }
   check(): Promise<void> { return this.legacy.check(true) }
   download(): void { this.legacy.install() }
   apply(): void { this.legacy.install() }
 
-  subscribe(listener: (status: UpdateStatus) => void): () => void {
+  subscribe(listener: (status: UpdateSnapshot) => void): () => void {
     this.listeners.add(listener)
     return () => { this.listeners.delete(listener) }
   }
 
   accept(status: UpdaterStatusEvent): void {
-    const mapped = mapUpdaterStatus(status)
-    for (const listener of this.listeners) listener(mapped)
+    this.status = mapUpdaterStatus(status)
+    const snapshot = this.getStatus()
+    for (const listener of this.listeners) listener(snapshot)
   }
 }

@@ -16,6 +16,7 @@ export const PairingStatusSchema = z.object({
   state: z.enum(['DISABLED', 'OFFLINE', 'CONNECTING', 'PAIRING', 'CONNECTED', 'ERROR']),
   code: z.string().regex(/^\d{6}$/).optional(),
   expiresAt: timestamp.optional(),
+  relayUrl: z.string().url().optional(),
   devices: z.array(RemoteDeviceSummarySchema),
   message: z.string().optional()
 }).superRefine((value, context) => {

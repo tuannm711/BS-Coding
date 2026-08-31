@@ -15,6 +15,7 @@ import { createBudgetPolicyRepository, createUsageRepository } from '../persiste
 import { UsageLedger } from '../../application/observability/usage-ledger'
 import { createRemoteAuditStore, type RemoteAuditStore } from '../remote/sqlite-remote-audit'
 import { P15PublicIpcSchemas } from '../../../../shared/v2/schemas/p15-backend-ipc'
+import { createPersistentUpdatePort } from '../updates/sqlite-update-preferences'
 
 export async function startV2Infrastructure(input: {
   databasePath: string
@@ -35,7 +36,10 @@ export async function startV2Infrastructure(input: {
     const usage = new UsageLedger(createUsageRepository(db))
     const budgets = createBudgetPolicyRepository(db)
     const remoteAudit = createRemoteAuditStore(db)
-    const support = typeof input.support === 'function' ? input.support({ repositories }) : input.support
+    const rawSupport = typeof input.support === 'function' ? input.support({ repositories }) : input.support
+    const support: V2CompositionSupport = rawSupport.updates
+      ? { ...rawSupport, updates: createPersistentUpdatePort(db, rawSupport.updates) }
+      : rawSupport
     const publisher = input.sendProjection ? createProjectionPublisher({ send: input.sendProjection }) : undefined
     const services = createV2Services({ repositories, events, support, usage, budgets,
       transaction: operation => unitOfWork.run(operation),

@@ -14,6 +14,7 @@ export interface PairingStatus {
   state: RemoteConnectionState
   code?: string
   expiresAt?: string
+  relayUrl?: string
   devices: readonly RemoteDeviceSummary[]
   message?: string
 }

@@ -18,7 +18,7 @@ exists to say out loud.
 **V2 P19 updates and remote control integration — Task 3 preflight.**
 
 - **Branch:** `v2/p19-updates-remote-control`
-- **Gate:** Task 3 TDD — approved secure remote transport amendment
+- **Gate:** P19 completion gate green — local merge pending
 - **Status:** P15 backend prerequisite merged locally into `master` at `c44cddc`
   and post-merge verified: typecheck pass, full Vitest 233 files / 1423 tests,
   production build pass and Playwright 16/16 pass. Continuous V2 execution rules
@@ -92,6 +92,17 @@ exists to say out loud.
   constrained to encrypted/loopback transports and no local audit sink is called.
   The owner approved injecting the V2 dispatcher/audit sink, retaining device
   identity for targeted revocation and rejecting non-WSS non-loopback relays.
+  Task 3 is committed at `148561c`; typecheck and 10 focused files / 73 tests passed.
+  Completion audit found both V2 Settings panels remain static, UpdatePort is not
+  composed into main services, and public V2 IPC exposes only a reduced
+  `remote.status` query rather than typed lifecycle/pairing/revocation/update APIs.
+  The owner approved the recommended vertical-slice amendment. Updates and
+  Remote Control now use typed V2 service/IPC/preload contracts, functional
+  accessible panels based on the vendored prototype, durable SQLite update
+  channel preference and an Electron E2E flow. The replaced reduced remote
+  status adapter was removed after its consumers migrated. Completion review
+  found no P0-P2; verification passed typecheck, full Vitest 254 files / 1471
+  tests, production build and Playwright 19/19.
 - **Plan:** [`v2/implementation-plans/plans/19-updates-remote-control.md`](v2/implementation-plans/plans/19-updates-remote-control.md)
 
 ## Next
@@ -101,8 +112,8 @@ after it has been decided.
 
 | # | Work | Prerequisite |
 |---|---|---|
-| 1 | P19 Task 3 — secure BrowserBridge/remote adapter | Task 2 committed at `8c7febd` |
-| 2 | P19 completion gate, review and local merge | Requires Task 3 commit |
+| 1 | P19 local merge, post-merge verification and branch deletion | Completion gate green |
+| 2 | Continue to P20 verification/release cutover | Requires P19 local merge |
 
 ## Blocked
 

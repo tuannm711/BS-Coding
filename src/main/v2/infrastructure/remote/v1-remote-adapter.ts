@@ -11,12 +11,14 @@ interface LegacyRemoteStatus {
   mobileDeviceId?: string
   pairingCode?: string
   pairingExpiresAt?: number
+  relayUrl?: string
   error?: string
 }
 
 interface LegacyRemoteEdge {
   getStatus(): LegacyRemoteStatus
   setEnabled(enabled: boolean): void
+  setRelayUrl(url: string): void
   startPairing(): { code: string; expiresAt: number } | null
   revokeDevice(deviceId: string): boolean
   onStatusChange(listener: (status: LegacyRemoteStatus) => void): () => void
@@ -63,6 +65,7 @@ function project(status: LegacyRemoteStatus): PairingStatus {
     enabled: status.enabled, state,
     ...(status.pairingCode && status.pairingExpiresAt
       ? { code: status.pairingCode, expiresAt: iso(status.pairingExpiresAt) } : {}),
+    ...(status.relayUrl ? { relayUrl: status.relayUrl } : {}),
     devices: status.mobileDeviceId ? [{
       id: status.mobileDeviceId, name: status.mobileDeviceId,
       status: status.paired ? 'ONLINE' : 'OFFLINE'
@@ -96,6 +99,10 @@ export class V1RemoteAdapter implements RemoteControlPort {
 
   async setEnabled(enabled: boolean): Promise<void> {
     this.legacy.setEnabled(enabled)
+  }
+
+  async setRelayUrl(url: string): Promise<void> {
+    this.legacy.setRelayUrl(url)
   }
 
   async startPairing(): Promise<PairingStatus> {

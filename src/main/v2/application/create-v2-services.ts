@@ -23,6 +23,8 @@ import { createDiagnosticsService } from './observability/diagnostics-service'
 import type { UsageLedger } from './observability/usage-ledger'
 import type { QuotaSnapshot } from '../../../shared/v2/contracts/usage'
 import { evaluateBudget, type BudgetPolicyPort } from './observability/budget-evaluator'
+import type { UpdatePort } from './ports/update-port'
+import type { RemoteControlPort } from './ports/remote-control-port'
 
 type JsonPatch = Readonly<Record<string, unknown>>
 const PROJECTION_EVENT_LIMIT = 1000
@@ -40,7 +42,9 @@ export interface V2CompositionSupport extends ProjectionSupportPort {
   listRuntimeTargets(projectId: string,
     workSessionId: string): Promise<readonly RuntimeTargetCandidateSummary[]>
   listQuotaSnapshots(): Promise<readonly QuotaSnapshot[]>
-  remoteStatus(): Promise<{ enabled: boolean; status: string }>
+  remoteStatus?(): Promise<{ enabled: boolean; status: string }>
+  updates?: UpdatePort
+  remoteControl?: RemoteControlPort
 }
 
 export interface CreateV2ServicesInput {
@@ -114,10 +118,21 @@ export function createV2Services(input: CreateV2ServicesInput) {
   const repositories = input.repositories
   const now = input.now ?? (() => new Date().toISOString())
   const nextId = input.nextId ?? (() => crypto.randomUUID())
+  const transaction = input.transaction
+  const updates = () => {
+    if (!input.support.updates) throw new Error('V2 update service is unavailable')
+    return input.support.updates
+  }
+  const remoteControl = () => {
+    if (!input.support.remoteControl) throw new Error('V2 remote control service is unavailable')
+    return input.support.remoteControl
+  }
+  const externalCommand = <T>(value: Input, name: string, operation: () => Promise<T>) =>
+    runIdempotentExternalCommand({ idempotency: repositories.commandIdempotency, transaction },
+      String(value.requestId), name, operation)
   const revision = async (aggregateId: string) => {
     return input.events.latestSequence(aggregateId)
   }
-  const transaction = input.transaction
   const projectProjections = createProjectProjectionService({
     reads: repositories.projections, support: input.support, revision
   })
@@ -402,7 +417,44 @@ export function createV2Services(input: CreateV2ServicesInput) {
     'settings.update': value => agentCommands.updateSettings({ requestId: String(value.requestId), ...(value.input as object) } as never),
     'diagnostics.list': async value => available(await input.support.listDiagnostics(String(value.projectId),
       typeof value.workflowRunId === 'string' ? value.workflowRunId : undefined), 'diagnostics'),
-    'remote.status': () => input.support.remoteStatus()
+    'update.status': async () => updates().getStatus(),
+    'update.setChannel': value => externalCommand(value, 'update.setChannel', async () => {
+      updates().setChannel((value.input as { channel: 'STABLE' | 'BETA' }).channel)
+      return updates().getStatus()
+    }),
+    'update.check': value => externalCommand(value, 'update.check', async () => {
+      await updates().check()
+      return updates().getStatus()
+    }),
+    'update.download': value => externalCommand(value, 'update.download', async () => {
+      updates().download()
+      return updates().getStatus()
+    }),
+    'update.apply': value => externalCommand(value, 'update.apply', async () => {
+      updates().apply()
+      return updates().getStatus()
+    }),
+    'remote.status': async () => input.support.remoteControl
+      ? input.support.remoteControl.getStatus()
+      : input.support.remoteStatus
+        ? input.support.remoteStatus().then(status => ({ enabled: status.enabled,
+            state: status.status === 'ERROR' ? 'ERROR' as const
+              : status.enabled ? 'OFFLINE' as const : 'DISABLED' as const, devices: [] }))
+        : Promise.reject(new Error('V2 remote control service is unavailable')),
+    'remote.setRelayUrl': value => externalCommand(value, 'remote.setRelayUrl', async () => {
+      await remoteControl().setRelayUrl((value.input as { relayUrl: string }).relayUrl)
+      return remoteControl().getStatus()
+    }),
+    'remote.setEnabled': value => externalCommand(value, 'remote.setEnabled', async () => {
+      await remoteControl().setEnabled((value.input as { enabled: boolean }).enabled)
+      return remoteControl().getStatus()
+    }),
+    'remote.startPairing': value => externalCommand(value, 'remote.startPairing',
+      () => remoteControl().startPairing()),
+    'remote.revokeDevice': value => externalCommand(value, 'remote.revokeDevice', async () => {
+      await remoteControl().revokeDevice((value.input as { deviceId: string }).deviceId)
+      return remoteControl().getStatus()
+    })
   }
   return { handlers: handlers as Readonly<Record<string, (value: unknown) => Promise<unknown>>> }
 }

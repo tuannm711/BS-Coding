@@ -10,6 +10,8 @@ import { ProviderAccountSummarySchema, WorkflowProjectionEventSchema, WorkflowRu
   WorkSessionSchema } from './ipc'
 import { RuntimeTargetCandidateSummarySchema } from './provider'
 import { BudgetPolicySchema, QuotaSnapshotSchema, UsageOverviewSchema } from './usage'
+import { PairingStatusSchema } from './remote'
+import { UpdateSnapshotSchema } from './update'
 
 const id = z.string().min(1)
 const empty = z.object({}).strict()
@@ -68,7 +70,20 @@ const entries = {
   'settings.get': { request: byProject, response: AgentSettingsProjectionSchema },
   'settings.update': { request: envelope(scope.extend({ patch: z.record(z.string(), z.json()) })), response: ack },
   'diagnostics.list': { request: byProject.extend({ workflowRunId: id.optional() }), response: z.array(ProblemSummarySchema) },
-  'remote.status': { request: empty, response: z.object({ enabled: z.boolean(), status: z.string() }).strict() }
+  'update.status': { request: empty, response: UpdateSnapshotSchema },
+  'update.setChannel': { request: envelope(z.object({ channel: z.enum(['STABLE', 'BETA']) }).strict()),
+    response: UpdateSnapshotSchema },
+  'update.check': { request: envelope(empty), response: UpdateSnapshotSchema },
+  'update.download': { request: envelope(empty), response: UpdateSnapshotSchema },
+  'update.apply': { request: envelope(empty), response: UpdateSnapshotSchema },
+  'remote.status': { request: empty, response: PairingStatusSchema },
+  'remote.setRelayUrl': { request: envelope(z.object({ relayUrl: z.string().url() }).strict()),
+    response: PairingStatusSchema },
+  'remote.setEnabled': { request: envelope(z.object({ enabled: z.boolean() }).strict()),
+    response: PairingStatusSchema },
+  'remote.startPairing': { request: envelope(empty), response: PairingStatusSchema },
+  'remote.revokeDevice': { request: envelope(z.object({ deviceId: id }).strict()),
+    response: PairingStatusSchema }
 } as const satisfies Record<P15PublicApiKey, Entry>
 export const P15PublicIpcSchemas = Object.freeze(entries)
 export const P15_PUBLIC_API_KEYS = Object.freeze(Object.keys(P15_IPC) as P15PublicApiKey[])

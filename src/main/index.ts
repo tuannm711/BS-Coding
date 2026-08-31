@@ -57,8 +57,8 @@ import { startV2Infrastructure } from './v2/infrastructure/composition/start-v2-
 import { V1WorkspaceGitAdapter } from './v2/infrastructure/workspace/v1-workspace-git-adapter'
 import { V1ProviderAccountAdapter } from './v2/infrastructure/providers/v1-provider-account-adapter'
 import { V1SettingsVaultAdapter } from './v2/infrastructure/settings/v1-settings-vault-adapter'
-import { V1RemoteStatusAdapter } from './v2/infrastructure/remote/v1-remote-status-adapter'
 import { V1RemoteAdapter } from './v2/infrastructure/remote/v1-remote-adapter'
+import { V1UpdaterAdapter } from './v2/infrastructure/updates/v1-updater-adapter'
 import { Channels } from '../shared/ipc'
 import { P15_IPC } from '../shared/v2/contracts/p15-backend-ipc'
 import type { AgentState, Command, FileViewerPayload, ImageAttachment, BsSettings, NewAgentInput, PromptResponse, Template, TerminalInfo, Workspace, WorkspaceRuntime } from '../shared/types'
@@ -224,6 +224,7 @@ class MainApp {
   private prices = new Map<string, { input?: number; output?: number; cacheRead?: number; cacheWrite?: number }>()
   private ptyStartTs = new Map<string, number>()
   private updater: Updater
+  updaterAdapter: V1UpdaterAdapter | null = null
 
   constructor() {
     this.providerRegistry.register(createOpenAiAdapter({
@@ -298,6 +299,7 @@ class MainApp {
     })
     this.updater = new Updater(
       (e) => {
+        this.updaterAdapter?.accept(e)
         win?.webContents.send(Channels.EventUpdaterStatus, e)
         if (e.type === 'downloaded') {
           // Download finished in the background — let the user know even with
@@ -317,6 +319,7 @@ class MainApp {
         getCurrentVersion: () => app.getVersion()
       }
     )
+    this.updaterAdapter = new V1UpdaterAdapter(this.updater, { currentVersion: app.getVersion() })
   }
 
   checkForUpdates(): void {
@@ -1009,6 +1012,21 @@ app.whenReady().then(async () => {
   v2Runtime = await createV2Runtime({ enabled: process.env.BS_V2 === '1', start: async () => {
     const stateDir = path.join(userDataDir, 'v2')
     mkdirSync(stateDir, { recursive: true })
+    let remoteAdapter: V1RemoteAdapter | null = null
+    const remoteControl = {
+      getStatus: () => remoteAdapter
+        ? remoteAdapter.getStatus() : Promise.reject(new Error('V2 remote control is not ready')),
+      setRelayUrl: (url: string) => remoteAdapter
+        ? remoteAdapter.setRelayUrl(url) : Promise.reject(new Error('V2 remote control is not ready')),
+      setEnabled: (enabled: boolean) => remoteAdapter
+        ? remoteAdapter.setEnabled(enabled) : Promise.reject(new Error('V2 remote control is not ready')),
+      startPairing: () => remoteAdapter
+        ? remoteAdapter.startPairing() : Promise.reject(new Error('V2 remote control is not ready')),
+      revokeDevice: (deviceId: string) => remoteAdapter
+        ? remoteAdapter.revokeDevice(deviceId) : Promise.reject(new Error('V2 remote control is not ready')),
+      subscribe: (listener: Parameters<V1RemoteAdapter['subscribe']>[0]) => remoteAdapter
+        ? remoteAdapter.subscribe(listener) : () => {}
+    }
     const infrastructure = await startV2Infrastructure({ databasePath: path.join(stateDir, 'state.sqlite'), registrar: ipcMain,
       sendProjection: event => win?.webContents.send(P15_IPC['workflow.projection'], event),
       support: ({ repositories }) => {
@@ -1036,7 +1054,6 @@ app.whenReady().then(async () => {
           getSettings: () => mainApp.bsAgent.getSettings() as unknown as Readonly<Record<string, unknown>>,
           saveSettings: value => mainApp.saveSettings(value as unknown as BsSettings)
         })
-        const remote = new V1RemoteStatusAdapter({ getStatus: () => mainApp.remote.getStatus() })
         return {
           getWorkspace: id => workspaceGit.getWorkspace(id),
           getGitStatus: id => workspaceGit.getGitStatus(id),
@@ -1059,19 +1076,21 @@ app.whenReady().then(async () => {
           setProviderEnabled: value => providers.setEnabled(value),
           probeProvider: value => providers.probe(value),
           updateSettings: value => settings.update(value),
-          remoteStatus: () => remote.get()
+          updates: mainApp.updaterAdapter!,
+          remoteControl
         }
       } })
-    const remote = new V1RemoteAdapter({
+    remoteAdapter = new V1RemoteAdapter({
       getStatus: () => mainApp.remote.getStatus(),
       setEnabled: enabled => mainApp.remote.setEnabled(enabled),
+      setRelayUrl: url => mainApp.remote.setRelayUrl(url),
       startPairing: () => mainApp.remote.startPairing(),
       revokeDevice: deviceId => mainApp.remote.revokeDevice(deviceId),
       onStatusChange: listener => mainApp.remote.onStatusChange(listener)
     }, { execute: (name, value) => infrastructure.execute(name, value) }, infrastructure.remoteAudit)
-    mainApp.remote.setDispatcher((name, value) => remote.dispatch(name, value))
+    mainApp.remote.setDispatcher((name, value) => remoteAdapter!.dispatch(name, value))
     return { dispose: async () => {
-      remote.dispose()
+      remoteAdapter?.dispose()
       await infrastructure.dispose()
     } }
   } })

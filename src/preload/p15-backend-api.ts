@@ -18,7 +18,9 @@ const commandKeys = new Set<InvokeKey>([
   'workSession.create','workSession.pause','workSession.resume','workSession.cancel',
   'workSession.switchRuntime','workflow.approvePlan','workflow.createRework','agent.create',
   'agent.update','agent.remove','provider.connect','provider.refresh','provider.setEnabled',
-  'provider.probe','settings.update','usage.updateBudget'
+  'provider.probe','settings.update','usage.updateBudget',
+  'update.setChannel','update.check','update.download','update.apply',
+  'remote.setRelayUrl','remote.setEnabled','remote.startPairing','remote.revokeDevice'
 ])
 
 export function createP15BackendApi(deps: {
