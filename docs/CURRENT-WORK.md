@@ -15,10 +15,10 @@ Last updated: 2026-08-31
 Exactly one entry. If two things are genuinely running, that is what this file
 exists to say out loud.
 
-**V2 P19 updates and remote control integration — Task 3 preflight.**
+**V2 P20 verification, production cutover and release preparation — Task 1 preflight.**
 
-- **Branch:** `v2/p19-updates-remote-control`
-- **Gate:** P19 completion gate green — local merge pending
+- **Branch:** `v2/p20-verification-release-cutover`
+- **Gate:** Task 1 preflight — executable acceptance matrix and lifecycle integration
 - **Status:** P15 backend prerequisite merged locally into `master` at `c44cddc`
   and post-merge verified: typecheck pass, full Vitest 233 files / 1423 tests,
   production build pass and Playwright 16/16 pass. Continuous V2 execution rules
@@ -102,8 +102,13 @@ exists to say out loud.
   channel preference and an Electron E2E flow. The replaced reduced remote
   status adapter was removed after its consumers migrated. Completion review
   found no P0-P2; verification passed typecheck, full Vitest 254 files / 1471
-  tests, production build and Playwright 19/19.
-- **Plan:** [`v2/implementation-plans/plans/19-updates-remote-control.md`](v2/implementation-plans/plans/19-updates-remote-control.md)
+  tests, production build and Playwright 19/19. P19 merged locally into `master`
+  at `a9aabac`; post-merge verification passed the same full gate and the merged
+  branch was deleted.
+- **Scope:** Build the executable V2 acceptance matrix and prove the complete
+  Goal → Plan → Tasks → Execution → Review → Rework → Re-review → Verification
+  → Completed lifecycle using deterministic fake runtimes and real temp SQLite/Git.
+- **Plan:** [`v2/implementation-plans/plans/20-verification-release-cutover.md`](v2/implementation-plans/plans/20-verification-release-cutover.md)
 
 ## Next
 
@@ -112,8 +117,8 @@ after it has been decided.
 
 | # | Work | Prerequisite |
 |---|---|---|
-| 1 | P19 local merge, post-merge verification and branch deletion | Completion gate green |
-| 2 | Continue to P20 verification/release cutover | Requires P19 local merge |
+| 1 | P20 Task 1 — acceptance matrix and workflow lifecycle integration | P19 merged at `a9aabac` |
+| 2 | P20 Task 2 — mandatory protocol/routing regressions | Requires Task 1 commit |
 
 ## Blocked
 
