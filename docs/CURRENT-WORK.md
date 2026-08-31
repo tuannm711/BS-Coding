@@ -15,10 +15,10 @@ Last updated: 2026-08-31
 Exactly one entry. If two things are genuinely running, that is what this file
 exists to say out loud.
 
-**V2 P19 updates and remote control integration — Task 1 preflight.**
+**V2 P19 updates and remote control integration — Task 2 implementation.**
 
 - **Branch:** `v2/p19-updates-remote-control`
-- **Gate:** Task 1 TDD — approved stable/beta updater channel amendment
+- **Gate:** Task 2 TDD — remote control and pairing contracts
 - **Status:** P15 backend prerequisite merged locally into `master` at `c44cddc`
   and post-merge verified: typecheck pass, full Vitest 233 files / 1423 tests,
   production build pass and Playwright 16/16 pass. Continuous V2 execution rules
@@ -72,13 +72,17 @@ exists to say out loud.
   into `master` at `eff2e91`; post-merge verification passed typecheck, full
   Vitest 248 files / 1456 tests, production build and Playwright 18/18, then the
   merged branch was deleted.
-- **Scope:** Wrap the existing updater behind a V2 application port with typed,
+  Task 1 wraps the existing updater behind a V2 application port with typed,
   serializable status and no coupling to workflow state. Preflight implementation
   maps check/download/apply/status and is focused-green, but completion review
   found the locked architecture also requires stable/beta channel selection;
   neither the detailed plan nor current V1 Updater exposes that capability. The
   owner approved extending the V2 port and V1 updater edge with explicit
   STABLE/BETA selection backed by electron-updater channel/prerelease settings.
+  Task 1 is committed at `28ca802`; 19 focused tests and typecheck passed.
+- **Scope:** Define serializable V2 enable/disable, short-lived pairing and
+  connected-device DTOs with no project content, credential or raw transport
+  handle exposure.
 - **Plan:** [`v2/implementation-plans/plans/19-updates-remote-control.md`](v2/implementation-plans/plans/19-updates-remote-control.md)
 
 ## Next
@@ -88,8 +92,8 @@ after it has been decided.
 
 | # | Work | Prerequisite |
 |---|---|---|
-| 1 | P19 Task 1 — updater V2 port/adapter | P18 merged at `eff2e91` |
-| 2 | P19 Task 2 — remote control contracts | Requires Task 1 commit |
+| 1 | P19 Task 2 — remote control contracts | Task 1 committed at `28ca802` |
+| 2 | P19 Task 3 — secure BrowserBridge adapter | Requires Task 2 commit |
 
 ## Blocked
 
