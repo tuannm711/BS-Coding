@@ -44,10 +44,20 @@ jobs:
         include:
           - os: windows-latest
             target: win
+            arch: x64
+            app_dir: win-unpacked
           - os: macos-latest
             target: mac
+            arch: arm64
+            app_dir: mac-arm64
+          - os: macos-15-intel
+            target: mac
+            arch: x64
+            app_dir: mac
           - os: ubuntu-latest
             target: linux
+            arch: x64
+            app_dir: linux-unpacked
     runs-on: ${{ matrix.os }}
     env:
       AZURE_CLIENT_ID: ${{ matrix.target == 'win' && secrets.AZURE_CLIENT_ID || '' }}
@@ -76,7 +86,7 @@ jobs:
           tenant-id: ${{ env.AZURE_TENANT_ID }}
           subscription-id: ${{ env.AZURE_SUBSCRIPTION_ID }}
       - name: Package
-        run: npx electron-builder --${{ matrix.target }} --publish never
+        run: npx electron-builder --${{ matrix.target }} --${{ matrix.arch }} --publish never
       - name: Smoke Windows packaged V2
         if: matrix.target == 'win'
         shell: pwsh
@@ -86,7 +96,7 @@ jobs:
       - name: Smoke macOS packaged V2
         if: matrix.target == 'mac'
         run: |
-          BS_PACKAGED_EXE="$PWD/release/mac/BS Coding.app/Contents/MacOS/BS Coding" \
+          BS_PACKAGED_EXE="$PWD/release/${{ matrix.app_dir }}/BS Coding.app/Contents/MacOS/BS Coding" \
             npx playwright test tests/e2e/v2-packaged-smoke.spec.ts
       - name: Smoke Linux packaged V2
         if: matrix.target == 'linux'
@@ -108,7 +118,7 @@ jobs:
           }
       - uses: actions/upload-artifact@v6
         with:
-          name: bs-${{ matrix.os }}
+          name: bs-${{ matrix.os }}-${{ matrix.arch }}
           path: |
             release/*.exe
             release/*.dmg

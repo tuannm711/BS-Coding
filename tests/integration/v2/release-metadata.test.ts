@@ -31,3 +31,12 @@ it('uses a supported Node runtime in CI', () => {
   expect(configuredVersions.length).toBeGreaterThan(0)
   expect(configuredVersions.every(version => version >= 22)).toBe(true)
 })
+
+it('builds and smokes each macOS architecture on a matching native runner', () => {
+  const workflow = readFileSync(path.join(process.cwd(), '.github', 'workflows', 'build.yml'), 'utf8')
+
+  expect(workflow).toMatch(/os: macos-latest\s+target: mac\s+arch: arm64\s+app_dir: mac-arm64/)
+  expect(workflow).toMatch(/os: macos-15-intel\s+target: mac\s+arch: x64\s+app_dir: mac/)
+  expect(workflow).toContain('electron-builder --${{ matrix.target }} --${{ matrix.arch }}')
+  expect(workflow).toContain('release/${{ matrix.app_dir }}')
+})
