@@ -15,10 +15,10 @@ Last updated: 2026-08-31
 Exactly one entry. If two things are genuinely running, that is what this file
 exists to say out loud.
 
-**V2 P20 verification, production cutover and release preparation — Task 4 implementation.**
+**V2 P20 verification, production cutover and release preparation — final release gate.**
 
 - **Branch:** `v2/p20-verification-release-cutover`
-- **Gate:** Task 4 TDD — version, docs, CI and release checklist preparation
+- **Gate:** Cross-platform packaged smoke pending external CI authority
 - **Status:** P15 backend prerequisite merged locally into `master` at `c44cddc`
   and post-merge verified: typecheck pass, full Vitest 233 files / 1423 tests,
   production build pass and Playwright 16/16 pass. Continuous V2 execution rules
@@ -110,10 +110,15 @@ exists to say out loud.
   `2ad3a52`; `TEST-REG-01..03` are consolidated in three integration tests and
   typecheck plus 8 focused files / 19 tests passed. Task 3 is committed at
   `4bb276d`; V2 production migration/cutover and read-only V1 archive passed
-  typecheck, full Vitest 260 files / 1478 tests, build and Playwright 19/19.
-- **Scope:** Set package version 2.0.0, update public product documentation,
-  create the exact release checklist and require V2 migration/core E2E gates in
-  CI. This prepares release artifacts only; no tag, push or release is authorized.
+  typecheck, full Vitest 260 files / 1478 tests, build and Playwright 19/19. Task
+  4 release preparation is committed at `2a1b198`; final review remediation at
+  `270afc1` makes corrupt V1 JSON fail closed. Final local gates pass: typecheck,
+  full Vitest 261 files / 1480 tests, production build, V2 E2E 5/5, Windows
+  unpacked package, and packaged migration against a hash-verified copy of the
+  real V1 userData. macOS/Linux packaged smoke remains external.
+- **Scope:** Complete the remaining macOS/Linux packaged smoke gate through CI,
+  then record P20 completion and merge locally. No push, tag or release has been
+  performed.
 - **Plan:** [`v2/implementation-plans/plans/20-verification-release-cutover.md`](v2/implementation-plans/plans/20-verification-release-cutover.md)
 
 ## Next
@@ -123,12 +128,14 @@ after it has been decided.
 
 | # | Work | Prerequisite |
 |---|---|---|
-| 1 | P20 Task 4 — version/docs/release verification | Task 3 committed at `4bb276d` |
-| 2 | P20 final review and release-level verification | Requires Task 4 commit |
+| 1 | Run macOS/Linux package + smoke gates | Requires remote CI execution authority |
+| 2 | Record P20 completion, merge local and delete branch | Requires all platform gates green |
 
 ## Blocked
 
-- No technical blocker.
+- Local Windows gates are green, but this host cannot build/smoke macOS or Linux
+  packages. Running those gates requires pushing a branch/tag or another
+  authorized remote CI run; project rules prohibit doing that implicitly.
 
 ## Standing rules
 

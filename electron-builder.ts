@@ -30,6 +30,10 @@ async function signWindows(configuration: { path: string }): Promise<void> {
 const config: Configuration = {
   appId: 'com.bs.coding',
   productName: 'BS Coding',
+  // Native dependencies ship Electron-compatible prebuilds (better-sqlite3 uses
+  // Node-API; node-pty is rebuilt explicitly in CI). Forcing node-gyp here breaks
+  // valid builds in workspace paths containing spaces and adds no ABI safety.
+  npmRebuild: false,
   publish: {
     provider: 'github',
     owner: 'tuannm711',
