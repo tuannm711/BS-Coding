@@ -9,6 +9,8 @@ const { mockAutoUpdater, listeners } = vi.hoisted(() => {
     mockAutoUpdater: {
       autoDownload: true,
       autoInstallOnAppQuit: true,
+      allowPrerelease: false,
+      channel: 'latest',
       checkForUpdates: vi.fn(),
       downloadUpdate: vi.fn(() => Promise.resolve()),
       on: vi.fn((event: string, cb: (...args: unknown[]) => void) => {
@@ -48,6 +50,8 @@ describe('Updater', () => {
     listeners.clear()
     mockAutoUpdater.autoDownload = true
     mockAutoUpdater.autoInstallOnAppQuit = true
+    mockAutoUpdater.allowPrerelease = false
+    mockAutoUpdater.channel = 'latest'
   })
 
   it('dev mode: manual check emits not-supported, auto check stays silent', async () => {
@@ -60,6 +64,18 @@ describe('Updater', () => {
     await updater.check(false)
     expect(events).toEqual([])
     expect(mockAutoUpdater.checkForUpdates).not.toHaveBeenCalled()
+  })
+
+  it('selects stable and beta update feeds explicitly', () => {
+    const { updater } = makeUpdater()
+
+    updater.setChannel('beta')
+    expect(mockAutoUpdater.channel).toBe('beta')
+    expect(mockAutoUpdater.allowPrerelease).toBe(true)
+
+    updater.setChannel('stable')
+    expect(mockAutoUpdater.channel).toBe('latest')
+    expect(mockAutoUpdater.allowPrerelease).toBe(false)
   })
 
   it('portable build: manual check emits not-supported', async () => {

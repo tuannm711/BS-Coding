@@ -18,7 +18,7 @@ exists to say out loud.
 **V2 P19 updates and remote control integration — Task 1 preflight.**
 
 - **Branch:** `v2/p19-updates-remote-control`
-- **Gate:** Task 1 TDD — updater V2 port and compatibility adapter
+- **Gate:** Task 1 TDD — approved stable/beta updater channel amendment
 - **Status:** P15 backend prerequisite merged locally into `master` at `c44cddc`
   and post-merge verified: typecheck pass, full Vitest 233 files / 1423 tests,
   production build pass and Playwright 16/16 pass. Continuous V2 execution rules
@@ -73,7 +73,12 @@ exists to say out loud.
   Vitest 248 files / 1456 tests, production build and Playwright 18/18, then the
   merged branch was deleted.
 - **Scope:** Wrap the existing updater behind a V2 application port with typed,
-  serializable status and no coupling to workflow state.
+  serializable status and no coupling to workflow state. Preflight implementation
+  maps check/download/apply/status and is focused-green, but completion review
+  found the locked architecture also requires stable/beta channel selection;
+  neither the detailed plan nor current V1 Updater exposes that capability. The
+  owner approved extending the V2 port and V1 updater edge with explicit
+  STABLE/BETA selection backed by electron-updater channel/prerelease settings.
 - **Plan:** [`v2/implementation-plans/plans/19-updates-remote-control.md`](v2/implementation-plans/plans/19-updates-remote-control.md)
 
 ## Next

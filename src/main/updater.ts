@@ -14,6 +14,8 @@ export interface UpdaterEnv {
   platform?: NodeJS.Platform
 }
 
+export type UpdaterChannel = 'stable' | 'beta'
+
 function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err)
 }
@@ -48,6 +50,11 @@ export class Updater {
 
   isSupported(): boolean {
     return this.notSupportedReason() === null
+  }
+
+  setChannel(channel: UpdaterChannel): void {
+    autoUpdater.channel = channel === 'stable' ? 'latest' : 'beta'
+    autoUpdater.allowPrerelease = channel === 'beta'
   }
 
   async check(manual: boolean): Promise<void> {
