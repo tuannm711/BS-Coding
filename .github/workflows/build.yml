@@ -75,6 +75,22 @@ jobs:
           subscription-id: ${{ env.AZURE_SUBSCRIPTION_ID }}
       - name: Package
         run: npx electron-builder --${{ matrix.target }} --publish never
+      - name: Smoke Windows packaged V2
+        if: matrix.target == 'win'
+        shell: pwsh
+        run: |
+          $env:BS_PACKAGED_EXE = (Resolve-Path 'release\win-unpacked\BS Coding.exe').Path
+          npx playwright test tests/e2e/v2-packaged-smoke.spec.ts
+      - name: Smoke macOS packaged V2
+        if: matrix.target == 'mac'
+        run: |
+          BS_PACKAGED_EXE="$PWD/release/mac/BS Coding.app/Contents/MacOS/BS Coding" \
+            npx playwright test tests/e2e/v2-packaged-smoke.spec.ts
+      - name: Smoke Linux packaged V2
+        if: matrix.target == 'linux'
+        run: |
+          BS_PACKAGED_EXE="$PWD/release/linux-unpacked/bs-coding" \
+            xvfb-run -a npx playwright test tests/e2e/v2-packaged-smoke.spec.ts
       - name: Verify Windows code signature
         if: matrix.target == 'win' && env.AZURE_CLIENT_ID != '' && env.AZURE_TRUSTED_SIGNING_ENDPOINT != '' && env.AZURE_TRUSTED_SIGNING_ACCOUNT_NAME != '' && env.AZURE_TRUSTED_SIGNING_CERTIFICATE_PROFILE != ''
         shell: pwsh
