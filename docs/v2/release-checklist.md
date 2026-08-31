@@ -54,6 +54,8 @@ diagnosis; never retry against the user's only V1 data copy.
 - [ ] `package.json` and `package-lock.json` both report `2.0.0`.
 - [ ] `docs/release-notes/v2.0.0.md` is final and English.
 - [ ] CI build artifacts contain installers, blockmaps and every `latest*.yml`.
+- [ ] `latest-mac.yml` contains both native x64 and ARM64 ZIPs with matching
+  SHA-512 and size values from the consolidated CI artifact.
 - [ ] Windows signatures are valid when signing credentials are configured.
 - [ ] After explicit release approval, push the `v2.0.0` tag; do not run
   `gh release create` manually.

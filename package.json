@@ -27,8 +27,8 @@
     "dist:dir": "electron-vite build && electron-builder --dir",
     "dist:linux": "electron-vite build && electron-builder --linux",
     "dist:linux:dir": "electron-vite build && electron-builder --linux dir",
-    "dist:mac": "electron-vite build && electron-builder --mac",
-    "dist:mac:dir": "electron-vite build && electron-builder --mac dir"
+    "dist:mac": "electron-vite build && electron-builder --mac --x64 --arm64",
+    "dist:mac:dir": "electron-vite build && electron-builder --mac dir --x64 --arm64"
   },
   "devDependencies": {
     "@electron/rebuild": "^4.2.0",

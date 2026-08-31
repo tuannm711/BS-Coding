@@ -87,10 +87,7 @@ const config: Configuration = {
     maintainer: 'BS Coding'
   },
   mac: {
-    target: [
-      { target: 'dmg', arch: ['x64', 'arm64'] },
-      { target: 'zip', arch: ['x64', 'arm64'] }
-    ],
+    target: ['dmg', 'zip'],
     category: 'public.app-category.developer-tools',
     icon: 'bs-coding-logo.png'
   }

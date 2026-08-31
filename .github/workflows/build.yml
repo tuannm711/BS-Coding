@@ -45,12 +45,21 @@ jobs:
           - os: windows-latest
             target: win
             package_args: --win --x64
+            artifact_name: bs-windows-packages
           - os: macos-latest
             target: mac
-            package_args: --mac
+            package_args: --mac --arm64
+            app_dir: mac-arm64
+            artifact_name: bs-macos-arm64-packages
+          - os: macos-15-intel
+            target: mac
+            package_args: --mac --x64
+            app_dir: mac
+            artifact_name: bs-macos-x64-packages
           - os: ubuntu-latest
             target: linux
             package_args: --linux --x64
+            artifact_name: bs-linux-packages
     runs-on: ${{ matrix.os }}
     env:
       AZURE_CLIENT_ID: ${{ matrix.target == 'win' && secrets.AZURE_CLIENT_ID || '' }}
@@ -66,11 +75,6 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Install macOS x64 PTY binary for the multi-arch package
-        if: matrix.target == 'mac'
-        run: |
-          PTY_X64_VERSION="$(node -p "require('./node_modules/@lydell/node-pty/package.json').optionalDependencies['@lydell/node-pty-darwin-x64']")"
-          npm install --no-save --package-lock=false --force "@lydell/node-pty-darwin-x64@$PTY_X64_VERSION"
       - run: npx @electron/rebuild -f -w @lydell/node-pty
       - run: npm run build
       - name: Build Windows multi-resolution icon
@@ -94,10 +98,8 @@ jobs:
       - name: Smoke macOS packaged V2
         if: matrix.target == 'mac'
         run: |
-          for app_dir in mac-arm64 mac; do
-            BS_PACKAGED_EXE="$PWD/release/$app_dir/BS Coding.app/Contents/MacOS/BS Coding" \
-              npx playwright test tests/e2e/v2-packaged-smoke.spec.ts
-          done
+          BS_PACKAGED_EXE="$PWD/release/${{ matrix.app_dir }}/BS Coding.app/Contents/MacOS/BS Coding" \
+            npx playwright test tests/e2e/v2-packaged-smoke.spec.ts
       - name: Smoke Linux packaged V2
         if: matrix.target == 'linux'
         run: |
@@ -118,7 +120,7 @@ jobs:
           }
       - uses: actions/upload-artifact@v6
         with:
-          name: bs-${{ matrix.os }}
+          name: ${{ matrix.artifact_name }}
           path: |
             release/*.exe
             release/*.dmg
@@ -126,11 +128,37 @@ jobs:
             release/*.AppImage
             release/*.deb
             release/*.blockmap
-            release/*.yml
+          if-no-files-found: error
+      - name: Upload platform update metadata
+        if: matrix.target != 'mac'
+        uses: actions/upload-artifact@v6
+        with:
+          name: ${{ matrix.artifact_name }}-metadata
+          path: release/*.yml
+          if-no-files-found: error
+
+  mac-update-metadata:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - uses: actions/download-artifact@v7
+        with:
+          pattern: bs-macos-*-packages
+          path: release
+          merge-multiple: true
+      - run: node scripts/generate-mac-update-metadata.mjs release release/latest-mac.yml
+      - uses: actions/upload-artifact@v6
+        with:
+          name: bs-macos-update-metadata
+          path: release/latest-mac.yml
           if-no-files-found: error
 
   publish:
-    needs: build
+    needs: [build, mac-update-metadata]
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     permissions:
