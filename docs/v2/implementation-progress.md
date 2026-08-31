@@ -25,7 +25,11 @@ plan be reviewed — that gate is tracked in `../CURRENT-WORK.md`, not here.
 | P12 | Review, rework and quality gates | `a8f05c1` | `npm run typecheck` + 14 P12/boundary tests + production build green; full suite 1344 passing |
 | P13 | Skills, MCP and LSP integration | `7682c61` | `npm run typecheck` + 17 P13/boundary tests + production build green; full suite 1359 passing |
 | P14 | Typed IPC and preload contracts | `f46f52f` | `npm run typecheck` + 17 P14/boundary tests + production build green; full suite 1374 passing; 15 Playwright e2e passing |
+| P15 | Renderer V2 UI and Figma prototype binding | `984de9e` | Five-screen V2 shell, Work lifecycle/runtime/rework flows, typed projections and Playwright core UI green |
 | P16 | Security, permissions and secrets | `8962fd3` | `npm run typecheck` + 21 P16/security/boundary tests + production build green; full suite 1384 passing |
+| P17 | Observability, usage, quota and budget | `acfe0ba` | Canonical usage pipeline, durable ledger, budget admission, diagnostics and typed UI green |
+| P18 | V1 migration and cutover preparation | `b95077d` | Backup-first idempotent projects/providers/agents/sessions/usage import; typecheck, full Vitest, build and 18 E2E green |
+| P19 | Updates and remote control integration | `cdfeb9e` | Typed updater/remote services, secure V2 command routing, durable audit/settings UI; typecheck, full Vitest, build and 19 E2E green |
 
 ## P01 notes
 

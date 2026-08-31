@@ -15,10 +15,10 @@ Last updated: 2026-08-31
 Exactly one entry. If two things are genuinely running, that is what this file
 exists to say out loud.
 
-**V2 P20 verification, production cutover and release preparation — Task 3 preflight.**
+**V2 P20 verification, production cutover and release preparation — Task 4 implementation.**
 
 - **Branch:** `v2/p20-verification-release-cutover`
-- **Gate:** Task 3 preflight — one-way production writer cutover and V1 removal audit
+- **Gate:** Task 4 TDD — version, docs, CI and release checklist preparation
 - **Status:** P15 backend prerequisite merged locally into `master` at `c44cddc`
   and post-merge verified: typecheck pass, full Vitest 233 files / 1423 tests,
   production build pass and Playwright 16/16 pass. Continuous V2 execution rules
@@ -108,10 +108,12 @@ exists to say out loud.
   lifecycle test exposed and fixed Review-before-Finding FK ordering, and
   typecheck plus 5 focused files / 15 tests passed. Task 2 is committed at
   `2ad3a52`; `TEST-REG-01..03` are consolidated in three integration tests and
-  typecheck plus 8 focused files / 19 tests passed.
-- **Scope:** Make V2 the sole production writer, run/require a successful P18
-  migration report before V2 feature use, turn V1 session stores into read-only
-  rollback archive and remove replaced V1 renderer/preload/IPC surfaces.
+  typecheck plus 8 focused files / 19 tests passed. Task 3 is committed at
+  `4bb276d`; V2 production migration/cutover and read-only V1 archive passed
+  typecheck, full Vitest 260 files / 1478 tests, build and Playwright 19/19.
+- **Scope:** Set package version 2.0.0, update public product documentation,
+  create the exact release checklist and require V2 migration/core E2E gates in
+  CI. This prepares release artifacts only; no tag, push or release is authorized.
 - **Plan:** [`v2/implementation-plans/plans/20-verification-release-cutover.md`](v2/implementation-plans/plans/20-verification-release-cutover.md)
 
 ## Next
@@ -121,8 +123,8 @@ after it has been decided.
 
 | # | Work | Prerequisite |
 |---|---|---|
-| 1 | P20 Task 3 — production writer cutover and V1 removal | Task 2 committed at `2ad3a52` |
-| 2 | P20 Task 4 — version/docs/release verification | Requires Task 3 commit |
+| 1 | P20 Task 4 — version/docs/release verification | Task 3 committed at `4bb276d` |
+| 2 | P20 final review and release-level verification | Requires Task 4 commit |
 
 ## Blocked
 

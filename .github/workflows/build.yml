@@ -24,6 +24,12 @@ jobs:
       - run: npx @electron/rebuild -f -w @lydell/node-pty
       - run: npm run typecheck
       - run: npm test
+      - name: Verify V1 to V2 migration and cutover
+        run: npx vitest run tests/integration/v2/production-migration.test.ts tests/integration/v2/migration-idempotency.test.ts
+      - name: Build production application for V2 E2E
+        run: npm run build
+      - name: Verify V2 core Electron flows
+        run: xvfb-run -a npx playwright test tests/e2e/v2-bootstrap.spec.ts tests/e2e/v2-core-flow.spec.ts tests/e2e/v2-backend-projections.spec.ts tests/e2e/v2-settings-controls.spec.ts
 
   build:
     needs: test
