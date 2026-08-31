@@ -44,20 +44,13 @@ jobs:
         include:
           - os: windows-latest
             target: win
-            arch: x64
-            app_dir: win-unpacked
+            package_args: --win --x64
           - os: macos-latest
             target: mac
-            arch: arm64
-            app_dir: mac-arm64
-          - os: macos-15-intel
-            target: mac
-            arch: x64
-            app_dir: mac
+            package_args: --mac
           - os: ubuntu-latest
             target: linux
-            arch: x64
-            app_dir: linux-unpacked
+            package_args: --linux --x64
     runs-on: ${{ matrix.os }}
     env:
       AZURE_CLIENT_ID: ${{ matrix.target == 'win' && secrets.AZURE_CLIENT_ID || '' }}
@@ -73,6 +66,11 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Install macOS x64 PTY binary for the multi-arch package
+        if: matrix.target == 'mac'
+        run: |
+          PTY_X64_VERSION="$(node -p "require('./node_modules/@lydell/node-pty/package.json').optionalDependencies['@lydell/node-pty-darwin-x64']")"
+          npm install --no-save --package-lock=false --force "@lydell/node-pty-darwin-x64@$PTY_X64_VERSION"
       - run: npx @electron/rebuild -f -w @lydell/node-pty
       - run: npm run build
       - name: Build Windows multi-resolution icon
@@ -86,7 +84,7 @@ jobs:
           tenant-id: ${{ env.AZURE_TENANT_ID }}
           subscription-id: ${{ env.AZURE_SUBSCRIPTION_ID }}
       - name: Package
-        run: npx electron-builder --${{ matrix.target }} --${{ matrix.arch }} --publish never
+        run: npx electron-builder ${{ matrix.package_args }} --publish never
       - name: Smoke Windows packaged V2
         if: matrix.target == 'win'
         shell: pwsh
@@ -96,8 +94,10 @@ jobs:
       - name: Smoke macOS packaged V2
         if: matrix.target == 'mac'
         run: |
-          BS_PACKAGED_EXE="$PWD/release/${{ matrix.app_dir }}/BS Coding.app/Contents/MacOS/BS Coding" \
-            npx playwright test tests/e2e/v2-packaged-smoke.spec.ts
+          for app_dir in mac-arm64 mac; do
+            BS_PACKAGED_EXE="$PWD/release/$app_dir/BS Coding.app/Contents/MacOS/BS Coding" \
+              npx playwright test tests/e2e/v2-packaged-smoke.spec.ts
+          done
       - name: Smoke Linux packaged V2
         if: matrix.target == 'linux'
         run: |
@@ -118,7 +118,7 @@ jobs:
           }
       - uses: actions/upload-artifact@v6
         with:
-          name: bs-${{ matrix.os }}-${{ matrix.arch }}
+          name: bs-${{ matrix.os }}
           path: |
             release/*.exe
             release/*.dmg

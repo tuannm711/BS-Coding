@@ -32,11 +32,12 @@ it('uses a supported Node runtime in CI', () => {
   expect(configuredVersions.every(version => version >= 22)).toBe(true)
 })
 
-it('builds and smokes each macOS architecture on a matching native runner', () => {
+it('packages both macOS architectures with matching native PTY binaries', () => {
   const workflow = readFileSync(path.join(process.cwd(), '.github', 'workflows', 'build.yml'), 'utf8')
 
-  expect(workflow).toMatch(/os: macos-latest\s+target: mac\s+arch: arm64\s+app_dir: mac-arm64/)
-  expect(workflow).toMatch(/os: macos-15-intel\s+target: mac\s+arch: x64\s+app_dir: mac/)
-  expect(workflow).toContain('electron-builder --${{ matrix.target }} --${{ matrix.arch }}')
-  expect(workflow).toContain('release/${{ matrix.app_dir }}')
+  expect(workflow).toMatch(/os: macos-latest\s+target: mac\s+package_args: --mac/)
+  expect(workflow).not.toContain('macos-15-intel')
+  expect(workflow).toContain('@lydell/node-pty-darwin-x64@$PTY_X64_VERSION')
+  expect(workflow).toContain('for app_dir in mac-arm64 mac')
+  expect(workflow).toContain('electron-builder ${{ matrix.package_args }}')
 })
