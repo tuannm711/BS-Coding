@@ -15,10 +15,10 @@ Last updated: 2026-08-31
 Exactly one entry. If two things are genuinely running, that is what this file
 exists to say out loud.
 
-**V2 P19 updates and remote control integration — Task 2 implementation.**
+**V2 P19 updates and remote control integration — Task 3 preflight.**
 
 - **Branch:** `v2/p19-updates-remote-control`
-- **Gate:** Task 2 TDD — remote control and pairing contracts
+- **Gate:** Task 3 TDD — approved secure remote transport amendment
 - **Status:** P15 backend prerequisite merged locally into `master` at `c44cddc`
   and post-merge verified: typecheck pass, full Vitest 233 files / 1423 tests,
   production build pass and Playwright 16/16 pass. Continuous V2 execution rules
@@ -80,9 +80,18 @@ exists to say out loud.
   owner approved extending the V2 port and V1 updater edge with explicit
   STABLE/BETA selection backed by electron-updater channel/prerelease settings.
   Task 1 is committed at `28ca802`; 19 focused tests and typecheck passed.
-- **Scope:** Define serializable V2 enable/disable, short-lived pairing and
+  Task 2 defines serializable V2 enable/disable, short-lived pairing and
   connected-device DTOs with no project content, credential or raw transport
-  handle exposure.
+  handle exposure. Task 2 is committed at `8c7febd`; 3 focused tests and
+  typecheck passed.
+- **Scope:** Route authenticated remote transport requests through the same V2
+  command/permission services as local UI and implement lifecycle/status/device
+  revocation through a compatibility adapter. Preflight found RemoteManager
+  hardcodes the V1 BsAgentManager dispatcher, relay status discards authenticated
+  mobile device identity, revocation is global-token only, relay URLs are not
+  constrained to encrypted/loopback transports and no local audit sink is called.
+  The owner approved injecting the V2 dispatcher/audit sink, retaining device
+  identity for targeted revocation and rejecting non-WSS non-loopback relays.
 - **Plan:** [`v2/implementation-plans/plans/19-updates-remote-control.md`](v2/implementation-plans/plans/19-updates-remote-control.md)
 
 ## Next
@@ -92,8 +101,8 @@ after it has been decided.
 
 | # | Work | Prerequisite |
 |---|---|---|
-| 1 | P19 Task 2 — remote control contracts | Task 1 committed at `28ca802` |
-| 2 | P19 Task 3 — secure BrowserBridge adapter | Requires Task 2 commit |
+| 1 | P19 Task 3 — secure BrowserBridge/remote adapter | Task 2 committed at `8c7febd` |
+| 2 | P19 completion gate, review and local merge | Requires Task 3 commit |
 
 ## Blocked
 

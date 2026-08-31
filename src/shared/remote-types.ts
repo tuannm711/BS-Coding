@@ -10,6 +10,9 @@ export type RemoteCommandName =
   | 'session:list' | 'session:switch' | 'session:create' | 'session:rename'
   | 'session:messages'
   | 'chat:send' | 'chat:respond'
+  | 'project:list' | 'workSession:listByProject' | 'workSession:create'
+  | 'workSession:pause' | 'workSession:resume' | 'workSession:cancel'
+  | 'workflow:approvePlan' | 'workflow:createRework'
 
 export type RemoteEvent =
   | { type: 'agent:state'; agentId: string; running: boolean; background: boolean }
@@ -48,7 +51,7 @@ export interface RemoteCmdResult {
   id: string
   ok: boolean
   result?: unknown
-  error?: string
+  error?: string | { code: string; message: string }
 }
 
 export interface RemoteEventMsg {
@@ -72,6 +75,7 @@ export interface RemoteStatus {
   connected: boolean
   paired: boolean
   deviceId: string
+  mobileDeviceId?: string
   relayUrl?: string
   pairingCode?: string
   pairingExpiresAt?: number

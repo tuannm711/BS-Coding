@@ -23,6 +23,7 @@ export interface RelayClientDeps {
 export interface RelayStatus {
   connected: boolean
   paired: boolean
+  deviceId?: string
   error?: string
 }
 
@@ -71,7 +72,13 @@ export class RemoteRelayClient {
 
   revokeToken(): void {
     this.deps.pairing.revokeToken()
-    this.setStatus({ paired: false })
+    this.setStatus({ paired: false, deviceId: undefined })
+  }
+
+  revokeDevice(deviceId: string): boolean {
+    if (!this._status.paired || this._status.deviceId !== deviceId) return false
+    this.revokeToken()
+    return true
   }
 
   onStatusChange(cb: (s: RelayStatus) => void): () => void {
@@ -89,7 +96,7 @@ export class RemoteRelayClient {
     const ws = this.ws
     this.ws = null
     if (ws) ws.close()
-    this.setStatus({ connected: false, paired: false })
+    this.setStatus({ connected: false, paired: false, deviceId: undefined })
   }
 
   private handleOpen(ws: WebSocket): void {
@@ -133,13 +140,18 @@ export class RemoteRelayClient {
       : { type: 'pair-result', ok: false, error: 'invalid pairing code or token' }
     this.send(res)
     if (ok) {
-      this.setStatus({ paired: true })
+      this.setStatus({ paired: true, deviceId: msg.deviceId })
       if (res.token) this.deps.onPairOk?.(res.token)
     }
   }
 
   private async handleCmd(ws: WebSocket, msg: RemoteCmd): Promise<void> {
     if (this.ws !== ws) return
+    if (!this._status.paired) {
+      this.send({ type: 'cmd-result', id: msg.id, ok: false,
+        error: 'remote device is not paired' })
+      return
+    }
     let result: RemoteCommandResult
     try {
       result = await this.deps.dispatch(msg.cmd, msg.params)
@@ -153,7 +165,7 @@ export class RemoteRelayClient {
     if (this.ws !== ws) return
     this.ws = null
     this.stopHeartbeat()
-    this.setStatus({ connected: false, paired: false })
+    this.setStatus({ connected: false, paired: false, deviceId: undefined })
     if (!this.closed) this.scheduleReconnect()
   }
 
@@ -208,6 +220,7 @@ export class RemoteRelayClient {
     if (
       next.connected === this._status.connected &&
       next.paired === this._status.paired &&
+      next.deviceId === this._status.deviceId &&
       next.error === this._status.error
     ) {
       return

@@ -26,3 +26,11 @@ export const PairingStatusSchema = z.object({
       message: 'pairing code and expiry are required together while pairing' })
   }
 })
+
+export const RemoteAuditEventSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('CONNECTION'),
+    state: z.enum(['DISABLED', 'OFFLINE', 'CONNECTING', 'PAIRING', 'CONNECTED', 'ERROR']),
+    deviceId: id.optional(), timestamp }),
+  z.object({ type: z.literal('PRIVILEGED_COMMAND'), command: id,
+    deviceId: id.optional(), timestamp })
+])

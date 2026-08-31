@@ -17,3 +17,7 @@ export interface PairingStatus {
   devices: readonly RemoteDeviceSummary[]
   message?: string
 }
+
+export type RemoteAuditEvent =
+  | { type: 'CONNECTION'; state: RemoteConnectionState; deviceId?: string; timestamp: string }
+  | { type: 'PRIVILEGED_COMMAND'; command: string; deviceId?: string; timestamp: string }

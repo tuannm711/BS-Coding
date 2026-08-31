@@ -58,6 +58,7 @@ import { V1WorkspaceGitAdapter } from './v2/infrastructure/workspace/v1-workspac
 import { V1ProviderAccountAdapter } from './v2/infrastructure/providers/v1-provider-account-adapter'
 import { V1SettingsVaultAdapter } from './v2/infrastructure/settings/v1-settings-vault-adapter'
 import { V1RemoteStatusAdapter } from './v2/infrastructure/remote/v1-remote-status-adapter'
+import { V1RemoteAdapter } from './v2/infrastructure/remote/v1-remote-adapter'
 import { Channels } from '../shared/ipc'
 import { P15_IPC } from '../shared/v2/contracts/p15-backend-ipc'
 import type { AgentState, Command, FileViewerPayload, ImageAttachment, BsSettings, NewAgentInput, PromptResponse, Template, TerminalInfo, Workspace, WorkspaceRuntime } from '../shared/types'
@@ -206,7 +207,9 @@ class MainApp {
       bsAgent: this.bsAgent,
       workspaceStore: this.workspaces,
       isEnabled: () => this.remoteStore.load().enabled
-    }
+    },
+    ...(process.env.BS_V2 === '1' ? { dispatch: async () => ({ ok: false,
+      error: 'V2 remote services are not ready' }) } : {})
   })
 
   private states = new Map<string, AgentState>()
@@ -1006,7 +1009,7 @@ app.whenReady().then(async () => {
   v2Runtime = await createV2Runtime({ enabled: process.env.BS_V2 === '1', start: async () => {
     const stateDir = path.join(userDataDir, 'v2')
     mkdirSync(stateDir, { recursive: true })
-    return startV2Infrastructure({ databasePath: path.join(stateDir, 'state.sqlite'), registrar: ipcMain,
+    const infrastructure = await startV2Infrastructure({ databasePath: path.join(stateDir, 'state.sqlite'), registrar: ipcMain,
       sendProjection: event => win?.webContents.send(P15_IPC['workflow.projection'], event),
       support: ({ repositories }) => {
         const workspaceGit = new V1WorkspaceGitAdapter({
@@ -1059,6 +1062,18 @@ app.whenReady().then(async () => {
           remoteStatus: () => remote.get()
         }
       } })
+    const remote = new V1RemoteAdapter({
+      getStatus: () => mainApp.remote.getStatus(),
+      setEnabled: enabled => mainApp.remote.setEnabled(enabled),
+      startPairing: () => mainApp.remote.startPairing(),
+      revokeDevice: deviceId => mainApp.remote.revokeDevice(deviceId),
+      onStatusChange: listener => mainApp.remote.onStatusChange(listener)
+    }, { execute: (name, value) => infrastructure.execute(name, value) }, infrastructure.remoteAudit)
+    mainApp.remote.setDispatcher((name, value) => remote.dispatch(name, value))
+    return { dispose: async () => {
+      remote.dispose()
+      await infrastructure.dispose()
+    } }
   } })
   mainApp.bsAgent.truncationCleanup()
   await mainApp.browserBridge.start().catch(err => {
