@@ -15,10 +15,10 @@ Last updated: 2026-08-31
 Exactly one entry. If two things are genuinely running, that is what this file
 exists to say out loud.
 
-**V2 P20 verification, production cutover and release preparation — Task 1 preflight.**
+**V2 P20 verification, production cutover and release preparation — Task 2 implementation.**
 
 - **Branch:** `v2/p20-verification-release-cutover`
-- **Gate:** Task 1 preflight — executable acceptance matrix and lifecycle integration
+- **Gate:** Task 2 TDD — mandatory runtime, routing and tool-protocol regressions
 - **Status:** P15 backend prerequisite merged locally into `master` at `c44cddc`
   and post-merge verified: typecheck pass, full Vitest 233 files / 1423 tests,
   production build pass and Playwright 16/16 pass. Continuous V2 execution rules
@@ -104,10 +104,12 @@ exists to say out loud.
   found no P0-P2; verification passed typecheck, full Vitest 254 files / 1471
   tests, production build and Playwright 19/19. P19 merged locally into `master`
   at `a9aabac`; post-merge verification passed the same full gate and the merged
-  branch was deleted.
-- **Scope:** Build the executable V2 acceptance matrix and prove the complete
-  Goal → Plan → Tasks → Execution → Review → Rework → Re-review → Verification
-  → Completed lifecycle using deterministic fake runtimes and real temp SQLite/Git.
+  branch was deleted. P20 Task 1 is committed at `f3f35f7`; its real SQLite/Git
+  lifecycle test exposed and fixed Review-before-Finding FK ordering, and
+  typecheck plus 5 focused files / 15 tests passed.
+- **Scope:** Consolidate `TEST-REG-01..03`: cross-runtime canonical portability,
+  same-model account fallback with a new epoch, narrated-tool protection and
+  duplicate structured call at-most-once execution.
 - **Plan:** [`v2/implementation-plans/plans/20-verification-release-cutover.md`](v2/implementation-plans/plans/20-verification-release-cutover.md)
 
 ## Next
@@ -117,8 +119,8 @@ after it has been decided.
 
 | # | Work | Prerequisite |
 |---|---|---|
-| 1 | P20 Task 1 — acceptance matrix and workflow lifecycle integration | P19 merged at `a9aabac` |
-| 2 | P20 Task 2 — mandatory protocol/routing regressions | Requires Task 1 commit |
+| 1 | P20 Task 2 — mandatory protocol/routing regressions | Task 1 committed at `f3f35f7` |
+| 2 | P20 Task 3 — production writer cutover and V1 removal | Requires Task 2 commit |
 
 ## Blocked
 

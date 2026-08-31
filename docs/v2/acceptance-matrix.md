@@ -32,9 +32,9 @@ manual/package checks are added by P20 Task 4.
 
 | Regression | Status | Evidence / P20 action |
 |---|---|---|
-| `TEST-REG-01` | PENDING CONSOLIDATION | Component evidence exists; P20 Task 2 creates `runtime-portability.test.ts`. |
-| `TEST-REG-02` | PENDING CONSOLIDATION | Component evidence exists; P20 Task 2 creates `routing-regression.test.ts`. |
-| `TEST-REG-03` | PENDING CONSOLIDATION | Component evidence exists; P20 Task 2 creates `tool-protocol-regression.test.ts`. |
+| `TEST-REG-01` | PASS | `tests/integration/v2/runtime-portability.test.ts` |
+| `TEST-REG-02` | PASS | `tests/integration/v2/routing-regression.test.ts` |
+| `TEST-REG-03` | PASS | `tests/integration/v2/tool-protocol-regression.test.ts` |
 | `TEST-REG-04` | PASS | `tests/integration/v2/work-session-lifecycle.test.ts`, `tests/integration/v2/rework-lifecycle.test.ts` |
 | `TEST-REG-05` | PASS | `tests/unit/v2/workflow-lifecycle.test.ts`, `tests/e2e/v2-runtime-switch.spec.ts` |
 | `TEST-REG-06` | PASS | `tests/integration/v2/worktree-manager.test.ts`, `tests/integration/v2/integration-service.test.ts` |
