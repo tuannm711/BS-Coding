@@ -9,7 +9,7 @@ it('owns migrated persistence and every validated P15 route', async () => {
   const dir = mkdtempSync(path.join(tmpdir(), 'bs-v2-runtime-'))
   const handlers = new Map<string, (event: unknown, raw: unknown) => unknown>()
   const removeHandler = vi.fn((channel: string) => { handlers.delete(channel) })
-  let runtime: { dispose(): Promise<void> } | undefined
+  let runtime: { dispose(): Promise<void>; execute(name: string, input: unknown): Promise<unknown> } | undefined
   try {
     runtime = await startV2Infrastructure({ databasePath: path.join(dir, 'state.sqlite'),
       registrar: { handle: (channel: string, handler: (event: unknown, raw: unknown) => unknown) => {
@@ -18,11 +18,23 @@ it('owns migrated persistence and every validated P15 route', async () => {
       support: ({ repositories }: { repositories: { projects: { get(id: string): Promise<unknown> } } }) => ({
         getWorkspace: async () => ({ status: 'EMPTY' }), getGitStatus: async () => ({ status: 'EMPTY' }),
         listProviderAccounts: async () => [], listSkillBindings: async () => ({ status: 'EMPTY' }),
-        listMcpServers: async () => ({ status: 'EMPTY' }), listDiagnostics: async () => ({ status: 'EMPTY' })
+        listMcpServers: async () => ({ status: 'EMPTY' }), listDiagnostics: async () => ({ status: 'EMPTY' }),
+        updates: { getStatus: () => ({ state: 'IDLE', channel: 'STABLE' }),
+          setChannel() {}, check: async () => {}, download() {}, apply() {}, subscribe: () => () => {} },
+        remoteControl: { getStatus: async () => ({ enabled: false, state: 'DISABLED', devices: [] }),
+          setRelayUrl: async () => {}, setEnabled: async () => {},
+          startPairing: async () => ({ enabled: false, state: 'DISABLED', devices: [] }),
+          revokeDevice: async () => {}, subscribe: () => () => {} }
       }) } as never)
 
     expect([...handlers]).toHaveLength(Object.keys(P15PublicIpcSchemas).length - 1)
     await expect(handlers.get('bs.v2.project.list')!({}, {})).resolves.toMatchObject({ projects: [] })
+    await expect(runtime.execute('project.list', {})).resolves.toMatchObject({ projects: [] })
+    await expect(runtime.execute('project.list', { token: 'must-not-cross' })).rejects.toThrow()
+    await expect(runtime.execute('update.status', {})).resolves.toEqual({ state: 'IDLE', channel: 'STABLE' })
+    await expect(runtime.execute('remote.status', {})).resolves.toEqual({
+      enabled: false, state: 'DISABLED', devices: []
+    })
     await runtime.dispose()
     expect(handlers.size).toBe(0)
     expect(removeHandler).toHaveBeenCalledTimes(Object.keys(P15PublicIpcSchemas).length - 1)

@@ -10,7 +10,7 @@ import type { ChatEvent } from '../../src/shared/types'
 function makeStore(initial?: Partial<RemoteSettings>): RemoteSettingsStore {
   let current: RemoteSettings = {
     enabled: false,
-    relayUrl: 'ws://relay.test',
+    relayUrl: 'wss://relay.test',
     deviceId: 'dev-1',
     ...initial
   }
@@ -240,7 +240,7 @@ describe('RemoteManager', () => {
   it('setRelayUrl reconnects when enabled', () => {
     manager.setEnabled(true)
     const first = clients[0].client
-    manager.setRelayUrl('ws://other.test')
+    manager.setRelayUrl('wss://other.test')
     expect(clients.length).toBe(2)
     expect(first.close).toHaveBeenCalled()
     expect(clients[1].client).not.toBe(first)
@@ -263,6 +263,22 @@ describe('RemoteManager', () => {
     expect(created).toHaveLength(1)
     expect(created[0].client.connect).toHaveBeenCalled()
     m.dispose()
+  })
+
+  it('disables an insecure persisted relay without crashing startup', () => {
+    const insecureStore = makeStore({ enabled: true, relayUrl: 'ws://relay.example' })
+    let manager: RemoteManager | undefined
+
+    expect(() => {
+      manager = new RemoteManager({
+        store: insecureStore, pairing: new RemotePairing(), context: makeContext(),
+        createClient: vi.fn()
+      })
+    }).not.toThrow()
+
+    expect(insecureStore.load().enabled).toBe(false)
+    expect(manager!.getStatus()).toMatchObject({ enabled: false, error: expect.stringMatching(/secure relay/i) })
+    manager!.dispose()
   })
 
   it('does not create a client on startup when disabled', () => {

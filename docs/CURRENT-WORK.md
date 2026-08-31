@@ -15,10 +15,10 @@ Last updated: 2026-08-31
 Exactly one entry. If two things are genuinely running, that is what this file
 exists to say out loud.
 
-**V2 P18 V1 data migration and cutover preparation — Task 4 implementation.**
+**V2 P19 updates and remote control integration — Task 3 preflight.**
 
-- **Branch:** `v2/p18-v1-migration-cutover`
-- **Gate:** P18 completion gate green — local merge in progress
+- **Branch:** `v2/p19-updates-remote-control`
+- **Gate:** P19 completion gate green — local merge pending
 - **Status:** P15 backend prerequisite merged locally into `master` at `c44cddc`
   and post-merge verified: typecheck pass, full Vitest 233 files / 1423 tests,
   production build pass and Playwright 16/16 pass. Continuous V2 execution rules
@@ -56,10 +56,9 @@ exists to say out loud.
   `d6fa88b`; typecheck and 3 focused files / 10 tests passed before commit.
   Task 3 canonical session conversion is committed at `0c26c3d`; typecheck and
   4 focused files / 17 tests passed before commit.
-- **Scope:** Implement checkpointed/resumable migration orchestration, backup
-  enforcement and count/hash/sample validation; confirm the planned usage stage
-  has a concrete V1-to-V2 import boundary rather than a placeholder. Preflight
-  confirmed no usage importer exists: V2 UsageRecord requires provider/account,
+  Task 4 implements checkpointed/resumable migration orchestration, backup
+  enforcement and count/hash/sample validation. Preflight confirmed the planned usage stage
+  initially had no concrete V1-to-V2 import boundary: V2 UsageRecord requires provider/account,
   V1 session aggregates do not carry that attribution, and quota snapshots have
   neither persistence nor the architecture-required source/confidence fields.
   The owner approved the recommended amendment: import only attributable usage,
@@ -69,8 +68,42 @@ exists to say out loud.
   passed before commit. Completion review found no P0-P2; pre-merge verification
   passed typecheck, full Vitest 248 files / 1456 tests, production build and
   Playwright 18/18. P20 Task 3 owns production writer composition/cutover and
-  explicitly consumes the successful P18 migration report.
-- **Plan:** [`v2/implementation-plans/plans/18-v1-migration-cutover.md`](v2/implementation-plans/plans/18-v1-migration-cutover.md)
+  explicitly consumes the successful P18 migration report. P18 merged locally
+  into `master` at `eff2e91`; post-merge verification passed typecheck, full
+  Vitest 248 files / 1456 tests, production build and Playwright 18/18, then the
+  merged branch was deleted.
+  Task 1 wraps the existing updater behind a V2 application port with typed,
+  serializable status and no coupling to workflow state. Preflight implementation
+  maps check/download/apply/status and is focused-green, but completion review
+  found the locked architecture also requires stable/beta channel selection;
+  neither the detailed plan nor current V1 Updater exposes that capability. The
+  owner approved extending the V2 port and V1 updater edge with explicit
+  STABLE/BETA selection backed by electron-updater channel/prerelease settings.
+  Task 1 is committed at `28ca802`; 19 focused tests and typecheck passed.
+  Task 2 defines serializable V2 enable/disable, short-lived pairing and
+  connected-device DTOs with no project content, credential or raw transport
+  handle exposure. Task 2 is committed at `8c7febd`; 3 focused tests and
+  typecheck passed.
+- **Scope:** Route authenticated remote transport requests through the same V2
+  command/permission services as local UI and implement lifecycle/status/device
+  revocation through a compatibility adapter. Preflight found RemoteManager
+  hardcodes the V1 BsAgentManager dispatcher, relay status discards authenticated
+  mobile device identity, revocation is global-token only, relay URLs are not
+  constrained to encrypted/loopback transports and no local audit sink is called.
+  The owner approved injecting the V2 dispatcher/audit sink, retaining device
+  identity for targeted revocation and rejecting non-WSS non-loopback relays.
+  Task 3 is committed at `148561c`; typecheck and 10 focused files / 73 tests passed.
+  Completion audit found both V2 Settings panels remain static, UpdatePort is not
+  composed into main services, and public V2 IPC exposes only a reduced
+  `remote.status` query rather than typed lifecycle/pairing/revocation/update APIs.
+  The owner approved the recommended vertical-slice amendment. Updates and
+  Remote Control now use typed V2 service/IPC/preload contracts, functional
+  accessible panels based on the vendored prototype, durable SQLite update
+  channel preference and an Electron E2E flow. The replaced reduced remote
+  status adapter was removed after its consumers migrated. Completion review
+  found no P0-P2; verification passed typecheck, full Vitest 254 files / 1471
+  tests, production build and Playwright 19/19.
+- **Plan:** [`v2/implementation-plans/plans/19-updates-remote-control.md`](v2/implementation-plans/plans/19-updates-remote-control.md)
 
 ## Next
 
@@ -79,8 +112,8 @@ after it has been decided.
 
 | # | Work | Prerequisite |
 |---|---|---|
-| 1 | Merge P18 locally into `master`, post-merge verify and delete branch | Completion gate green |
-| 2 | Continue to next dependency-ready V2 plan | Requires P18 local merge |
+| 1 | P19 local merge, post-merge verification and branch deletion | Completion gate green |
+| 2 | Continue to P20 verification/release cutover | Requires P19 local merge |
 
 ## Blocked
 

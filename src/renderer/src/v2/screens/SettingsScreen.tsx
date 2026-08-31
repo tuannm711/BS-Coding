@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from 'react'
 import type { AgentSettingsProjection } from '../../../../shared/v2/contracts/ui-projections'
 import ProvidersPanel from './settings/ProvidersPanel'
 import { StaticSettingsPanel } from './settings/panels'
+import UpdatesPanel from './settings/UpdatesPanel'
+import RemoteControlPanel from './settings/RemoteControlPanel'
 
 export const GLOBAL_SETTINGS = [
   'Application', 'Appearance', 'Providers', 'Security',
@@ -20,6 +22,8 @@ export default function SettingsScreen() {
       aria-current={panel === item ? 'page' : undefined} onClick={() => setPanel(item)}>{item}</button>)}</nav>
       <main>{error ? <div className="v2-panel-state" role="alert">{error}</div>
         : panel === 'Providers' ? <ProvidersPanel projection={projection} onRefresh={refresh} />
-          : <StaticSettingsPanel panel={panel} projection={projection} />}</main></div>
+          : panel === 'Updates' ? <UpdatesPanel />
+            : panel === 'Remote Control' ? <RemoteControlPanel />
+              : <StaticSettingsPanel panel={panel} projection={projection} />}</main></div>
   </div>
 }

@@ -9,7 +9,7 @@ function migrations(): Array<{ version: number; sql: string }> {
   const root = path.join(process.cwd(), 'src', 'main', 'v2', 'infrastructure', 'persistence', 'migrations')
   const files = ['001-core.sql', '002-events.sql', '003-projections-idempotency.sql',
     '004-usage.sql', '005-budget-cost-known.sql', '006-provider-accounts.sql',
-    '007-historical-quota.sql']
+    '007-historical-quota.sql', '008-remote-audit.sql', '009-update-preferences.sql']
   return files.map((file, index) => ({ version: index + 1,
     sql: readFileSync(path.join(root, file), 'utf8') }))
 }

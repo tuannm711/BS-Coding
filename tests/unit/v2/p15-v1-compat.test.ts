@@ -2,7 +2,6 @@ import { expect, it } from 'vitest'
 import { V1ProviderAccountAdapter } from '../../../src/main/v2/infrastructure/providers/v1-provider-account-adapter'
 import { V1WorkspaceGitAdapter } from '../../../src/main/v2/infrastructure/workspace/v1-workspace-git-adapter'
 import { V1SettingsVaultAdapter } from '../../../src/main/v2/infrastructure/settings/v1-settings-vault-adapter'
-import { V1RemoteStatusAdapter } from '../../../src/main/v2/infrastructure/remote/v1-remote-status-adapter'
 
 it('maps workspace and Git state without exposing V1 handles', async () => {
   const adapter = new V1WorkspaceGitAdapter({
@@ -40,12 +39,6 @@ it('reports credential metadata without reading secret values', async () => {
     .rejects.toThrow('unknown setting')
   await expect(adapter.update({ patch: { apiKey: 'must-not-cross' } }))
     .rejects.toThrow('secret-bearing setting')
-})
-
-it('reduces remote state to the public V2 status shape', async () => {
-  const adapter = new V1RemoteStatusAdapter({ getStatus: () => ({ enabled: true,
-    connected: false, paired: false, deviceId: 'private-device', error: 'offline' }) })
-  await expect(adapter.get()).resolves.toEqual({ enabled: true, status: 'ERROR' })
 })
 
 it('projects provider accounts without key references or raw credentials', async () => {

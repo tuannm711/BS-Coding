@@ -8,7 +8,9 @@ const names = [
   'provider.listAccounts','provider.connect','provider.refresh','provider.setEnabled','provider.probe',
   'provider.quota','usage.get','usage.updateBudget',
   'workspace.get','git.status','skill.list','mcp.listServers','settings.get','settings.update',
-  'diagnostics.list','remote.status'
+  'diagnostics.list',
+  'update.status','update.setChannel','update.check','update.download','update.apply',
+  'remote.status','remote.setRelayUrl','remote.setEnabled','remote.startPairing','remote.revokeDevice'
 ] as const
 export type P15PublicApiKey = typeof names[number]
 export const P15_IPC: Readonly<Record<P15PublicApiKey, string>> = Object.freeze(

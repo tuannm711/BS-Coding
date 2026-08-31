@@ -1,4 +1,4 @@
-import { describe, expect, it, afterEach } from 'vitest'
+import { describe, expect, it, afterEach, vi } from 'vitest'
 import WebSocket from 'ws'
 import { createRelayServer } from '../../../server/index'
 import { RemoteRelayClient } from '../../../src/main/remote/remote-relay-client'
@@ -130,6 +130,7 @@ describe('RemoteRelayClient relay flow', () => {
     expect(mobile.pair.ok).toBe(true)
     expect(mobile.token).toBeTruthy()
     expect(client.status.paired).toBe(true)
+    expect(client.status.deviceId).toBe('phone-1')
     expect(statuses.some((s) => s.connected && s.paired)).toBe(true)
 
     mobile.ws.send(JSON.stringify({ type: 'cmd', id: 'c1', cmd: 'workspace:list', params: {} }))
@@ -203,5 +204,25 @@ describe('RemoteRelayClient relay flow', () => {
     expect(mobile.pair.ok).toBe(false)
     expect(mobile.token).toBeUndefined()
     expect(client.status.paired).toBe(false)
+  })
+
+  it('rejects commands after targeted device revocation without dispatching', async () => {
+    const { port } = await startRelay()
+    const dispatch = vi.fn(async () => ({ ok: true as const, result: ['forbidden'] }))
+    const client = newClient({ url: `ws://127.0.0.1:${port}`, deviceId: 'desk-1', dispatch })
+    client.connect()
+    await waitForStatus(client, status => status.connected)
+    const { code } = client.startPairing()
+    const mobile = await fakeMobile(port, code)
+    await waitForStatus(client, status => status.paired && status.deviceId === 'phone-1')
+
+    expect(client.revokeDevice('phone-1')).toBe(true)
+    mobile.ws.send(JSON.stringify({ type: 'cmd', id: 'after-revoke',
+      cmd: 'project:list', params: {} }))
+    const result = await waitForMsg(mobile.ws,
+      message => message.type === 'cmd-result' && message.id === 'after-revoke')
+
+    expect(result).toMatchObject({ ok: false, error: 'remote device is not paired' })
+    expect(dispatch).not.toHaveBeenCalled()
   })
 })
