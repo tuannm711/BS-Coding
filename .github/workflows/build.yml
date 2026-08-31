@@ -18,14 +18,16 @@ jobs:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
       - run: npm ci
-      - run: npx @electron/rebuild -f -w @lydell/node-pty
       - run: npm run typecheck
       - run: npm test
       - name: Verify V1 to V2 migration and cutover
         run: npx vitest run tests/integration/v2/production-migration.test.ts tests/integration/v2/migration-idempotency.test.ts
+      # electron-rebuild also rebuilds discovered native dependencies such as
+      # better-sqlite3 for Electron. Keep Node/Vitest gates above this ABI switch.
+      - run: npx @electron/rebuild -f -w @lydell/node-pty
       - name: Build production application for V2 E2E
         run: npm run build
       - name: Verify V2 core Electron flows
@@ -58,7 +60,7 @@ jobs:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
       - run: npm ci
       - run: npx @electron/rebuild -f -w @lydell/node-pty

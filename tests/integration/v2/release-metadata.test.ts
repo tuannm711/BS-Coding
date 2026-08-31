@@ -12,3 +12,22 @@ it('release metadata selects the V2 production writer', () => {
     v1Writable: false, v2Writable: true
   })
 })
+
+it('runs Node ABI tests before rebuilding native modules for Electron', () => {
+  const workflow = readFileSync(path.join(process.cwd(), '.github', 'workflows', 'build.yml'), 'utf8')
+  const testJob = workflow.slice(workflow.indexOf('  test:'), workflow.indexOf('\n  build:'))
+
+  expect(testJob.indexOf('- run: npm test')).toBeGreaterThan(-1)
+  expect(testJob.indexOf('- run: npx @electron/rebuild')).toBeGreaterThan(
+    testJob.indexOf('- run: npm test')
+  )
+})
+
+it('uses a supported Node runtime in CI', () => {
+  const workflow = readFileSync(path.join(process.cwd(), '.github', 'workflows', 'build.yml'), 'utf8')
+  const configuredVersions = [...workflow.matchAll(/node-version:\s*(\d+)/g)]
+    .map(match => Number(match[1]))
+
+  expect(configuredVersions.length).toBeGreaterThan(0)
+  expect(configuredVersions.every(version => version >= 22)).toBe(true)
+})

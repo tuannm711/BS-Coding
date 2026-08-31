@@ -9,9 +9,10 @@ all rows below are complete.
 - [ ] Working tree is clean and the release commit is on local `master`.
 - [ ] Every row in `docs/v2/acceptance-matrix.md` is `PASS`.
 - [ ] `npm ci`
-- [ ] `npx @electron/rebuild -f -w @lydell/node-pty`
 - [ ] `npm run typecheck`
 - [ ] `npm test`
+- [ ] `npx @electron/rebuild -f -w @lydell/node-pty` (after Node/Vitest gates;
+  this switches discovered native modules to the Electron ABI).
 - [ ] `npm run build`
 - [ ] `npm run e2e`
 
