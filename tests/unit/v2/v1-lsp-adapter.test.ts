@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import path from 'node:path'
 import { mapLegacyDiagnostic, V1LspAdapter } from '../../../src/main/v2/infrastructure/lsp/v1-lsp-adapter'
 
 describe('V1 LSP adapter', () => {
@@ -32,17 +33,19 @@ describe('V1 LSP adapter', () => {
       }
     })
 
+    const workspacePath = path.resolve('project')
+    const filePath = path.join(workspacePath, 'src', 'a.ts')
     const diagnostics = await adapter.diagnostics({
-      projectId: 'project-1', workspacePath: 'C:/project',
-      uri: 'C:/project/src/a.ts', text: 'const x = y'
+      projectId: 'project-1', workspacePath,
+      uri: filePath, text: 'const x = y'
     })
 
-    expect(calls).toEqual([{ filePath: 'C:\\project\\src\\a.ts', text: 'const x = y' }])
+    expect(calls).toEqual([{ filePath, text: 'const x = y' }])
     expect(diagnostics[0]).toMatchObject({ severity: 'WARNING', message: 'x' })
     expect(diagnostics[0]).not.toHaveProperty('workflowRunId')
     await expect(adapter.diagnostics({
-      projectId: 'project-1', workspacePath: 'C:/project',
-      uri: 'C:/other/secret.ts', text: ''
+      projectId: 'project-1', workspacePath,
+      uri: path.resolve('other', 'secret.ts'), text: ''
     })).rejects.toThrow(/workspace/i)
   })
 })
