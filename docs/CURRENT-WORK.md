@@ -8,7 +8,7 @@ It belongs to no version. `docs/v1/` is the past and `docs/v2/` is the target;
 this is the present. V1.3.2 is the shipped product and V2.0.0 is being built
 beside it, so both appear here.
 
-Last updated: 2026-08-30
+Last updated: 2026-08-31
 
 ## Now
 
@@ -18,7 +18,7 @@ exists to say out loud.
 **V2 P18 V1 data migration and cutover preparation — Task 4 implementation.**
 
 - **Branch:** `v2/p18-v1-migration-cutover`
-- **Gate:** Task 4 TDD — approved historical usage/quota amendment
+- **Gate:** P18 completion gate green — local merge in progress
 - **Status:** P15 backend prerequisite merged locally into `master` at `c44cddc`
   and post-merge verified: typecheck pass, full Vitest 233 files / 1423 tests,
   production build pass and Playwright 16/16 pass. Continuous V2 execution rules
@@ -65,6 +65,11 @@ exists to say out loud.
   The owner approved the recommended amendment: import only attributable usage,
   persist compatible historical quota snapshots with source/confidence, and
   report unattributable aggregates instead of inventing provider metadata.
+  Task 4 is committed at `ee35c22`; typecheck and 7 focused files / 18 tests
+  passed before commit. Completion review found no P0-P2; pre-merge verification
+  passed typecheck, full Vitest 248 files / 1456 tests, production build and
+  Playwright 18/18. P20 Task 3 owns production writer composition/cutover and
+  explicitly consumes the successful P18 migration report.
 - **Plan:** [`v2/implementation-plans/plans/18-v1-migration-cutover.md`](v2/implementation-plans/plans/18-v1-migration-cutover.md)
 
 ## Next
@@ -74,8 +79,8 @@ after it has been decided.
 
 | # | Work | Prerequisite |
 |---|---|---|
-| 1 | P18 Task 4 — resumable runner and validation | Task 3 committed at `0c26c3d` |
-| 2 | P18 completion gate, review and local merge | Requires Task 4 commit |
+| 1 | Merge P18 locally into `master`, post-merge verify and delete branch | Completion gate green |
+| 2 | Continue to next dependency-ready V2 plan | Requires P18 local merge |
 
 ## Blocked
 
