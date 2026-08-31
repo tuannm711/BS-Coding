@@ -17,7 +17,7 @@
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "start": "electron-vite preview",
-    "test": "vitest run --passWithNoTests",
+    "test": "vitest run --passWithNoTests --maxWorkers=4",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json && tsc --noEmit -p tsconfig.extension.json && tsc --noEmit -p tsconfig.test.json && npm run typecheck:server",
     "typecheck:server": "tsc --noEmit -p server/tsconfig.json",
