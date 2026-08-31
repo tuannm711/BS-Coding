@@ -15,10 +15,10 @@ Last updated: 2026-08-31
 Exactly one entry. If two things are genuinely running, that is what this file
 exists to say out loud.
 
-**V2 P18 V1 data migration and cutover preparation — Task 4 implementation.**
+**V2 P19 updates and remote control integration — Task 1 preflight.**
 
-- **Branch:** `v2/p18-v1-migration-cutover`
-- **Gate:** P18 completion gate green — local merge in progress
+- **Branch:** `v2/p19-updates-remote-control`
+- **Gate:** Task 1 TDD — updater V2 port and compatibility adapter
 - **Status:** P15 backend prerequisite merged locally into `master` at `c44cddc`
   and post-merge verified: typecheck pass, full Vitest 233 files / 1423 tests,
   production build pass and Playwright 16/16 pass. Continuous V2 execution rules
@@ -56,10 +56,9 @@ exists to say out loud.
   `d6fa88b`; typecheck and 3 focused files / 10 tests passed before commit.
   Task 3 canonical session conversion is committed at `0c26c3d`; typecheck and
   4 focused files / 17 tests passed before commit.
-- **Scope:** Implement checkpointed/resumable migration orchestration, backup
-  enforcement and count/hash/sample validation; confirm the planned usage stage
-  has a concrete V1-to-V2 import boundary rather than a placeholder. Preflight
-  confirmed no usage importer exists: V2 UsageRecord requires provider/account,
+  Task 4 implements checkpointed/resumable migration orchestration, backup
+  enforcement and count/hash/sample validation. Preflight confirmed the planned usage stage
+  initially had no concrete V1-to-V2 import boundary: V2 UsageRecord requires provider/account,
   V1 session aggregates do not carry that attribution, and quota snapshots have
   neither persistence nor the architecture-required source/confidence fields.
   The owner approved the recommended amendment: import only attributable usage,
@@ -69,8 +68,13 @@ exists to say out loud.
   passed before commit. Completion review found no P0-P2; pre-merge verification
   passed typecheck, full Vitest 248 files / 1456 tests, production build and
   Playwright 18/18. P20 Task 3 owns production writer composition/cutover and
-  explicitly consumes the successful P18 migration report.
-- **Plan:** [`v2/implementation-plans/plans/18-v1-migration-cutover.md`](v2/implementation-plans/plans/18-v1-migration-cutover.md)
+  explicitly consumes the successful P18 migration report. P18 merged locally
+  into `master` at `eff2e91`; post-merge verification passed typecheck, full
+  Vitest 248 files / 1456 tests, production build and Playwright 18/18, then the
+  merged branch was deleted.
+- **Scope:** Wrap the existing updater behind a V2 application port with typed,
+  serializable status and no coupling to workflow state.
+- **Plan:** [`v2/implementation-plans/plans/19-updates-remote-control.md`](v2/implementation-plans/plans/19-updates-remote-control.md)
 
 ## Next
 
@@ -79,8 +83,8 @@ after it has been decided.
 
 | # | Work | Prerequisite |
 |---|---|---|
-| 1 | Merge P18 locally into `master`, post-merge verify and delete branch | Completion gate green |
-| 2 | Continue to next dependency-ready V2 plan | Requires P18 local merge |
+| 1 | P19 Task 1 — updater V2 port/adapter | P18 merged at `eff2e91` |
+| 2 | P19 Task 2 — remote control contracts | Requires Task 1 commit |
 
 ## Blocked
 
