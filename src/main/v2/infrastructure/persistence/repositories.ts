@@ -14,6 +14,7 @@ import type { CommandIdempotencyPort } from '../../application/ports/command-ide
 import type { ProjectionReadPort } from '../../application/ports/projection-read-port'
 import type { ReviewFinding, ReviewRecord } from '../../../../shared/v2/contracts/review'
 import type { RuntimeEpochSummary } from '../../../../shared/v2/contracts/ui-projections'
+import type { QuotaSnapshot } from '../../../../shared/v2/contracts/usage'
 import { z } from 'zod'
 import { WorkSessionSchema, WorkflowRunSchema } from '../../../../shared/v2/schemas/ipc'
 import { FindingSchema, ReviewSchema } from '../../../../shared/v2/schemas/review'
@@ -26,6 +27,28 @@ interface Entity {
 export interface Repository<T extends Entity> {
   get(id: string): Promise<T | null>
   save(value: T): Promise<void>
+}
+
+export interface ProviderAccountRecord extends Entity {
+  providerId: string
+  label: string
+  authMode: 'api-key' | 'oauth' | 'imported'
+  status: 'HEALTHY' | 'EXPIRED' | 'ERROR' | 'UNKNOWN'
+  enabled: boolean
+  vaultRef?: string
+  createdAt: string
+  lastUsedAt: string
+  updatedAt: string
+}
+
+export interface ImportHistoryRepository {
+  get(sourceType: string, sourceKey: string): Promise<string | null>
+  record(sourceType: string, sourceKey: string, importedId: string): Promise<void>
+}
+
+export interface HistoricalQuotaSnapshotRecord extends QuotaSnapshot, Entity {
+  source: 'v1-provider'
+  confidence: 'EXACT' | 'ATTRIBUTED' | 'UNKNOWN'
 }
 
 interface PayloadRow {
@@ -89,7 +112,7 @@ const PersistedRuntimeEpochSchema: z.ZodType<PersistedRuntimeEpoch> = RuntimeEpo
 function createJsonRepository<T extends Entity>(
   db: BetterSqlite3.Database,
   table: string,
-  ownerValues: (value: T) => Record<string, string>
+  ownerValues: (value: T) => Record<string, string | null>
 ): Repository<T> {
   return {
     async get(id) {
@@ -166,6 +189,9 @@ export interface V2Repositories {
   agentDefinitions: Repository<AgentDefinition>
   agentVersions: Repository<AgentVersion>
   agentRuns: Repository<AgentRun>
+  providerAccounts: Repository<ProviderAccountRecord>
+  importHistory: ImportHistoryRepository
+  historicalQuotaSnapshots: Repository<HistoricalQuotaSnapshotRecord>
   runtimeEpochs: RuntimeEpochRepository
   reviews: Repository<ReviewRecord>
   findings: Repository<ReviewFinding>
@@ -287,6 +313,26 @@ function createCommandIdempotency(db: BetterSqlite3.Database): CommandIdempotenc
   }
 }
 
+function createImportHistory(db: BetterSqlite3.Database): ImportHistoryRepository {
+  const get = async (sourceType: string, sourceKey: string): Promise<string | null> => {
+    const row = db.prepare(`SELECT imported_id FROM import_history
+      WHERE source_type = ? AND source_key = ?`).get(sourceType, sourceKey) as
+      | { imported_id: string }
+      | undefined
+    return row?.imported_id ?? null
+  }
+  return {
+    get,
+    async record(sourceType, sourceKey, importedId) {
+      db.prepare(`INSERT INTO import_history(source_type, source_key, imported_id, imported_at)
+        VALUES (?, ?, ?, ?) ON CONFLICT(source_type, source_key) DO NOTHING`)
+        .run(sourceType, sourceKey, importedId, new Date().toISOString())
+      const recorded = await get(sourceType, sourceKey)
+      if (recorded !== importedId) throw new Error('legacy source key maps to a different entity')
+    }
+  }
+}
+
 export function createRepositories(db: BetterSqlite3.Database): V2Repositories {
   const artifacts = createArtifactRepository(db)
   const runtimeEpochBase = createJsonRepository<PersistedRuntimeEpoch>(db, 'runtime_epochs', value => ({
@@ -324,6 +370,16 @@ export function createRepositories(db: BetterSqlite3.Database): V2Repositories {
     agentRuns: createJsonRepository(db, 'agent_runs', value => ({
       task_run_id: value.taskRunId,
       agent_version_id: value.agentVersionId
+    })),
+    providerAccounts: createJsonRepository(db, 'provider_accounts', value => ({
+      provider_id: value.providerId,
+      vault_ref: value.vaultRef ?? null
+    })),
+    importHistory: createImportHistory(db),
+    historicalQuotaSnapshots: createJsonRepository(db, 'historical_quota_snapshots', value => ({
+      provider_id: value.providerId,
+      account_id: value.accountId,
+      captured_at: value.capturedAt
     })),
     runtimeEpochs,
     reviews: createJsonRepository(db, 'reviews', value => ({

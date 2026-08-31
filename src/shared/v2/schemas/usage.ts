@@ -10,12 +10,15 @@ export const UsageRecordSchema = z.object({
   taskRunId: id.optional(), agentRunId: id.optional(), providerId: id, accountId: id,
   modelId: id.optional(), requests: count, inputTokens: count, outputTokens: count,
   cacheReadTokens: count.optional(), cacheWriteTokens: count.optional(), costUsd: amount.optional(),
-  occurredAt: timestamp
+  occurredAt: timestamp, source: z.enum(['runtime', 'v1-session']).optional(),
+  confidence: z.enum(['EXACT', 'ATTRIBUTED', 'UNKNOWN']).optional()
 }).strict()
 
 export const QuotaSnapshotSchema = z.object({ providerId: id, accountId: id,
   status: z.enum(['AVAILABLE', 'UNAVAILABLE']), remainingPercent: z.number().min(0).max(100).optional(),
-  resetAt: timestamp.optional(), capturedAt: timestamp }).strict()
+  resetAt: timestamp.optional(), capturedAt: timestamp,
+  source: z.enum(['runtime', 'v1-provider']).optional(),
+  confidence: z.enum(['EXACT', 'ATTRIBUTED', 'UNKNOWN']).optional() }).strict()
 
 export const BudgetPolicySchema = z.object({ maxCostUsd: amount.positive().optional(),
   maxInputTokens: count.positive().optional(), maxRequests: count.positive().optional(),

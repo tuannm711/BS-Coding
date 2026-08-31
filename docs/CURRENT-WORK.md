@@ -8,17 +8,17 @@ It belongs to no version. `docs/v1/` is the past and `docs/v2/` is the target;
 this is the present. V1.3.2 is the shipped product and V2.0.0 is being built
 beside it, so both appear here.
 
-Last updated: 2026-08-30
+Last updated: 2026-08-31
 
 ## Now
 
 Exactly one entry. If two things are genuinely running, that is what this file
 exists to say out loud.
 
-**V2 P17 observability, usage and budget — completion and local merge.**
+**V2 P18 V1 data migration and cutover preparation — Task 4 implementation.**
 
-- **Branch:** `v2/p17-observability-usage-budget`
-- **Gate:** Final commit, local merge and post-merge verification
+- **Branch:** `v2/p18-v1-migration-cutover`
+- **Gate:** P18 completion gate green — local merge in progress
 - **Status:** P15 backend prerequisite merged locally into `master` at `c44cddc`
   and post-merge verified: typecheck pass, full Vitest 233 files / 1423 tests,
   production build pass and Playwright 16/16 pass. Continuous V2 execution rules
@@ -42,12 +42,35 @@ exists to say out loud.
   events into the ledger, do not call budget admission from real dispatch, and
   do not expose usage/budget projections to Work/Providers UI. The approved
   amendment now connects runtime finish usage → canonical USAGE → atomic ledger
-  → budget admission → scoped IPC → Work/Providers UI; unknown cost stays
-  explicit. Completion evidence: focused 11 files / 27 tests, full Vitest 243
-  files / 1441 tests, build and Playwright 18/18 exit 0. No P0-P2 remain.
-- **Scope:** Commit P17 completion, merge locally, verify merged result and move
-  to the next dependency-ready detailed plan.
-- **Plan:** [`v2/implementation-plans/plans/17-observability-usage-budget.md`](v2/implementation-plans/plans/17-observability-usage-budget.md)
+  → budget admission → scoped IPC → Work/Providers UI. P17 merged at `3cbb772`
+  and post-merge passed typecheck, 243 files / 1441 Vitest, build and 18/18 E2E.
+  P18 Task 1 backup manifest is committed at `6b4afbe`. Task 2 preflight found
+  that P05 intentionally exposes provider accounts through a V1 compatibility
+  port, while the V2 schema/repositories contain no durable provider-account
+  metadata store or vault-reference contract. P18 cannot import provider
+  metadata durably or complete provider cutover without an approved schema and
+  repository amendment. The owner approved the recommended amendment: add an
+  immutable migration 006, a main-only provider-account metadata entity and a
+  repository that preserves opaque vault references without exposing secret
+  bytes through shared/renderer DTOs. Task 2 core imports are committed at
+  `d6fa88b`; typecheck and 3 focused files / 10 tests passed before commit.
+  Task 3 canonical session conversion is committed at `0c26c3d`; typecheck and
+  4 focused files / 17 tests passed before commit.
+- **Scope:** Implement checkpointed/resumable migration orchestration, backup
+  enforcement and count/hash/sample validation; confirm the planned usage stage
+  has a concrete V1-to-V2 import boundary rather than a placeholder. Preflight
+  confirmed no usage importer exists: V2 UsageRecord requires provider/account,
+  V1 session aggregates do not carry that attribution, and quota snapshots have
+  neither persistence nor the architecture-required source/confidence fields.
+  The owner approved the recommended amendment: import only attributable usage,
+  persist compatible historical quota snapshots with source/confidence, and
+  report unattributable aggregates instead of inventing provider metadata.
+  Task 4 is committed at `ee35c22`; typecheck and 7 focused files / 18 tests
+  passed before commit. Completion review found no P0-P2; pre-merge verification
+  passed typecheck, full Vitest 248 files / 1456 tests, production build and
+  Playwright 18/18. P20 Task 3 owns production writer composition/cutover and
+  explicitly consumes the successful P18 migration report.
+- **Plan:** [`v2/implementation-plans/plans/18-v1-migration-cutover.md`](v2/implementation-plans/plans/18-v1-migration-cutover.md)
 
 ## Next
 
@@ -56,8 +79,8 @@ after it has been decided.
 
 | # | Work | Prerequisite |
 |---|---|---|
-| 1 | Merge `v2/p17-observability-usage-budget` locally | Completion gate green |
-| 2 | Continue next dependency-ready V2 plan | Requires post-merge verification |
+| 1 | Merge P18 locally into `master`, post-merge verify and delete branch | Completion gate green |
+| 2 | Continue to next dependency-ready V2 plan | Requires P18 local merge |
 
 ## Blocked
 
