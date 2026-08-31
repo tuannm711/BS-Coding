@@ -5,11 +5,12 @@ describe('specialist review ingestion', () => {
   it('persists a structured failed review and its evidenced findings', async () => {
     const reviews: unknown[] = []
     const findings: unknown[] = []
+    const writes: string[] = []
     const service = createReviewService({
       nextId: (() => { let id = 0; return () => `id-${++id}` })(),
       now: () => '2026-08-29T00:00:00.000Z',
-      saveReview: async review => { reviews.push(review) },
-      saveFinding: async finding => { findings.push(finding) },
+      saveReview: async review => { writes.push('review'); reviews.push(review) },
+      saveFinding: async finding => { writes.push('finding'); findings.push(finding) },
       transaction: async operation => operation()
     })
     const result = await service.ingest({ workflowRunId: 'wf', reviewerAgentVersionId: 'av',
@@ -19,6 +20,7 @@ describe('specialist review ingestion', () => {
     expect(result.blocked).toBe(true)
     expect(reviews).toHaveLength(1)
     expect(findings).toHaveLength(1)
+    expect(writes).toEqual(['review', 'finding'])
   })
 
   it('rejects malformed structured findings before persistence', async () => {

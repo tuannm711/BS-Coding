@@ -32,8 +32,8 @@ export function createReviewService(deps: {
         findingIds: findings.map(finding => finding.id), createdAt: deps.now()
       }) as ReviewRecord
       await deps.transaction(async () => {
-        for (const finding of findings) await deps.saveFinding(finding)
         await deps.saveReview(review)
+        for (const finding of findings) await deps.saveFinding(finding)
       })
       const failedDecision = review.decision === 'FAIL' || review.decision === 'BLOCKED'
       return { review, findings, blocked: failedDecision || !reviewPasses(findings) }
