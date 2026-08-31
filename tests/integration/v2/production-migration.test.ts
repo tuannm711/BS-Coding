@@ -65,3 +65,20 @@ it('backs up V1 sources, imports once and reuses a validated cutover marker', as
   await expect(runProductionV1Migration({ userDataPath: userData, databasePath, backupRoot }))
     .rejects.toThrow()
 })
+
+it('refuses corrupted V1 JSON without recording a cutover marker', async () => {
+  const root = mkdtempSync(path.join(tmpdir(), 'bs-v2-corrupt-'))
+  roots.push(root)
+  const userData = path.join(root, 'userData')
+  mkdirSync(userData, { recursive: true })
+  writeFileSync(path.join(userData, 'workspaces.json'), '{not-json')
+  const databasePath = path.join(userData, 'v2', 'state.sqlite')
+
+  await expect(runProductionV1Migration({ userDataPath: userData, databasePath,
+    backupRoot: path.join(userData, 'v1-backups') })).rejects.toThrow()
+
+  const db = new Database(databasePath)
+  expect(db.prepare("SELECT COUNT(*) count FROM cutover_state WHERE id = 'global'").get())
+    .toEqual({ count: 0 })
+  db.close()
+})

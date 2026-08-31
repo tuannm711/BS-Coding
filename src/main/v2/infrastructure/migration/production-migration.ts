@@ -28,7 +28,12 @@ const sourceFiles = ['workspaces.json', 'sessions.json', 'connections/accounts.j
   'connections/vault.json'] as const
 
 async function json(file: string, fallback: unknown): Promise<unknown> {
-  try { return JSON.parse(await readFile(file, 'utf8')) as unknown } catch { return fallback }
+  try {
+    return JSON.parse(await readFile(file, 'utf8')) as unknown
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return fallback
+    throw error
+  }
 }
 
 async function snapshotSources(userDataPath: string): Promise<string> {
