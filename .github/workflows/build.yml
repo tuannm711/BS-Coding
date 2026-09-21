@@ -3,10 +3,29 @@ name: build
 on:
   workflow_dispatch:
   push:
-    tags: ['v*']
+    tags: ['v1.*']
 
 jobs:
+  # Guard: reject tags that don't belong to release/v1 history.
+  # A v1.* tag on V2 source is a packaging error — fail fast.
+  tag-guard:
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Verify tag belongs to release/v1
+        run: |
+          TAG_COMMIT=$(git rev-list -n1 "$GITHUB_REF")
+          if ! git merge-base --is-ancestor "$TAG_COMMIT" origin/release/v1; then
+            echo "::error::Tag $GITHUB_REF_NAME does not belong to release/v1 history. Refusing to build."
+            exit 1
+          fi
+
   test:
+    needs: [tag-guard]
+    if: always() && (needs.tag-guard.result == 'success' || needs.tag-guard.result == 'skipped')
     runs-on: ubuntu-latest
     steps:
       # Every action here is on its first major that runs Node 24. GitHub
@@ -56,8 +75,9 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx @electron/rebuild -f -w @lydell/node-pty
-      - run: npm run build
-      - name: Build Windows multi-resolution icon
+      - name: Build
+        run: npm run build
+      - name: Build Windows icon
         if: matrix.target == 'win'
         run: npm run build:icon
       - name: Azure login for Windows code signing

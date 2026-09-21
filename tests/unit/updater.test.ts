@@ -86,18 +86,18 @@ describe('Updater', () => {
     expect(events).toEqual([{ type: 'checking' }, { type: 'up-to-date', currentVersion: '1.0.0' }])
   })
 
-  it('supported + newer version emits update-available with version and currentVersion', async () => {
+  it('supported + newer same-major version emits update-available', async () => {
     const { events, updater } = makeUpdater()
     mockAutoUpdater.checkForUpdates.mockResolvedValue({
       isUpdateAvailable: true,
-      updateInfo: { version: '2.1.0', releaseDate: '2026-08-18T00:00:00.000Z' }
+      updateInfo: { version: '1.1.0', releaseDate: '2026-08-18T00:00:00.000Z' }
     })
     await updater.check(true)
     expect(events).toEqual([
       { type: 'checking' },
       {
         type: 'update-available',
-        version: '2.1.0',
+        version: '1.1.0',
         currentVersion: '1.0.0',
         releaseNotes: undefined,
         releaseDate: '2026-08-18T00:00:00.000Z'
@@ -105,12 +105,53 @@ describe('Updater', () => {
     ])
   })
 
+  it('rejects cross-major update: v1 does not auto-update to v2', async () => {
+    const { events, updater } = makeUpdater(makeEnv({ getCurrentVersion: () => '1.3.2' }))
+    mockAutoUpdater.checkForUpdates.mockResolvedValue({
+      isUpdateAvailable: true,
+      updateInfo: { version: '2.0.0', releaseDate: '2026-08-18T00:00:00.000Z' }
+    })
+    await updater.check(true)
+    // Must emit up-to-date, NOT update-available
+    expect(events).toEqual([{ type: 'checking' }, { type: 'up-to-date', currentVersion: '1.3.2' }])
+  })
+
+  it('rejects cross-major update: v1 does not auto-update to v3', async () => {
+    const { events, updater } = makeUpdater(makeEnv({ getCurrentVersion: () => '1.4.0' }))
+    mockAutoUpdater.checkForUpdates.mockResolvedValue({
+      isUpdateAvailable: true,
+      updateInfo: { version: '3.0.0', releaseDate: '2026-08-18T00:00:00.000Z' }
+    })
+    await updater.check(true)
+    expect(events).toEqual([{ type: 'checking' }, { type: 'up-to-date', currentVersion: '1.4.0' }])
+  })
+
+  it('accepts same-major patch update: 1.3.2 -> 1.3.3', async () => {
+    const { events, updater } = makeUpdater(makeEnv({ getCurrentVersion: () => '1.3.2' }))
+    mockAutoUpdater.checkForUpdates.mockResolvedValue({
+      isUpdateAvailable: true,
+      updateInfo: { version: '1.3.3', releaseDate: '2026-08-18T00:00:00.000Z' }
+    })
+    await updater.check(true)
+    expect(events[1]).toMatchObject({ type: 'update-available', version: '1.3.3' })
+  })
+
+  it('accepts same-major minor update: 1.3.2 -> 1.4.0', async () => {
+    const { events, updater } = makeUpdater(makeEnv({ getCurrentVersion: () => '1.3.2' }))
+    mockAutoUpdater.checkForUpdates.mockResolvedValue({
+      isUpdateAvailable: true,
+      updateInfo: { version: '1.4.0', releaseDate: '2026-08-18T00:00:00.000Z' }
+    })
+    await updater.check(true)
+    expect(events[1]).toMatchObject({ type: 'update-available', version: '1.4.0' })
+  })
+
   it('passes through releaseNotes string and releaseDate when present', async () => {
     const { events, updater } = makeUpdater()
     mockAutoUpdater.checkForUpdates.mockResolvedValue({
       isUpdateAvailable: true,
       updateInfo: {
-        version: '2.1.0',
+        version: '1.1.0',
         releaseDate: '2026-08-19T00:00:00.000Z',
         releaseNotes: '<h1>What\'s new</h1>'
       }
@@ -128,11 +169,11 @@ describe('Updater', () => {
     mockAutoUpdater.checkForUpdates.mockResolvedValue({
       isUpdateAvailable: true,
       updateInfo: {
-        version: '2.1.0',
+        version: '1.1.0',
         releaseDate: '2026-08-19T00:00:00.000Z',
         releaseNotes: [
-          { version: '2.1.0', note: '<p>latest</p>' },
-          { version: '2.0.0', note: '<p>older</p>' }
+          { version: '1.1.0', note: '<p>latest</p>' },
+          { version: '1.0.1', note: '<p>older</p>' }
         ]
       }
     })
@@ -167,8 +208,8 @@ describe('Updater', () => {
   it('forwards update-downloaded as downloaded with the new version', async () => {
     const { events } = makeUpdater()
     const emit = listeners.get('update-downloaded')!
-    emit({ version: '2.1.0', downloadedFile: '/tmp/update' })
-    expect(events).toEqual([{ type: 'downloaded', version: '2.1.0' }])
+    emit({ version: '1.1.0', downloadedFile: '/tmp/update' })
+    expect(events).toEqual([{ type: 'downloaded', version: '1.1.0' }])
   })
 
   it('forwards autoUpdater errors', async () => {
@@ -191,7 +232,7 @@ describe('Updater', () => {
     const { updater } = makeUpdater()
     // Simulate a finished download before the user clicks restart.
     const emit = listeners.get('update-downloaded')!
-    emit({ version: '2.1.0', downloadedFile: '/tmp/update' })
+    emit({ version: '1.1.0', downloadedFile: '/tmp/update' })
     updater.install()
     expect(mockAutoUpdater.downloadUpdate).not.toHaveBeenCalled()
     expect(mockAutoUpdater.quitAndInstall).toHaveBeenCalledTimes(1)
@@ -217,7 +258,7 @@ describe('Updater', () => {
     expect(mockAutoUpdater.checkForUpdates).toHaveBeenCalledTimes(1)
     resolveCheck({
       isUpdateAvailable: true,
-      updateInfo: { version: '2.0.0', releaseDate: '2026-08-18T00:00:00.000Z' }
+      updateInfo: { version: '1.1.0', releaseDate: '2026-08-18T00:00:00.000Z' }
     })
     await first
     expect(events.filter(e => e.type === 'checking')).toHaveLength(1)

@@ -14,6 +14,15 @@ export interface UpdaterEnv {
   platform?: NodeJS.Platform
 }
 
+// V1 must never auto-update to V2. Extract the major version from a semver
+// string and reject any update whose major differs from the running app.
+// This is the primary safety net against cross-major auto-updates when V1
+// and V2 releases coexist in the same GitHub repository.
+function parseMajor(version: string): number {
+  const m = /^v?(\d+)/.exec(version)
+  return m ? Number(m[1]) : NaN
+}
+
 function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err)
 }
@@ -66,6 +75,14 @@ export class Updater {
       const currentVersion = this.env.getCurrentVersion()
       const info = result?.updateInfo
       if (!info || info.version === currentVersion) {
+        this.onStatus({ type: 'up-to-date', currentVersion })
+        return
+      }
+      // Guard: reject any update whose major version differs from current.
+      // V1 (1.x) must never silently upgrade to V2 (2.x) or any other major.
+      const currentMajor = parseMajor(currentVersion)
+      const updateMajor = parseMajor(info.version)
+      if (currentMajor !== updateMajor) {
         this.onStatus({ type: 'up-to-date', currentVersion })
         return
       }
