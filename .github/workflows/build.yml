@@ -3,18 +3,12 @@ name: build
 on:
   workflow_dispatch:
   push:
-    tags: ['v*']
+    branches: ['main']
 
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      # Every action here is on its first major that runs Node 24. GitHub
-      # forces Node 20 actions onto 24 already and warns; these are runtime
-      # bumps only — checked release by release, no API changed. The majors
-      # differ because each action reached Node 24 at a different one:
-      # checkout/setup-node at v5, upload-artifact at v6, download-artifact
-      # at v7. They also need runner >= 2.327.1, which GitHub-hosted meets.
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
         with:
@@ -56,8 +50,9 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx @electron/rebuild -f -w @lydell/node-pty
-      - run: npm run build
-      - name: Build Windows multi-resolution icon
+      - name: Build
+        run: npm run build
+      - name: Build Windows icon
         if: matrix.target == 'win'
         run: npm run build:icon
       - name: Azure login for Windows code signing
@@ -94,78 +89,3 @@ jobs:
             release/*.blockmap
             release/*.yml
           if-no-files-found: error
-
-  publish:
-    needs: build
-    if: startsWith(github.ref, 'refs/tags/')
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      # The job had no checkout, so it could not read anything from the repo.
-      # That is why every release before v1.1.7 published with an empty body.
-      - uses: actions/checkout@v5
-      - uses: actions/download-artifact@v7
-        with:
-          path: artifacts
-          merge-multiple: true
-      - name: Publish release
-        uses: softprops/action-gh-release@v3
-        with:
-          files: artifacts/**/*
-          # Tag v1.1.7 reads docs/release-notes/v1.1.7.md. A test in
-          # design-docs.test.ts fails first if the file is missing, so this
-          # is the second net rather than the first.
-          body_path: docs/release-notes/${{ github.ref_name }}.md
-
-      # v1.3.1 failed uploading one 151KB blockmap. action-gh-release creates
-      # the release as a draft, uploads, and flips it to published last — so a
-      # failure part-way leaves a draft holding most of the assets. A draft's
-      # assets are not publicly downloadable, which is indistinguishable from a
-      # finished release unless something looks: `gh release view` listed
-      # latest.yml while every updater got 404 on it.
-      - name: Verify the release published
-        env:
-          GH_TOKEN: ${{ github.token }}
-          TAG: ${{ github.ref_name }}
-          REPO: ${{ github.repository }}
-        run: |
-          set -euo pipefail
-
-          if [ "$(gh release view "$TAG" --json isDraft --jq '.isDraft')" != "false" ]; then
-            echo "::error::Release $TAG is still a draft. Its assets cannot be downloaded; re-run the publish job."
-            exit 1
-          fi
-
-          # GitHub rewrites anything outside [A-Za-z0-9._-] to a dot when it names
-          # an asset, so "BS Coding-1.3.2-mac.zip" on disk becomes
-          # "BS.Coding-1.3.2-mac.zip" on the release. Comparing raw names reported
-          # every file with a space in it as missing — checked against the names on
-          # v1.3.0 through v1.3.2, all of which are already inside that set.
-          normalise() { sed 's/[^A-Za-z0-9._-]/./g' | sort; }
-          gh release view "$TAG" --json assets --jq '.assets[].name' | normalise > published.txt
-          find artifacts -type f -printf '%f\n' | normalise > expected.txt
-          missing=$(comm -23 expected.txt published.txt)
-          if [ -n "$missing" ]; then
-            echo "::error::Uploaded files are missing from release $TAG:"
-            echo "$missing"
-            exit 1
-          fi
-
-          # The public download URL, not the API. The API reported latest.yml
-          # present on v1.3.1 while this URL returned 404, and this URL is what
-          # electron-updater fetches.
-          while read -r file; do
-            code=""
-            for _ in 1 2 3 4 5; do
-              code=$(curl -sL -o /dev/null -w '%{http_code}' "https://github.com/$REPO/releases/download/$TAG/$file")
-              if [ "$code" = "200" ]; then break; fi
-              sleep 5
-            done
-            if [ "$code" != "200" ]; then
-              echo "::error::$file is not downloadable (HTTP $code). Updaters will fail."
-              exit 1
-            fi
-          done < <(grep -E '^latest.*\.yml$' expected.txt)
-
-          echo "Release $TAG published with $(wc -l < expected.txt) assets."
