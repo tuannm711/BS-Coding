@@ -42,6 +42,7 @@ npm run dist:mac    # package macOS (dmg + zip; must run on macOS)
 - **Development Branch**: `develop/v1`
 - **Stable / Release Branch**: `release/v1`
 - **Release Tags**: `v1.*` (triggered from `release/v1`)
+- **Strategy Document**: [`docs/BRANCHING_AND_RELEASE_STRATEGY.md`](docs/BRANCHING_AND_RELEASE_STRATEGY.md)
 
 GitHub Actions (`.github/workflows/build.yml`) builds Windows, macOS, and Linux installers when a
 `v1.*` tag is pushed to `release/v1`. Tagged releases are published automatically — grab the
