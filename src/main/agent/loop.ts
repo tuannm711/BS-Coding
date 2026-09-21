@@ -159,7 +159,8 @@ export class SessionRunner {
           tools: isLastStep ? [] : this.visibleToolDefs(),
           signal,
           variantOptions: target?.variantOptions ?? this.deps.variantOptions,
-          serviceTier: this.deps.serviceTier
+          serviceTier: this.deps.serviceTier,
+          cwd: this.deps.cwd
         })
         for await (const part of stream) {
           if (signal?.aborted) {

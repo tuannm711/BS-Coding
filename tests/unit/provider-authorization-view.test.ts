@@ -12,9 +12,6 @@ const waitingSession: ProviderAuthorizationSession = {
   methodId: 'oauth',
   authUrl: 'https://auth.example/authorize',
   expiresAt: 61_000,
-  verifier: '',
-  expectedState: '',
-  callbackUrl: '',
   status: 'waiting'
 }
 

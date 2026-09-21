@@ -89,10 +89,8 @@ export interface ProviderAuthorizationSession {
   verificationUrl?: string
   userCode?: string
   expiresAt: number
-  verifier: string
-  expectedState: string
-  callbackUrl: string
   status: ProviderAuthorizationStatus
+  accountId?: string
   error?: ProviderAuthorizationError
 }
 
@@ -104,10 +102,33 @@ export function providerModelKey(providerId: string, accountId: string, modelId:
   return `${providerId}/${accountId}/${modelId}`
 }
 
-export function sanitizeProviderAuthorizationSession(session: ProviderAuthorizationSession): ProviderAuthorizationSession {
+export function sanitizeProviderAuthorizationSession(
+  session: ProviderAuthorizationSession & Record<string, unknown>
+): ProviderAuthorizationSession {
+  const {
+    loginId,
+    providerId,
+    methodId,
+    authUrl,
+    expiresAt,
+    status,
+    accountId,
+    error,
+    reconnectAccountId,
+    verificationUrl,
+    userCode
+  } = session
   return {
-    ...session,
-    verifier: '',
-    expectedState: ''
+    loginId,
+    providerId,
+    methodId,
+    authUrl,
+    expiresAt,
+    status,
+    ...(reconnectAccountId ? { reconnectAccountId } : {}),
+    ...(verificationUrl ? { verificationUrl } : {}),
+    ...(userCode ? { userCode } : {}),
+    ...(accountId ? { accountId } : {}),
+    ...(error ? { error } : {})
   }
 }

@@ -47,12 +47,15 @@ function findAuthorizationStrategy(adapter: { authorization?: ProviderAuthorizat
 export class ProviderManager {
   readonly store: ProviderAccountStore
   readonly registry: ProviderRegistry
-  private readonly authorizations = new AuthSessionCoordinator()
+  private readonly authorizations: AuthSessionCoordinator
   private snapshotRevision = 1
 
   constructor(private readonly deps: ProviderManagerDeps) {
     this.store = new ProviderAccountStore(deps.accountsFile, deps.vault)
     this.registry = deps.registry ?? new ProviderRegistry()
+    this.authorizations = new AuthSessionCoordinator({
+      onExpired: session => this.emitAuthorization(session)
+    })
   }
 
   list(providerId?: string): ProviderConnection[] {
@@ -525,7 +528,19 @@ export class ProviderManager {
     this.emitAccountsChanged()
   }
 
-  remove(accountId: string): void {
+  async remove(accountId: string): Promise<void> {
+    const account = this.store.get(accountId)
+    const secret = this.store.getSecret(accountId)
+    if (account) {
+      const adapter = this.registry.get(account.providerId)
+      if (adapter?.removeAccount) {
+        try {
+          await adapter.removeAccount(account, secret ?? undefined)
+        } catch (err) {
+          console.warn(`[bs] Adapter removeAccount error for ${accountId}:`, err)
+        }
+      }
+    }
     this.store.remove(accountId)
     this.emitAccountsChanged()
   }

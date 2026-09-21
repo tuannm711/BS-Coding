@@ -191,12 +191,12 @@ export class CodexAppServerClient {
 
   async readRateLimits(): Promise<any> {
     await this.start()
-    return this.request('account/rateLimits/read', {}).catch(() => null)
+    return this.request('account/rateLimits/read', {})
   }
 
   async readUsage(): Promise<any> {
     await this.start()
-    return this.request('account/usage/read', {}).catch(() => null)
+    return this.request('account/usage/read', {})
   }
 
   stop(): void {

@@ -57,26 +57,27 @@
 | `CODEX_HOME` isolation | **YES** | **YES** | **YES** | `CODEX_HOME` set per account in `<userData>/providers/openai/<id>/codex-home` |
 | `initialize` request | **YES** | **YES** | **YES** | Handshake request sent on startup |
 | `initialized` notification | **YES** | **YES** | **YES** | Notification sent immediately after `initialize` response |
-| `account/read` | **YES** | **YES** | **YES** | Queries account profile & auth state |
-| `account/login/start` | **YES** | **YES** | **YES** | Starts browser login session (`chatgpt`) or device code session (`chatgptDeviceCode`) |
-| browser login | **YES** | **YES** | **YES** | App opens `authUrl` in browser via `openAuthorization()` |
-| device-code login | **YES** | **YES** | **YES** | Exposes `verificationUrl` and `userCode` with copy UI |
-| login completion event | **YES** | **YES** | **YES** | Handled via `account/login/completed` JSON-RPC notifications |
-| account logout | **YES** | **YES** | **YES** | `account/logout` method implemented in client |
-| account updated notification | **YES** | **YES** | **YES** | Received over JSON-RPC stdio notification stream |
-| rate limits | **YES** | **YES** | **YES** | `account/rateLimits/read` mapped into `ProviderUsage` |
-| usage | **YES** | **YES** | **YES** | Turn completed usage token counts & lifetime tokens extracted |
-| thread creation | **YES** | **YES** | **YES** | `thread/start` called before turn with model and baseInstructions |
-| turn creation | **YES** | **YES** | **YES** | `turn/start` called for streaming prompts |
-| text streaming | **YES** | **YES** | **YES** | `item/agentMessage/delta` mapped to `LlmStreamPart` |
-| reasoning streaming | **YES** | **YES** | **YES** | Reasoning deltas mapped to `kind: 'reasoning'` |
-| tools capability | **DISABLED**| **YES** | **YES** | Catalog explicitly specifies `supportsTools: false` |
-| finish | **YES** | **YES** | **YES** | `turn/completed` mapped to finish event with token breakdown |
-| errors | **YES** | **YES** | **YES** | `error` / `turn/error` mapped to error stream events |
-| cancellation / `turn/interrupt`| **YES**| **YES**| **YES** | `turn/interrupt` called on `AbortSignal` abort with listener cleanup |
-| process restart | **YES** | **YES** | **YES** | Child process exit handler cleans state & allows restart |
-| crash handling | **YES** | **YES** | **YES** | Process crash rejects pending RPC requests |
-| timeouts | **YES** | **YES** | **YES** | 30s timeout per RPC request |
+| `account/read` | **YES** | **YES** | **YES** | Queries account profile & auth state (unauthenticated verified live) |
+| `account/login/start` | **YES** | **YES** | **YES** | Starts device code session (`chatgptDeviceCode`) verified against live CLI |
+| browser login | **YES** | **YES** | **NO (Pending Interactive Auth)** | App opens `authUrl` in browser via `openAuthorization()` |
+| device-code login | **YES** | **YES** | **NO (Pending Interactive Auth)** | Exposes `verificationUrl` and `userCode`; token capture pending live user auth |
+| login completion event | **YES** | **YES** | **NO (Unit/Mock Tested)** | Handled via `account/login/completed` JSON-RPC notifications |
+| account logout | **YES** | **YES** | **NO (Unit/Mock Tested)** | `account/logout` method implemented in client |
+| account updated notification | **YES** | **YES** | **NO (Unit/Mock Tested)** | Received over JSON-RPC stdio notification stream |
+| rate limits | **YES** | **YES** | **NO (Unit/Mock Tested)** | `account/rateLimits/read` mapped into `ProviderUsage` with allSettled resilience |
+| usage | **YES** | **YES** | **NO (Unit/Mock Tested)** | Turn completed usage token counts & lifetime tokens extracted |
+| thread creation | **YES** | **YES** | **NO (Unit/Mock Tested)** | `thread/start` called before turn with model, baseInstructions, and cwd |
+| turn creation | **YES** | **YES** | **NO (Unit/Mock Tested)** | `turn/start` called for streaming prompts |
+| text streaming | **YES** | **YES** | **NO (Unit/Mock Tested)** | `item/agentMessage/delta` mapped to `LlmStreamPart` |
+| reasoning streaming | **YES** | **YES** | **NO (Unit/Mock Tested)** | Reasoning deltas mapped to `kind: 'reasoning'` |
+| tools capability | **DISABLED**| **YES** | **N/A (Disabled: false)** | Catalog explicitly specifies `supportsTools: false` |
+| finish | **YES** | **YES** | **NO (Unit/Mock Tested)** | `turn/completed` mapped to finish event with token breakdown |
+| errors | **YES** | **YES** | **NO (Unit/Mock Tested)** | `error` / `turn/error` mapped to error stream events |
+| cancellation / `account/login/cancel` | **YES** | **YES** | **YES** | `account/login/cancel` tested against live CLI |
+| cancellation / `turn/interrupt` | **YES** | **YES** | **NO (Unit/Mock Tested)** | `turn/interrupt` called on `AbortSignal` abort with listener cleanup |
+| process restart | **YES** | **YES** | **NO (Unit/Mock Tested)** | Child process exit handler cleans state & allows restart |
+| crash handling | **YES** | **YES** | **NO (Unit/Mock Tested)** | Process crash rejects pending RPC requests |
+| timeouts | **YES** | **YES** | **NO (Unit/Mock Tested)** | 30s timeout per RPC request |
 | clean shutdown | **YES** | **YES** | **YES** | `client.stop()` terminates full process tree via `tree-kill` |
 
 ---
@@ -88,7 +89,9 @@
 - **Authentication**: Official Gemini Developer API Key (`AIzaSy...`) from Google AI Studio.
 - **Client**: Official `@ai-sdk/google` (`createGoogleGenerativeAI({ apiKey })`).
 - **Required Fields**: `apiKey`.
-- **Supported Models**: `gemini-2.5-pro`, `gemini-2.5-flash`, `gemini-1.5-pro`, `gemini-1.5-flash`.
+- **Supported Models**: `gemini-2.5-pro`, `gemini-2.5-flash`, `gemini-3.1-pro`, `gemini-3.1-flash`.
+- **Model Discovery**: Dynamically queries Google AI Studio API for available models, filtering out embeddings, image generation, and deprecated models, with static catalog fallback.
+- **Legacy 1.5 Models**: All `gemini-1.5-*` models completely removed.
 - **Vertex AI Status**: Incomplete experimental Vertex code disabled/removed to keep V1 surface secure and strictly compliant.
 
 ---
@@ -104,7 +107,7 @@
 ## G. Automated Test Results
 
 - **`npm run typecheck`**: **PASSED** (0 errors across `tsconfig.node.json`, `tsconfig.web.json`, `tsconfig.extension.json`, `tsconfig.test.json`, and `server/tsconfig.json`).
-- **`npm test`**: **161 / 161 test files PASSED (1206 / 1206 tests PASSED, 0 failed)**.
+- **`npm test`**: **161 / 161 test files PASSED (1216 / 1216 tests PASSED, 0 failed)**.
 - **`npm run build`**: **PASSED** (Main, Preload, Renderer, Extension all built successfully).
 
 ---

@@ -1,16 +1,17 @@
 import type { AuthMethodDescriptor, ProviderCapability, ProviderConnectRequest, ProviderModel } from '../../../shared/providers'
 import type { ProviderAccount } from '../../../shared/types'
 import type { ProviderAdapter } from '../types'
+import type { ProviderSecrets } from '../../connections/types'
 import { createLlm } from '../../agent/llm'
 
-const GEMINI_MODELS: ProviderModel[] = [
+const STATIC_GEMINI_MODELS: ProviderModel[] = [
   { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', capabilities: { isCodeModel: true, supportsStreaming: true, supportsTools: true } },
   { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', capabilities: { isCodeModel: true, supportsStreaming: true, supportsTools: true } },
-  { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro', capabilities: { isCodeModel: true, supportsStreaming: true, supportsTools: true } },
-  { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash', capabilities: { isCodeModel: true, supportsStreaming: true, supportsTools: true } }
+  { id: 'gemini-3.1-pro', name: 'Gemini 3.1 Pro', capabilities: { isCodeModel: true, supportsStreaming: true, supportsTools: true } },
+  { id: 'gemini-3.1-flash', name: 'Gemini 3.1 Flash', capabilities: { isCodeModel: true, supportsStreaming: true, supportsTools: true } }
 ]
 
-const modelIds = GEMINI_MODELS.map(m => m.id)
+const staticModelIds = STATIC_GEMINI_MODELS.map(m => m.id)
 
 export function createGoogleAdapter(): ProviderAdapter {
   const methods: AuthMethodDescriptor[] = [
@@ -49,18 +50,60 @@ export function createGoogleAdapter(): ProviderAdapter {
         label,
         authMode: 'api-key',
         status: 'active',
-        models: modelIds,
-        modelCatalog: GEMINI_MODELS
+        models: staticModelIds,
+        modelCatalog: STATIC_GEMINI_MODELS
       }, { apiKey })
       return { account }
     },
 
     async refreshAccount(account, secret) {
-      return { ...account, status: 'active', models: modelIds, modelCatalog: GEMINI_MODELS }
+      const models = await this.listModels(account, secret)
+      const modelIds = models.map(m => m.id)
+      return { ...account, status: 'active', models: modelIds, modelCatalog: models }
     },
 
-    async listModels() {
-      return GEMINI_MODELS
+    async listModels(account?: ProviderAccount, secret?: ProviderSecrets) {
+      const apiKey = secret?.apiKey
+      if (apiKey) {
+        try {
+          const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`, {
+            signal: AbortSignal.timeout(10000)
+          })
+          if (res.ok) {
+            const data = await res.json() as any
+            if (Array.isArray(data?.models)) {
+              const discovered: ProviderModel[] = []
+              for (const m of data.models) {
+                const id = typeof m.name === 'string' ? m.name.replace(/^models\//, '') : ''
+                if (!id) continue
+                // Exclude 1.5 models, embeddings, imagen, aqa
+                if (id.includes('1.5') || id.includes('embedding') || id.includes('imagen') || id.includes('aqa')) {
+                  continue
+                }
+                const methods: string[] = m.supportedGenerationMethods || []
+                if (methods.length > 0 && !methods.includes('generateContent')) {
+                  continue
+                }
+                discovered.push({
+                  id,
+                  name: m.displayName || id,
+                  capabilities: {
+                    isCodeModel: true,
+                    supportsStreaming: true,
+                    supportsTools: true
+                  }
+                })
+              }
+              if (discovered.length > 0) {
+                return discovered
+              }
+            }
+          }
+        } catch {
+          // Fall back to static catalog on failure
+        }
+      }
+      return STATIC_GEMINI_MODELS
     },
 
     createRuntime(account, secret, model) {

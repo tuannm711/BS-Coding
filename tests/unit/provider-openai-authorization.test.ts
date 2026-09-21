@@ -307,4 +307,215 @@ describe('OpenAI provider authorization via Codex App Server', () => {
     expect(usage.status).toBe('unavailable')
     expect(usage.statusReason).toContain('API key')
   })
+
+  it('connect() throws error on oauth and chatgpt-device-code', async () => {
+    const adapter = createOpenAiAdapter()
+    const context = { saveAccount: vi.fn() }
+    await expect(adapter.connect({
+      providerId: 'openai',
+      methodId: 'oauth',
+      fields: {}
+    }, context)).rejects.toThrow('[bs] ChatGPT authentication must use managed authorization')
+
+    await expect(adapter.connect({
+      providerId: 'openai',
+      methodId: 'chatgpt-device-code',
+      fields: {}
+    }, context)).rejects.toThrow('[bs] ChatGPT authentication must use managed authorization')
+  })
+
+  it('refreshAccount handles logged out / requiresOpenaiAuth, error, and active states', async () => {
+    const adapter = createOpenAiAdapter()
+    const baseAccount: ProviderAccount = {
+      id: 'acc_oauth_1',
+      providerId: 'openai',
+      label: 'Old Label',
+      authMode: 'oauth',
+      status: 'active',
+      createdAt: 1,
+      lastUsedAt: 1
+    }
+
+    // Missing codexHome -> error
+    const noHome = await adapter.refreshAccount(baseAccount, {})
+    expect(noHome.status).toBe('error')
+    expect(noHome.lastError).toContain('Codex home directory is missing')
+
+    // requiresOpenaiAuth: true -> expired
+    vi.spyOn(CodexAppServerClient.prototype, 'readAccount').mockResolvedValueOnce({
+      account: null,
+      requiresOpenaiAuth: true
+    })
+    const expired1 = await adapter.refreshAccount(baseAccount, { codexHome: 'C:/fake' })
+    expect(expired1.status).toBe('expired')
+    expect(expired1.lastError).toContain('expired or logged out')
+
+    // account: null -> expired
+    vi.spyOn(CodexAppServerClient.prototype, 'readAccount').mockResolvedValueOnce({
+      account: null,
+      requiresOpenaiAuth: false
+    })
+    const expired2 = await adapter.refreshAccount(baseAccount, { codexHome: 'C:/fake' })
+    expect(expired2.status).toBe('expired')
+    expect(expired2.lastError).toContain('expired or logged out')
+
+    // Unexpected error -> error
+    vi.spyOn(CodexAppServerClient.prototype, 'readAccount').mockRejectedValueOnce(new Error('Process crashed'))
+    const errorRes = await adapter.refreshAccount(baseAccount, { codexHome: 'C:/fake' })
+    expect(errorRes.status).toBe('error')
+    expect(errorRes.lastError).toContain('Process crashed')
+
+    // Valid authenticated account -> active
+    vi.spyOn(CodexAppServerClient.prototype, 'readAccount').mockResolvedValueOnce({
+      account: {
+        type: 'chatgpt',
+        email: 'user@example.com',
+        name: 'Test User',
+        planType: 'pro'
+      } as any
+    })
+    const activeRes = await adapter.refreshAccount(baseAccount, { codexHome: 'C:/fake' })
+    expect(activeRes.status).toBe('active')
+    expect(activeRes.label).toBe('user@example.com')
+    expect(activeRes.profile?.email).toBe('user@example.com')
+    expect(activeRes.profile?.planName).toBe('pro')
+  })
+
+  it('fetchUsage handles partial failures gracefully with Promise.allSettled', async () => {
+    const adapter = createOpenAiAdapter()
+    const account: ProviderAccount = {
+      id: 'acc_usage_settled',
+      providerId: 'openai',
+      label: 'test@example.com',
+      authMode: 'oauth',
+      status: 'active',
+      createdAt: 1,
+      lastUsedAt: 1
+    }
+
+    // Both reject -> unavailable
+    vi.spyOn(CodexAppServerClient.prototype, 'readRateLimits').mockRejectedValueOnce(new Error('Rate limit timeout'))
+    vi.spyOn(CodexAppServerClient.prototype, 'readUsage').mockRejectedValueOnce(new Error('Usage not found'))
+    const bothFail = await adapter.fetchUsage!(account, { codexHome: 'C:/fake' })
+    expect(bothFail.status).toBe('unavailable')
+    expect(bothFail.statusReason).toContain('Rate limit timeout')
+    expect(bothFail.statusReason).toContain('Usage not found')
+
+    // Rate limit fails, usage succeeds -> ok with partial info
+    vi.spyOn(CodexAppServerClient.prototype, 'readRateLimits').mockRejectedValueOnce(new Error('Rate limit failure'))
+    vi.spyOn(CodexAppServerClient.prototype, 'readUsage').mockResolvedValueOnce({
+      summary: { lifetimeTokens: '50000' }
+    })
+    const usageOnly = await adapter.fetchUsage!(account, { codexHome: 'C:/fake' })
+    expect(usageOnly.status).toBe('ok')
+    expect(usageOnly.tokensInput).toBe(50000)
+    expect(usageOnly.statusReason).toContain('Rate limits unavailable')
+
+    // Rate limit succeeds, usage fails -> ok with rate limit info
+    vi.spyOn(CodexAppServerClient.prototype, 'readRateLimits').mockResolvedValueOnce({
+      rateLimits: { primary: { usedPercent: 75, resetsAt: 1700000000 } }
+    })
+    vi.spyOn(CodexAppServerClient.prototype, 'readUsage').mockRejectedValueOnce(new Error('Usage timeout'))
+    const limitsOnly = await adapter.fetchUsage!(account, { codexHome: 'C:/fake' })
+    expect(limitsOnly.status).toBe('ok')
+    expect(limitsOnly.primaryUsedPercent).toBe(75)
+    expect(limitsOnly.statusReason).toContain('Usage summary unavailable')
+  })
+
+  it('removeAccount deletes isolated account directory and leaves others untouched', async () => {
+    const tmpDir = mkdtempSync(path.join(tmpdir(), 'bs-openai-remove-'))
+    try {
+      const adapter = createOpenAiAdapter({ userDataDir: tmpDir })
+      const accAHome = path.join(tmpDir, 'providers', 'openai', 'acc_A', 'codex-home')
+      const accBHome = path.join(tmpDir, 'providers', 'openai', 'acc_B', 'codex-home')
+      const { mkdirSync, writeFileSync, existsSync } = await import('node:fs')
+      mkdirSync(accAHome, { recursive: true })
+      mkdirSync(accBHome, { recursive: true })
+      writeFileSync(path.join(accAHome, 'config.json'), '{}')
+      writeFileSync(path.join(accBHome, 'config.json'), '{}')
+
+      const accountA: ProviderAccount = {
+        id: 'acc_A',
+        providerId: 'openai',
+        label: 'Account A',
+        authMode: 'oauth',
+        status: 'active',
+        createdAt: 1,
+        lastUsedAt: 1
+      }
+
+      await adapter.removeAccount!(accountA, { codexHome: accAHome })
+
+      expect(existsSync(path.join(tmpDir, 'providers', 'openai', 'acc_A'))).toBe(false)
+      expect(existsSync(path.join(tmpDir, 'providers', 'openai', 'acc_B'))).toBe(true)
+      expect(existsSync(path.join(accBHome, 'config.json'))).toBe(true)
+    } finally {
+      try {
+        rmSync(tmpDir, { recursive: true, force: true })
+      } catch {}
+    }
+  })
+
+  it('removeAccount refuses to delete outside isolated account directory', async () => {
+    const tmpDir = mkdtempSync(path.join(tmpdir(), 'bs-openai-guard-'))
+    try {
+      const adapter = createOpenAiAdapter({ userDataDir: tmpDir })
+      const outsideDir = path.join(tmpDir, 'outside-codex')
+      const { mkdirSync, writeFileSync, existsSync } = await import('node:fs')
+      mkdirSync(outsideDir, { recursive: true })
+      writeFileSync(path.join(outsideDir, 'important.txt'), 'data')
+
+      const account: ProviderAccount = {
+        id: 'acc_safe',
+        providerId: 'openai',
+        label: 'Safe Account',
+        authMode: 'oauth',
+        status: 'active',
+        createdAt: 1,
+        lastUsedAt: 1
+      }
+
+      await adapter.removeAccount!(account, { codexHome: outsideDir })
+      // Must not delete outsideDir
+      expect(existsSync(outsideDir)).toBe(true)
+      expect(existsSync(path.join(outsideDir, 'important.txt'))).toBe(true)
+    } finally {
+      try {
+        rmSync(tmpDir, { recursive: true, force: true })
+      } catch {}
+    }
+  })
+
+  it('CodexAppServerLlm passes cwd into thread/start', async () => {
+    const { CodexAppServerLlm } = await import('../../src/main/agent/codex-app-server-llm')
+    let threadStartParams: any = null
+    vi.spyOn(CodexAppServerClient.prototype, 'start').mockResolvedValue(undefined)
+    vi.spyOn(CodexAppServerClient.prototype, 'request').mockImplementation(async function(this: any, method: string, params: any) {
+      if (method === 'thread/start') {
+        threadStartParams = params
+        return { thread: { id: 'th_123' } }
+      }
+      if (method === 'turn/start') {
+        this.options?.onNotification?.('turn/completed', { turn: { status: 'completed' } })
+        return { turn: { id: 'turn_123' } }
+      }
+      return {}
+    })
+    vi.spyOn(CodexAppServerClient.prototype, 'stop').mockImplementation(() => {})
+
+    const llm = new CodexAppServerLlm({ codexHome: 'C:/fake' })
+    const gen = llm.stream({
+      model: 'o3-mini',
+      system: 'system prompt',
+      messages: [{ role: 'user', content: 'hello' }],
+      tools: [],
+      cwd: 'C:/my-project'
+    })
+
+    // Advance generator
+    await gen.next()
+    expect(threadStartParams).toBeDefined()
+    expect(threadStartParams.cwd).toBe('C:/my-project')
+    expect(threadStartParams.model).toBe('o3-mini')
+  })
 })

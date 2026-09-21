@@ -216,12 +216,15 @@ Executed `npm run build`:
 ## Section M: Real-Provider Smoke Test Results
 
 Validated live protocol exchange against `codex-cli 0.155.0`:
-1. `initialize` request -> response with server metadata.
-2. `initialized` notification -> accepted by server.
-3. `account/read` -> `{ requiresOpenaiAuth: true }`.
+1. `initialize` request -> response with server metadata (`codex-cli 0.155.0`).
+2. `initialized` notification -> accepted by server without protocol errors.
+3. `account/read` -> unauthenticated response `{ requiresOpenaiAuth: true, account: null }`.
 4. `account/login/start` (`chatgptDeviceCode`) -> `{ loginId, verificationUrl: "https://auth0.openai.com/activate", userCode: "..." }`.
-5. `account/login/cancel` -> `{ status: "canceled" }`.
-6. Full child process tree terminated cleanly via `tree-kill`.
+5. `account/login/cancel` -> `{ status: "canceled" }` properly cancels the pending session.
+6. Full child process tree terminated cleanly via `tree-kill` without orphaned processes or hanging stdio handles.
+7. Multi-account directory isolation verified: separate `CODEX_HOME` directories created without modifying user's `%USERPROFILE%\.codex`.
+
+*Note on Capabilities*: Only the above operations were validated against the live CLI binary. Interactive browser OAuth completion, live session token acquisition, live ChatGPT thread/turn streaming, and account logout on authenticated profiles remain mock/unit-tested and are pending real user interactive authentication.
 
 ---
 
@@ -233,14 +236,18 @@ In `AddProviderModal.tsx`:
 - A direct verification link is presented to navigate to `openai.com` / `auth0.openai.com/activate`.
 - Status indicators reflect `waiting` -> `connected`.
 
+In `SettingsDialog.tsx` & `ProvidersTab.tsx`:
+- Minimal text input for custom `Codex CLI Executable` path with placeholder and guidance.
+- Defaults to `codex` on PATH if unset.
+
 ---
 
 ## Section O: Stop Point & Interactive Authentication Boundary
 
 Per security and isolation requirements:
 - **AUTOMATED TESTING CEASES AT THE PRE-AUTHENTICATION BOUNDARY.**
-- Non-interactive operations (handshake, device-code generation, cancellation, rate limits, status queries) are 100% automated and verified.
-- Performing actual end-to-end interactive authentication with real credentials requires explicit user interaction in an external browser session and is intentionally halted here.
+- Non-interactive operations (handshake, device-code generation, cancellation, rate limits, status queries, active timers, account deletion isolation) are 100% automated and verified.
+- Performing actual end-to-end interactive authentication with real credentials (logging in via OpenAI in Chrome, receiving OAuth tokens) requires explicit user interaction in an external browser session and is intentionally halted here.
 
 ---
 
@@ -248,16 +255,19 @@ Per security and isolation requirements:
 
 ### Git Branch Status:
 ```text
-* fix/v1-provider-auth  e0e208a [origin/fix/v1-provider-auth] docs(v1): add V1 provider authentication fix execution report
+* fix/v1-provider-auth  e937d8b [origin/fix/v1-provider-auth]
 ```
 
 ### Git Diff Summary:
-- Clean architecture contracts in `src/main/providers/types.ts`.
-- Direct routing in `src/main/connections/manager.ts`.
-- Complete handshake and `tree-kill` in `src/main/connections/codex-app-server.ts`.
-- Device code support in `openai.ts` and `AddProviderModal.tsx`.
-- Strict Gemini scoping in `google.ts`.
-- 161 test suites passing.
+- Leaked internal fields removed from `ProviderAuthorizationSession` (`verifier`, `expectedState`, `callbackUrl`); `accountId?` restored.
+- Active timer lifecycle with clearTimeout implemented in `AuthSessionCoordinator`.
+- Unsafe duplicate OAuth bypass eliminated from `createOpenAiAdapter().connect()`.
+- Resilient `fetchUsage()` implemented using `Promise.allSettled`.
+- Comprehensive `refreshAccount()` with expired/error/active state transitions.
+- Isolated account removal with strict directory containment check in `removeAccount()`.
+- Working directory `cwd` propagated through `loop.ts` -> `stream()` -> `thread/start`.
+- Google provider catalog updated with `gemini-2.5-*` and `gemini-3.1-*` models; `gemini-1.5-*` completely removed; dynamic discovery enabled with fallback.
+- 161 test suites passing (1216 / 1216 tests passing).
 
 ---
 

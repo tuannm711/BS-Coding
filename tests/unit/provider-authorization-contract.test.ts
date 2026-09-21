@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { sanitizeProviderAuthorizationSession, type ProviderAuthorizationSession } from '../../src/shared/providers'
 
 describe('provider authorization contract', () => {
-  it('clears OAuth verifier and expectedState from sanitized session', () => {
-    const session: ProviderAuthorizationSession = {
+  it('omits OAuth verifier, expectedState, and callbackUrl from sanitized session', () => {
+    const session = {
       loginId: 'login-1',
       providerId: 'openai',
       methodId: 'oauth',
@@ -12,12 +12,14 @@ describe('provider authorization contract', () => {
       verifier: 'verifier-secret',
       expectedState: 'state-secret',
       callbackUrl: 'http://localhost',
-      status: 'waiting'
+      status: 'waiting' as const
     }
 
-    const sanitized = sanitizeProviderAuthorizationSession(session)
-    expect(sanitized.verifier).toBe('')
-    expect(sanitized.expectedState).toBe('')
+    const sanitized = sanitizeProviderAuthorizationSession(session as any)
+    expect((sanitized as any).verifier).toBeUndefined()
+    expect((sanitized as any).expectedState).toBeUndefined()
+    expect((sanitized as any).callbackUrl).toBeUndefined()
     expect(sanitized.loginId).toBe('login-1')
+    expect(sanitized.status).toBe('waiting')
   })
 })

@@ -60,9 +60,56 @@ describe('Google / Gemini Provider Adapter', () => {
     }, context)).rejects.toThrow('[bs] Gemini API key không được để trống')
   })
 
-  it('lists Gemini models', async () => {
+  it('lists Gemini models without any 1.5 models', async () => {
     const models = await adapter.listModels({} as any, {} as any)
-    expect(models.map(m => m.id)).toContain('gemini-2.5-pro')
-    expect(models.map(m => m.id)).toContain('gemini-2.5-flash')
+    const ids = models.map(m => m.id)
+    expect(ids).toContain('gemini-2.5-pro')
+    expect(ids).toContain('gemini-2.5-flash')
+    expect(ids).toContain('gemini-3.1-pro')
+    expect(ids).toContain('gemini-3.1-flash')
+    expect(ids).not.toContain('gemini-1.5-pro')
+    expect(ids).not.toContain('gemini-1.5-flash')
+  })
+
+  it('dynamically discovers models from Google API and filters out embeddings and 1.5', async () => {
+    const originalFetch = globalThis.fetch
+    globalThis.fetch = async () => {
+      return {
+        ok: true,
+        json: async () => ({
+          models: [
+            { name: 'models/gemini-2.5-pro', displayName: 'Gemini 2.5 Pro', supportedGenerationMethods: ['generateContent'] },
+            { name: 'models/gemini-1.5-flash', displayName: 'Gemini 1.5 Flash', supportedGenerationMethods: ['generateContent'] },
+            { name: 'models/text-embedding-004', displayName: 'Embedding', supportedGenerationMethods: ['embedContent'] },
+            { name: 'models/imagen-3.0', displayName: 'Imagen 3', supportedGenerationMethods: ['imageGeneration'] },
+            { name: 'models/gemini-3.1-pro', displayName: 'Gemini 3.1 Pro', supportedGenerationMethods: ['generateContent'] }
+          ]
+        })
+      } as any
+    }
+
+    try {
+      const models = await adapter.listModels({} as any, { apiKey: 'test-key' } as any)
+      const ids = models.map(m => m.id)
+      expect(ids).toEqual(['gemini-2.5-pro', 'gemini-3.1-pro'])
+    } finally {
+      globalThis.fetch = originalFetch
+    }
+  })
+
+  it('falls back to static catalog if Google API fetch fails', async () => {
+    const originalFetch = globalThis.fetch
+    globalThis.fetch = async () => {
+      throw new Error('Network error')
+    }
+
+    try {
+      const models = await adapter.listModels({} as any, { apiKey: 'test-key' } as any)
+      const ids = models.map(m => m.id)
+      expect(ids).toContain('gemini-2.5-pro')
+      expect(ids).not.toContain('gemini-1.5-pro')
+    } finally {
+      globalThis.fetch = originalFetch
+    }
   })
 })

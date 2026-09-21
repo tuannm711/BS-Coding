@@ -77,6 +77,8 @@ export interface ProviderAdapter {
   quotaGroupForModel?(modelId: string): string | undefined
   /** Spend one provider-side quota reset. Irreversible. */
   consumeResetCredit?(account: ProviderAccount, secret: ProviderSecrets): Promise<void>
+  /** Provider-specific cleanup when an account is removed by the user. */
+  removeAccount?(account: ProviderAccount, secret?: ProviderSecrets): Promise<void> | void
 }
 
 export type ProviderAuthMethod = AuthMethodDescriptor

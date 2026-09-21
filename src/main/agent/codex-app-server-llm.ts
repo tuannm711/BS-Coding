@@ -104,7 +104,8 @@ export class CodexAppServerLlm implements LlmClient {
 
       const threadRes = await client.request('thread/start', {
         model: opts.model,
-        baseInstructions: opts.system || undefined
+        baseInstructions: opts.system || undefined,
+        cwd: opts.cwd || undefined
       })
 
       const threadId = threadRes?.thread?.id

@@ -29,6 +29,7 @@ export interface LlmStreamOptions {
   signal?: AbortSignal
   variantOptions?: Record<string, unknown>
   serviceTier?: 'priority'
+  cwd?: string
 }
 
 export interface LlmClient {
