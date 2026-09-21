@@ -185,7 +185,7 @@ export class CodexAppServerClient {
   }
 
   async logout(): Promise<unknown> {
-    if (!this.proc) return
+    await this.start()
     return this.request('account/logout', {})
   }
 
@@ -199,19 +199,26 @@ export class CodexAppServerClient {
     return this.request('account/usage/read', {})
   }
 
-  stop(): void {
+  async stop(): Promise<void> {
     if (this.proc) {
       const p = this.proc
       this.proc = null
       this.isInitialized = false
       if (p.pid) {
-        try {
-          kill(p.pid)
-        } catch {
-          p.kill()
-        }
+        await new Promise<void>((resolve) => {
+          try {
+            kill(p.pid!, () => resolve())
+          } catch {
+            try {
+              p.kill()
+            } catch {}
+            resolve()
+          }
+        })
       } else {
-        p.kill()
+        try {
+          p.kill()
+        } catch {}
       }
     }
   }

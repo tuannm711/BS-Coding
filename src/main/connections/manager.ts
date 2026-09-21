@@ -379,6 +379,7 @@ export class ProviderManager {
         }
       })
       this.emitAuthorization(session)
+      started.activate?.()
       return session
     }
 

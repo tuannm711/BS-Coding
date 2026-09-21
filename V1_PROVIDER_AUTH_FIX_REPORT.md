@@ -1,5 +1,10 @@
 # BS Coding V1 Provider Authentication Fix Report
 
+> [!WARNING]
+> **SUPERSEDED / HISTORICAL REPORT**  
+> This initial report represents the historical first pass and has been superseded by `V1_PROVIDER_AUTH_CORRECTIVE_REPORT.md` and `V1_PROVIDER_AUTH_REVIEW_PREP_REPORT.md`.  
+> It is preserved for audit trail and baseline comparison only. Refer to the newer reports for current architecture, exact test counts, and verified capabilities.
+
 **Date**: 2026-09-21  
 **Executor**: BS Coding Agent  
 **Target Branch**: `develop/v1` (fix branch: `fix/v1-provider-auth`)  
@@ -10,7 +15,7 @@
 ## A. Baseline Information
 
 - **Starting Branch**: `develop/v1`
-- **Starting Commit SHA**: `2f16deb968f24201fa2b5899f6f0f53361c202a`
+- **Starting Commit SHA**: `2f16deb968f24201fa2b5899f6f0f553361c202a`
 - **Fix Branch Commit SHA**: `c71654a9d7cdad0bf9644917531761d198305c48`
 - **BS Coding Version**: `1.3.2`
 - **Codex Version Used in Tests**: `codex-cli 0.155.0` (installed on system PATH)

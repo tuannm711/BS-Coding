@@ -24,6 +24,22 @@ export interface OpenAiAdapterOptions {
   getCodexPath?: () => string | undefined
 }
 
+async function safeRemoveDirectory(targetDir: string, retries = 20, delayMs = 50): Promise<void> {
+  for (let i = 0; i < retries; i++) {
+    try {
+      if (existsSync(targetDir)) {
+        rmSync(targetDir, { recursive: true, force: true })
+      }
+      return
+    } catch (err: any) {
+      if (i === retries - 1 || !['EPERM', 'EBUSY', 'ENOTEMPTY'].includes(err?.code)) {
+        throw err
+      }
+      await new Promise(resolve => setTimeout(resolve, delayMs))
+    }
+  }
+}
+
 export function createOpenAiAdapter(options: OpenAiAdapterOptions = {}): ProviderAdapter {
   const getCodexExecutable = (): string | undefined => {
     const custom = options.getCodexPath ? options.getCodexPath() : options.codexPath
@@ -43,10 +59,10 @@ export function createOpenAiAdapter(options: OpenAiAdapterOptions = {}): Provide
       })
       await client.start()
 
-      const isDeviceCode = request.methodId === 'chatgpt-device-code'
-      const login = await client.startLogin(isDeviceCode ? 'chatgptDeviceCode' : 'chatgpt')
-
       let isCompleted = false
+      let isActivated = false
+      let bufferedCompletion: { success: boolean; errorMsg?: string | null } | null = null
+      let targetLoginId: string | null = null
 
       const completeAccount = async (success: boolean, errorMsg?: string | null) => {
         if (isCompleted) return
@@ -71,10 +87,10 @@ export function createOpenAiAdapter(options: OpenAiAdapterOptions = {}): Provide
                 planName: planType
               }
             }, { codexHome })
-            context.onConnected({ loginId: login.loginId, account })
+            context.onConnected({ loginId: targetLoginId!, account })
           } else {
             context.onError({
-              loginId: login.loginId,
+              loginId: targetLoginId!,
               error: {
                 kind: 'authorization-denied',
                 message: errorMsg || '[bs] ChatGPT login không thành công'
@@ -82,15 +98,27 @@ export function createOpenAiAdapter(options: OpenAiAdapterOptions = {}): Provide
             })
           }
         } finally {
-          client.stop()
+          await client.stop()
         }
       }
 
+      // Early listener registration before startLogin to guarantee no notifications are lost
       client.onNotification('account/login/completed', (params: any) => {
-        if (params?.loginId === login.loginId || !params?.loginId) {
-          void completeAccount(params?.success !== false, params?.error)
+        if (isCompleted) return
+        if (targetLoginId && params?.loginId && params.loginId !== targetLoginId) {
+          return
         }
+        const event = { success: params?.success !== false, errorMsg: params?.error }
+        if (!isActivated) {
+          bufferedCompletion = event
+          return
+        }
+        void completeAccount(event.success, event.errorMsg)
       })
+
+      const isDeviceCode = request.methodId === 'chatgpt-device-code'
+      const login = await client.startLogin(isDeviceCode ? 'chatgptDeviceCode' : 'chatgpt')
+      targetLoginId = login.loginId
 
       return {
         loginId: login.loginId,
@@ -98,10 +126,22 @@ export function createOpenAiAdapter(options: OpenAiAdapterOptions = {}): Provide
         verificationUrl: login.verificationUrl,
         userCode: login.userCode,
         expiresAt: Date.now() + 300_000,
+        activate: () => {
+          if (isCompleted) return
+          isActivated = true
+          if (bufferedCompletion) {
+            const ev = bufferedCompletion
+            bufferedCompletion = null
+            void completeAccount(ev.success, ev.errorMsg)
+          }
+        },
         close: () => {
           if (!isCompleted) {
             isCompleted = true
-            client.cancelLogin(login.loginId).catch(() => {})
+            bufferedCompletion = null
+            if (targetLoginId) {
+              client.cancelLogin(targetLoginId).catch(() => {})
+            }
             client.stop()
           }
         }
@@ -327,33 +367,67 @@ export function createOpenAiAdapter(options: OpenAiAdapterOptions = {}): Provide
       if (!secret?.codexHome) return
 
       const userDataDir = path.resolve(options.userDataDir || process.cwd())
-      const expectedAccountDir = path.resolve(userDataDir, 'providers', 'openai', account.id)
-      const targetHome = path.resolve(secret.codexHome)
+      const openaiRoot = path.resolve(userDataDir, 'providers', 'openai')
 
-      const rel = path.relative(expectedAccountDir, targetHome)
-      const isContained = !rel.startsWith('..') && !path.isAbsolute(rel)
+      // Validate account.id against path traversal, slashes, or malicious segmenting
+      if (
+        !account.id ||
+        typeof account.id !== 'string' ||
+        account.id.includes('/') ||
+        account.id.includes('\\') ||
+        account.id.includes('..') ||
+        path.isAbsolute(account.id)
+      ) {
+        console.warn(`[bs] Refusing account removal for invalid or malicious account id: ${account.id}`)
+        return
+      }
+
+      const expectedAccountDir = path.resolve(openaiRoot, account.id)
+      const relToRoot = path.relative(openaiRoot, expectedAccountDir)
+      if (
+        relToRoot.startsWith('..') ||
+        path.isAbsolute(relToRoot) ||
+        relToRoot === '' ||
+        relToRoot !== account.id
+      ) {
+        console.warn(`[bs] Refusing account removal outside openaiRoot: ${expectedAccountDir}`)
+        return
+      }
+
+      const targetHome = path.resolve(secret.codexHome)
+      const relHome = path.relative(expectedAccountDir, targetHome)
+      const isContained = !relHome.startsWith('..') && !path.isAbsolute(relHome)
+
       const userHome = path.resolve(homedir())
       const userDotCodex = path.resolve(homedir(), '.codex')
 
-      if (!isContained || targetHome === userHome || targetHome === userDotCodex) {
+      if (
+        !isContained ||
+        targetHome === userHome ||
+        targetHome === userDotCodex ||
+        expectedAccountDir === userHome ||
+        expectedAccountDir === userDotCodex ||
+        expectedAccountDir === openaiRoot
+      ) {
         console.warn(`[bs] Refusing to delete codexHome outside isolated account directory: ${targetHome}`)
         return
       }
 
-      const client = new CodexAppServerClient({
-        codexHome: targetHome,
-        executablePath: getCodexExecutable()
-      })
+      let client: CodexAppServerClient | null = null
       try {
-        await client.logout().catch(() => {})
+        client = new CodexAppServerClient({
+          codexHome: targetHome,
+          executablePath: getCodexExecutable()
+        })
+        await client.logout()
+      } catch (err) {
+        console.warn(`[bs] Codex native logout failed or unavailable during account removal for ${account.id}:`, err)
       } finally {
-        client.stop()
+        await client?.stop()
       }
 
       try {
-        if (existsSync(expectedAccountDir)) {
-          rmSync(expectedAccountDir, { recursive: true, force: true })
-        }
+        await safeRemoveDirectory(expectedAccountDir)
       } catch (err) {
         console.warn(`[bs] Failed to remove account directory ${expectedAccountDir}:`, err)
       }

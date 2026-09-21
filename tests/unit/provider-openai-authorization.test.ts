@@ -156,7 +156,7 @@ describe('OpenAI provider authorization via Codex App Server', () => {
       }
       return () => {}
     })
-    const stopSpy = vi.spyOn(CodexAppServerClient.prototype, 'stop').mockImplementation(() => {})
+    const stopSpy = vi.spyOn(CodexAppServerClient.prototype, 'stop').mockResolvedValue(undefined)
 
     const adapter = createOpenAiAdapter()
     const strategy = adapter.authorization as ProviderManagedAuthorizationStrategy
@@ -178,6 +178,7 @@ describe('OpenAI provider authorization via Codex App Server', () => {
 
     expect(session.loginId).toBe('login_mock_123')
     expect(capturedNotificationCb).toBeTruthy()
+    session.activate?.()
 
     // Trigger completion notification
     capturedNotificationCb!({
@@ -219,7 +220,7 @@ describe('OpenAI provider authorization via Codex App Server', () => {
       }
       return () => {}
     })
-    const stopSpy = vi.spyOn(CodexAppServerClient.prototype, 'stop').mockImplementation(() => {})
+    const stopSpy = vi.spyOn(CodexAppServerClient.prototype, 'stop').mockResolvedValue(undefined)
 
     const adapter = createOpenAiAdapter()
     const strategy = adapter.authorization as ProviderManagedAuthorizationStrategy
@@ -230,10 +231,11 @@ describe('OpenAI provider authorization via Codex App Server', () => {
       onError: vi.fn()
     }
 
-    await strategy.start({
+    const session = await strategy.start({
       providerId: 'openai',
       methodId: 'oauth'
     }, context)
+    session.activate?.()
 
     // Trigger failure notification
     await capturedNotificationCb!({
@@ -250,6 +252,264 @@ describe('OpenAI provider authorization via Codex App Server', () => {
       }
     })
     expect(stopSpy).toHaveBeenCalled()
+  })
+
+  it('buffers account/login/completed arriving before activation and flushes on activate()', async () => {
+    let capturedNotificationCb: ((params: any) => void) | null = null
+    vi.spyOn(CodexAppServerClient.prototype, 'start').mockResolvedValue(undefined)
+    vi.spyOn(CodexAppServerClient.prototype, 'startLogin').mockResolvedValue({
+      type: 'chatgpt',
+      loginId: 'login_buffer_1',
+      authUrl: 'https://auth.openai.com/oauth/authorize?mock=1'
+    })
+    vi.spyOn(CodexAppServerClient.prototype, 'readAccount').mockResolvedValue({
+      account: { email: 'buffered@example.com', planType: 'plus' } as any
+    })
+    vi.spyOn(CodexAppServerClient.prototype, 'onNotification').mockImplementation((method, cb) => {
+      if (method === 'account/login/completed') capturedNotificationCb = cb
+      return () => {}
+    })
+    vi.spyOn(CodexAppServerClient.prototype, 'stop').mockImplementation(async () => {})
+
+    const adapter = createOpenAiAdapter()
+    const strategy = adapter.authorization as ProviderManagedAuthorizationStrategy
+    const context = {
+      saveAccount: vi.fn((acc: any) => acc),
+      onConnected: vi.fn(),
+      onError: vi.fn()
+    }
+
+    const session = await strategy.start({ providerId: 'openai', methodId: 'oauth' }, context)
+    expect(capturedNotificationCb).toBeTruthy()
+
+    // Deliver notification BEFORE activation
+    capturedNotificationCb!({ loginId: 'login_buffer_1', success: true })
+    await new Promise(r => setTimeout(r, 10))
+
+    // Should NOT be connected yet
+    expect(context.onConnected).not.toHaveBeenCalled()
+
+    // Now activate
+    session.activate?.()
+    await new Promise(r => setTimeout(r, 20))
+
+    expect(context.onConnected).toHaveBeenCalledWith({
+      loginId: 'login_buffer_1',
+      account: expect.objectContaining({ label: 'buffered@example.com' })
+    })
+  })
+
+  it('handles early completion notification during startLogin execution before start resolves', async () => {
+    let capturedNotificationCb: ((params: any) => void) | null = null
+    vi.spyOn(CodexAppServerClient.prototype, 'start').mockResolvedValue(undefined)
+    vi.spyOn(CodexAppServerClient.prototype, 'onNotification').mockImplementation((method, cb) => {
+      if (method === 'account/login/completed') capturedNotificationCb = cb
+      return () => {}
+    })
+    vi.spyOn(CodexAppServerClient.prototype, 'startLogin').mockImplementation(async () => {
+      // Early completion arrives right before startLogin returns!
+      capturedNotificationCb?.({ loginId: 'login_early_start', success: true })
+      return {
+        type: 'chatgpt',
+        loginId: 'login_early_start',
+        authUrl: 'https://auth.openai.com/oauth/authorize?mock=1'
+      }
+    })
+    vi.spyOn(CodexAppServerClient.prototype, 'readAccount').mockResolvedValue({
+      account: { email: 'early@example.com', planType: 'plus' } as any
+    })
+    vi.spyOn(CodexAppServerClient.prototype, 'stop').mockImplementation(async () => {})
+
+    const adapter = createOpenAiAdapter()
+    const strategy = adapter.authorization as ProviderManagedAuthorizationStrategy
+    const context = {
+      saveAccount: vi.fn((acc: any) => acc),
+      onConnected: vi.fn(),
+      onError: vi.fn()
+    }
+
+    const session = await strategy.start({ providerId: 'openai', methodId: 'oauth' }, context)
+    expect(context.onConnected).not.toHaveBeenCalled()
+
+    session.activate?.()
+    await new Promise(r => setTimeout(r, 20))
+
+    expect(context.onConnected).toHaveBeenCalledWith({
+      loginId: 'login_early_start',
+      account: expect.objectContaining({ label: 'early@example.com' })
+    })
+  })
+
+  it('handles completion arriving normally after activation', async () => {
+    let capturedNotificationCb: ((params: any) => void) | null = null
+    vi.spyOn(CodexAppServerClient.prototype, 'start').mockResolvedValue(undefined)
+    vi.spyOn(CodexAppServerClient.prototype, 'startLogin').mockResolvedValue({
+      type: 'chatgpt',
+      loginId: 'login_normal_1',
+      authUrl: 'https://auth.openai.com/oauth/authorize?mock=1'
+    })
+    vi.spyOn(CodexAppServerClient.prototype, 'readAccount').mockResolvedValue({
+      account: { email: 'normal@example.com', planType: 'plus' } as any
+    })
+    vi.spyOn(CodexAppServerClient.prototype, 'onNotification').mockImplementation((method, cb) => {
+      if (method === 'account/login/completed') capturedNotificationCb = cb
+      return () => {}
+    })
+    vi.spyOn(CodexAppServerClient.prototype, 'stop').mockImplementation(async () => {})
+
+    const adapter = createOpenAiAdapter()
+    const strategy = adapter.authorization as ProviderManagedAuthorizationStrategy
+    const context = {
+      saveAccount: vi.fn((acc: any) => acc),
+      onConnected: vi.fn(),
+      onError: vi.fn()
+    }
+
+    const session = await strategy.start({ providerId: 'openai', methodId: 'oauth' }, context)
+    session.activate?.()
+
+    // Notification arrives AFTER activation
+    capturedNotificationCb!({ loginId: 'login_normal_1', success: true })
+    await new Promise(r => setTimeout(r, 20))
+
+    expect(context.onConnected).toHaveBeenCalledTimes(1)
+    expect(context.onConnected).toHaveBeenCalledWith({
+      loginId: 'login_normal_1',
+      account: expect.objectContaining({ label: 'normal@example.com' })
+    })
+  })
+
+  it('ignores duplicate completion notifications and emits only one terminal state', async () => {
+    let capturedNotificationCb: ((params: any) => void) | null = null
+    vi.spyOn(CodexAppServerClient.prototype, 'start').mockResolvedValue(undefined)
+    vi.spyOn(CodexAppServerClient.prototype, 'startLogin').mockResolvedValue({
+      type: 'chatgpt',
+      loginId: 'login_dup_1',
+      authUrl: 'https://auth.openai.com/oauth/authorize?mock=1'
+    })
+    vi.spyOn(CodexAppServerClient.prototype, 'readAccount').mockResolvedValue({
+      account: { email: 'dup@example.com', planType: 'plus' } as any
+    })
+    vi.spyOn(CodexAppServerClient.prototype, 'onNotification').mockImplementation((method, cb) => {
+      if (method === 'account/login/completed') capturedNotificationCb = cb
+      return () => {}
+    })
+    vi.spyOn(CodexAppServerClient.prototype, 'stop').mockImplementation(async () => {})
+
+    const adapter = createOpenAiAdapter()
+    const strategy = adapter.authorization as ProviderManagedAuthorizationStrategy
+    const context = {
+      saveAccount: vi.fn((acc: any) => acc),
+      onConnected: vi.fn(),
+      onError: vi.fn()
+    }
+
+    const session = await strategy.start({ providerId: 'openai', methodId: 'oauth' }, context)
+    session.activate?.()
+
+    // First completion
+    capturedNotificationCb!({ loginId: 'login_dup_1', success: true })
+    // Duplicate completions (success and failure)
+    capturedNotificationCb!({ loginId: 'login_dup_1', success: true })
+    capturedNotificationCb!({ loginId: 'login_dup_1', success: false, error: 'ignored' })
+    await new Promise(r => setTimeout(r, 20))
+
+    expect(context.onConnected).toHaveBeenCalledTimes(1)
+    expect(context.onError).not.toHaveBeenCalled()
+  })
+
+  it('drops completion notification if session has already been cancelled / closed', async () => {
+    let capturedNotificationCb: ((params: any) => void) | null = null
+    vi.spyOn(CodexAppServerClient.prototype, 'start').mockResolvedValue(undefined)
+    vi.spyOn(CodexAppServerClient.prototype, 'startLogin').mockResolvedValue({
+      type: 'chatgpt',
+      loginId: 'login_cancel_race',
+      authUrl: 'https://auth.openai.com/oauth/authorize?mock=1'
+    })
+    vi.spyOn(CodexAppServerClient.prototype, 'cancelLogin').mockResolvedValue({})
+    vi.spyOn(CodexAppServerClient.prototype, 'onNotification').mockImplementation((method, cb) => {
+      if (method === 'account/login/completed') capturedNotificationCb = cb
+      return () => {}
+    })
+    vi.spyOn(CodexAppServerClient.prototype, 'stop').mockImplementation(async () => {})
+
+    const adapter = createOpenAiAdapter()
+    const strategy = adapter.authorization as ProviderManagedAuthorizationStrategy
+    const context = {
+      saveAccount: vi.fn((acc: any) => acc),
+      onConnected: vi.fn(),
+      onError: vi.fn()
+    }
+
+    const session = await strategy.start({ providerId: 'openai', methodId: 'oauth' }, context)
+
+    // User cancels the session first
+    session.close()
+
+    // Notification races in after cancellation
+    capturedNotificationCb!({ loginId: 'login_cancel_race', success: true })
+    session.activate?.()
+    await new Promise(r => setTimeout(r, 20))
+
+    expect(context.onConnected).not.toHaveBeenCalled()
+    expect(context.onError).not.toHaveBeenCalled()
+  })
+
+  it('expiration racing completion maintains single terminal expired state', async () => {
+    const { AuthSessionCoordinator } = await import('../../src/main/providers/auth/session')
+    let capturedNotificationCb: ((params: any) => void) | null = null
+    vi.spyOn(CodexAppServerClient.prototype, 'start').mockResolvedValue(undefined)
+    vi.spyOn(CodexAppServerClient.prototype, 'startLogin').mockResolvedValue({
+      type: 'chatgpt',
+      loginId: 'login_expire_race',
+      authUrl: 'https://auth.openai.com/oauth/authorize?mock=1'
+    })
+    vi.spyOn(CodexAppServerClient.prototype, 'cancelLogin').mockResolvedValue({})
+    vi.spyOn(CodexAppServerClient.prototype, 'onNotification').mockImplementation((method, cb) => {
+      if (method === 'account/login/completed') capturedNotificationCb = cb
+      return () => {}
+    })
+    vi.spyOn(CodexAppServerClient.prototype, 'stop').mockImplementation(async () => {})
+
+    const adapter = createOpenAiAdapter()
+    const strategy = adapter.authorization as ProviderManagedAuthorizationStrategy
+
+    const coordinator = new AuthSessionCoordinator()
+    const emittedStates: string[] = []
+
+    const started = await strategy.start({ providerId: 'openai', methodId: 'oauth' }, {
+      saveAccount: (acc: any) => acc,
+      onConnected: ({ loginId, account }) => {
+        const next = coordinator.complete(loginId, account.id)
+        if (next) emittedStates.push(next.status)
+      },
+      onError: ({ loginId, error }) => {
+        const next = coordinator.fail(loginId, error)
+        if (next) emittedStates.push(next.status)
+      }
+    })
+
+    coordinator.start({
+      loginId: started.loginId,
+      providerId: 'openai',
+      methodId: 'oauth',
+      authUrl: started.authUrl,
+      expiresAt: Date.now() + 1000,
+      close: started.close
+    })
+    started.activate?.()
+
+    // Coordinator marks expired
+    const expired = coordinator.expire(started.loginId)
+    expect(expired?.status).toBe('expired')
+
+    // Late completion notification arrives
+    capturedNotificationCb!({ loginId: started.loginId, success: true })
+    await new Promise(r => setTimeout(r, 20))
+
+    // Should NOT have completed after expiration
+    expect(emittedStates).toEqual([])
+    expect(coordinator.public(started.loginId)?.status).toBe('expired')
   })
 
   it('fetchUsage returns mapped rate limits and quota for OAuth accounts', async () => {
@@ -486,6 +746,115 @@ describe('OpenAI provider authorization via Codex App Server', () => {
     }
   })
 
+  it('native logout failure still cleanly deletes isolated account directory', async () => {
+    const tmpDir = mkdtempSync(path.join(tmpdir(), 'bs-openai-logout-fail-'))
+    try {
+      const adapter = createOpenAiAdapter({ userDataDir: tmpDir })
+      const accDir = path.join(tmpDir, 'providers', 'openai', 'acc_logout_fail')
+      const codexHome = path.join(accDir, 'codex-home')
+      const { mkdirSync, writeFileSync, existsSync } = await import('node:fs')
+      mkdirSync(codexHome, { recursive: true })
+      writeFileSync(path.join(codexHome, 'config.json'), '{}')
+
+      vi.spyOn(CodexAppServerClient.prototype, 'start').mockResolvedValue(undefined)
+      vi.spyOn(CodexAppServerClient.prototype, 'logout').mockRejectedValue(new Error('Logout RPC crashed'))
+      vi.spyOn(CodexAppServerClient.prototype, 'stop').mockResolvedValue(undefined)
+
+      const account: ProviderAccount = {
+        id: 'acc_logout_fail',
+        providerId: 'openai',
+        label: 'Logout Fail Account',
+        authMode: 'oauth',
+        status: 'active',
+        createdAt: 1,
+        lastUsedAt: 1
+      }
+
+      await adapter.removeAccount!(account, { codexHome })
+      expect(existsSync(accDir)).toBe(false)
+    } finally {
+      try {
+        rmSync(tmpDir, { recursive: true, force: true })
+      } catch {}
+    }
+  })
+
+  it('Codex executable unavailable still deletes isolated account directory', async () => {
+    const tmpDir = mkdtempSync(path.join(tmpdir(), 'bs-openai-no-exec-'))
+    try {
+      const adapter = createOpenAiAdapter({
+        userDataDir: tmpDir,
+        codexPath: 'C:/nonexistent/codex.exe'
+      })
+      const accDir = path.join(tmpDir, 'providers', 'openai', 'acc_no_exec')
+      const codexHome = path.join(accDir, 'codex-home')
+      const { mkdirSync, writeFileSync, existsSync } = await import('node:fs')
+      mkdirSync(codexHome, { recursive: true })
+      writeFileSync(path.join(codexHome, 'config.json'), '{}')
+
+      const account: ProviderAccount = {
+        id: 'acc_no_exec',
+        providerId: 'openai',
+        label: 'No Exec Account',
+        authMode: 'oauth',
+        status: 'active',
+        createdAt: 1,
+        lastUsedAt: 1
+      }
+
+      await adapter.removeAccount!(account, { codexHome })
+      expect(existsSync(accDir)).toBe(false)
+    } finally {
+      try {
+        rmSync(tmpDir, { recursive: true, force: true })
+      } catch {}
+    }
+  })
+
+  it('refuses deletion and native action for malicious or traversing account IDs', async () => {
+    const tmpDir = mkdtempSync(path.join(tmpdir(), 'bs-openai-malicious-'))
+    try {
+      const adapter = createOpenAiAdapter({ userDataDir: tmpDir })
+      const sensitiveDir = path.join(tmpDir, 'sensitive-project')
+      const { mkdirSync, writeFileSync, existsSync } = await import('node:fs')
+      mkdirSync(sensitiveDir, { recursive: true })
+      writeFileSync(path.join(sensitiveDir, 'secret.key'), 'confidential')
+
+      const logoutSpy = vi.spyOn(CodexAppServerClient.prototype, 'logout')
+
+      const maliciousIds = [
+        '../outside',
+        '../../outside',
+        '..\\..\\outside',
+        path.resolve(sensitiveDir),
+        'acc/traversal',
+        'acc\\traversal'
+      ]
+
+      for (const badId of maliciousIds) {
+        const maliciousAccount: ProviderAccount = {
+          id: badId,
+          providerId: 'openai',
+          label: 'Malicious Account',
+          authMode: 'oauth',
+          status: 'active',
+          createdAt: 1,
+          lastUsedAt: 1
+        }
+
+        await adapter.removeAccount!(maliciousAccount, { codexHome: sensitiveDir })
+        expect(existsSync(sensitiveDir)).toBe(true)
+        expect(existsSync(path.join(sensitiveDir, 'secret.key'))).toBe(true)
+      }
+
+      expect(logoutSpy).not.toHaveBeenCalled()
+    } finally {
+      try {
+        rmSync(tmpDir, { recursive: true, force: true })
+      } catch {}
+    }
+  })
+
   it('CodexAppServerLlm passes cwd into thread/start', async () => {
     const { CodexAppServerLlm } = await import('../../src/main/agent/codex-app-server-llm')
     let threadStartParams: any = null
@@ -501,7 +870,7 @@ describe('OpenAI provider authorization via Codex App Server', () => {
       }
       return {}
     })
-    vi.spyOn(CodexAppServerClient.prototype, 'stop').mockImplementation(() => {})
+    vi.spyOn(CodexAppServerClient.prototype, 'stop').mockResolvedValue(undefined)
 
     const llm = new CodexAppServerLlm({ codexHome: 'C:/fake' })
     const gen = llm.stream({

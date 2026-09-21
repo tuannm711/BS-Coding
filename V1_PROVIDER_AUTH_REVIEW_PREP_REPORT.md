@@ -13,14 +13,14 @@
 - **Repository**: `https://github.com/tuannm711/BS-Coding.git`
 - **Current Branch**: `fix/v1-provider-auth`
 - **Full Local HEAD SHA**: `e0e208a32bae8f1ba6158090b6bcc31cc0086720` (prior to corrective commit)
-- **V1 Baseline SHA (`develop/v1`)**: `2f16deb968f24201fa2b5899f6f0f53361c202a`
+- **V1 Baseline SHA (`develop/v1`)**: `2f16deb968f24201fa2b5899f6f0f553361c202a`
 - **Working Tree State**: Fix and corrective tasks applied cleanly; ready for review commit.
 
 ---
 
 ## B. Branch Isolation
 
-- **Merge Base with `develop/v1`**: `2f16deb968f24201fa2b5899f6f0f53361c202a`
+- **Merge Base with `develop/v1`**: `2f16deb968f24201fa2b5899f6f0f553361c202a`
 - **Merge Base with `develop/v2`**: `31f865340a6c3fc85cdc3925b09705b300d60f6e`
 - **Merge Base with `main`**: `31f865340a6c3fc85cdc3925b09705b300d60f6e`
 - **Merge Base with `release/v1`**: `75a2a98655e5a8e66b0510a1628e03120cbc6122`
@@ -46,6 +46,21 @@
    - Retained only official Google AI Studio Gemini API Key authentication.
 6. **Configurable Codex Binary**:
    - Added `codexPath` to `BsSettings` and `BsConfig`, allowing users with non-standard PATH installations to customize the executable location.
+7. **Managed Authorization Two-Phase Activation**:
+   - Introduced `activate?: () => void` to `ProviderManagedAuthorizationStartResult` and `ProviderManager.createAuthorization()`.
+   - Event listeners for `account/login/completed` are attached before starting login to prevent any window where notifications could be dropped.
+   - Completions arriving before session registration are buffered and atomically flushed on `activate()`.
+   - Idempotent: duplicate notifications, cancelled sessions, and expired sessions emit only one single terminal state.
+8. **Codex Account Directory Containment Hardening**:
+   - Set trusted root strictly to `<userDataDir>/providers/openai`.
+   - Enforced strict validation against `account.id` path traversal (forbidding `/`, `\`, `..`, and absolute paths).
+   - Ensured `targetHome` is contained strictly within `<userDataDir>/providers/openai/<account.id>` and never resolves to user home or `~/.codex`.
+   - Refuses any deletion or native action if any check fails.
+9. **Safe Native Logout & Isolated Directory Removal**:
+   - `CodexAppServerClient.logout()` starts the client if not already running and awaits native `account/logout`.
+   - Caught and logged safely if the native client is unavailable or returns an error, without failing the account removal operation.
+   - `client.stop()` cleanly terminates the process tree via `tree-kill` and awaits process exit to release file locks.
+   - Directory deletion is backed by `safeRemoveDirectory` retry helper to handle transient Windows filesystem lock delays (`EPERM`, `EBUSY`, `ENOTEMPTY`).
 
 ---
 
@@ -107,8 +122,9 @@
 ## G. Automated Test Results
 
 - **`npm run typecheck`**: **PASSED** (0 errors across `tsconfig.node.json`, `tsconfig.web.json`, `tsconfig.extension.json`, `tsconfig.test.json`, and `server/tsconfig.json`).
-- **`npm test`**: **161 / 161 test files PASSED (1216 / 1216 tests PASSED, 0 failed)**.
+- **`npm test`**: **161 / 161 test files PASSED (1225 / 1225 tests PASSED, 0 failed)**.
 - **`npm run build`**: **PASSED** (Main, Preload, Renderer, Extension all built successfully).
+- **`npm run e2e`**: **PASSED** (Provider capability modal and account connection verified in Electron browser UI at `tests/e2e/smoke.spec.ts:152`).
 
 ---
 

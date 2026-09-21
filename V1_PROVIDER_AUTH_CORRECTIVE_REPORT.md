@@ -264,10 +264,12 @@ Per security and isolation requirements:
 - Unsafe duplicate OAuth bypass eliminated from `createOpenAiAdapter().connect()`.
 - Resilient `fetchUsage()` implemented using `Promise.allSettled`.
 - Comprehensive `refreshAccount()` with expired/error/active state transitions.
-- Isolated account removal with strict directory containment check in `removeAccount()`.
+- Isolated account removal with strict directory containment check (`openaiRoot`) and traversal defense in `removeAccount()`.
+- Two-phase activation (`activate?: () => void`) with early event listener registration and event buffering in OpenAI adapter.
+- Safe native logout fallback with asynchronous process teardown and `safeRemoveDirectory` retry handling transient Windows file locks.
 - Working directory `cwd` propagated through `loop.ts` -> `stream()` -> `thread/start`.
 - Google provider catalog updated with `gemini-2.5-*` and `gemini-3.1-*` models; `gemini-1.5-*` completely removed; dynamic discovery enabled with fallback.
-- 161 test suites passing (1216 / 1216 tests passing).
+- 161 test suites passing (1225 / 1225 tests passing).
 
 ---
 

@@ -51,6 +51,7 @@ export interface ProviderManagedAuthorizationStartResult {
   userCode?: string
   expiresAt: number
   close: () => void
+  activate?: () => void
 }
 
 export interface ProviderManagedAuthorizationStrategy {
