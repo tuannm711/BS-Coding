@@ -1,7 +1,15 @@
 # AGENTS.md
 
-BS Coding — desktop app (Electron + React) quản lý nhiều CLI coding agent (opencode, Claude Code,
-aider, ...) chạy song song trong các pane terminal trên một cửa sổ.
+BS Coding — Repository Governance & Root Instructions
+
+## Branch Governance & Context
+
+- **Branch**: `main` (Repository Governance & Default Branch)
+- **Rule**: **DO NOT develop product code here.**
+- **Development tracks**:
+  - **BS Coding V1**: `develop/v1` → `release/v1` (tag `v1.*`)
+  - **BS Coding V2**: `develop/v2` → `release/v2` (tag `v2.*`)
+- **Maximum Remote Branches**: 5 (`main`, `release/v1`, `develop/v1`, `release/v2`, `develop/v2`).
 
 ## Công nghệ
 
@@ -11,67 +19,7 @@ aider, ...) chạy song song trong các pane terminal trên một cửa sổ.
 
 ## Cấu trúc
 
-3 tiến trình tách biệt, giao tiếp qua IPC contract tập trung:
-
-- `src/main` — main process: PTY, stores, services, IPC handlers, vòng đời app.
-- `src/preload` — contextBridge, expose `window.api` (implement `AgentApi`).
-- `src/renderer` — React UI: sidebar, pane grid, xterm + native-agent chat.
-- `src/shared` — types + IPC contract chung. **KHÔNG** import Node/Electron ở đây.
-- `src/browser-extension` — Chrome MV3 extension (build riêng bằng esbuild → `out/browser-extension`,
-  copy sang `userData/browser-extension/` để Load unpacked trên profile Chrome thật).
-- `src/main/browser` — BrowserBridge (WS server local + pairing code) + Chrome launcher/hướng dẫn cài.
-
-Alias `@shared` → `src/shared` (đã cấu hình trong electron.vite.config.ts, vitest.config.ts, tsconfig).
-
-## Lệnh
-
-- `npm run dev` — chạy dev (electron-vite; pre-hook tự build extension).
-- `npm run build` / `npm run start` — build / preview (pre-hook tự build extension).
-- `npm test` — unit + integration (Vitest).
-- `npm run typecheck` — tsc node + web + extension.
-- `npm run build:extension` — build Chrome extension (esbuild → `out/browser-extension`).
-- `npm run e2e` — Playwright smoke (cần `npm run build` trước).
-- `npm run dist` / `dist:dir` / `dist:linux` / `dist:mac` — đóng gói qua electron-builder.
-- `npm run regen:models` — regenerate `src/main/models-snapshot.json`.
-
-## Cài đặt trên Windows
-
-- Sau `npm install`, nếu thiếu binding native cho node-pty:
-  `npx @electron/rebuild -f -w @lydell/node-pty`.
-- node-pty dùng prebuilds; đừng sửa code node-pty trực tiếp.
-- Trên Windows (ConPTY), lệnh non-`.exe` (opencode, claude, ... chỉ là `.cmd` shim) phải được bọc qua
-  `cmd.exe` — xem `buildSpawnCommand` trong `src/main/pty-manager.ts`. Đừng phá vỡ logic này.
-
-## Quy ước
-
-- IPC: **không hardcode** channel string; chỉ dùng `Channels` từ `src/shared/ipc.ts`.
-- Dữ liệu bền: `userData/templates.json`, `userData/workspaces.json`; log mỗi agent trong
-  `userData/logs/<agentId>.log`.
-- Chỉ main process được spawn/kill process; renderer truy cập mọi thứ qua `window.api`.
-- Security: `contextIsolation: true`, `nodeIntegration: false`, `sandbox: false`. Không expose
-  `ipcRenderer` ra window.
-- Ngôn ngữ: mã nguồn + UI label tiếng Anh; thông báo system-style từ main dùng tiếng Việt, prefix
-  `[bs]`.
-- Không thêm comment thừa; chỉ comment khi giải thích quyết định phức tạp (VD: Windows shim, tree-kill).
-- Agent thoát phải được xử lý: kill cả process tree (`tree-kill`), không để process mồ côi.
-- Browser bridge: chỉ bind `127.0.0.1` (không expose mạng), pairing code bắt buộc trước khi nhận lệnh;
-  chạy trên profile Chrome **thật** của user — không tách profile riêng theo project.
-
-## Kiểm thử bắt buộc trước khi hoàn thành
-
-- `npm run typecheck` pass.
-- `npm test` pass.
-- Nếu ảnh hưởng tới e2e: `npm run build && npm run e2e`.
-
-## Docs
-
-- `docs/v2/` — **căn cứ cho V2.** Bắt đầu từ `docs/v2/START_HERE.md`, rồi
-  `docs/v2/architecture/README.md`, rồi `docs/v2/implementation-plans/00-MASTER-PLAN.md`.
-  Đặt nguyên khối, không sửa nội dung: liên kết nội bộ, `depends_on` và `MANIFEST.txt`
-  đều là đường dẫn tương đối trong đó.
-- `docs/v1/` — **hồ sơ lịch sử của V1.** Thiết kế, spec, plan, nợ kỹ thuật và changelog của
-  V1.3.2 trở về trước. Tham chiếu, không phải việc phải làm: V2 không kế thừa nợ của V1.
-- `docs/release-notes/` — ở nguyên ngoài `v1/`: job publish đọc `docs/release-notes/<tag>.md`
-  theo đúng tên tag.
-- Code V1 ở nguyên `src/`. Theo `docs/v2/implementation-plans/plans/01-...`, V2 dựng **bên cạnh**
-  tại `src/main/v2`, `src/shared/v2`, `src/renderer/src/v2`, và cutover nằm ở plan 18 và 20.
+- `release/v1` & `develop/v1` — BS Coding V1 maintenance line.
+- `develop/v2` — BS Coding V2 active development line.
+- `docs/v2/` — V2 architecture documentation pack.
+- `docs/BRANCHING_AND_RELEASE_STRATEGY.md` — Dual-track branching policy.
