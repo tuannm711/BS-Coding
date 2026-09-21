@@ -2,25 +2,88 @@ import { autoUpdater } from 'electron-updater'
 import type { UpdateInfo } from 'electron-updater'
 import type { UpdaterStatusEvent } from '../shared/types'
 
-// Production defaults (supplied by Task 5's caller): { isPackaged: app.isPackaged,
-// isPortable: () => !!process.env.PORTABLE_EXECUTABLE_FILE,
-// isAppImage: () => process.platform === 'linux' && !!process.env.APPIMAGE,
-// getCurrentVersion: () => app.getVersion() }. platform defaults to process.platform.
 export interface UpdaterEnv {
   isPackaged: boolean
   isPortable: () => boolean
   isAppImage: () => boolean
   getCurrentVersion: () => string
   platform?: NodeJS.Platform
+  fetchFeed?: (url: string) => Promise<string>
 }
 
-// V1 must never auto-update to V2. Extract the major version from a semver
-// string and reject any update whose major differs from the running app.
-// This is the primary safety net against cross-major auto-updates when V1
-// and V2 releases coexist in the same GitHub repository.
-function parseMajor(version: string): number {
+// Extract major version from semver string (e.g. "1.3.2" -> 1, "v2.0.0" -> 2).
+export function parseMajor(version: string): number {
   const m = /^v?(\d+)/.exec(version)
   return m ? Number(m[1]) : NaN
+}
+
+export function parseSemver(v: string): [number, number, number, string] | null {
+  const m = /^v?(\d+)\.(\d+)\.(\d+)(?:-(.+))?$/.exec(v.trim())
+  if (!m) return null
+  return [Number(m[1]), Number(m[2]), Number(m[3]), m[4] || '']
+}
+
+export function compareSemver(aStr: string, bStr: string): number {
+  const a = parseSemver(aStr)
+  const b = parseSemver(bStr)
+  if (!a || !b) return 0
+  for (let i = 0; i < 3; i++) {
+    if (a[i] > b[i]) return 1
+    if (a[i] < b[i]) return -1
+  }
+  if (!a[3] && b[3]) return 1
+  if (a[3] && !b[3]) return -1
+  if (a[3] && b[3]) return a[3].localeCompare(b[3])
+  return 0
+}
+
+export interface FeedReleaseTag {
+  tag: string
+  version: string
+}
+
+export function parseReleaseTagsFromAtomFeed(xml: string, targetMajor: number): FeedReleaseTag[] {
+  const matches = [...xml.matchAll(/\/tag\/(v?[0-9]+\.[0-9]+\.[0-9]+[^\/"]*)/g)]
+  const tags: FeedReleaseTag[] = []
+  const seen = new Set<string>()
+
+  for (const match of matches) {
+    const rawTag = match[1]
+    const cleanVer = rawTag.replace(/^v/, '')
+    if (seen.has(rawTag)) continue
+    seen.add(rawTag)
+
+    if (parseMajor(cleanVer) === targetMajor) {
+      tags.push({ tag: rawTag, version: cleanVer })
+    }
+  }
+  return tags
+}
+
+export async function discoverLatestMatchingRelease(
+  currentVersion: string,
+  fetchFeed: (url: string) => Promise<string>,
+  feedUrl = 'https://github.com/tuannm711/BS-Coding/releases.atom'
+): Promise<{ targetTag: string; targetVersion: string } | null> {
+  const currentMajor = parseMajor(currentVersion)
+  if (Number.isNaN(currentMajor)) return null
+
+  try {
+    const xml = await fetchFeed(feedUrl)
+    const matchingTags = parseReleaseTagsFromAtomFeed(xml, currentMajor)
+    let best: FeedReleaseTag | null = null
+
+    for (const item of matchingTags) {
+      if (compareSemver(item.version, currentVersion) > 0) {
+        if (!best || compareSemver(item.version, best.version) > 0) {
+          best = item
+        }
+      }
+    }
+    return best ? { targetTag: best.tag, targetVersion: best.version } : null
+  } catch {
+    return null
+  }
 }
 
 function errorMessage(err: unknown): string {
@@ -67,25 +130,41 @@ export class Updater {
     }
     if (this.checking) return
     this.checking = true
-    // A fresh check may find a newer version than the one already downloaded.
     this.downloaded = false
     try {
       if (manual) this.onStatus({ type: 'checking' })
-      const result = await autoUpdater.checkForUpdates()
       const currentVersion = this.env.getCurrentVersion()
+      const currentMajor = parseMajor(currentVersion)
+
+      // Layer 1: Update Discovery Isolation
+      // Fetch release feed and find the latest release tag matching currentMajor (v1.* for V1, v2.* for V2).
+      const fetchFn = this.env.fetchFeed || (typeof fetch !== 'undefined' ? (url: string) => fetch(url).then(r => r.text()) : undefined)
+      if (fetchFn) {
+        const discovered = await discoverLatestMatchingRelease(currentVersion, fetchFn)
+        if (discovered) {
+          // Direct autoUpdater to download manifests from the specific discovered release tag
+          autoUpdater.setFeedURL({
+            provider: 'generic',
+            url: `https://github.com/tuannm711/BS-Coding/releases/download/${discovered.targetTag}`
+          })
+        }
+      }
+
+      const result = await autoUpdater.checkForUpdates()
       const info = result?.updateInfo
       if (!info || info.version === currentVersion) {
         this.onStatus({ type: 'up-to-date', currentVersion })
         return
       }
-      // Guard: reject any update whose major version differs from current.
-      // V1 (1.x) must never silently upgrade to V2 (2.x) or any other major.
-      const currentMajor = parseMajor(currentVersion)
+
+      // Layer 2: Major-Version Guard
+      // Reject any update whose major version differs from the current app version.
       const updateMajor = parseMajor(info.version)
       if (currentMajor !== updateMajor) {
         this.onStatus({ type: 'up-to-date', currentVersion })
         return
       }
+
       this.onStatus({
         type: 'update-available',
         version: info.version,
