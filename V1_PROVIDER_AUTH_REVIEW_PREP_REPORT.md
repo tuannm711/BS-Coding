@@ -12,7 +12,9 @@
 
 - **Repository**: `https://github.com/tuannm711/BS-Coding.git`
 - **Current Branch**: `fix/v1-provider-auth`
-- **Full Local HEAD SHA**: `e0e208a32bae8f1ba6158090b6bcc31cc0086720` (prior to corrective commit)
+- **Starting Pass HEAD**: `25cfa8d8aceda21ad6e836626f86680bf678c529`
+- **Latest Implementation Commit**: `49ab79d80d6c9010fcf5d494e708caf470e4b31b`
+- **Final Audit Commit**: see branch HEAD (`fix/v1-provider-auth`)
 - **V1 Baseline SHA (`develop/v1`)**: `2f16deb968f24201fa2b5899f6f0f553361c202a`
 - **Working Tree State**: Fix and corrective tasks applied cleanly; ready for review commit.
 
@@ -61,6 +63,12 @@
    - Caught and logged safely if the native client is unavailable or returns an error, without failing the account removal operation.
    - `client.stop()` cleanly terminates the process tree via `tree-kill` and awaits process exit to release file locks.
    - Directory deletion is backed by `safeRemoveDirectory` retry helper to handle transient Windows filesystem lock delays (`EPERM`, `EBUSY`, `ENOTEMPTY`).
+10. **Post-Login Account Verification & Exception Teardown**:
+   - `account/login/completed` success strictly queries `account/read` and asserts both `account != null` and `requiresOpenaiAuth !== true`.
+   - If `account/read` throws, returns null account, or reports `requiresOpenaiAuth: true`, the adapter emits `profile-fetch-failed`, cleanly stops the client, and never saves an active account.
+   - If `startLogin()` throws, the spawned native process is immediately stopped in a try/catch before the error leaves `strategy.start()`.
+   - All async lifecycle calls to `client.stop()` are awaited (`refreshAccount`, `fetchUsage`, `stream()`), and synchronous `close()` uses `void client.stop()`.
+   - Pre-activation buffering enforces that the first terminal notification wins without risk of duplicate overwrite.
 
 ---
 
@@ -122,7 +130,7 @@
 ## G. Automated Test Results
 
 - **`npm run typecheck`**: **PASSED** (0 errors across `tsconfig.node.json`, `tsconfig.web.json`, `tsconfig.extension.json`, `tsconfig.test.json`, and `server/tsconfig.json`).
-- **`npm test`**: **161 / 161 test files PASSED (1225 / 1225 tests PASSED, 0 failed)**.
+- **`npm test`**: **161 / 161 test files PASSED (1231 / 1231 tests PASSED, 0 failed)**.
 - **`npm run build`**: **PASSED** (Main, Preload, Renderer, Extension all built successfully).
 - **`npm run e2e`**: **PASSED** (Provider capability modal and account connection verified in Electron browser UI at `tests/e2e/smoke.spec.ts:152`).
 

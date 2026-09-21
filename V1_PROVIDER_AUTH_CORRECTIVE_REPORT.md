@@ -15,7 +15,9 @@
 - **Working Tree Directory**: `C:\Users\brads\Documents\BS-Coding-v1-provider-auth` (isolated worktree)
 - **Active Git Branch**: `fix/v1-provider-auth`
 - **Baseline Commit SHA**: `2f16deb968f24201fa2b5899f6f0f53361c202a` (`develop/v1`)
-- **Remote Verified HEAD**: `e0e208a32bae8f1ba6158090b6bcc31cc0086720`
+- **Starting Pass HEAD**: `25cfa8d8aceda21ad6e836626f86680bf678c529`
+- **Latest Implementation Commit**: `49ab79d80d6c9010fcf5d494e708caf470e4b31b`
+- **Final Audit Commit**: see branch HEAD (`fix/v1-provider-auth`)
 - **Product Version**: `1.3.2` (no unauthorized version bump)
 - **Codex CLI Version**: `codex-cli 0.155.0` (installed on system PATH)
 - **Node.js / npm Environment**: Node `v24.17.0`, npm `10.8.2` on Windows (win32-x64)
@@ -255,7 +257,7 @@ Per security and isolation requirements:
 
 ### Git Branch Status:
 ```text
-* fix/v1-provider-auth  e937d8b [origin/fix/v1-provider-auth]
+* fix/v1-provider-auth (code commit: 49ab79d; final audit commit: see branch HEAD)
 ```
 
 ### Git Diff Summary:
@@ -267,9 +269,13 @@ Per security and isolation requirements:
 - Isolated account removal with strict directory containment check (`openaiRoot`) and traversal defense in `removeAccount()`.
 - Two-phase activation (`activate?: () => void`) with early event listener registration and event buffering in OpenAI adapter.
 - Safe native logout fallback with asynchronous process teardown and `safeRemoveDirectory` retry handling transient Windows file locks.
+- Post-login account verification: requires `account != null` and `requiresOpenaiAuth !== true`, otherwise emits `profile-fetch-failed` and cleans up process without creating an active account.
+- Spawned process teardown on `startLogin()` rejection before error leaves `strategy.start()`.
+- Awaited async `client.stop()` across all async lifecycle methods and explicit `void client.stop()` in synchronous close callback.
+- Pre-activation first terminal notification wins without risk of duplicate overwrite.
 - Working directory `cwd` propagated through `loop.ts` -> `stream()` -> `thread/start`.
 - Google provider catalog updated with `gemini-2.5-*` and `gemini-3.1-*` models; `gemini-1.5-*` completely removed; dynamic discovery enabled with fallback.
-- 161 test suites passing (1225 / 1225 tests passing).
+- 161 test suites passing (1231 / 1231 tests passing).
 
 ---
 
