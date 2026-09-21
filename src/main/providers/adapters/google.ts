@@ -21,21 +21,13 @@ export function createGoogleAdapter(): ProviderAdapter {
       kind: 'api-key',
       fields: ['apiKey'],
       supportsMultipleAccounts: true
-    },
-    {
-      id: 'vertex-ai',
-      label: 'Vertex AI / Google Cloud',
-      description: 'Connect using Google Cloud Vertex AI (Project ID & API Key)',
-      kind: 'api-key',
-      fields: ['projectId', 'location', 'apiKey'],
-      supportsMultipleAccounts: true
     }
   ]
 
   const capability: ProviderCapability = {
     id: 'google',
     displayName: 'Google / Gemini',
-    description: 'Official Google Gemini Developer API or Vertex AI integration',
+    description: 'Official Google Gemini Developer API integration',
     methods,
     status: 'ready',
     chatTransport: 'google'
@@ -45,20 +37,8 @@ export function createGoogleAdapter(): ProviderAdapter {
     capability,
     definition() { return capability },
     async connect(request: ProviderConnectRequest, context) {
-      if (request.methodId === 'vertex-ai') {
-        const apiKey = request.fields.apiKey?.trim()
-        const projectId = request.fields.projectId?.trim()
-        const location = request.fields.location?.trim() || 'us-central1'
-        if (!apiKey) throw new Error('[bs] Gemini API key không được để trống')
-        const account = context.saveAccount({
-          providerId: 'google',
-          label: `Vertex AI (${projectId || 'GCP'})`,
-          authMode: 'api-key',
-          status: 'active',
-          models: modelIds,
-          modelCatalog: GEMINI_MODELS
-        }, { apiKey, projectId, location })
-        return { account }
+      if (request.methodId !== 'gemini-api-key') {
+        throw new Error(`[bs] Phương thức kết nối không hỗ trợ: ${request.methodId}`)
       }
 
       const apiKey = request.fields.apiKey?.trim()

@@ -35,6 +35,15 @@ export interface ProviderManagerDeps {
   priceFor?: (providerId: string, modelId: string) => ModelPrice | undefined
 }
 
+function findAuthorizationStrategy(adapter: { authorization?: ProviderAuthorizationStrategy | ProviderAuthorizationStrategy[] }, methodId: string): ProviderAuthorizationStrategy | undefined {
+  const auth = adapter.authorization
+  if (!auth) return undefined
+  if (Array.isArray(auth)) {
+    return auth.find(s => Array.isArray(s.methodId) ? s.methodId.includes(methodId) : s.methodId === methodId)
+  }
+  return (Array.isArray(auth.methodId) ? auth.methodId.includes(methodId) : auth.methodId === methodId) ? auth : undefined
+}
+
 export class ProviderManager {
   readonly store: ProviderAccountStore
   readonly registry: ProviderRegistry
@@ -164,56 +173,51 @@ export class ProviderManager {
                   break
                 }
                 manager.recordRuntimeError(accountId, error, providerId, modelId)
-                if (error.kind === 'runtime-entity-not-found') {
-                  yield {
-                    ...part,
-                    error: `${part.error}; provider=${providerId}; account=${currentAccount.label}; model=${modelId}. Refresh or reconnect this account, then retry.`
-                  }
-                  continue
-                }
-              }
-              if (part.kind === 'finish') {
+              } else if (part.kind === 'finish') {
                 completed = true
-                completedTokens = {
-                  input: part.tokens?.input ?? 0,
-                  output: part.tokens?.output ?? 0,
-                  cacheRead: part.tokens?.cacheRead ?? 0,
-                  cacheWrite: part.tokens?.cacheWrite ?? 0
-                }
+                if (part.tokens) completedTokens = { input: part.tokens.input, output: part.tokens.output, cacheRead: part.tokens.cacheRead ?? 0, cacheWrite: part.tokens.cacheWrite ?? 0 }
               }
               yield part
             }
           } catch (error) {
-            manager.recordRuntimeError(accountId, runtimeProviderError(String(error)), providerId, modelId)
-            throw error
-          }
-          if (!retry) {
-            if (!hadError) {
-              manager.clearRuntimeError(accountId, providerId, modelId)
-              if (completed) manager.recordRuntimeUsage(providerId, accountId, modelId, completedTokens)
+            hadError = true
+            const classified = runtimeProviderError(String(error))
+            if (classified.kind === 'auth' && attempt === 0 && adapter.refreshCredentials && readySecret.refreshToken) {
+              retry = 'auth'
+            } else if (classified.kind === 'runtime-entity-not-found' && attempt === 0 && adapter.recoverRuntimeContext) {
+              retry = 'runtime-context'
+            } else {
+              manager.recordRuntimeError(accountId, classified, providerId, modelId)
+              throw error
             }
+          }
+          if (completed && !hadError) {
+            manager.clearRuntimeError(accountId, providerId, modelId)
+            manager.recordRuntimeUsage(providerId, accountId, modelId, completedTokens)
             return
           }
           if (retry === 'auth') {
             forceRefresh = true
             continue
           }
-          try {
-            const recovered = await adapter.recoverRuntimeContext!(currentAccount, readySecret, { code: 'runtime-entity-not-found', modelId })
-            const exactModel = recovered.models.find(candidate => candidate.id === modelId)
-            if (!exactModel) throw new Error(`selected model ${modelId} was not returned after refresh`)
-            manager.store.upsert({
-              ...currentAccount,
-              oauthExpiresAt: recovered.secret.expiresAt ?? currentAccount.oauthExpiresAt,
-              models: recovered.models.map(candidate => candidate.id),
-              modelCatalog: recovered.models
-            }, recovered.secret)
-            manager.emitAccountsChanged()
-          } catch (error) {
-            const message = `[bs] [runtime-entity-not-found] Unable to recover provider=${providerId}; account=${currentAccount.label}; model=${modelId}. Refresh or reconnect this account, then retry. ${String(error)}`
-            manager.recordRuntimeError(accountId, runtimeProviderError(message), providerId, modelId)
-            yield { kind: 'error', error: message }
-            return
+          if (retry === 'runtime-context') {
+            try {
+              const recovered = await adapter.recoverRuntimeContext!(currentAccount, readySecret, { code: 'runtime-entity-not-found', modelId })
+              const exactModel = recovered.models.find(candidate => candidate.id === modelId)
+              if (!exactModel) throw new Error(`selected model ${modelId} was not returned after refresh`)
+              manager.store.upsert({
+                ...currentAccount,
+                oauthExpiresAt: recovered.secret.expiresAt ?? currentAccount.oauthExpiresAt,
+                models: recovered.models.map(candidate => candidate.id),
+                modelCatalog: recovered.models
+              }, recovered.secret)
+              manager.emitAccountsChanged()
+            } catch (error) {
+              const message = `[bs] [runtime-entity-not-found] Unable to recover provider=${providerId}; account=${currentAccount.label}; model=${modelId}. Refresh or reconnect this account, then retry. ${String(error)}`
+              manager.recordRuntimeError(accountId, runtimeProviderError(message), providerId, modelId)
+              yield { kind: 'error', error: message }
+              return
+            }
           }
         }
       }
@@ -326,8 +330,8 @@ export class ProviderManager {
   async createAuthorization(request: ProviderAuthorizationRequest): Promise<ProviderAuthorizationSession> {
     const adapter = this.registry.resolveRequest({ ...request, fields: {} })
     const method = adapter.capability.methods.find(candidate => candidate.id === request.methodId)
-    const strategy = adapter.authorization
-    if (method?.kind !== 'oauth' || !strategy || strategy.methodId !== request.methodId) {
+    const strategy = findAuthorizationStrategy(adapter, request.methodId)
+    if (method?.kind !== 'oauth' || !strategy) {
       throw new Error('[bs] Provider OAuth authorization link is unavailable')
     }
     const reconnectAccount = request.reconnectAccountId ? this.store.get(request.reconnectAccountId) ?? undefined : undefined
@@ -337,9 +341,47 @@ export class ProviderManager {
     const reconnectSecret = reconnectAccount ? this.store.getSecret(reconnectAccount.id) ?? undefined : undefined
     const previousActiveAccountId = this.store.list(request.providerId)[0]?.activeAccountId ?? null
 
+    if (strategy.kind === 'managed') {
+      const started = await strategy.start(request, {
+        saveAccount: (account, secrets) => {
+          return this.store.upsert({
+            ...account,
+            ...(reconnectAccount
+              ? { id: reconnectAccount.id, createdAt: reconnectAccount.createdAt, keyRef: reconnectAccount.keyRef }
+              : {})
+          }, secrets)
+        },
+        onConnected: ({ loginId, account }) => {
+          this.emitAccountsChanged()
+          const next = this.authorizations.complete(loginId, account.id)
+          if (next) this.emitAuthorization(next)
+        },
+        onError: ({ loginId, error }) => {
+          const next = this.authorizations.fail(loginId, error)
+          if (next) this.emitAuthorization(next)
+        }
+      })
+
+      const session = this.authorizations.start({
+        loginId: started.loginId,
+        providerId: request.providerId,
+        methodId: request.methodId,
+        reconnectAccountId: request.reconnectAccountId,
+        authUrl: started.authUrl,
+        verificationUrl: started.verificationUrl,
+        userCode: started.userCode,
+        expiresAt: started.expiresAt,
+        close: () => {
+          started.close()
+        }
+      })
+      this.emitAuthorization(session)
+      return session
+    }
+
     const pkce = createPkce()
     const callback = await listenForCallback(strategy.callback)
-    let built: ReturnType<ProviderAuthorizationStrategy['build']>
+    let built: ReturnType<typeof strategy['build']>
     try {
       built = strategy.build({ pkce, callbackUrl: callback.callbackUrl })
     } catch (error) {
@@ -367,8 +409,8 @@ export class ProviderManager {
       }
       const completed = await strategy.complete({
         code: result.code,
-        verifier: pending.verifier,
-        callbackUrl: pending.callbackUrl,
+        verifier: pending.verifier ?? '',
+        callbackUrl: pending.callbackUrl ?? '',
         reconnectAccount
       })
       let saved: ProviderAccount | undefined
@@ -419,7 +461,7 @@ export class ProviderManager {
     if (!pending) throw new Error('[bs] OAuth authorization session is not waiting')
     try {
       if (!this.deps.openExternal) throw new Error('External browser integration unavailable')
-      await this.deps.openExternal(pending.authUrl)
+      await this.deps.openExternal(pending.verificationUrl || pending.authUrl)
     } catch (error) {
       const next = this.authorizations.fail(loginId, {
         kind: 'browser-open-failed',
@@ -445,7 +487,8 @@ export class ProviderManager {
     const reconnectAccount = request.reconnectAccountId ? this.store.get(request.reconnectAccountId) : null
     if (request.reconnectAccountId && (!reconnectAccount || reconnectAccount.providerId !== request.providerId)) throw new Error('[bs] Account reconnect không hợp lệ')
     const method = adapter.capability.methods.find(candidate => candidate.id === request.methodId)
-    if (method?.kind === 'oauth' && adapter.authorization) {
+    const strategy = findAuthorizationStrategy(adapter, request.methodId)
+    if (method?.kind === 'oauth' && strategy) {
       const session = await this.createAuthorization({
         providerId: request.providerId,
         methodId: request.methodId,
@@ -454,6 +497,8 @@ export class ProviderManager {
       return {
         loginId: session.loginId,
         authUrl: session.authUrl,
+        verificationUrl: session.verificationUrl,
+        userCode: session.userCode,
         expiresIn: Math.max(0, Math.ceil((session.expiresAt - Date.now()) / 1000)),
         requiresBrowser: true
       }

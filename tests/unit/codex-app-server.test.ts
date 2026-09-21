@@ -1,4 +1,4 @@
-import { describe, expect, it, afterEach } from 'vitest'
+import { describe, expect, it, afterEach, vi } from 'vitest'
 import { mkdtempSync, rmSync, readdirSync } from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
@@ -46,6 +46,19 @@ describe('CodexAppServerClient & Multi-Account Isolation', () => {
     } finally {
       client.stop()
       expect(client.isRunning).toBe(false)
+    }
+  })
+
+  it('sends initialized notification during handshake', async () => {
+    const isolatedHome = makeTmpHome()
+    const client = new CodexAppServerClient({ codexHome: isolatedHome })
+    const notifySpy = vi.spyOn(client, 'notify')
+
+    try {
+      await client.start()
+      expect(notifySpy).toHaveBeenCalledWith('initialized')
+    } finally {
+      client.stop()
     }
   })
 

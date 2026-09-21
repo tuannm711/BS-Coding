@@ -4,11 +4,11 @@ import { createGoogleAdapter } from '../../src/main/providers/adapters/google'
 describe('Google / Gemini Provider Adapter', () => {
   const adapter = createGoogleAdapter()
 
-  it('exposes definition with gemini-api-key and vertex-ai methods', () => {
+  it('exposes definition with gemini-api-key method only', () => {
     const def = adapter.definition()
     expect(def.id).toBe('google')
     expect(def.displayName).toBe('Google / Gemini')
-    expect(def.methods).toHaveLength(2)
+    expect(def.methods).toHaveLength(1)
 
     const apiKeyMethod = def.methods.find(m => m.id === 'gemini-api-key')
     expect(apiKeyMethod).toBeDefined()
@@ -16,9 +16,7 @@ describe('Google / Gemini Provider Adapter', () => {
     expect(apiKeyMethod?.fields).toContain('apiKey')
 
     const vertexMethod = def.methods.find(m => m.id === 'vertex-ai')
-    expect(vertexMethod).toBeDefined()
-    expect(vertexMethod?.kind).toBe('api-key')
-    expect(vertexMethod?.fields).toContain('projectId')
+    expect(vertexMethod).toBeUndefined()
   })
 
   it('connects with Gemini API Key successfully', async () => {
@@ -44,26 +42,13 @@ describe('Google / Gemini Provider Adapter', () => {
     expect(savedAccounts[0].secrets.apiKey).toBe('AIzaSyTest1234567890')
   })
 
-  it('connects with Vertex AI parameters', async () => {
-    const savedAccounts: any[] = []
-    const context = {
-      saveAccount: (account: any, secrets: any) => {
-        const item = { id: 'acc_2', ...account }
-        savedAccounts.push({ item, secrets })
-        return item
-      }
-    }
-
-    const res = await adapter.connect({
+  it('rejects unsupported methods like vertex-ai', async () => {
+    const context = { saveAccount: () => ({} as any) }
+    await expect(adapter.connect({
       providerId: 'google',
       methodId: 'vertex-ai',
-      fields: { apiKey: 'AIzaSyTest123', projectId: 'my-gcp-project', location: 'us-central1' }
-    }, context)
-
-    expect(res.account).toBeDefined()
-    expect(res.account.providerId).toBe('google')
-    expect(res.account.authMode).toBe('api-key')
-    expect(savedAccounts[0].secrets.projectId).toBe('my-gcp-project')
+      fields: { apiKey: 'AIzaSyTest123' }
+    }, context)).rejects.toThrow('Phương thức kết nối không hỗ trợ: vertex-ai')
   })
 
   it('rejects empty API key', async () => {

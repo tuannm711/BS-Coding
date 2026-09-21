@@ -11,7 +11,7 @@
 
 - **Starting Branch**: `develop/v1`
 - **Starting Commit SHA**: `2f16deb968f24201fa2b5899f6f0f53361c202a`
-- **Fix Branch Commit SHA**: `c71654a`
+- **Fix Branch Commit SHA**: `c71654a9d7cdad0bf9644917531761d198305c48`
 - **BS Coding Version**: `1.3.2`
 - **Codex Version Used in Tests**: `codex-cli 0.155.0` (installed on system PATH)
 - **Node.js / npm Version**: Node `v24.17.0`, npm `10.8.2`
@@ -164,7 +164,7 @@ nothing to commit, working tree clean
  tests/unit/provider-authorization-contract.test.ts|  21 +--
  tests/unit/provider-authorization-view.test.ts    |   3 +
  tests/unit/provider-openai-authorization.test.ts  |  50 +++----
- tests/unit/provider-openai-reset-credit.test.ts   |  41 +-----
+ tests/unit/provider-openai-reset-credit.test.ts    |  41 +-----
  tests/unit/provider-quota-pool.test.ts            |  23 +---
  tests/unit/providers-registry.test.ts            |   3 +-
  29 files changed, 954 insertions(+), 1195 deletions(-)

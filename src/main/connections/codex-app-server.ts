@@ -1,6 +1,7 @@
 import { spawn, type ChildProcess } from 'node:child_process'
 import { existsSync, mkdirSync } from 'node:fs'
 import path from 'node:path'
+import kill from 'tree-kill'
 
 export interface CodexAppServerOptions {
   codexHome: string
@@ -21,11 +22,16 @@ export interface CodexAccountInfo {
 export interface CodexLoginStartResult {
   type: string
   loginId: string
-  authUrl: string
+  authUrl?: string
+  verificationUrl?: string
+  userCode?: string
 }
 
 export function resolveCodexExecutablePath(customPath?: string): string {
-  if (customPath && existsSync(customPath)) return customPath
+  if (customPath && customPath.trim()) {
+    if (existsSync(customPath.trim())) return customPath.trim()
+    throw new Error(`[bs] Configured Codex executable not found: ${customPath}`)
+  }
   return process.platform === 'win32' ? 'codex.cmd' : 'codex'
 }
 
@@ -33,6 +39,7 @@ export class CodexAppServerClient {
   private proc: ChildProcess | null = null
   private reqId = 0
   private pending = new Map<number, { resolve: (val: any) => void; reject: (err: Error) => void }>()
+  private listeners = new Map<string, Set<(params: any) => void>>()
   private isInitialized = false
 
   constructor(private readonly options: CodexAppServerOptions) {
@@ -45,6 +52,19 @@ export class CodexAppServerClient {
 
   get isRunning(): boolean {
     return this.proc !== null
+  }
+
+  onNotification(method: string, listener: (params: any) => void): () => void {
+    let set = this.listeners.get(method)
+    if (!set) {
+      set = new Set()
+      this.listeners.set(method, set)
+    }
+    set.add(listener)
+    return () => {
+      set?.delete(listener)
+      if (set?.size === 0) this.listeners.delete(method)
+    }
   }
 
   async start(): Promise<void> {
@@ -74,6 +94,16 @@ export class CodexAppServerClient {
               resolve(msg.result)
             }
           } else if (msg.method) {
+            const set = this.listeners.get(msg.method)
+            if (set) {
+              for (const listener of set) {
+                try {
+                  listener(msg.params)
+                } catch {
+                  // ignore callback errors
+                }
+              }
+            }
             this.options.onNotification?.(msg.method, msg.params)
           }
         } catch {
@@ -95,12 +125,23 @@ export class CodexAppServerClient {
     await this.initialize()
   }
 
+  notify(method: string, params?: Record<string, unknown>): void {
+    if (!this.proc) {
+      throw new Error('[bs] Codex app-server is not running')
+    }
+    const msg = params !== undefined
+      ? { jsonrpc: '2.0', method, params }
+      : { jsonrpc: '2.0', method }
+    this.proc.stdin?.write(JSON.stringify(msg) + '\n')
+  }
+
   async initialize(): Promise<unknown> {
     if (this.isInitialized) return
     const res = await this.request('initialize', {
       clientInfo: { name: 'bs-coding', version: '1.3.2' },
       capabilities: {}
     })
+    this.notify('initialized')
     this.isInitialized = true
     return res
   }
@@ -133,7 +174,7 @@ export class CodexAppServerClient {
     return this.request('account/read', { refreshToken: true })
   }
 
-  async startLogin(type = 'chatgpt'): Promise<CodexLoginStartResult> {
+  async startLogin(type: 'chatgpt' | 'chatgptDeviceCode' = 'chatgpt'): Promise<CodexLoginStartResult> {
     await this.start()
     return this.request('account/login/start', { type })
   }
@@ -148,16 +189,30 @@ export class CodexAppServerClient {
     return this.request('account/logout', {})
   }
 
-  async readRateLimits(): Promise<unknown> {
+  async readRateLimits(): Promise<any> {
     await this.start()
     return this.request('account/rateLimits/read', {}).catch(() => null)
   }
 
+  async readUsage(): Promise<any> {
+    await this.start()
+    return this.request('account/usage/read', {}).catch(() => null)
+  }
+
   stop(): void {
     if (this.proc) {
-      this.proc.kill()
+      const p = this.proc
       this.proc = null
       this.isInitialized = false
+      if (p.pid) {
+        try {
+          kill(p.pid)
+        } catch {
+          p.kill()
+        }
+      } else {
+        p.kill()
+      }
     }
   }
 }

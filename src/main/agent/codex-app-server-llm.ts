@@ -1,4 +1,5 @@
 import type { LlmClient, LlmStreamOptions, LlmStreamPart } from './llm'
+import type { MessageTokens } from '../../shared/types'
 import { CodexAppServerClient } from '../connections/codex-app-server'
 
 export interface CodexAppServerLlmOptions {
@@ -14,6 +15,7 @@ export class CodexAppServerLlm implements LlmClient {
     let errorOccurred: string | null = null
     let finished = false
     let resolveNext: (() => void) | null = null
+    let lastTokens: MessageTokens | undefined = undefined
 
     const pushPart = (part: LlmStreamPart) => {
       streamQueue.push(part)
@@ -29,24 +31,52 @@ export class CodexAppServerLlm implements LlmClient {
       executablePath: this.options.executablePath,
       onNotification: (method, params: any) => {
         if (method === 'item/agentMessage/delta' || method === 'agentMessageDelta') {
-          const deltaText = params?.delta?.text || params?.text || ''
+          const deltaText = typeof params?.delta === 'string'
+            ? params.delta
+            : (params?.delta?.text || params?.text || '')
           if (deltaText) {
             pushPart({ kind: 'text', text: deltaText })
           }
+        } else if (method === 'item/reasoning/textDelta') {
+          const reasoningText = typeof params?.delta === 'string'
+            ? params.delta
+            : (params?.delta?.text || params?.text || '')
+          if (reasoningText) {
+            pushPart({ kind: 'reasoning', text: reasoningText })
+          }
+        } else if (method === 'thread/tokenUsage/updated') {
+          const breakdown = params?.tokenUsage?.last || params?.tokenUsage?.total
+          if (breakdown) {
+            lastTokens = {
+              input: breakdown.inputTokens ?? 0,
+              output: breakdown.outputTokens ?? 0,
+              total: breakdown.totalTokens ?? 0,
+              cacheRead: breakdown.cachedInputTokens ?? 0,
+              cacheWrite: breakdown.cacheWriteInputTokens ?? 0
+            }
+          }
         } else if (method === 'turn/completed' || method === 'turnCompleted') {
-          const usage = params?.turn?.usage
-          pushPart({
-            kind: 'finish',
-            finishReason: 'stop',
-            tokens: usage ? {
+          if (params?.turn?.status === 'failed' || params?.turn?.error) {
+            const msg = params?.turn?.error?.message || 'Codex turn execution failed'
+            errorOccurred = msg
+            pushPart({ kind: 'error', error: msg })
+            finished = true
+          } else {
+            const usage = params?.turn?.usage
+            const tokens = lastTokens || (usage ? {
               input: usage.inputTokens ?? usage.promptTokens ?? 0,
               output: usage.outputTokens ?? usage.completionTokens ?? 0,
               total: usage.totalTokens ?? 0
-            } : undefined
-          })
-          finished = true
+            } : undefined)
+            pushPart({
+              kind: 'finish',
+              finishReason: 'stop',
+              tokens
+            })
+            finished = true
+          }
         } else if (method === 'error' || method === 'turn/error') {
-          const msg = params?.message || 'Codex execution error'
+          const msg = params?.message || params?.error?.message || 'Codex execution error'
           errorOccurred = msg
           pushPart({ kind: 'error', error: msg })
           finished = true
@@ -61,6 +91,8 @@ export class CodexAppServerLlm implements LlmClient {
       }
     })
 
+    let abortHandler: (() => void) | null = null
+
     try {
       await client.start()
 
@@ -72,7 +104,7 @@ export class CodexAppServerLlm implements LlmClient {
 
       const threadRes = await client.request('thread/start', {
         model: opts.model,
-        instructionSources: opts.system ? [opts.system] : []
+        baseInstructions: opts.system || undefined
       })
 
       const threadId = threadRes?.thread?.id
@@ -82,18 +114,18 @@ export class CodexAppServerLlm implements LlmClient {
 
       const turnRes = await client.request('turn/start', {
         threadId,
-        input: [{ type: 'text', text: promptText }]
+        input: [{ type: 'text', text: promptText, text_elements: [] }]
       })
 
       const turnId = turnRes?.turn?.id
 
-      // Abort signal handler
       if (opts.signal) {
-        opts.signal.addEventListener('abort', () => {
+        abortHandler = () => {
           if (turnId) {
             client.request('turn/interrupt', { threadId, turnId }).catch(() => {})
           }
-        })
+        }
+        opts.signal.addEventListener('abort', abortHandler, { once: true })
       }
 
       // Yield streamed parts
@@ -112,6 +144,9 @@ export class CodexAppServerLlm implements LlmClient {
     } catch (err: any) {
       yield { kind: 'error', error: err.message || String(err) }
     } finally {
+      if (opts.signal && abortHandler) {
+        opts.signal.removeEventListener('abort', abortHandler)
+      }
       client.stop()
     }
   }

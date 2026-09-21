@@ -1,7 +1,8 @@
 import { randomUUID } from 'node:crypto'
 import path from 'node:path'
 import type { ProviderModel } from '../../../shared/providers'
-import type { ProviderAdapter } from '../types'
+import type { ProviderAccount, ProviderUsage } from '../../../shared/types'
+import type { ProviderAdapter, ProviderManagedAuthorizationStrategy } from '../types'
 import { createLlm } from '../../agent/llm'
 import { OPENAI_OAUTH_MODELS } from '../../../shared/openai-oauth'
 import { CodexAppServerClient } from '../../connections/codex-app-server'
@@ -10,15 +11,95 @@ import { CodexAppServerLlm } from '../../agent/codex-app-server-llm'
 const models: ProviderModel[] = OPENAI_OAUTH_MODELS.map(id => ({
   id,
   name: id,
-  capabilities: { isCodeModel: true, supportsStreaming: true, supportsTools: true, speedModes: ['standard', 'fast'] }
+  capabilities: { isCodeModel: true, supportsStreaming: true, supportsTools: false, speedModes: ['standard', 'fast'] }
 }))
 const modelIds = models.map(m => m.id)
 
 export interface OpenAiAdapterOptions {
   userDataDir?: string
+  codexPath?: string
 }
 
 export function createOpenAiAdapter(options: OpenAiAdapterOptions = {}): ProviderAdapter {
+  const authorization: ProviderManagedAuthorizationStrategy = {
+    kind: 'managed',
+    methodId: ['oauth', 'chatgpt-device-code'],
+    async start(request, context) {
+      const accountId = request.reconnectAccountId || `acc_${randomUUID().slice(0, 8)}`
+      const userDataDir = options.userDataDir || process.cwd()
+      const codexHome = path.join(userDataDir, 'providers', 'openai', accountId, 'codex-home')
+      const client = new CodexAppServerClient({
+        codexHome,
+        executablePath: options.codexPath
+      })
+      await client.start()
+
+      const isDeviceCode = request.methodId === 'chatgpt-device-code'
+      const login = await client.startLogin(isDeviceCode ? 'chatgptDeviceCode' : 'chatgpt')
+
+      let isCompleted = false
+
+      const completeAccount = async (success: boolean, errorMsg?: string | null) => {
+        if (isCompleted) return
+        isCompleted = true
+        try {
+          if (success) {
+            const accInfo = await client.readAccount().catch(() => null)
+            const email = accInfo?.account?.email
+            const planType = (accInfo?.account as any)?.planType
+            const label = email || `ChatGPT (${accountId})`
+            const account = context.saveAccount({
+              id: accountId,
+              providerId: 'openai',
+              label,
+              authMode: 'oauth',
+              status: 'active',
+              models: modelIds,
+              modelCatalog: models,
+              profile: {
+                email,
+                name: email || label,
+                planName: planType
+              }
+            }, { codexHome })
+            context.onConnected({ loginId: login.loginId, account })
+          } else {
+            context.onError({
+              loginId: login.loginId,
+              error: {
+                kind: 'authorization-denied',
+                message: errorMsg || '[bs] ChatGPT login không thành công'
+              }
+            })
+          }
+        } finally {
+          client.stop()
+        }
+      }
+
+      client.onNotification('account/login/completed', (params: any) => {
+        if (params?.loginId === login.loginId || !params?.loginId) {
+          void completeAccount(params?.success !== false, params?.error)
+        }
+      })
+
+      return {
+        loginId: login.loginId,
+        authUrl: login.authUrl || login.verificationUrl || '',
+        verificationUrl: login.verificationUrl,
+        userCode: login.userCode,
+        expiresAt: Date.now() + 300_000,
+        close: () => {
+          if (!isCompleted) {
+            isCompleted = true
+            client.cancelLogin(login.loginId).catch(() => {})
+            client.stop()
+          }
+        }
+      }
+    }
+  }
+
   return {
     capability: {
       id: 'openai',
@@ -35,6 +116,15 @@ export function createOpenAiAdapter(options: OpenAiAdapterOptions = {}): Provide
           supportsMultipleAccounts: true
         },
         {
+          id: 'chatgpt-device-code',
+          label: 'Sign in with Device Code',
+          description: 'Sign in using a one-time code on openai.com',
+          kind: 'oauth',
+          fields: [],
+          opensBrowser: false,
+          supportsMultipleAccounts: true
+        },
+        {
           id: 'api-key',
           label: 'API key',
           description: 'Use an OpenAI API key and optional base URL',
@@ -47,19 +137,7 @@ export function createOpenAiAdapter(options: OpenAiAdapterOptions = {}): Provide
       chatTransport: 'codex-app-server'
     },
 
-    authorization: {
-      methodId: 'oauth',
-      callback: { port: 1455, path: '/auth/callback', timeoutMs: 300_000 },
-      build({ pkce }) {
-        return {
-          authUrl: `https://auth.openai.com/oauth/authorize?response_type=code&client_id=app_EMoamEEZ73f0CkXaXp7hrann&code_challenge=${pkce.challenge}&code_challenge_method=S256&state=${pkce.state}`,
-          expectedState: pkce.state
-        }
-      },
-      async complete() {
-        throw new Error('[bs] ChatGPT login được thực hiện qua Codex App Server')
-      }
-    },
+    authorization,
 
     definition() {
       return this.capability
@@ -82,14 +160,14 @@ export function createOpenAiAdapter(options: OpenAiAdapterOptions = {}): Provide
         return { account }
       }
 
-      if (request.methodId === 'oauth') {
+      if (request.methodId === 'oauth' || request.methodId === 'chatgpt-device-code') {
         const accountId = request.reconnectAccountId || `acc_${randomUUID().slice(0, 8)}`
         const userDataDir = options.userDataDir || process.cwd()
         const codexHome = path.join(userDataDir, 'providers', 'openai', accountId, 'codex-home')
-
-        const client = new CodexAppServerClient({ codexHome })
+        const client = new CodexAppServerClient({ codexHome, executablePath: options.codexPath })
         try {
-          const login = await client.startLogin('chatgpt')
+          const isDevice = request.methodId === 'chatgpt-device-code'
+          const login = await client.startLogin(isDevice ? 'chatgptDeviceCode' : 'chatgpt')
           const account = context.saveAccount({
             id: accountId,
             providerId: 'openai',
@@ -105,7 +183,9 @@ export function createOpenAiAdapter(options: OpenAiAdapterOptions = {}): Provide
             account,
             login: {
               loginId: login.loginId,
-              authUrl: login.authUrl,
+              authUrl: login.authUrl || login.verificationUrl || '',
+              verificationUrl: login.verificationUrl,
+              userCode: login.userCode,
               expiresIn: 300
             }
           }
@@ -119,7 +199,7 @@ export function createOpenAiAdapter(options: OpenAiAdapterOptions = {}): Provide
 
     async refreshAccount(account, secret) {
       if (account.authMode === 'oauth' && secret?.codexHome) {
-        const client = new CodexAppServerClient({ codexHome: secret.codexHome })
+        const client = new CodexAppServerClient({ codexHome: secret.codexHome, executablePath: options.codexPath })
         try {
           const accInfo = await client.readAccount()
           if (accInfo.account?.email) {
@@ -129,7 +209,11 @@ export function createOpenAiAdapter(options: OpenAiAdapterOptions = {}): Provide
               status: 'active',
               models: modelIds,
               modelCatalog: models,
-              profile: { email: accInfo.account.email, name: accInfo.account.name || accInfo.account.email }
+              profile: {
+                email: accInfo.account.email,
+                name: accInfo.account.name || accInfo.account.email,
+                planName: (accInfo.account as any).planType || account.profile?.planName
+              }
             }
           }
         } catch (err: any) {
@@ -145,13 +229,72 @@ export function createOpenAiAdapter(options: OpenAiAdapterOptions = {}): Provide
       return { ...account, status: 'active', models: modelIds, modelCatalog: models }
     },
 
+    async fetchUsage(account, secret): Promise<ProviderUsage> {
+      if (account.authMode !== 'oauth' || !secret?.codexHome) {
+        return {
+          accountId: account.id,
+          accountLabel: account.profile?.email ?? account.label,
+          accountType: account.authMode === 'api-key' ? 'api-key' : 'oauth',
+          refreshedAt: Date.now(),
+          source: 'unavailable',
+          status: 'unavailable',
+          statusReason: 'Usage is not applicable for API key accounts'
+        }
+      }
+
+      const client = new CodexAppServerClient({ codexHome: secret.codexHome, executablePath: options.codexPath })
+      try {
+        const [rateLimitsRes, usageRes] = await Promise.all([
+          client.readRateLimits(),
+          client.readUsage()
+        ])
+
+        const primary = rateLimitsRes?.rateLimits?.primary
+        const secondary = rateLimitsRes?.rateLimits?.secondary
+        const resetCredits = rateLimitsRes?.rateLimitResetCredits
+        const planType = rateLimitsRes?.rateLimits?.planType
+        const summary = usageRes?.summary
+
+        return {
+          accountId: account.id,
+          accountLabel: account.profile?.email ?? account.label,
+          accountType: 'oauth',
+          planName: planType ?? account.profile?.planName,
+          primaryUsedPercent: primary?.usedPercent,
+          secondaryUsedPercent: secondary?.usedPercent,
+          resetAt: primary?.resetsAt ? primary.resetsAt * 1000 : undefined,
+          secondaryResetAt: secondary?.resetsAt ? secondary.resetsAt * 1000 : undefined,
+          resetCredits: resetCredits ? {
+            available: resetCredits.available ?? 0,
+            applicable: resetCredits.applicable ?? 0
+          } : undefined,
+          tokensInput: summary?.lifetimeTokens ? Number(summary.lifetimeTokens) : undefined,
+          refreshedAt: Date.now(),
+          source: 'provider',
+          status: 'ok'
+        }
+      } catch (err: any) {
+        return {
+          accountId: account.id,
+          accountLabel: account.profile?.email ?? account.label,
+          accountType: 'oauth',
+          refreshedAt: Date.now(),
+          source: 'unavailable',
+          status: 'unavailable',
+          statusReason: err.message || 'Failed to fetch Codex usage'
+        }
+      } finally {
+        client.stop()
+      }
+    },
+
     async listModels() {
       return models
     },
 
     createRuntime(account, secret, model) {
       if (account.authMode === 'oauth' && secret?.codexHome) {
-        return new CodexAppServerLlm({ codexHome: secret.codexHome })
+        return new CodexAppServerLlm({ codexHome: secret.codexHome, executablePath: options.codexPath })
       }
       return createLlm('openai', secret?.apiKey || '', secret?.baseUrl)
     }

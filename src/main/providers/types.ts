@@ -29,7 +29,8 @@ export interface ProviderAuthorizationCompleteResult {
   secrets: ProviderSecrets
 }
 
-export interface ProviderAuthorizationStrategy {
+export interface ProviderCallbackAuthorizationStrategy {
+  kind?: 'callback'
   methodId: string
   callback: { port: number; path: string; timeoutMs: number }
   build(input: ProviderAuthorizationBuildInput): ProviderAuthorizationBuildResult
@@ -37,9 +38,33 @@ export interface ProviderAuthorizationStrategy {
   afterPersist?(account: ProviderAccount, secrets: ProviderSecrets): Promise<void> | void
 }
 
+export interface ProviderManagedAuthorizationContext {
+  saveAccount(account: Omit<ProviderAccount, 'id' | 'createdAt' | 'lastUsedAt'> & Partial<Pick<ProviderAccount, 'id' | 'createdAt' | 'lastUsedAt'>>, secrets?: ProviderSecrets): ProviderAccount
+  onConnected(result: { loginId: string; account: ProviderAccount }): void
+  onError(result: { loginId: string; error: import('../../shared/providers').ProviderAuthorizationError }): void
+}
+
+export interface ProviderManagedAuthorizationStartResult {
+  loginId: string
+  authUrl: string
+  verificationUrl?: string
+  userCode?: string
+  expiresAt: number
+  close: () => void
+}
+
+export interface ProviderManagedAuthorizationStrategy {
+  kind: 'managed'
+  methodId: string | string[]
+  start(request: import('../../shared/providers').ProviderAuthorizationRequest, context: ProviderManagedAuthorizationContext): Promise<ProviderManagedAuthorizationStartResult>
+  cancel?(loginId: string): Promise<void> | void
+}
+
+export type ProviderAuthorizationStrategy = ProviderCallbackAuthorizationStrategy | ProviderManagedAuthorizationStrategy
+
 export interface ProviderAdapter {
   capability: ProviderCapability
-  authorization?: ProviderAuthorizationStrategy
+  authorization?: ProviderAuthorizationStrategy | ProviderAuthorizationStrategy[]
   definition(): ProviderCapability
   connect(request: ProviderConnectRequest, context: ProviderAdapterContext): Promise<{ account: ProviderAccount; login?: { loginId: string; authUrl: string; expiresIn: number } }>
   refreshAccount(account: ProviderAccount, secret: ProviderSecrets): Promise<ProviderAccount>

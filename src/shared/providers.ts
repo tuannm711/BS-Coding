@@ -49,6 +49,8 @@ export interface ProviderConnectResult {
   accountId?: string
   loginId?: string
   authUrl?: string
+  verificationUrl?: string
+  userCode?: string
   expiresIn?: number
   requiresBrowser?: boolean
 }
@@ -84,6 +86,8 @@ export interface ProviderAuthorizationSession {
   methodId: string
   reconnectAccountId?: string
   authUrl: string
+  verificationUrl?: string
+  userCode?: string
   expiresAt: number
   verifier: string
   expectedState: string

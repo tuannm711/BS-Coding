@@ -6,14 +6,17 @@ import type {
 } from '../../../shared/providers'
 
 export interface PendingAuthorizationInput {
+  loginId?: string
   providerId: string
   methodId: string
   reconnectAccountId?: string
   authUrl: string
+  verificationUrl?: string
+  userCode?: string
   expiresAt: number
-  verifier: string
-  expectedState: string
-  callbackUrl: string
+  verifier?: string
+  expectedState?: string
+  callbackUrl?: string
   close: () => void
 }
 
@@ -33,13 +36,15 @@ export class AuthSessionCoordinator {
   constructor(private readonly now: () => number = Date.now) {}
 
   start(input: PendingAuthorizationInput): ProviderAuthorizationSession {
-    const loginId = randomUUID()
+    const loginId = input.loginId ?? randomUUID()
     const publicSession: ProviderAuthorizationSession = {
       loginId,
       providerId: input.providerId,
       methodId: input.methodId,
       reconnectAccountId: input.reconnectAccountId,
       authUrl: input.authUrl,
+      verificationUrl: input.verificationUrl,
+      userCode: input.userCode,
       expiresAt: input.expiresAt,
       verifier: '',
       expectedState: '',
@@ -48,7 +53,13 @@ export class AuthSessionCoordinator {
     }
     this.sessions.set(loginId, {
       public: publicSession,
-      pending: { ...input, loginId },
+      pending: {
+        ...input,
+        verifier: input.verifier ?? '',
+        expectedState: input.expectedState ?? '',
+        callbackUrl: input.callbackUrl ?? '',
+        loginId
+      },
       closed: false
     })
     const res = { ...publicSession }

@@ -54,6 +54,7 @@ export interface BsConfig {
   lsp: LspConfig
   notifications?: NotificationsConfig
   trace?: TraceConfig
+  codexPath?: string
   subagentModels?: Partial<Record<SubagentType, ModelRef>>
 }
 
@@ -360,6 +361,7 @@ export function configToSettings(cfg: BsConfig): BsSettings {
     lsp: cfg.lsp,
     notifications: cfg.notifications ? normalizeNotifications(cfg.notifications) : DEFAULT_NOTIFICATIONS,
     trace: normalizeTrace(cfg.trace),
+    codexPath: cfg.codexPath,
     ...(cfg.subagentModels ? { subagentModels: cfg.subagentModels } : {})
   }
 }
@@ -414,6 +416,7 @@ export function settingsToConfig(settings: SettingsInput, base: BsConfig = DEFAU
       ? normalizeNotifications(settings.notifications)
       : normalizeNotifications(base.notifications),
     trace: normalizeTrace(settings.trace ?? base.trace),
+    codexPath: settings.codexPath ?? base.codexPath,
     ...(settings.subagentModels
       ? { subagentModels: normalizeSubagentModels(settings.subagentModels, providers) }
       : {})
