@@ -3,6 +3,19 @@
 BS Coding — desktop app (Electron + React) quản lý nhiều CLI coding agent (opencode, Claude Code,
 aider, ...) chạy song song trong các pane terminal trên một cửa sổ.
 
+## Branch Governance & Context
+
+- **Product Track**: BS Coding V1
+- **Current Version**: 1.3.2
+- **Development Branch**: `develop/v1`
+- **Stable / Release Branch**: `release/v1`
+- **Release Tags**: `v1.*` (triggered from `release/v1` only)
+- **Rules**:
+  - All V1 feature development lands in `develop/v1`.
+  - Releases are merged from `develop/v1` to `release/v1` and tagged `v1.*`.
+  - Do not merge V2 code into this branch.
+  - Maximum remote branches for repo = 5 (`main`, `release/v1`, `develop/v1`, `release/v2`, `develop/v2`).
+
 ## Công nghệ
 
 - Electron 41 + electron-vite 5 + React 19 + TypeScript (strict).
@@ -39,36 +52,7 @@ Alias `@shared` → `src/shared` (đã cấu hình trong electron.vite.config.ts
 - Sau `npm install`, nếu thiếu binding native cho node-pty:
   `npx @electron/rebuild -f -w @lydell/node-pty`.
 - node-pty dùng prebuilds; đừng sửa code node-pty trực tiếp.
-- Trên Windows (ConPTY), lệnh non-`.exe` (opencode, claude, ... chỉ là `.cmd` shim) phải được bọc qua
-  `cmd.exe` — xem `buildSpawnCommand` trong `src/main/pty-manager.ts`. Đừng phá vỡ logic này.
-
-## Quy ước
-
-- IPC: **không hardcode** channel string; chỉ dùng `Channels` từ `src/shared/ipc.ts`.
-- Dữ liệu bền: `userData/templates.json`, `userData/workspaces.json`; log mỗi agent trong
-  `userData/logs/<agentId>.log`.
-- Chỉ main process được spawn/kill process; renderer truy cập mọi thứ qua `window.api`.
-- Security: `contextIsolation: true`, `nodeIntegration: false`, `sandbox: false`. Không expose
-  `ipcRenderer` ra window.
-- Ngôn ngữ: mã nguồn + UI label tiếng Anh; thông báo system-style từ main dùng tiếng Việt, prefix
-  `[bs]`.
-- Không thêm comment thừa; chỉ comment khi giải thích quyết định phức tạp (VD: Windows shim, tree-kill).
-- Agent thoát phải được xử lý: kill cả process tree (`tree-kill`), không để process mồ côi.
-- Browser bridge: chỉ bind `127.0.0.1` (không expose mạng), pairing code bắt buộc trước khi nhận lệnh;
-  chạy trên profile Chrome **thật** của user — không tách profile riêng theo project.
-
-## Kiểm thử bắt buộc trước khi hoàn thành
-
-- `npm run typecheck` pass.
-- `npm test` pass.
-- Nếu ảnh hưởng tới e2e: `npm run build && npm run e2e`.
 
 ## Docs
 
-- `docs/design/` — **tài liệu thiết kế: hệ thống hiện là gì.** Bắt đầu từ `docs/design/README.md`;
-  mỗi tài liệu miền mở đầu bằng TOC có khoảng dòng và danh sách tên, và overview có chỉ mục tên
-  xuyên file để nhảy thẳng tới nơi giải thích.
-- `docs/technical-debt.md` — việc đã hoãn, kèm lý do hoãn và điều kiện để đóng.
-- `docs/superpowers/specs` — design specs; `docs/superpowers/plans` — kế hoạch triển khai.
-- `docs/changelog-format.md` — format viết changelog giữa các version (tái sử dụng mỗi release).
-- Workflow: brainstorm → spec → plan → thực thi (chi tiết trong docs hiện có).
+- `docs/release-notes/` — chứa release notes theo tên tag (VD: `v1.3.2.md`).
