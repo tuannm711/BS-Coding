@@ -14,6 +14,8 @@ export interface ProviderSecrets {
   organizationId?: string
   expiresAt?: number
   projectId?: string
+  location?: string
+  codexHome?: string
   planName?: string
   cloudCodeBaseUrl?: string
 }

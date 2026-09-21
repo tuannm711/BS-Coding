@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { get } from 'node:http'
-import { mkdtempSync } from 'node:fs'
+import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { ProviderManager } from '../../src/main/connections/manager'
@@ -16,47 +15,37 @@ function fakeVault() {
   }
 }
 
-function jwt(payload: Record<string, unknown>): string {
-  return `x.${Buffer.from(JSON.stringify(payload)).toString('base64url')}.y`
-}
-
 describe('provider authorization full flows', () => {
   afterEach(() => vi.unstubAllGlobals())
 
-  it('creates and completes an OpenAI link without exposing or automatically opening it', async () => {
-    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
-      if (url === 'https://auth.openai.com/oauth/token') {
-        return new Response(JSON.stringify({
-          access_token: 'openai-access',
-          refresh_token: 'openai-refresh',
-          id_token: jwt({ email: 'plus@example.com', 'https://api.openai.com/auth': { account_id: 'chatgpt-account' } }),
-          expires_in: 3_600
-        }), { status: 200 })
+  it('creates ChatGPT login session using Codex App Server in isolated directory', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'bs-openai-flow-'))
+    try {
+      const registry = new ProviderRegistry()
+      registry.register(createOpenAiAdapter({ userDataDir: dir }))
+      const openExternal = vi.fn()
+      const manager = new ProviderManager({
+        accountsFile: path.join(dir, 'accounts.json'),
+        registry,
+        vault: fakeVault() as never,
+        openExternal
+      })
+
+      const res = await manager.registry.get('openai')?.connect({
+        providerId: 'openai',
+        methodId: 'oauth',
+        fields: {}
+      }, {
+        saveAccount: (account, secrets) => manager.store.upsert({ id: 'acc_test', ...account as any }, secrets as any)
+      })
+
+      expect(res?.login?.authUrl).toContain('https://auth.openai.com/oauth/authorize')
+    } finally {
+      try {
+        rmSync(dir, { recursive: true, force: true })
+      } catch {
+        // ignore
       }
-      throw new Error(`Unexpected URL ${url}`)
-    }))
-    const registry = new ProviderRegistry()
-    registry.register(createOpenAiAdapter())
-    const openExternal = vi.fn()
-    const manager = new ProviderManager({
-      accountsFile: path.join(mkdtempSync(path.join(tmpdir(), 'bs-openai-flow-')), 'accounts.json'),
-      registry,
-      vault: fakeVault() as never,
-      openExternal
-    })
-
-    const session = await manager.createAuthorization({ providerId: 'openai', methodId: 'oauth' })
-    expect(openExternal).not.toHaveBeenCalled()
-    expect(JSON.stringify(session)).not.toMatch(/verifier|accessToken|refreshToken/)
-
-    const auth = new URL(session.authUrl)
-    get(`http://127.0.0.1:1455/auth/callback?code=oauth-code&state=${encodeURIComponent(auth.searchParams.get('state') ?? '')}`).on('error', () => {})
-    await vi.waitFor(() => expect(manager.getAuthorization(session.loginId)?.status).toBe('connected'))
-
-    const account = manager.list('openai')[0].accounts[0]
-    expect(account).toMatchObject({ label: 'plus@example.com', authMode: 'oauth', status: 'active' })
-    expect(account.models).toContain('gpt-5.6-sol')
-    expect(manager.store.getSecret(account.id)).toMatchObject({ accessToken: 'openai-access', refreshToken: 'openai-refresh' })
-    manager.close()
+    }
   })
 })

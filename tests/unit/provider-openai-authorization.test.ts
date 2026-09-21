@@ -1,92 +1,67 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { decodeJwtProfile } from '../../src/main/connections/codex'
-import { mkdtempSync, readFileSync } from 'node:fs'
+import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { createOpenAiAdapter } from '../../src/main/providers/adapters/openai'
 
-const pkce = { verifier: 'verifier', challenge: 'challenge', state: 'state-value' }
-
-function jwt(payload: Record<string, unknown>): string {
-  return `x.${Buffer.from(JSON.stringify(payload)).toString('base64url')}.y`
-}
-
-describe('OpenAI provider authorization', () => {
+describe('OpenAI provider authorization via Codex App Server', () => {
   afterEach(() => vi.unstubAllGlobals())
 
-  it('builds and completes ChatGPT authorization in the adapter', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
-      access_token: 'access',
-      refresh_token: 'refresh',
-      id_token: jwt({ email: 'plus@example.com', name: 'Plus User' }),
-      expires_in: 3_600
-    }), { status: 200 })))
+  it('exposes oauth and api-key methods in definition', () => {
     const adapter = createOpenAiAdapter()
+    const def = adapter.definition()
+    expect(def.id).toBe('openai')
+    expect(def.methods.map(m => m.id)).toContain('oauth')
+    expect(def.methods.map(m => m.id)).toContain('api-key')
+  })
 
-    const built = adapter.authorization!.build({
-      pkce,
-      callbackUrl: 'http://127.0.0.1:1455/auth/callback'
-    })
-    const result = await adapter.authorization!.complete({
-      code: 'oauth-code',
-      verifier: pkce.verifier,
-      callbackUrl: 'http://127.0.0.1:1455/auth/callback'
-    })
+  it('connects api-key method directly', async () => {
+    const adapter = createOpenAiAdapter()
+    const saved: any[] = []
+    const context = {
+      saveAccount: (account: any, secrets: any) => {
+        const item = { id: 'acc_api', ...account }
+        saved.push({ item, secrets })
+        return item
+      }
+    }
 
-    expect(new URL(built.authUrl).searchParams.get('state')).toBe(pkce.state)
-    expect(built.expectedState).toBe(pkce.state)
-    expect(result.account).toMatchObject({
+    const res = await adapter.connect({
       providerId: 'openai',
-      label: 'plus@example.com',
-      authMode: 'oauth',
-      status: 'active'
-    })
-    expect(result.secrets).toMatchObject({ accessToken: 'access', refreshToken: 'refresh' })
+      methodId: 'api-key',
+      fields: { apiKey: 'sk-test12345' }
+    }, context)
+
+    expect(res.account).toBeDefined()
+    expect(res.account.authMode).toBe('api-key')
+    expect(saved[0].secrets.apiKey).toBe('sk-test12345')
   })
 
-  it('writes the Codex auth file only after account persistence', async () => {
-    const dir = mkdtempSync(path.join(tmpdir(), 'bs-openai-auth-'))
-    const authFile = path.join(dir, 'auth.json')
-    const adapter = createOpenAiAdapter({ codexAuthFile: authFile })
-    const secrets = { accessToken: 'access', refreshToken: 'refresh', idToken: 'id', accountId: 'acct-1' }
+  it('starts ChatGPT login session using Codex App Server in isolated userDataDir', async () => {
+    const tmpDir = mkdtempSync(path.join(tmpdir(), 'bs-openai-test-'))
+    try {
+      const adapter = createOpenAiAdapter({ userDataDir: tmpDir })
+      const context = {
+        saveAccount: (account: any, secrets: any) => {
+          return { id: account.id || 'acc_oauth', ...account }
+        }
+      }
 
-    await adapter.authorization!.afterPersist?.({
-      id: 'provider-account',
-      providerId: 'openai',
-      label: 'Plus',
-      authMode: 'oauth',
-      status: 'active',
-      createdAt: 1,
-      lastUsedAt: 1
-    }, secrets)
+      const res = await adapter.connect({
+        providerId: 'openai',
+        methodId: 'oauth',
+        fields: {}
+      }, context)
 
-    const saved = JSON.parse(readFileSync(authFile, 'utf8'))
-    expect(saved.tokens).toMatchObject({ access_token: 'access', refresh_token: 'refresh', account_id: 'acct-1' })
-  })
-})
-
-describe('ChatGPT id_token claims', () => {
-  it('reads the chatgpt-prefixed identifiers and subscription window from the auth claim', () => {
-    const claim = { email: 'a@b.c', 'https://api.openai.com/auth': { chatgpt_account_id: 'acct-1', chatgpt_plan_type: 'plus', chatgpt_subscription_active_until: '2026-09-18T05:47:59+00:00' } }
-    const token = `x.${Buffer.from(JSON.stringify(claim)).toString('base64url')}.y`
-    expect(decodeJwtProfile(token)).toMatchObject({
-      email: 'a@b.c',
-      accountId: 'acct-1',
-      planName: 'plus',
-      subscriptionExpiresAt: Date.parse('2026-09-18T05:47:59+00:00')
-    })
-  })
-
-  it('ignores an auth claim that carries no subscription window', () => {
-    const claim = { 'https://api.openai.com/auth': { chatgpt_account_id: 'acct-2' } }
-    const token = `x.${Buffer.from(JSON.stringify(claim)).toString('base64url')}.y`
-    const profile = decodeJwtProfile(token)
-    expect(profile.accountId).toBe('acct-2')
-    expect(profile.subscriptionExpiresAt).toBeUndefined()
-  })
-
-  it('returns nothing for a malformed token', () => {
-    expect(decodeJwtProfile('not-a-jwt')).toEqual({})
-    expect(decodeJwtProfile(undefined)).toEqual({})
+      expect(res.account).toBeDefined()
+      expect(res.login).toBeDefined()
+      expect(res.login?.authUrl).toContain('https://auth.openai.com/oauth/authorize')
+    } finally {
+      try {
+        rmSync(tmpDir, { recursive: true, force: true })
+      } catch {
+        // ignore Windows file locks on temp dir
+      }
+    }
   })
 })

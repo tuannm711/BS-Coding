@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { ProviderRegistry } from '../../src/main/providers/registry'
 import { createFixtureAdapter } from '../../src/main/providers/adapters/fixture'
 import { createOpenAiAdapter } from '../../src/main/providers/adapters/openai'
+import { createGoogleAdapter } from '../../src/main/providers/adapters/google'
 import { createAntigravityAdapter } from '../../src/main/providers/adapters/antigravity'
 import { createGitHubCopilotAdapter } from '../../src/main/providers/adapters/github-copilot'
 import { createOpenAiCompatibleAdapter } from '../../src/main/providers/adapters/openai-compatible'
@@ -42,7 +43,8 @@ describe('ProviderRegistry', () => {
   })
 
   it('declares the exact chat transport for every adapter class', () => {
-    expect((createOpenAiAdapter().capability as any).chatTransport).toBe('openai-responses')
+    expect((createOpenAiAdapter().capability as any).chatTransport).toBe('codex-app-server')
+    expect((createGoogleAdapter().capability as any).chatTransport).toBe('google')
     expect((createAntigravityAdapter().capability as any).chatTransport).toBe('cloud-code')
     expect((createGitHubCopilotAdapter().capability as any).chatTransport).toBe('openai-compatible')
     expect((createOpenAiCompatibleAdapter('cursor', 'Cursor').capability as any).chatTransport).toBe('openai-compatible')

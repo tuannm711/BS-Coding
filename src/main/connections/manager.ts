@@ -77,7 +77,7 @@ export class ProviderManager {
     const refreshedAccount = await adapter.refreshAccount(account, refreshedSecret)
     const current = this.store.get(accountId)
     if (!current) throw new Error('[bs] Provider account was removed during refresh')
-    this.store.upsert({ ...refreshedAccount, status: current.status, keyRef: current.keyRef, oauthExpiresAt: refreshedSecret.expiresAt ?? refreshedAccount.oauthExpiresAt, refreshStages: { credentials: 'ready', models: 'refreshing', usage: 'refreshing' } }, refreshedSecret)
+    this.store.upsert({ ...refreshedAccount, status: current.status === "disabled" ? "disabled" : (refreshedAccount.status || current.status), keyRef: current.keyRef, oauthExpiresAt: refreshedSecret.expiresAt ?? refreshedAccount.oauthExpiresAt, refreshStages: { credentials: 'ready', models: 'refreshing', usage: 'refreshing' } }, refreshedSecret)
     this.emitAccountsChanged()
     await this.refreshModels(providerId, accountId)
     await this.refreshUsage(providerId, accountId)

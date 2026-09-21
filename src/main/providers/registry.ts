@@ -6,7 +6,7 @@ export class ProviderRegistry {
 
   register(adapter: ProviderAdapter): void {
     if (this.adapters.has(adapter.capability.id)) throw new Error(`[bs] Provider ${adapter.capability.id} already registered`)
-    if (adapter.capability.status !== 'unavailable' && !['openai-responses', 'openai-compatible', 'cloud-code'].includes(adapter.capability.chatTransport)) {
+    if (adapter.capability.status !== 'unavailable' && !['openai-responses', 'openai-compatible', 'cloud-code', 'codex-app-server', 'google'].includes(adapter.capability.chatTransport)) {
       throw new Error(`[bs] Provider ${adapter.capability.id} must declare a supported chat transport`)
     }
     const oauthMethods = adapter.capability.methods.filter(method => method.kind === 'oauth')

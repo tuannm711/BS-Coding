@@ -41,6 +41,7 @@ import { ProviderUsageLedger } from './connections/usage-ledger'
 import { UsageScheduler } from './connections/usage'
 import { ProviderRegistry } from './providers/registry'
 import { createOpenAiAdapter } from './providers/adapters/openai'
+import { createGoogleAdapter } from './providers/adapters/google'
 import { createOpenAiCompatibleAdapter } from './providers/adapters/openai-compatible'
 import { createGitHubCopilotAdapter } from './providers/adapters/github-copilot'
 import { createAntigravityAdapter } from './providers/adapters/antigravity'
@@ -214,10 +215,9 @@ class MainApp {
   private updater: Updater
 
   constructor() {
-    this.providerRegistry.register(createOpenAiAdapter({
-      codexAuthFile: path.join(os.homedir(), '.codex', 'auth.json'),
-      codexBackupFile: path.join(app.getPath('userData'), 'connections', 'codex-auth.json.backup')
-    }))
+    const userDataDir = process.env.BS_USER_DATA || app.getPath('userData')
+    this.providerRegistry.register(createOpenAiAdapter({ userDataDir }))
+    this.providerRegistry.register(createGoogleAdapter())
     this.providerRegistry.register(createGitHubCopilotAdapter())
     this.providerRegistry.register(createAntigravityAdapter())
     const compatibleProviders: Array<[string, string, boolean]> = [

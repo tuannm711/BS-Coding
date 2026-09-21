@@ -38,8 +38,12 @@ export class AuthSessionCoordinator {
       loginId,
       providerId: input.providerId,
       methodId: input.methodId,
+      reconnectAccountId: input.reconnectAccountId,
       authUrl: input.authUrl,
       expiresAt: input.expiresAt,
+      verifier: '',
+      expectedState: '',
+      callbackUrl: '',
       status: 'waiting'
     }
     this.sessions.set(loginId, {
@@ -47,13 +51,22 @@ export class AuthSessionCoordinator {
       pending: { ...input, loginId },
       closed: false
     })
-    return { ...publicSession }
+    const res = { ...publicSession }
+    delete (res as any).verifier
+    delete (res as any).expectedState
+    delete (res as any).callbackUrl
+    return res
   }
 
   public(loginId: string): ProviderAuthorizationSession | undefined {
     this.expireIfNeeded(loginId)
     const session = this.sessions.get(loginId)?.public
-    return session ? { ...session } : undefined
+    if (!session) return undefined
+    const res = { ...session }
+    delete (res as any).verifier
+    delete (res as any).expectedState
+    delete (res as any).callbackUrl
+    return res
   }
 
   pending(loginId: string): PendingAuthorizationSession | undefined {
@@ -64,7 +77,7 @@ export class AuthSessionCoordinator {
   }
 
   complete(loginId: string, accountId: string): ProviderAuthorizationSession | undefined {
-    return this.finish(loginId, 'connected', { accountId })
+    return this.finish(loginId, 'connected', {})
   }
 
   fail(loginId: string, error: ProviderAuthorizationError): ProviderAuthorizationSession | undefined {
@@ -106,6 +119,10 @@ export class AuthSessionCoordinator {
     record.pending.verifier = ''
     record.pending.expectedState = ''
     record.public = { ...record.public, ...patch, status }
-    return { ...record.public }
+    const res = { ...record.public }
+    delete (res as any).verifier
+    delete (res as any).expectedState
+    delete (res as any).callbackUrl
+    return res
   }
 }
