@@ -8,7 +8,7 @@ import type { ProviderSecrets } from '../../connections/types'
 import type { ProviderAdapter, ProviderManagedAuthorizationStrategy } from '../types'
 import { createLlm } from '../../agent/llm'
 import { OPENAI_OAUTH_MODELS } from '../../../shared/openai-oauth'
-import { CodexAppServerClient } from '../../connections/codex-app-server'
+import { CodexAppServerClient, type CodexLoginStartResult } from '../../connections/codex-app-server'
 import { CodexAppServerLlm } from '../../agent/codex-app-server-llm'
 
 const models: ProviderModel[] = OPENAI_OAUTH_MODELS.map(id => ({
@@ -69,9 +69,33 @@ export function createOpenAiAdapter(options: OpenAiAdapterOptions = {}): Provide
         isCompleted = true
         try {
           if (success) {
-            const accInfo = await client.readAccount().catch(() => null)
-            const email = accInfo?.account?.email
-            const planType = (accInfo?.account as any)?.planType
+            let accInfo: any = null
+            try {
+              accInfo = await client.readAccount()
+            } catch (err: any) {
+              context.onError({
+                loginId: targetLoginId!,
+                error: {
+                  kind: 'profile-fetch-failed',
+                  message: err?.message || '[bs] Không thể lấy thông tin tài khoản ChatGPT sau khi đăng nhập'
+                }
+              })
+              return
+            }
+
+            if (!accInfo?.account || accInfo.requiresOpenaiAuth === true) {
+              context.onError({
+                loginId: targetLoginId!,
+                error: {
+                  kind: 'profile-fetch-failed',
+                  message: '[bs] Tài khoản ChatGPT chưa được xác thực hoặc phiên đăng nhập không hợp lệ'
+                }
+              })
+              return
+            }
+
+            const email = accInfo.account.email
+            const planType = (accInfo.account as any)?.planType
             const label = email || `ChatGPT (${accountId})`
             const account = context.saveAccount({
               id: accountId,
@@ -110,14 +134,22 @@ export function createOpenAiAdapter(options: OpenAiAdapterOptions = {}): Provide
         }
         const event = { success: params?.success !== false, errorMsg: params?.error }
         if (!isActivated) {
-          bufferedCompletion = event
+          if (!bufferedCompletion) {
+            bufferedCompletion = event
+          }
           return
         }
         void completeAccount(event.success, event.errorMsg)
       })
 
       const isDeviceCode = request.methodId === 'chatgpt-device-code'
-      const login = await client.startLogin(isDeviceCode ? 'chatgptDeviceCode' : 'chatgpt')
+      let login: CodexLoginStartResult
+      try {
+        login = await client.startLogin(isDeviceCode ? 'chatgptDeviceCode' : 'chatgpt')
+      } catch (err) {
+        await client.stop()
+        throw err
+      }
       targetLoginId = login.loginId
 
       return {
@@ -142,7 +174,7 @@ export function createOpenAiAdapter(options: OpenAiAdapterOptions = {}): Provide
             if (targetLoginId) {
               client.cancelLogin(targetLoginId).catch(() => {})
             }
-            client.stop()
+            void client.stop()
           }
         }
       }
@@ -269,7 +301,7 @@ export function createOpenAiAdapter(options: OpenAiAdapterOptions = {}): Provide
             lastError: msg || 'Failed to refresh account'
           }
         } finally {
-          client.stop()
+          await client.stop()
         }
       }
       return { ...account, status: 'active', models: modelIds, modelCatalog: models }
@@ -358,7 +390,7 @@ export function createOpenAiAdapter(options: OpenAiAdapterOptions = {}): Provide
           statusReason: err.message || 'Failed to fetch Codex usage'
         }
       } finally {
-        client.stop()
+        await client.stop()
       }
     },
 

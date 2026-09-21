@@ -148,7 +148,7 @@ export class CodexAppServerLlm implements LlmClient {
       if (opts.signal && abortHandler) {
         opts.signal.removeEventListener('abort', abortHandler)
       }
-      client.stop()
+      await client.stop()
     }
   }
 }

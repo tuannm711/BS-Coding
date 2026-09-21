@@ -254,6 +254,243 @@ describe('OpenAI provider authorization via Codex App Server', () => {
     expect(stopSpy).toHaveBeenCalled()
   })
 
+  it('stops native client if startLogin() rejects', async () => {
+    vi.spyOn(CodexAppServerClient.prototype, 'start').mockResolvedValue(undefined)
+    vi.spyOn(CodexAppServerClient.prototype, 'startLogin').mockRejectedValue(new Error('Codex spawn failure'))
+    const stopSpy = vi.spyOn(CodexAppServerClient.prototype, 'stop').mockResolvedValue(undefined)
+
+    const adapter = createOpenAiAdapter()
+    const strategy = adapter.authorization as ProviderManagedAuthorizationStrategy
+    const context = {
+      saveAccount: vi.fn((acc: any) => acc),
+      onConnected: vi.fn(),
+      onError: vi.fn()
+    }
+
+    await expect(
+      strategy.start({ providerId: 'openai', methodId: 'oauth' }, context)
+    ).rejects.toThrow('Codex spawn failure')
+
+    expect(stopSpy).toHaveBeenCalled()
+  })
+
+  it('login completion fails if account/read throws (does not create active account)', async () => {
+    let capturedNotificationCb: ((params: any) => void) | null = null
+    vi.spyOn(CodexAppServerClient.prototype, 'start').mockResolvedValue(undefined)
+    vi.spyOn(CodexAppServerClient.prototype, 'startLogin').mockResolvedValue({
+      type: 'chatgpt',
+      loginId: 'login_read_throw',
+      authUrl: 'https://auth.openai.com/oauth/authorize?mock=1'
+    })
+    vi.spyOn(CodexAppServerClient.prototype, 'readAccount').mockRejectedValue(new Error('IPC pipe broken during read'))
+    vi.spyOn(CodexAppServerClient.prototype, 'onNotification').mockImplementation((method, cb) => {
+      if (method === 'account/login/completed') capturedNotificationCb = cb
+      return () => {}
+    })
+    const stopSpy = vi.spyOn(CodexAppServerClient.prototype, 'stop').mockResolvedValue(undefined)
+
+    const adapter = createOpenAiAdapter()
+    const strategy = adapter.authorization as ProviderManagedAuthorizationStrategy
+    const context = {
+      saveAccount: vi.fn((acc: any) => acc),
+      onConnected: vi.fn(),
+      onError: vi.fn()
+    }
+
+    const session = await strategy.start({ providerId: 'openai', methodId: 'oauth' }, context)
+    session.activate?.()
+
+    capturedNotificationCb!({ loginId: 'login_read_throw', success: true })
+    await new Promise(r => setTimeout(r, 20))
+
+    expect(context.saveAccount).not.toHaveBeenCalled()
+    expect(context.onConnected).not.toHaveBeenCalled()
+    expect(context.onError).toHaveBeenCalledWith({
+      loginId: 'login_read_throw',
+      error: expect.objectContaining({
+        kind: 'profile-fetch-failed',
+        message: expect.stringContaining('IPC pipe broken')
+      })
+    })
+    expect(stopSpy).toHaveBeenCalled()
+  })
+
+  it('login completion fails if account/read returns account: null (does not create active account)', async () => {
+    let capturedNotificationCb: ((params: any) => void) | null = null
+    vi.spyOn(CodexAppServerClient.prototype, 'start').mockResolvedValue(undefined)
+    vi.spyOn(CodexAppServerClient.prototype, 'startLogin').mockResolvedValue({
+      type: 'chatgpt',
+      loginId: 'login_null_acc',
+      authUrl: 'https://auth.openai.com/oauth/authorize?mock=1'
+    })
+    vi.spyOn(CodexAppServerClient.prototype, 'readAccount').mockResolvedValue({
+      account: null,
+      requiresOpenaiAuth: false
+    })
+    vi.spyOn(CodexAppServerClient.prototype, 'onNotification').mockImplementation((method, cb) => {
+      if (method === 'account/login/completed') capturedNotificationCb = cb
+      return () => {}
+    })
+    const stopSpy = vi.spyOn(CodexAppServerClient.prototype, 'stop').mockResolvedValue(undefined)
+
+    const adapter = createOpenAiAdapter()
+    const strategy = adapter.authorization as ProviderManagedAuthorizationStrategy
+    const context = {
+      saveAccount: vi.fn((acc: any) => acc),
+      onConnected: vi.fn(),
+      onError: vi.fn()
+    }
+
+    const session = await strategy.start({ providerId: 'openai', methodId: 'oauth' }, context)
+    session.activate?.()
+
+    capturedNotificationCb!({ loginId: 'login_null_acc', success: true })
+    await new Promise(r => setTimeout(r, 20))
+
+    expect(context.saveAccount).not.toHaveBeenCalled()
+    expect(context.onConnected).not.toHaveBeenCalled()
+    expect(context.onError).toHaveBeenCalledWith({
+      loginId: 'login_null_acc',
+      error: expect.objectContaining({
+        kind: 'profile-fetch-failed'
+      })
+    })
+    expect(stopSpy).toHaveBeenCalled()
+  })
+
+  it('login completion fails if account/read returns requiresOpenaiAuth: true (does not create active account)', async () => {
+    let capturedNotificationCb: ((params: any) => void) | null = null
+    vi.spyOn(CodexAppServerClient.prototype, 'start').mockResolvedValue(undefined)
+    vi.spyOn(CodexAppServerClient.prototype, 'startLogin').mockResolvedValue({
+      type: 'chatgpt',
+      loginId: 'login_req_auth',
+      authUrl: 'https://auth.openai.com/oauth/authorize?mock=1'
+    })
+    vi.spyOn(CodexAppServerClient.prototype, 'readAccount').mockResolvedValue({
+      account: { email: 'unauth@example.com' } as any,
+      requiresOpenaiAuth: true
+    })
+    vi.spyOn(CodexAppServerClient.prototype, 'onNotification').mockImplementation((method, cb) => {
+      if (method === 'account/login/completed') capturedNotificationCb = cb
+      return () => {}
+    })
+    const stopSpy = vi.spyOn(CodexAppServerClient.prototype, 'stop').mockResolvedValue(undefined)
+
+    const adapter = createOpenAiAdapter()
+    const strategy = adapter.authorization as ProviderManagedAuthorizationStrategy
+    const context = {
+      saveAccount: vi.fn((acc: any) => acc),
+      onConnected: vi.fn(),
+      onError: vi.fn()
+    }
+
+    const session = await strategy.start({ providerId: 'openai', methodId: 'oauth' }, context)
+    session.activate?.()
+
+    capturedNotificationCb!({ loginId: 'login_req_auth', success: true })
+    await new Promise(r => setTimeout(r, 20))
+
+    expect(context.saveAccount).not.toHaveBeenCalled()
+    expect(context.onConnected).not.toHaveBeenCalled()
+    expect(context.onError).toHaveBeenCalledWith({
+      loginId: 'login_req_auth',
+      error: expect.objectContaining({
+        kind: 'profile-fetch-failed'
+      })
+    })
+    expect(stopSpy).toHaveBeenCalled()
+  })
+
+  it('pre-activation: success first wins over duplicate failure before activation', async () => {
+    let capturedNotificationCb: ((params: any) => void) | null = null
+    vi.spyOn(CodexAppServerClient.prototype, 'start').mockResolvedValue(undefined)
+    vi.spyOn(CodexAppServerClient.prototype, 'startLogin').mockResolvedValue({
+      type: 'chatgpt',
+      loginId: 'login_preact_succ_win',
+      authUrl: 'https://auth.openai.com/oauth/authorize?mock=1'
+    })
+    vi.spyOn(CodexAppServerClient.prototype, 'readAccount').mockResolvedValue({
+      account: { email: 'succwin@example.com', planType: 'plus' } as any
+    })
+    vi.spyOn(CodexAppServerClient.prototype, 'onNotification').mockImplementation((method, cb) => {
+      if (method === 'account/login/completed') capturedNotificationCb = cb
+      return () => {}
+    })
+    const stopSpy = vi.spyOn(CodexAppServerClient.prototype, 'stop').mockResolvedValue(undefined)
+
+    const adapter = createOpenAiAdapter()
+    const strategy = adapter.authorization as ProviderManagedAuthorizationStrategy
+    const context = {
+      saveAccount: vi.fn((acc: any) => acc),
+      onConnected: vi.fn(),
+      onError: vi.fn()
+    }
+
+    const session = await strategy.start({ providerId: 'openai', methodId: 'oauth' }, context)
+
+    // 1. Success notification before activation
+    capturedNotificationCb!({ loginId: 'login_preact_succ_win', success: true })
+    // 2. Failure duplicate before activation
+    capturedNotificationCb!({ loginId: 'login_preact_succ_win', success: false, error: 'late failure' })
+
+    // 3. Activate
+    session.activate?.()
+    await new Promise(r => setTimeout(r, 20))
+
+    expect(context.onConnected).toHaveBeenCalledTimes(1)
+    expect(context.onConnected).toHaveBeenCalledWith({
+      loginId: 'login_preact_succ_win',
+      account: expect.objectContaining({ label: 'succwin@example.com' })
+    })
+    expect(context.onError).not.toHaveBeenCalled()
+    expect(stopSpy).toHaveBeenCalled()
+  })
+
+  it('pre-activation: failure first wins over duplicate success before activation', async () => {
+    let capturedNotificationCb: ((params: any) => void) | null = null
+    vi.spyOn(CodexAppServerClient.prototype, 'start').mockResolvedValue(undefined)
+    vi.spyOn(CodexAppServerClient.prototype, 'startLogin').mockResolvedValue({
+      type: 'chatgpt',
+      loginId: 'login_preact_fail_win',
+      authUrl: 'https://auth.openai.com/oauth/authorize?mock=1'
+    })
+    vi.spyOn(CodexAppServerClient.prototype, 'onNotification').mockImplementation((method, cb) => {
+      if (method === 'account/login/completed') capturedNotificationCb = cb
+      return () => {}
+    })
+    const stopSpy = vi.spyOn(CodexAppServerClient.prototype, 'stop').mockResolvedValue(undefined)
+
+    const adapter = createOpenAiAdapter()
+    const strategy = adapter.authorization as ProviderManagedAuthorizationStrategy
+    const context = {
+      saveAccount: vi.fn((acc: any) => acc),
+      onConnected: vi.fn(),
+      onError: vi.fn()
+    }
+
+    const session = await strategy.start({ providerId: 'openai', methodId: 'oauth' }, context)
+
+    // 1. Failure first before activation
+    capturedNotificationCb!({ loginId: 'login_preact_fail_win', success: false, error: 'User cancelled prompt' })
+    // 2. Success duplicate before activation
+    capturedNotificationCb!({ loginId: 'login_preact_fail_win', success: true })
+
+    // 3. Activate
+    session.activate?.()
+    await new Promise(r => setTimeout(r, 20))
+
+    expect(context.onError).toHaveBeenCalledTimes(1)
+    expect(context.onError).toHaveBeenCalledWith({
+      loginId: 'login_preact_fail_win',
+      error: {
+        kind: 'authorization-denied',
+        message: 'User cancelled prompt'
+      }
+    })
+    expect(context.onConnected).not.toHaveBeenCalled()
+    expect(stopSpy).toHaveBeenCalled()
+  })
+
   it('buffers account/login/completed arriving before activation and flushes on activate()', async () => {
     let capturedNotificationCb: ((params: any) => void) | null = null
     vi.spyOn(CodexAppServerClient.prototype, 'start').mockResolvedValue(undefined)
