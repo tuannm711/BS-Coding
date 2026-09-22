@@ -6,7 +6,7 @@ aider, ...) chạy song song trong các pane terminal trên một cửa sổ.
 ## Branch Governance & Context
 
 - **Product Track**: BS Coding V1
-- **Current Version**: 1.3.3
+- **Current Version**: 1.3.4
 - **Development Branch**: `develop/v1`
 - **Stable / Release Branch**: `release/v1`
 - **Release Tags**: `v1.*` (triggered from `release/v1` only)
