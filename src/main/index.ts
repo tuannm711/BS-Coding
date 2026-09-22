@@ -216,10 +216,7 @@ class MainApp {
 
   constructor() {
     const userDataDir = process.env.BS_USER_DATA || app.getPath('userData')
-    this.providerRegistry.register(createOpenAiAdapter({
-      userDataDir,
-      getCodexPath: () => this.bsAgent.getSettings().codexPath
-    }))
+    this.providerRegistry.register(createOpenAiAdapter())
     this.providerRegistry.register(createGoogleAdapter())
     this.providerRegistry.register(createGitHubCopilotAdapter())
     this.providerRegistry.register(createAntigravityAdapter())

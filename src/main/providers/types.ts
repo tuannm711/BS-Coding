@@ -65,6 +65,8 @@ export type ProviderAuthorizationStrategy = ProviderCallbackAuthorizationStrateg
 
 export interface ProviderAdapter {
   capability: ProviderCapability
+  /** Resolves once one-time async setup (e.g. borrowed-identity detection) completes. */
+  ready?: Promise<void>
   authorization?: ProviderAuthorizationStrategy | ProviderAuthorizationStrategy[]
   definition(): ProviderCapability
   connect(request: ProviderConnectRequest, context: ProviderAdapterContext): Promise<{ account: ProviderAccount; login?: { loginId: string; authUrl: string; expiresIn: number } }>

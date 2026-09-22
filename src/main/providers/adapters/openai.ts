@@ -1,479 +1,210 @@
 import { randomUUID } from 'node:crypto'
-import { existsSync, rmSync } from 'node:fs'
-import { homedir } from 'node:os'
-import path from 'node:path'
-import type { ProviderModel } from '../../../shared/providers'
-import type { ProviderAccount, ProviderUsage } from '../../../shared/types'
-import type { ProviderSecrets } from '../../connections/types'
-import type { ProviderAdapter, ProviderManagedAuthorizationStrategy } from '../types'
+import type { ProviderModel, ProviderCapability } from '../../../shared/providers'
+import type { ProviderAdapter } from '../types'
 import { createLlm } from '../../agent/llm'
 import { OPENAI_OAUTH_MODELS } from '../../../shared/openai-oauth'
-import { CodexAppServerClient, type CodexLoginStartResult } from '../../connections/codex-app-server'
-import { CodexAppServerLlm } from '../../agent/codex-app-server-llm'
+import { extractOpenAISubscriptionMetadata, normalizeOpenAICodexUsage } from '../../connections/usage'
+import { detectCodexIdentity, type BorrowedIdentity } from '../identity/client-identity'
+import {
+  codexAuthorizeUrl,
+  decodeJwtProfile,
+  exchangeCodexCode,
+  mergeCodexAuthFile,
+  refreshCodexToken
+} from '../../connections/codex'
 
-const models: ProviderModel[] = OPENAI_OAUTH_MODELS.map(id => ({
-  id,
-  name: id,
-  capabilities: { isCodeModel: true, supportsStreaming: true, supportsTools: false, speedModes: ['standard', 'fast'] }
-}))
-const modelIds = models.map(m => m.id)
+const models: ProviderModel[] = OPENAI_OAUTH_MODELS.map(id => ({ id, name: id, capabilities: { isCodeModel: true, supportsStreaming: true, supportsTools: true, speedModes: ['standard', 'fast'] } }))
 
-export interface OpenAiAdapterOptions {
-  userDataDir?: string
-  codexPath?: string
-  getCodexPath?: () => string | undefined
+interface OpenAiAdapterOptions {
+  codexAuthFile?: string
+  codexBackupFile?: string
+  /** Injectable for tests; defaults to detecting the installed Codex CLI. */
+  detectIdentity?: () => Promise<BorrowedIdentity>
 }
 
-async function safeRemoveDirectory(targetDir: string, retries = 20, delayMs = 50): Promise<void> {
-  for (let i = 0; i < retries; i++) {
-    try {
-      if (existsSync(targetDir)) {
-        rmSync(targetDir, { recursive: true, force: true })
-      }
-      return
-    } catch (err: any) {
-      if (i === retries - 1 || !['EPERM', 'EBUSY', 'ENOTEMPTY'].includes(err?.code)) {
-        throw err
-      }
-      await new Promise(resolve => setTimeout(resolve, delayMs))
-    }
+const CONSUME_RESET_CREDIT_URL = 'https://chatgpt.com/backend-api/wham/rate-limit-reset-credits/consume'
+
+// One definition, so the usage read and the consume post cannot drift apart.
+function codexHeaders(secret: { accessToken?: string; accountId?: string }, identity: BorrowedIdentity): Record<string, string> {
+  const headers: Record<string, string> = {
+    authorization: `Bearer ${secret.accessToken}`,
+    originator: identity.originator ?? 'codex_cli',
+    'user-agent': identity.userAgent ?? 'codex_cli',
+    accept: 'application/json',
+    origin: 'https://chatgpt.com',
+    referer: 'https://chatgpt.com/'
   }
+  if (secret.accountId) headers['ChatGPT-Account-ID'] = secret.accountId
+  return headers
 }
 
 export function createOpenAiAdapter(options: OpenAiAdapterOptions = {}): ProviderAdapter {
-  const getCodexExecutable = (): string | undefined => {
-    const custom = options.getCodexPath ? options.getCodexPath() : options.codexPath
-    return custom && custom.trim() ? custom.trim() : undefined
+  const detectIdentity = options.detectIdentity ?? (() => detectCodexIdentity())
+  // The transport identity is borrowed from the installed Codex CLI. It resolves
+  // asynchronously; until then the subscription (oauth) method stays hidden so
+  // the app never offers a login it cannot back with a real installed client.
+  let identity: BorrowedIdentity = { installed: false }
+
+  const oauthMethod = { id: 'oauth', label: 'Sign in with ChatGPT', description: 'Sign in with ChatGPT in your browser (requires Codex CLI installed)', kind: 'oauth' as const, fields: [], opensBrowser: true, supportsMultipleAccounts: true }
+  const apiKeyMethod = { id: 'api-key', label: 'API key', description: 'Use an OpenAI API key', kind: 'api-key' as const, fields: ['apiKey', 'baseUrl'] }
+
+  const capability: ProviderCapability = {
+    id: 'openai',
+    displayName: 'OpenAI / ChatGPT',
+    description: 'ChatGPT OAuth or OpenAI API key for coding agents',
+    methods: [apiKeyMethod],
+    status: 'ready',
+    chatTransport: 'openai-responses'
   }
 
-  const authorization: ProviderManagedAuthorizationStrategy = {
-    kind: 'managed',
-    methodId: ['oauth', 'chatgpt-device-code'],
-    async start(request, context) {
-      const accountId = request.reconnectAccountId || `acc_${randomUUID().slice(0, 8)}`
-      const userDataDir = options.userDataDir || process.cwd()
-      const codexHome = path.join(userDataDir, 'providers', 'openai', accountId, 'codex-home')
-      const client = new CodexAppServerClient({
-        codexHome,
-        executablePath: getCodexExecutable()
-      })
-      await client.start()
-
-      let isCompleted = false
-      let isActivated = false
-      let bufferedCompletion: { success: boolean; errorMsg?: string | null } | null = null
-      let targetLoginId: string | null = null
-
-      const completeAccount = async (success: boolean, errorMsg?: string | null) => {
-        if (isCompleted) return
-        isCompleted = true
-        try {
-          if (success) {
-            let accInfo: any = null
-            try {
-              accInfo = await client.readAccount()
-            } catch (err: any) {
-              context.onError({
-                loginId: targetLoginId!,
-                error: {
-                  kind: 'profile-fetch-failed',
-                  message: err?.message || '[bs] Không thể lấy thông tin tài khoản ChatGPT sau khi đăng nhập'
-                }
-              })
-              return
-            }
-
-            if (!accInfo?.account || accInfo.requiresOpenaiAuth === true) {
-              context.onError({
-                loginId: targetLoginId!,
-                error: {
-                  kind: 'profile-fetch-failed',
-                  message: '[bs] Tài khoản ChatGPT chưa được xác thực hoặc phiên đăng nhập không hợp lệ'
-                }
-              })
-              return
-            }
-
-            const email = accInfo.account.email
-            const planType = (accInfo.account as any)?.planType
-            const label = email || `ChatGPT (${accountId})`
-            const account = context.saveAccount({
-              id: accountId,
-              providerId: 'openai',
-              label,
-              authMode: 'oauth',
-              status: 'active',
-              models: modelIds,
-              modelCatalog: models,
-              profile: {
-                email,
-                name: email || label,
-                planName: planType
-              }
-            }, { codexHome })
-            context.onConnected({ loginId: targetLoginId!, account })
-          } else {
-            context.onError({
-              loginId: targetLoginId!,
-              error: {
-                kind: 'authorization-denied',
-                message: errorMsg || '[bs] ChatGPT login không thành công'
-              }
-            })
-          }
-        } finally {
-          await client.stop()
-        }
-      }
-
-      // Early listener registration before startLogin to guarantee no notifications are lost
-      client.onNotification('account/login/completed', (params: any) => {
-        if (isCompleted) return
-        if (targetLoginId && params?.loginId && params.loginId !== targetLoginId) {
-          return
-        }
-        const event = { success: params?.success !== false, errorMsg: params?.error }
-        if (!isActivated) {
-          if (!bufferedCompletion) {
-            bufferedCompletion = event
-          }
-          return
-        }
-        void completeAccount(event.success, event.errorMsg)
-      })
-
-      const isDeviceCode = request.methodId === 'chatgpt-device-code'
-      let login: CodexLoginStartResult
-      try {
-        login = await client.startLogin(isDeviceCode ? 'chatgptDeviceCode' : 'chatgpt')
-      } catch (err) {
-        await client.stop()
-        throw err
-      }
-      targetLoginId = login.loginId
-
-      return {
-        loginId: login.loginId,
-        authUrl: login.authUrl || login.verificationUrl || '',
-        verificationUrl: login.verificationUrl,
-        userCode: login.userCode,
-        expiresAt: Date.now() + 300_000,
-        activate: () => {
-          if (isCompleted) return
-          isActivated = true
-          if (bufferedCompletion) {
-            const ev = bufferedCompletion
-            bufferedCompletion = null
-            void completeAccount(ev.success, ev.errorMsg)
-          }
-        },
-        close: () => {
-          if (!isCompleted) {
-            isCompleted = true
-            bufferedCompletion = null
-            if (targetLoginId) {
-              client.cancelLogin(targetLoginId).catch(() => {})
-            }
-            void client.stop()
-          }
-        }
-      }
+  const ready = detectIdentity().then(resolved => {
+    identity = resolved
+    if (resolved.installed && !capability.methods.some(method => method.id === 'oauth')) {
+      capability.methods.unshift(oauthMethod)
     }
-  }
+  }).catch(() => { /* detection failure keeps oauth hidden; api-key still works */ })
 
   return {
-    capability: {
-      id: 'openai',
-      displayName: 'OpenAI / ChatGPT',
-      description: 'ChatGPT OAuth via Codex App Server or OpenAI API key',
-      methods: [
-        {
-          id: 'oauth',
-          label: 'Sign in with ChatGPT',
-          description: 'Sign in with your ChatGPT subscription using official Codex App Server',
-          kind: 'oauth',
-          fields: [],
-          opensBrowser: true,
-          supportsMultipleAccounts: true
-        },
-        {
-          id: 'chatgpt-device-code',
-          label: 'Sign in with Device Code',
-          description: 'Sign in using a one-time code on openai.com',
-          kind: 'oauth',
-          fields: [],
-          opensBrowser: false,
-          supportsMultipleAccounts: true
-        },
-        {
-          id: 'api-key',
-          label: 'API key',
-          description: 'Use an OpenAI API key and optional base URL',
-          kind: 'api-key',
-          fields: ['apiKey', 'baseUrl'],
-          supportsMultipleAccounts: true
-        }
-      ],
-      status: 'ready',
-      chatTransport: 'codex-app-server'
-    },
-
-    authorization,
-
-    definition() {
-      return this.capability
-    },
-
-    async connect(request, context) {
-      if (request.methodId === 'api-key') {
-        const apiKey = request.fields.apiKey?.trim()
-        if (!apiKey) throw new Error('[bs] OpenAI API key không được để trống')
-        const label = request.fields.label?.trim() || `OpenAI (${apiKey.slice(0, 4)}...)`
-        const account = context.saveAccount({
-          providerId: 'openai',
-          label,
-          authMode: 'api-key',
-          status: 'active',
-          models: modelIds,
-          modelCatalog: models,
-          profile: { name: label }
-        }, { apiKey, baseUrl: request.fields.baseUrl })
-        return { account }
-      }
-
-      if (request.methodId === 'oauth' || request.methodId === 'chatgpt-device-code') {
-        throw new Error('[bs] ChatGPT authentication must use managed authorization')
-      }
-
-      throw new Error(`[bs] Phương thức kết nối không hỗ trợ: ${request.methodId}`)
-    },
-
-    async refreshAccount(account, secret) {
-      if (account.authMode === 'oauth') {
-        if (!secret?.codexHome) {
-          return {
-            ...account,
-            status: 'error',
-            lastError: '[bs] Codex home directory is missing'
-          }
-        }
-        const client = new CodexAppServerClient({
-          codexHome: secret.codexHome,
-          executablePath: getCodexExecutable()
-        })
-        try {
-          const accInfo = await client.readAccount()
-          if (accInfo.requiresOpenaiAuth || !accInfo.account) {
-            return {
-              ...account,
-              status: 'expired',
-              lastError: '[bs] ChatGPT session expired or logged out. Please reconnect your account.'
-            }
-          }
-          const email = accInfo.account.email
-          const label = email || account.label
-          return {
-            ...account,
-            label,
+    ready,
+    capability,
+    authorization: {
+      methodId: 'oauth',
+      callback: { port: 1455, path: '/auth/callback', timeoutMs: 300_000 },
+      build({ pkce }) {
+        return { authUrl: codexAuthorizeUrl(pkce), expectedState: pkce.state }
+      },
+      async complete({ code, verifier }) {
+        const tokens = await exchangeCodexCode(code, verifier)
+        const profile = decodeJwtProfile(tokens.idToken)
+        return {
+          account: {
+            providerId: 'openai',
+            label: profile.email ?? `ChatGPT account ${new Date().toLocaleString()}`,
+            authMode: 'oauth',
             status: 'active',
-            lastError: undefined,
-            models: modelIds,
-            modelCatalog: models,
-            profile: {
-              ...account.profile,
-              email,
-              name: accInfo.account.name || email || account.profile?.name,
-              planName: (accInfo.account as any).planType || account.profile?.planName
-            }
-          }
-        } catch (err: any) {
-          const msg = err?.message || String(err)
-          if (/expired|unauthorized|requires.*auth|logged out/i.test(msg)) {
-            return {
-              ...account,
-              status: 'expired',
-              lastError: '[bs] ChatGPT session expired or logged out. Please reconnect your account.'
-            }
-          }
-          return {
-            ...account,
-            status: 'error',
-            lastError: msg || 'Failed to refresh account'
-          }
-        } finally {
-          await client.stop()
+            profile: { email: profile.email, name: profile.name },
+            oauthExpiresAt: tokens.expiresAt
+          },
+          secrets: { ...tokens, accountId: profile.accountId }
         }
-      }
-      return { ...account, status: 'active', models: modelIds, modelCatalog: models }
-    },
-
-    async fetchUsage(account, secret): Promise<ProviderUsage> {
-      if (account.authMode !== 'oauth' || !secret?.codexHome) {
-        return {
-          accountId: account.id,
-          accountLabel: account.profile?.email ?? account.label,
-          accountType: account.authMode === 'api-key' ? 'api-key' : 'oauth',
-          refreshedAt: Date.now(),
-          source: 'unavailable',
-          status: 'unavailable',
-          statusReason: 'Usage is not applicable for API key accounts'
-        }
-      }
-
-      const client = new CodexAppServerClient({
-        codexHome: secret.codexHome,
-        executablePath: getCodexExecutable()
-      })
-      try {
-        const [rateLimitsSettled, usageSettled] = await Promise.allSettled([
-          client.readRateLimits(),
-          client.readUsage()
-        ])
-
-        if (rateLimitsSettled.status === 'rejected' && usageSettled.status === 'rejected') {
-          const rErr = rateLimitsSettled.reason?.message || String(rateLimitsSettled.reason)
-          const uErr = usageSettled.reason?.message || String(usageSettled.reason)
-          return {
-            accountId: account.id,
-            accountLabel: account.profile?.email ?? account.label,
-            accountType: 'oauth',
-            refreshedAt: Date.now(),
-            source: 'unavailable',
-            status: 'unavailable',
-            statusReason: `Failed to fetch rate limits (${rErr}) and usage (${uErr})`
-          }
-        }
-
-        const rateLimitsRes = rateLimitsSettled.status === 'fulfilled' ? rateLimitsSettled.value : undefined
-        const usageRes = usageSettled.status === 'fulfilled' ? usageSettled.value : undefined
-
-        const primary = rateLimitsRes?.rateLimits?.primary
-        const secondary = rateLimitsRes?.rateLimits?.secondary
-        const resetCredits = rateLimitsRes?.rateLimitResetCredits
-        const planType = rateLimitsRes?.rateLimits?.planType
-        const summary = usageRes?.summary
-
-        let statusReason: string | undefined
-        if (rateLimitsSettled.status === 'rejected') {
-          statusReason = `Rate limits unavailable: ${rateLimitsSettled.reason?.message || String(rateLimitsSettled.reason)}`
-        } else if (usageSettled.status === 'rejected') {
-          statusReason = `Usage summary unavailable: ${usageSettled.reason?.message || String(usageSettled.reason)}`
-        }
-
-        return {
-          accountId: account.id,
-          accountLabel: account.profile?.email ?? account.label,
-          accountType: 'oauth',
-          planName: planType ?? account.profile?.planName,
-          primaryUsedPercent: primary?.usedPercent,
-          secondaryUsedPercent: secondary?.usedPercent,
-          resetAt: primary?.resetsAt ? primary.resetsAt * 1000 : undefined,
-          secondaryResetAt: secondary?.resetsAt ? secondary.resetsAt * 1000 : undefined,
-          resetCredits: resetCredits ? {
-            available: resetCredits.available ?? 0,
-            applicable: resetCredits.applicable ?? 0
-          } : undefined,
-          tokensInput: summary?.lifetimeTokens ? Number(summary.lifetimeTokens) : undefined,
-          refreshedAt: Date.now(),
-          source: 'provider',
-          status: 'ok',
-          statusReason
-        }
-      } catch (err: any) {
-        return {
-          accountId: account.id,
-          accountLabel: account.profile?.email ?? account.label,
-          accountType: 'oauth',
-          refreshedAt: Date.now(),
-          source: 'unavailable',
-          status: 'unavailable',
-          statusReason: err.message || 'Failed to fetch Codex usage'
-        }
-      } finally {
-        await client.stop()
+      },
+      afterPersist(_account, secrets) {
+        if (!options.codexAuthFile) return
+        mergeCodexAuthFile(options.codexAuthFile, {
+          accessToken: secrets.accessToken ?? '',
+          refreshToken: secrets.refreshToken ?? '',
+          idToken: secrets.idToken,
+          accountId: secrets.accountId,
+          expiresAt: secrets.expiresAt
+        }, options.codexBackupFile)
       }
     },
-
-    async removeAccount(account: ProviderAccount, secret?: ProviderSecrets): Promise<void> {
-      if (account.authMode !== 'oauth') return
-      if (!secret?.codexHome) return
-
-      const userDataDir = path.resolve(options.userDataDir || process.cwd())
-      const openaiRoot = path.resolve(userDataDir, 'providers', 'openai')
-
-      // Validate account.id against path traversal, slashes, or malicious segmenting
-      if (
-        !account.id ||
-        typeof account.id !== 'string' ||
-        account.id.includes('/') ||
-        account.id.includes('\\') ||
-        account.id.includes('..') ||
-        path.isAbsolute(account.id)
-      ) {
-        console.warn(`[bs] Refusing account removal for invalid or malicious account id: ${account.id}`)
-        return
-      }
-
-      const expectedAccountDir = path.resolve(openaiRoot, account.id)
-      const relToRoot = path.relative(openaiRoot, expectedAccountDir)
-      if (
-        relToRoot.startsWith('..') ||
-        path.isAbsolute(relToRoot) ||
-        relToRoot === '' ||
-        relToRoot !== account.id
-      ) {
-        console.warn(`[bs] Refusing account removal outside openaiRoot: ${expectedAccountDir}`)
-        return
-      }
-
-      const targetHome = path.resolve(secret.codexHome)
-      const relHome = path.relative(expectedAccountDir, targetHome)
-      const isContained = !relHome.startsWith('..') && !path.isAbsolute(relHome)
-
-      const userHome = path.resolve(homedir())
-      const userDotCodex = path.resolve(homedir(), '.codex')
-
-      if (
-        !isContained ||
-        targetHome === userHome ||
-        targetHome === userDotCodex ||
-        expectedAccountDir === userHome ||
-        expectedAccountDir === userDotCodex ||
-        expectedAccountDir === openaiRoot
-      ) {
-        console.warn(`[bs] Refusing to delete codexHome outside isolated account directory: ${targetHome}`)
-        return
-      }
-
-      let client: CodexAppServerClient | null = null
-      try {
-        client = new CodexAppServerClient({
-          codexHome: targetHome,
-          executablePath: getCodexExecutable()
+    definition() { return this.capability },
+    async connect(request, context) {
+      if (request.methodId !== 'api-key') throw new Error('[bs] OpenAI OAuth cần được bắt đầu qua login session')
+      const label = request.fields.label?.trim() || 'OpenAI API account'
+      const account = context.saveAccount({ providerId: 'openai', label, authMode: 'api-key', status: 'active', profile: { name: label } }, { apiKey: request.fields.apiKey, baseUrl: request.fields.baseUrl })
+      return { account }
+    },
+    async refreshAccount(account) { return account },
+    async refreshCredentials(account, secret, options) {
+      if (account.authMode !== 'oauth') return secret
+      const expiresAt = secret.expiresAt ?? account.oauthExpiresAt
+      if (!options?.force && (!expiresAt || expiresAt > Date.now() + 60_000)) return secret
+      if (!secret.refreshToken) throw new Error('[bs] ChatGPT OAuth refresh token unavailable')
+      const refreshed = await refreshCodexToken(secret.refreshToken)
+      return { ...secret, ...refreshed }
+    },
+    async listModels(account) {
+      return account.authMode === 'oauth' ? models : models
+    },
+    createRuntime(account, secret, _model) {
+      if (account.authMode === 'oauth') {
+        if (!secret.accessToken) throw new Error('[bs] ChatGPT OAuth access token unavailable')
+        return createLlm('openai', secret.accessToken, 'https://chatgpt.com/backend-api/codex', {
+          ...(secret.accountId ? { 'ChatGPT-Account-ID': secret.accountId } : {}),
+          originator: identity.originator ?? 'codex_cli',
+          'user-agent': identity.userAgent ?? 'codex_cli',
+          'OpenAI-Beta': 'responses_websockets=2026-02-06',
+          'x-openai-internal-codex-residency': 'us',
+          accept: 'text/event-stream'
         })
-        await client.logout()
-      } catch (err) {
-        console.warn(`[bs] Codex native logout failed or unavailable during account removal for ${account.id}:`, err)
-      } finally {
-        await client?.stop()
       }
-
-      try {
-        await safeRemoveDirectory(expectedAccountDir)
-      } catch (err) {
-        console.warn(`[bs] Failed to remove account directory ${expectedAccountDir}:`, err)
-      }
+      return createLlm('openai', secret.apiKey ?? '', secret.baseUrl)
     },
-
-    async listModels() {
-      return models
-    },
-
-    createRuntime(account, secret, model) {
-      if (account.authMode === 'oauth' && secret?.codexHome) {
-        return new CodexAppServerLlm({ codexHome: secret.codexHome, executablePath: getCodexExecutable() })
+    // One pool covers every Codex model on this provider.
+    quotaGroupForModel: () => 'openai-base',
+    async consumeResetCredit(account, secret) {
+      if (account.authMode !== 'oauth' || !secret.accessToken) {
+        throw new Error('[bs] A reset credit needs a ChatGPT OAuth account')
       }
-      return createLlm('openai', secret?.apiKey || '', secret?.baseUrl)
+      // Generated once, before the first attempt: a retry that mints a new
+      // id spends a second credit.
+      const redeemRequestId = randomUUID()
+      const post = async (): Promise<Response> => fetch(CONSUME_RESET_CREDIT_URL, {
+        method: 'POST',
+        headers: { ...codexHeaders(secret, identity), 'content-type': 'application/json' },
+        body: JSON.stringify({ redeem_request_id: redeemRequestId })
+      })
+      let response = await post()
+      if (response.status === 401 && secret.refreshToken) {
+        Object.assign(secret, await refreshCodexToken(secret.refreshToken))
+        response = await post()
+      }
+      if (!response.ok) throw new Error(`[bs] Reset credit refused (${response.status}): ${await response.text()}`)
+    },
+    async fetchUsage(account, secret) {
+      if (account.authMode !== 'oauth' || !secret.accessToken) {
+        return account.usage ?? { accountId: account.id, accountLabel: account.profile?.email ?? account.label, accountType: account.authMode === 'api-key' ? 'api-key' : 'oauth', refreshedAt: Date.now(), source: 'unavailable', status: 'unavailable', statusReason: 'OpenAI API quota is unavailable for this connection method' }
+      }
+      // The stored id_token carries the account id and the subscription window,
+      // so neither depends on an HTTP call that a Codex bearer may be refused.
+      const claim = decodeJwtProfile(secret.idToken)
+      if (!secret.accountId && claim.accountId) Object.assign(secret, { accountId: claim.accountId })
+      let lastStatus = 0
+      for (let authAttempt = 0; authAttempt < 2; authAttempt++) {
+        const headers = codexHeaders(secret, identity)
+        for (const endpoint of ['https://chatgpt.com/backend-api/wham/usage', 'https://chatgpt.com/backend-api/codex/usage']) {
+          const response = await fetch(endpoint, { headers })
+          const body = await response.text()
+          if (!response.ok) { lastStatus = response.status; continue }
+          let parsed: unknown
+          try { parsed = JSON.parse(body) } catch { return { accountId: account.id, refreshedAt: Date.now(), source: 'unavailable', status: 'unavailable', statusReason: 'Quota response was not valid JSON' } }
+          const normalized = normalizeOpenAICodexUsage(account.id, parsed)
+          normalized.accountLabel = account.profile?.email ?? account.label
+          normalized.accountType = 'oauth'
+          normalized.planName = normalized.planName ?? account.profile?.planName
+          const subscription = await fetchSubscriptionMetadata(headers, secret.accountId)
+          normalized.planName = normalized.planName ?? subscription.planName ?? claim.planName
+          normalized.subscriptionExpiresAt = subscription.subscriptionExpiresAt ?? normalized.subscriptionExpiresAt ?? claim.subscriptionExpiresAt
+          return normalized
+        }
+        if (authAttempt === 0 && (lastStatus === 401 || lastStatus === 403) && secret.refreshToken) {
+          Object.assign(secret, await refreshCodexToken(secret.refreshToken))
+          continue
+        }
+        break
+      }
+      return { accountId: account.id, accountLabel: account.profile?.email ?? account.label, accountType: 'oauth', refreshedAt: Date.now(), source: 'unavailable', status: 'unavailable', statusReason: `Quota request failed (${lastStatus || 'network error'})` }
     }
   }
+}
+
+async function fetchSubscriptionMetadata(headers: Record<string, string>, accountId?: string) {
+  const endpoints = [
+    'https://chatgpt.com/backend-api/accounts/check/v4-2023-04-27?timezone_offset_min=420',
+    ...(accountId ? [`https://chatgpt.com/backend-api/subscriptions?account_id=${encodeURIComponent(accountId)}`] : [])
+  ]
+  const merged: { planName?: string; subscriptionExpiresAt?: number } = {}
+  for (const endpoint of endpoints) {
+    if (merged.planName && merged.subscriptionExpiresAt) break
+    try {
+      const response = await fetch(endpoint, { headers })
+      if (!response.ok) continue
+      const metadata = extractOpenAISubscriptionMetadata(await response.json())
+      merged.planName = merged.planName ?? metadata.planName
+      merged.subscriptionExpiresAt = merged.subscriptionExpiresAt ?? metadata.subscriptionExpiresAt
+    } catch { /* usage remains valid when subscription metadata is unavailable */ }
+  }
+  return merged
 }
