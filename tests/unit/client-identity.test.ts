@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 const execMock = vi.fn()
 const existsSyncMock = vi.fn()
@@ -31,7 +31,14 @@ beforeEach(() => {
   execMock.mockReset()
   existsSyncMock.mockReset()
   existsSyncMock.mockReturnValue(false)
+  // Antigravity detection reads %LOCALAPPDATA%; stub it so the test is
+  // deterministic on non-Windows CI where the variable is absent.
+  vi.stubEnv('LOCALAPPDATA', 'C:\\Users\\test\\AppData\\Local')
   __resetIdentityCacheForTests()
+})
+
+afterEach(() => {
+  vi.unstubAllEnvs()
 })
 
 describe('detectCodexIdentity (CLI)', () => {
