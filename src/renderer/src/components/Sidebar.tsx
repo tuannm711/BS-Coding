@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Ellipsis, PanelLeft, RefreshCw, Settings, Server } from 'lucide-react'
+import { Ellipsis, PanelLeft, RefreshCw, Settings } from 'lucide-react'
 import type { NewAgentInput, ProjectSessionSummary, Template, WorkspaceSummary } from '@shared/types'
 import AddProjectDialog from './AddProjectDialog'
 import AddAgentDialog from './AddAgentDialog'
@@ -24,14 +24,13 @@ interface Props {
   onRefresh: () => void
   onOpenTerminal: (path: string) => void
   onOpenSettings: () => void
-  onOpenModelRouter: () => void
   onCheckUpdate: () => void
   updateChecking: boolean
 }
 
 export default function Sidebar({
   workspaces, templates, activePath, sessions, activeSessionId, onSelectSession, onCreateSession, onDeleteSession,
-  onOpen, onRemove, onRefresh, onOpenTerminal, onOpenSettings, onOpenModelRouter, onCheckUpdate, updateChecking
+  onOpen, onRemove, onRefresh, onOpenTerminal, onOpenSettings, onCheckUpdate, updateChecking
 }: Props) {
   const [showAddProject, setShowAddProject] = useState(false)
   const [addAgentPath, setAddAgentPath] = useState<string | null>(null)
@@ -271,13 +270,6 @@ export default function Sidebar({
             >
               <Settings size={14} aria-hidden="true" />
               Settings
-            </button>
-            <button
-              className="menu-item"
-              onClick={() => { setFooterMenuOpen(false); setFooterMenuPos(null); onOpenModelRouter() }}
-            >
-              <Server size={14} aria-hidden="true" />
-              Model Router
             </button>
             <div className="sidebar-update-block">
               <span className="sidebar-update-version">v{version || '…'}</span>
