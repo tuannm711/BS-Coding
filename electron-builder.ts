@@ -65,8 +65,8 @@ const config: Configuration = {
     installerIcon: 'build/icons/icon.ico',
     uninstallerIcon: 'build/icons/icon.ico',
     installerHeaderIcon: 'build/icons/icon.ico',
-    oneClick: false,
-    allowToChangeInstallationDirectory: true,
+    oneClick: true,
+    perMachine: false,
     createDesktopShortcut: true,
     createStartMenuShortcut: true
   },

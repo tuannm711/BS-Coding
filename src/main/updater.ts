@@ -181,7 +181,9 @@ export class Updater {
 
   install(): void {
     if (this.downloaded) {
-      autoUpdater.quitAndInstall()
+      // isSilent=true: apply the NSIS update without showing the installer
+      // window; isForceRunAfter=true: relaunch the app once it is applied.
+      autoUpdater.quitAndInstall(true, true)
       return
     }
     void autoUpdater.downloadUpdate().catch((err) => {
