@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { writeFileSync } from 'node:fs'
 import type { CoordinationAssignment, ChatEvent, ChatMessage, ChatTranscriptItem, ContextInfo, FileSuggestion, ImageAttachment, McpServerStatus, BsSettings, MessageTokens, ModelUsage, NotificationsSettings, ProjectSessionSummary, PromptResponse, QueuedMessage, ResolvedTurnExecutionSnapshot, StatsSummary, TodoItem, TraceEvent, UsageSummary, ProviderConnection } from '../shared/types'
-import type { AgentConfig, AgentMode, ArtifactEntry, CatalogProviderSummary, Command, ModelRef, SubagentType } from '../shared/types'
+import type { AgentConfig, AgentMode, ArtifactEntry, CatalogProviderSummary, Command, ModelRef } from '../shared/types'
 import {
   configToSettings, loadBsConfig, resolveAgentConfig, settingsToConfig, writeBsConfig,
   type BsConfig, type ResolvedAgentConfig
@@ -32,7 +32,6 @@ import { ModelsCatalog } from './models-catalog'
 import type { VariantBody } from './model-variants'
 import { revertTool } from './agent/tools/revert'
 import { createTaskTool } from './agent/tools/task'
-import type { ResolvedSubagentModel } from './agent/tools/task'
 import type { ToolDefinition } from './agent/tools/types'
 import type { NotificationService } from './notification-service'
 import type { Vault } from './vault'
@@ -1390,22 +1389,10 @@ export class BsAgentManager {
     const llmClient = resolved.accountId && resolved.provider && resolved.model
       ? this.deps.providerRuntime?.(resolved.provider, resolved.accountId, resolved.model) ?? unavailableProviderRuntime(resolved.provider)
       : (this.deps.createLlm ?? createLlm)(resolved.provider, resolved.apiKey ?? '', resolved.baseUrl)
-    const resolveSubagent = (type: SubagentType): ResolvedSubagentModel | undefined => {
-      const ref = cfg.subagentModels?.[type]
-      if (!ref) return undefined
-      const subResolved = this.resolveAgentConfig(cfg, agent.name, `${ref.provider}/${ref.model}`)
-      if (!subResolved.provider || !subResolved.model) return undefined
-      const subLlm = subResolved.accountId
-        ? this.deps.providerRuntime?.(subResolved.provider, subResolved.accountId, subResolved.model)
-        : subResolved.apiKey ? (this.deps.createLlm ?? createLlm)(subResolved.provider, subResolved.apiKey, subResolved.baseUrl) : undefined
-      if (!subLlm) return undefined
-      return { provider: subResolved.provider, model: subResolved.model, llm: subLlm }
-    }
     const taskTool = createTaskTool({
       llm: llmClient,
       model: resolved.model,
       tools: this.tools,
-      resolveSubagent,
       onBackgroundResult: (taskId, text, error) => {
         const sessionId = this.activeSessionId(agent.id)
         this.deps.store.appendMessage(sessionId, {

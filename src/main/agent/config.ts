@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import type { AgentSettings, CompactionSettings, BsSettings, ModelRef, NotificationsSettings, PermissionRule, SubagentType } from '../../shared/types'
+import type { AgentSettings, CompactionSettings, BsSettings, NotificationsSettings, PermissionRule } from '../../shared/types'
 import type { McpServerConfig } from './mcp/manager'
 
 export type { PermissionRule }
@@ -54,7 +54,6 @@ export interface BsConfig {
   lsp: LspConfig
   notifications?: NotificationsConfig
   trace?: TraceConfig
-  subagentModels?: Partial<Record<SubagentType, ModelRef>>
 }
 
 export interface ResolvedAgentConfig {
@@ -226,24 +225,6 @@ function normalizeMcp(raw: Record<string, McpServerConfig> | undefined): Record<
   return out
 }
 
-const SUBAGENT_ROLES: readonly SubagentType[] = ['research', 'general', 'reviewer']
-
-function normalizeSubagentModels(
-  raw: Partial<Record<SubagentType, ModelRef>> | undefined,
-  providers: Record<string, BsProviderConfig>
-): Partial<Record<SubagentType, ModelRef>> | undefined {
-  if (!raw) return undefined
-  const out: Partial<Record<SubagentType, ModelRef>> = {}
-  for (const type of SUBAGENT_ROLES) {
-    const ref = raw[type]
-    if (!ref || !ref.provider || !ref.model) continue
-    const provider = providers[ref.provider]
-    if (!provider || !provider.models.includes(ref.model)) continue
-    out[type] = { provider: ref.provider, model: ref.model }
-  }
-  return Object.keys(out).length > 0 ? out : undefined
-}
-
 function mergeDefaults(raw: Partial<BsConfig>): BsConfig {
   const providers: Record<string, BsProviderConfig> = {}
   for (const [id, p] of Object.entries(raw.provider ?? {})) {
@@ -261,8 +242,7 @@ function mergeDefaults(raw: Partial<BsConfig>): BsConfig {
     toolOutput: normalizeToolOutput(raw.toolOutput),
     lsp: normalizeLsp(raw.lsp),
     notifications: normalizeNotifications(raw.notifications),
-    trace: normalizeTrace(raw.trace),
-    subagentModels: normalizeSubagentModels(raw.subagentModels, providers)
+    trace: normalizeTrace(raw.trace)
   }
 }
 
@@ -359,8 +339,7 @@ export function configToSettings(cfg: BsConfig): BsSettings {
     toolOutput: cfg.toolOutput,
     lsp: cfg.lsp,
     notifications: cfg.notifications ? normalizeNotifications(cfg.notifications) : DEFAULT_NOTIFICATIONS,
-    trace: normalizeTrace(cfg.trace),
-    ...(cfg.subagentModels ? { subagentModels: cfg.subagentModels } : {})
+    trace: normalizeTrace(cfg.trace)
   }
 }
 
@@ -413,10 +392,7 @@ export function settingsToConfig(settings: SettingsInput, base: BsConfig = DEFAU
     notifications: settings.notifications
       ? normalizeNotifications(settings.notifications)
       : normalizeNotifications(base.notifications),
-    trace: normalizeTrace(settings.trace ?? base.trace),
-    ...(settings.subagentModels
-      ? { subagentModels: normalizeSubagentModels(settings.subagentModels, providers) }
-      : {})
+    trace: normalizeTrace(settings.trace ?? base.trace)
   }
 }
 

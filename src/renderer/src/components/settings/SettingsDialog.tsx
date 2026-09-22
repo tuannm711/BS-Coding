@@ -123,9 +123,7 @@ export default function SettingsDialog({ onClose, projectPath, templates, onTemp
               <AgentsTab
                 agents={draft.agents}
                 runtimeAgents={runtimeAgents}
-                subagentModels={draft.subagentModels}
                 onChangeAgents={agents => patch({ agents })}
-                onChangeSubagentModels={subagentModels => patch({ subagentModels })}
               />
             )}
             {draft && tab === 'permissions' && (

@@ -505,8 +505,6 @@ export interface BsSettings {
   lsp: LspSettings
   notifications?: NotificationsSettings
   trace?: { enabled: boolean }
-  /** Model override per sub-agent role. Missing role -> inherit main agent model. */
-  subagentModels?: Partial<Record<SubagentType, ModelRef>>
 }
 
 export type SubagentType = 'research' | 'general' | 'reviewer'

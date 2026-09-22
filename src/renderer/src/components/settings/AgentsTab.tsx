@@ -1,11 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Pencil, Trash2 } from 'lucide-react'
-import type { AgentSettings, ModelRef, SubagentType } from '@shared/types'
+import type { AgentSettings } from '@shared/types'
 import { shouldAcceptSnapshot, type AgentAssignmentSetRequest, type ProviderSnapshot } from '@shared/provider-state'
 import AgentPromptModal from './AgentPromptModal'
 import Modal from './Modal'
-
-const SUBMODEL_ROLES = ['research', 'general', 'reviewer'] as const
 
 const defaultPrompt = (name: string) =>
   `You are ${name}, a coding agent running inside the BS Coding desktop app. ` +
@@ -15,9 +13,7 @@ const defaultPrompt = (name: string) =>
 interface Props {
   agents: AgentSettings[]
   runtimeAgents: Array<{ id: string; name: string }>
-  subagentModels?: Partial<Record<SubagentType, ModelRef>>
   onChangeAgents: (agents: AgentSettings[]) => void
-  onChangeSubagentModels: (models?: Partial<Record<SubagentType, ModelRef>>) => void
 }
 
 export function connectedProviderOptions(snapshot: ProviderSnapshot | null) {
@@ -64,7 +60,7 @@ export function reconcileAgentAccountSelection(agent: AgentSettings, accountId: 
   }
 }
 
-export default function AgentsTab({ agents, runtimeAgents, subagentModels, onChangeAgents, onChangeSubagentModels }: Props) {
+export default function AgentsTab({ agents, runtimeAgents, onChangeAgents }: Props) {
   const [adding, setAdding] = useState(false)
   const [newName, setNewName] = useState('')
   const [newPrompt, setNewPrompt] = useState('')
@@ -88,13 +84,6 @@ export default function AgentsTab({ agents, runtimeAgents, subagentModels, onCha
     () => hydrateAgentsFromAssignments(agents, snapshot, runtimeBindings, editedAgentNames),
     [agents, snapshot, runtimeBindings, editedAgentNames]
   )
-
-  const setRole = (role: SubagentType, ref: ModelRef | undefined) => {
-    const next = { ...(subagentModels ?? {}) }
-    if (ref) next[role] = ref
-    else delete next[role]
-    onChangeSubagentModels(Object.keys(next).length > 0 ? next : undefined)
-  }
 
   const updateAgent = (index: number, patch: Partial<AgentSettings>) => {
     const next = visibleAgents.map((a, i) => (i === index ? { ...a, ...patch } : a))
@@ -230,42 +219,6 @@ export default function AgentsTab({ agents, runtimeAgents, subagentModels, onCha
           </tbody>
         </table>
       </div>
-      <section className="subagent-models" aria-labelledby="subagent-models-heading">
-        <h4 id="subagent-models-heading">Sub-agent model overrides</h4>
-        <p className="settings-hint">
-          Models used when the main agent dispatches sub-agents. Leave a role empty to inherit the main agent model.
-        </p>
-        {SUBMODEL_ROLES.map(role => {
-          const ref = subagentModels?.[role]
-          const providerModels = snapshot?.accounts.filter(account => account.providerId === ref?.provider && account.status === 'active').flatMap(account => account.models) ?? []
-          return (
-            <div className="settings-row agents-row" key={role}>
-              <div className="agents-row-head">
-                <span className="agent-name">{role}</span>
-                <button className="btn small" onClick={() => setRole(role, undefined)}>Use main agent model</button>
-              </div>
-              <div className="submodel-fields">
-                <select
-                  className="input"
-                  value={ref?.provider ?? ''}
-                  onChange={e => setRole(role, e.target.value ? { provider: e.target.value, model: '' } : undefined)}
-                >
-                  <option value="">(inherit main agent model)</option>
-                  {providerOptions.map(provider => <option key={provider.id} value={provider.id}>{provider.displayName}</option>)}
-                </select>
-                <select
-                  className="input"
-                  value={ref?.model ?? ''}
-                  disabled={!ref?.provider}
-                  onChange={e => setRole(role, { provider: ref!.provider, model: e.target.value })}
-                >
-                  {[...new Map(providerModels.map(model => [model.id, model])).values()].map(model => <option key={model.id} value={model.id}>{model.name}</option>)}
-                </select>
-              </div>
-            </div>
-          )
-        })}
-      </section>
       {editingIndex !== null && visibleAgents[editingIndex] && (
         <AgentPromptModal
           agent={visibleAgents[editingIndex]}
