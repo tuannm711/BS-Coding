@@ -8,12 +8,7 @@ export function groupProviderAccounts(snapshot: ProviderSnapshot | null) {
   return (snapshot?.providers ?? []).map(provider => ({ provider, accounts: snapshot?.accounts.filter(account => account.providerId === provider.id) ?? [] })).filter(group => group.accounts.length > 0)
 }
 
-export interface ProvidersTabProps {
-  codexPath?: string
-  onChangeCodexPath?: (path: string) => void
-}
-
-export default function ProvidersTab({ codexPath, onChangeCodexPath }: ProvidersTabProps = {}) {
+export default function ProvidersTab() {
   const [modalAccount, setModalAccount] = useState<ProviderAccountSnapshot | null | undefined>(undefined)
   const [status, setStatus] = useState('')
   const [snapshot, setSnapshot] = useState<ProviderSnapshot | null>(null)
@@ -34,21 +29,6 @@ export default function ProvidersTab({ codexPath, onChangeCodexPath }: Providers
   return <div className="settings-tab providers-tab">
     <div className="provider-actions"><button className="btn primary" onClick={() => setModalAccount(null)}>＋ Add provider ▾</button></div>
     <p className="settings-hint">Connected accounts are available to Agents and chat. Credentials stay encrypted in the OS keychain.</p>
-
-    <div className="settings-field" style={{ marginTop: '16px', marginBottom: '16px' }}>
-      <label className="label">Codex CLI Executable</label>
-      <input
-        className="input"
-        type="text"
-        value={codexPath ?? ''}
-        placeholder="Optional: path to custom codex binary"
-        onChange={e => onChangeCodexPath?.(e.target.value)}
-      />
-      <p className="settings-hint">
-        Optional: path to custom codex binary. Defaults to codex in PATH.
-      </p>
-    </div>
-
     <div className="provider-connected">
       <h4>Connected accounts</h4>
       {groupProviderAccounts(snapshot).map(({ provider, accounts: providerAccounts }) => {

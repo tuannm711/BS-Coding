@@ -43,7 +43,7 @@ describe('ProviderRegistry', () => {
   })
 
   it('declares the exact chat transport for every adapter class', () => {
-    expect((createOpenAiAdapter().capability as any).chatTransport).toBe('codex-app-server')
+    expect((createOpenAiAdapter().capability as any).chatTransport).toBe('openai-responses')
     expect((createGoogleAdapter().capability as any).chatTransport).toBe('google')
     expect((createAntigravityAdapter().capability as any).chatTransport).toBe('cloud-code')
     expect((createGitHubCopilotAdapter().capability as any).chatTransport).toBe('openai-compatible')

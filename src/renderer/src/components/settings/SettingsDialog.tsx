@@ -118,10 +118,7 @@ export default function SettingsDialog({ onClose, projectPath, templates, onTemp
           </nav>
           <div className="settings-content">
             {draft && tab === 'providers' && (
-              <ProvidersTab
-                codexPath={draft.codexPath}
-                onChangeCodexPath={codexPath => patch({ codexPath })}
-              />
+              <ProvidersTab />
             )}
             {draft && tab === 'agents' && (
               <AgentsTab

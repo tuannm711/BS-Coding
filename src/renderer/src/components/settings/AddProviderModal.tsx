@@ -64,7 +64,6 @@ export default function AddProviderModal({ providers, reconnectAccount, onClose,
   const [session, setSession] = useState<ProviderAuthorizationSession | null>(null)
   const [now, setNow] = useState(Date.now())
   const [copied, setCopied] = useState(false)
-  const [codeCopied, setCodeCopied] = useState(false)
   const connectedNotificationRef = useRef<string | null>(null)
   const callbacksRef = useRef({ onClose, onConnected })
   const capabilitiesRef = useRef(capabilities)
@@ -142,7 +141,6 @@ export default function AddProviderModal({ providers, reconnectAccount, onClose,
     setBusy(true)
     setError('')
     setCopied(false)
-    setCodeCopied(false)
     setSession(null)
     try {
       const next = await window.api.createProviderAuthorization({
@@ -175,20 +173,10 @@ export default function AddProviderModal({ providers, reconnectAccount, onClose,
   const copyLink = async () => {
     if (!session) return
     try {
-      await navigator.clipboard.writeText(session.verificationUrl || session.authUrl)
+      await navigator.clipboard.writeText(session.authUrl)
       setCopied(true)
     } catch {
       setError('Unable to copy the authorization link.')
-    }
-  }
-
-  const copyUserCode = async () => {
-    if (!session?.userCode) return
-    try {
-      await navigator.clipboard.writeText(session.userCode)
-      setCodeCopied(true)
-    } catch {
-      setError('Unable to copy the authorization code.')
     }
   }
 
@@ -272,24 +260,13 @@ export default function AddProviderModal({ providers, reconnectAccount, onClose,
       {session && (
         <section className={`authorization-session ${session.status}`} aria-live="polite">
           <div className="authorization-session-head">
-            <strong>{session.status === 'waiting' ? (session.userCode ? 'Waiting for device authorization' : 'Waiting for authorization') : session.status}</strong>
+            <strong>{session.status === 'waiting' ? 'Waiting for authorization' : session.status}</strong>
             {session.status === 'waiting' && <span className="authorization-countdown">{view.secondsLeft}s</span>}
           </div>
-          {session.userCode && (
-            <div className="authorization-device-code" style={{ margin: '8px 0', textAlign: 'center' }}>
-              <div className="settings-hint" style={{ marginBottom: '4px' }}>Enter this one-time code on the verification page:</div>
-              <div style={{ fontSize: '1.4rem', fontWeight: 'bold', letterSpacing: '2px', padding: '6px', background: 'var(--bg-card, rgba(0,0,0,0.2))', borderRadius: '4px', userSelect: 'all' }}>
-                {session.userCode}
-              </div>
-            </div>
-          )}
-          <input className="input authorization-url" aria-label="Authorization link" readOnly value={session.verificationUrl || session.authUrl} />
+          <input className="input authorization-url" aria-label="Authorization link" readOnly value={session.authUrl} />
           {view.showWaitingActions && (
             <div className="authorization-actions">
-              {session.userCode && (
-                <button className="btn" onClick={() => void copyUserCode()}>{codeCopied ? 'Code copied' : 'Copy code'}</button>
-              )}
-              <button className="btn" onClick={() => void copyLink()}>{copied ? 'Copied' : (session.verificationUrl ? 'Copy URL' : 'Copy link')}</button>
+              <button className="btn" onClick={() => void copyLink()}>{copied ? 'Copied' : 'Copy link'}</button>
               <button className="btn primary" onClick={() => void openBrowser()}>Open browser</button>
               <button className="btn" onClick={() => void cancelAuthorization(true)}>Cancel</button>
             </div>

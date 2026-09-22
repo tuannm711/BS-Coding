@@ -36,7 +36,7 @@ export interface ProviderCapability {
   logo?: string
 }
 
-export type ProviderChatTransport = 'openai-responses' | 'openai-compatible' | 'cloud-code' | 'codex-app-server' | 'google'
+export type ProviderChatTransport = 'openai-responses' | 'openai-compatible' | 'cloud-code' | 'google'
 
 export interface ProviderConnectRequest {
   providerId: string
@@ -49,8 +49,6 @@ export interface ProviderConnectResult {
   accountId?: string
   loginId?: string
   authUrl?: string
-  verificationUrl?: string
-  userCode?: string
   expiresIn?: number
   requiresBrowser?: boolean
 }
@@ -86,8 +84,6 @@ export interface ProviderAuthorizationSession {
   methodId: string
   reconnectAccountId?: string
   authUrl: string
-  verificationUrl?: string
-  userCode?: string
   expiresAt: number
   status: ProviderAuthorizationStatus
   accountId?: string
@@ -114,9 +110,7 @@ export function sanitizeProviderAuthorizationSession(
     status,
     accountId,
     error,
-    reconnectAccountId,
-    verificationUrl,
-    userCode
+    reconnectAccountId
   } = session
   return {
     loginId,
@@ -126,8 +120,6 @@ export function sanitizeProviderAuthorizationSession(
     expiresAt,
     status,
     ...(reconnectAccountId ? { reconnectAccountId } : {}),
-    ...(verificationUrl ? { verificationUrl } : {}),
-    ...(userCode ? { userCode } : {}),
     ...(accountId ? { accountId } : {}),
     ...(error ? { error } : {})
   }

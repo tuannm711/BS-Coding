@@ -38,30 +38,7 @@ export interface ProviderCallbackAuthorizationStrategy {
   afterPersist?(account: ProviderAccount, secrets: ProviderSecrets): Promise<void> | void
 }
 
-export interface ProviderManagedAuthorizationContext {
-  saveAccount(account: Omit<ProviderAccount, 'id' | 'createdAt' | 'lastUsedAt'> & Partial<Pick<ProviderAccount, 'id' | 'createdAt' | 'lastUsedAt'>>, secrets?: ProviderSecrets): ProviderAccount
-  onConnected(result: { loginId: string; account: ProviderAccount }): void
-  onError(result: { loginId: string; error: import('../../shared/providers').ProviderAuthorizationError }): void
-}
-
-export interface ProviderManagedAuthorizationStartResult {
-  loginId: string
-  authUrl: string
-  verificationUrl?: string
-  userCode?: string
-  expiresAt: number
-  close: () => void
-  activate?: () => void
-}
-
-export interface ProviderManagedAuthorizationStrategy {
-  kind: 'managed'
-  methodId: string | string[]
-  start(request: import('../../shared/providers').ProviderAuthorizationRequest, context: ProviderManagedAuthorizationContext): Promise<ProviderManagedAuthorizationStartResult>
-  cancel?(loginId: string): Promise<void> | void
-}
-
-export type ProviderAuthorizationStrategy = ProviderCallbackAuthorizationStrategy | ProviderManagedAuthorizationStrategy
+export type ProviderAuthorizationStrategy = ProviderCallbackAuthorizationStrategy
 
 export interface ProviderAdapter {
   capability: ProviderCapability

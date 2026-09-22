@@ -344,45 +344,6 @@ export class ProviderManager {
     const reconnectSecret = reconnectAccount ? this.store.getSecret(reconnectAccount.id) ?? undefined : undefined
     const previousActiveAccountId = this.store.list(request.providerId)[0]?.activeAccountId ?? null
 
-    if (strategy.kind === 'managed') {
-      const started = await strategy.start(request, {
-        saveAccount: (account, secrets) => {
-          return this.store.upsert({
-            ...account,
-            ...(reconnectAccount
-              ? { id: reconnectAccount.id, createdAt: reconnectAccount.createdAt, keyRef: reconnectAccount.keyRef }
-              : {})
-          }, secrets)
-        },
-        onConnected: ({ loginId, account }) => {
-          this.emitAccountsChanged()
-          const next = this.authorizations.complete(loginId, account.id)
-          if (next) this.emitAuthorization(next)
-        },
-        onError: ({ loginId, error }) => {
-          const next = this.authorizations.fail(loginId, error)
-          if (next) this.emitAuthorization(next)
-        }
-      })
-
-      const session = this.authorizations.start({
-        loginId: started.loginId,
-        providerId: request.providerId,
-        methodId: request.methodId,
-        reconnectAccountId: request.reconnectAccountId,
-        authUrl: started.authUrl,
-        verificationUrl: started.verificationUrl,
-        userCode: started.userCode,
-        expiresAt: started.expiresAt,
-        close: () => {
-          started.close()
-        }
-      })
-      this.emitAuthorization(session)
-      started.activate?.()
-      return session
-    }
-
     const pkce = createPkce()
     const callback = await listenForCallback(strategy.callback)
     let built: ReturnType<typeof strategy['build']>
@@ -465,7 +426,7 @@ export class ProviderManager {
     if (!pending) throw new Error('[bs] OAuth authorization session is not waiting')
     try {
       if (!this.deps.openExternal) throw new Error('External browser integration unavailable')
-      await this.deps.openExternal(pending.verificationUrl || pending.authUrl)
+      await this.deps.openExternal(pending.authUrl)
     } catch (error) {
       const next = this.authorizations.fail(loginId, {
         kind: 'browser-open-failed',
@@ -501,8 +462,6 @@ export class ProviderManager {
       return {
         loginId: session.loginId,
         authUrl: session.authUrl,
-        verificationUrl: session.verificationUrl,
-        userCode: session.userCode,
         expiresIn: Math.max(0, Math.ceil((session.expiresAt - Date.now()) / 1000)),
         requiresBrowser: true
       }
