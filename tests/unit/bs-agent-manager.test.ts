@@ -1121,6 +1121,33 @@ describe('BsAgentManager', () => {
       rmSync(dir, { recursive: true, force: true })
     }
   })
+
+  it('runs compaction when /compact is dispatched', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'bs-compact-'))
+    try {
+      const configPath = path.join(dir, 'bs.json')
+      // tailTurns: 0 makes the whole transcript the head, so a manual compact
+      // fires even on a short session.
+      writeFileSync(configPath, JSON.stringify({
+        provider: { test: { apiKey: 'sk-test', models: ['test-model'] } },
+        model: 'test',
+        compaction: { tailTurns: 0 }
+      }))
+      const { manager, events } = await makeManager({
+        configPath,
+        partsQueue: [
+          [{ kind: 'text', text: 'first reply' }, { kind: 'finish' }],
+          [{ kind: 'text', text: 'A COMPACTED SUMMARY' }, { kind: 'finish' }]
+        ]
+      })
+      manager.newSession('a1')
+      await manager.send('a1', 'a message worth compacting')
+      await manager.runCommand('a1', '/compact', '')
+      expect(events.some(e => e.type === 'compacted')).toBe(true)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
 })
 
 describe('agent fallback', () => {

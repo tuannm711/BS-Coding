@@ -1229,6 +1229,13 @@ export class BsAgentManager {
       if (command.name === 'new') {
         this.newSession(agentId)
         this.emit({ type: 'session-created', agentId })
+      } else if (command.name === 'compact') {
+        if (!this.runners.has(agentId)) this.register(agent)
+        const runner = this.runners.get(agentId)
+        const compacted = runner ? await runner.compactNow() : false
+        if (!compacted) {
+          this.emit({ type: 'error', agentId, message: '[bs] Không có gì để nén trong session này.' })
+        }
       }
       return
     }
