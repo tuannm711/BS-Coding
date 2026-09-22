@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-const execFileMock = vi.fn()
+const execMock = vi.fn()
 vi.mock('node:child_process', () => ({
-  execFile: (...args: unknown[]) => execFileMock(...args)
+  exec: (...args: unknown[]) => execMock(...args)
 }))
 
 import {
@@ -14,14 +14,14 @@ import {
 type ExecCb = (err: Error | null, stdout?: string, stderr?: string) => void
 
 function whenVersion(stdout: string | null): void {
-  execFileMock.mockImplementation((_bin: string, _args: string[], _opts: unknown, cb: ExecCb) => {
+  execMock.mockImplementation((_cmd: string, _opts: unknown, cb: ExecCb) => {
     if (stdout === null) cb(new Error('ENOENT'))
     else cb(null, stdout, '')
   })
 }
 
 beforeEach(() => {
-  execFileMock.mockReset()
+  execMock.mockReset()
   __resetIdentityCacheForTests()
 })
 
@@ -46,9 +46,9 @@ describe('detectCodexIdentity', () => {
     whenVersion('codex-cli 0.155.0\n')
     await detectCodexIdentity()
     await detectCodexIdentity()
-    expect(execFileMock).toHaveBeenCalledTimes(1)
+    expect(execMock).toHaveBeenCalledTimes(1)
     await detectCodexIdentity({ refresh: true })
-    expect(execFileMock).toHaveBeenCalledTimes(2)
+    expect(execMock).toHaveBeenCalledTimes(2)
   })
 
   it('treats unparseable version output as not installed', async () => {

@@ -1,4 +1,4 @@
-import { execFile } from 'node:child_process'
+import { exec } from 'node:child_process'
 
 /**
  * A client identity borrowed from a coding CLI the user has actually installed
@@ -20,9 +20,13 @@ interface DetectOptions {
 
 const cache = new Map<string, BorrowedIdentity>()
 
+// `bin` is a fixed internal constant ('codex' | 'antigravity'), never user
+// input, so running it through the shell carries no injection risk. The shell
+// is required on Windows so PATHEXT resolves the `.cmd` launcher shims that
+// `execFile` (no shell) would miss with ENOENT.
 function readVersion(bin: string): Promise<string | null> {
   return new Promise(resolve => {
-    execFile(bin, ['--version'], { timeout: 4000, windowsHide: true }, (err, stdout) => {
+    exec(`${bin} --version`, { timeout: 4000, windowsHide: true }, (err, stdout) => {
       resolve(err ? null : String(stdout ?? ''))
     })
   })
