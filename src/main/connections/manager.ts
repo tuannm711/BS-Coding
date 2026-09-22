@@ -35,15 +35,25 @@ export interface ProviderManagerDeps {
   priceFor?: (providerId: string, modelId: string) => ModelPrice | undefined
 }
 
+function findAuthorizationStrategy(adapter: { authorization?: ProviderAuthorizationStrategy | ProviderAuthorizationStrategy[] }, methodId: string): ProviderAuthorizationStrategy | undefined {
+  const auth = adapter.authorization
+  if (!auth) return undefined
+  const strategies = Array.isArray(auth) ? auth : [auth]
+  return strategies.find(strategy => strategy.methodId === methodId)
+}
+
 export class ProviderManager {
   readonly store: ProviderAccountStore
   readonly registry: ProviderRegistry
-  private readonly authorizations = new AuthSessionCoordinator()
+  private readonly authorizations: AuthSessionCoordinator
   private snapshotRevision = 1
 
   constructor(private readonly deps: ProviderManagerDeps) {
     this.store = new ProviderAccountStore(deps.accountsFile, deps.vault)
     this.registry = deps.registry ?? new ProviderRegistry()
+    this.authorizations = new AuthSessionCoordinator({
+      onExpired: session => this.emitAuthorization(session)
+    })
   }
 
   list(providerId?: string): ProviderConnection[] {
@@ -77,7 +87,7 @@ export class ProviderManager {
     const refreshedAccount = await adapter.refreshAccount(account, refreshedSecret)
     const current = this.store.get(accountId)
     if (!current) throw new Error('[bs] Provider account was removed during refresh')
-    this.store.upsert({ ...refreshedAccount, status: current.status, keyRef: current.keyRef, oauthExpiresAt: refreshedSecret.expiresAt ?? refreshedAccount.oauthExpiresAt, refreshStages: { credentials: 'ready', models: 'refreshing', usage: 'refreshing' } }, refreshedSecret)
+    this.store.upsert({ ...refreshedAccount, status: current.status === "disabled" ? "disabled" : (refreshedAccount.status || current.status), keyRef: current.keyRef, oauthExpiresAt: refreshedSecret.expiresAt ?? refreshedAccount.oauthExpiresAt, refreshStages: { credentials: 'ready', models: 'refreshing', usage: 'refreshing' } }, refreshedSecret)
     this.emitAccountsChanged()
     await this.refreshModels(providerId, accountId)
     await this.refreshUsage(providerId, accountId)
@@ -164,56 +174,51 @@ export class ProviderManager {
                   break
                 }
                 manager.recordRuntimeError(accountId, error, providerId, modelId)
-                if (error.kind === 'runtime-entity-not-found') {
-                  yield {
-                    ...part,
-                    error: `${part.error}; provider=${providerId}; account=${currentAccount.label}; model=${modelId}. Refresh or reconnect this account, then retry.`
-                  }
-                  continue
-                }
-              }
-              if (part.kind === 'finish') {
+              } else if (part.kind === 'finish') {
                 completed = true
-                completedTokens = {
-                  input: part.tokens?.input ?? 0,
-                  output: part.tokens?.output ?? 0,
-                  cacheRead: part.tokens?.cacheRead ?? 0,
-                  cacheWrite: part.tokens?.cacheWrite ?? 0
-                }
+                if (part.tokens) completedTokens = { input: part.tokens.input, output: part.tokens.output, cacheRead: part.tokens.cacheRead ?? 0, cacheWrite: part.tokens.cacheWrite ?? 0 }
               }
               yield part
             }
           } catch (error) {
-            manager.recordRuntimeError(accountId, runtimeProviderError(String(error)), providerId, modelId)
-            throw error
-          }
-          if (!retry) {
-            if (!hadError) {
-              manager.clearRuntimeError(accountId, providerId, modelId)
-              if (completed) manager.recordRuntimeUsage(providerId, accountId, modelId, completedTokens)
+            hadError = true
+            const classified = runtimeProviderError(String(error))
+            if (classified.kind === 'auth' && attempt === 0 && adapter.refreshCredentials && readySecret.refreshToken) {
+              retry = 'auth'
+            } else if (classified.kind === 'runtime-entity-not-found' && attempt === 0 && adapter.recoverRuntimeContext) {
+              retry = 'runtime-context'
+            } else {
+              manager.recordRuntimeError(accountId, classified, providerId, modelId)
+              throw error
             }
+          }
+          if (completed && !hadError) {
+            manager.clearRuntimeError(accountId, providerId, modelId)
+            manager.recordRuntimeUsage(providerId, accountId, modelId, completedTokens)
             return
           }
           if (retry === 'auth') {
             forceRefresh = true
             continue
           }
-          try {
-            const recovered = await adapter.recoverRuntimeContext!(currentAccount, readySecret, { code: 'runtime-entity-not-found', modelId })
-            const exactModel = recovered.models.find(candidate => candidate.id === modelId)
-            if (!exactModel) throw new Error(`selected model ${modelId} was not returned after refresh`)
-            manager.store.upsert({
-              ...currentAccount,
-              oauthExpiresAt: recovered.secret.expiresAt ?? currentAccount.oauthExpiresAt,
-              models: recovered.models.map(candidate => candidate.id),
-              modelCatalog: recovered.models
-            }, recovered.secret)
-            manager.emitAccountsChanged()
-          } catch (error) {
-            const message = `[bs] [runtime-entity-not-found] Unable to recover provider=${providerId}; account=${currentAccount.label}; model=${modelId}. Refresh or reconnect this account, then retry. ${String(error)}`
-            manager.recordRuntimeError(accountId, runtimeProviderError(message), providerId, modelId)
-            yield { kind: 'error', error: message }
-            return
+          if (retry === 'runtime-context') {
+            try {
+              const recovered = await adapter.recoverRuntimeContext!(currentAccount, readySecret, { code: 'runtime-entity-not-found', modelId })
+              const exactModel = recovered.models.find(candidate => candidate.id === modelId)
+              if (!exactModel) throw new Error(`selected model ${modelId} was not returned after refresh`)
+              manager.store.upsert({
+                ...currentAccount,
+                oauthExpiresAt: recovered.secret.expiresAt ?? currentAccount.oauthExpiresAt,
+                models: recovered.models.map(candidate => candidate.id),
+                modelCatalog: recovered.models
+              }, recovered.secret)
+              manager.emitAccountsChanged()
+            } catch (error) {
+              const message = `[bs] [runtime-entity-not-found] Unable to recover provider=${providerId}; account=${currentAccount.label}; model=${modelId}. Refresh or reconnect this account, then retry. ${String(error)}`
+              manager.recordRuntimeError(accountId, runtimeProviderError(message), providerId, modelId)
+              yield { kind: 'error', error: message }
+              return
+            }
           }
         }
       }
@@ -326,8 +331,8 @@ export class ProviderManager {
   async createAuthorization(request: ProviderAuthorizationRequest): Promise<ProviderAuthorizationSession> {
     const adapter = this.registry.resolveRequest({ ...request, fields: {} })
     const method = adapter.capability.methods.find(candidate => candidate.id === request.methodId)
-    const strategy = adapter.authorization
-    if (method?.kind !== 'oauth' || !strategy || strategy.methodId !== request.methodId) {
+    const strategy = findAuthorizationStrategy(adapter, request.methodId)
+    if (method?.kind !== 'oauth' || !strategy) {
       throw new Error('[bs] Provider OAuth authorization link is unavailable')
     }
     const reconnectAccount = request.reconnectAccountId ? this.store.get(request.reconnectAccountId) ?? undefined : undefined
@@ -339,7 +344,7 @@ export class ProviderManager {
 
     const pkce = createPkce()
     const callback = await listenForCallback(strategy.callback)
-    let built: ReturnType<ProviderAuthorizationStrategy['build']>
+    let built: ReturnType<typeof strategy['build']>
     try {
       built = strategy.build({ pkce, callbackUrl: callback.callbackUrl })
     } catch (error) {
@@ -367,8 +372,8 @@ export class ProviderManager {
       }
       const completed = await strategy.complete({
         code: result.code,
-        verifier: pending.verifier,
-        callbackUrl: pending.callbackUrl,
+        verifier: pending.verifier ?? '',
+        callbackUrl: pending.callbackUrl ?? '',
         reconnectAccount
       })
       let saved: ProviderAccount | undefined
@@ -445,7 +450,8 @@ export class ProviderManager {
     const reconnectAccount = request.reconnectAccountId ? this.store.get(request.reconnectAccountId) : null
     if (request.reconnectAccountId && (!reconnectAccount || reconnectAccount.providerId !== request.providerId)) throw new Error('[bs] Account reconnect không hợp lệ')
     const method = adapter.capability.methods.find(candidate => candidate.id === request.methodId)
-    if (method?.kind === 'oauth' && adapter.authorization) {
+    const strategy = findAuthorizationStrategy(adapter, request.methodId)
+    if (method?.kind === 'oauth' && strategy) {
       const session = await this.createAuthorization({
         providerId: request.providerId,
         methodId: request.methodId,
@@ -480,7 +486,19 @@ export class ProviderManager {
     this.emitAccountsChanged()
   }
 
-  remove(accountId: string): void {
+  async remove(accountId: string): Promise<void> {
+    const account = this.store.get(accountId)
+    const secret = this.store.getSecret(accountId)
+    if (account) {
+      const adapter = this.registry.get(account.providerId)
+      if (adapter?.removeAccount) {
+        try {
+          await adapter.removeAccount(account, secret ?? undefined)
+        } catch (err) {
+          console.warn(`[bs] Adapter removeAccount error for ${accountId}:`, err)
+        }
+      }
+    }
     this.store.remove(accountId)
     this.emitAccountsChanged()
   }

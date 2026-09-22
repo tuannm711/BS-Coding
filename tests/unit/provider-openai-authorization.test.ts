@@ -4,6 +4,15 @@ import { mkdtempSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { createOpenAiAdapter } from '../../src/main/providers/adapters/openai'
+import type { ProviderCallbackAuthorizationStrategy } from '../../src/main/providers/types'
+
+vi.mock('../../src/main/agent/llm', () => ({ createLlm: vi.fn(() => ({})) }))
+import { createLlm } from '../../src/main/agent/llm'
+
+const callbackAuth = (adapter: ReturnType<typeof createOpenAiAdapter>) =>
+  adapter.authorization as ProviderCallbackAuthorizationStrategy
+
+const installedCodex = async () => ({ installed: true, version: '0.155.0', userAgent: 'codex_cli/0.155.0', originator: 'codex_cli' })
 
 const pkce = { verifier: 'verifier', challenge: 'challenge', state: 'state-value' }
 
@@ -23,11 +32,11 @@ describe('OpenAI provider authorization', () => {
     }), { status: 200 })))
     const adapter = createOpenAiAdapter()
 
-    const built = adapter.authorization!.build({
+    const built = callbackAuth(adapter).build({
       pkce,
       callbackUrl: 'http://127.0.0.1:1455/auth/callback'
     })
-    const result = await adapter.authorization!.complete({
+    const result = await callbackAuth(adapter).complete({
       code: 'oauth-code',
       verifier: pkce.verifier,
       callbackUrl: 'http://127.0.0.1:1455/auth/callback'
@@ -50,7 +59,7 @@ describe('OpenAI provider authorization', () => {
     const adapter = createOpenAiAdapter({ codexAuthFile: authFile })
     const secrets = { accessToken: 'access', refreshToken: 'refresh', idToken: 'id', accountId: 'acct-1' }
 
-    await adapter.authorization!.afterPersist?.({
+    await callbackAuth(adapter).afterPersist?.({
       id: 'provider-account',
       providerId: 'openai',
       label: 'Plus',
@@ -88,5 +97,40 @@ describe('ChatGPT id_token claims', () => {
   it('returns nothing for a malformed token', () => {
     expect(decodeJwtProfile('not-a-jwt')).toEqual({})
     expect(decodeJwtProfile(undefined)).toEqual({})
+  })
+})
+
+describe('OpenAI subscription gate and borrowed identity', () => {
+  it('hides the oauth method until an installed Codex CLI is detected', async () => {
+    const adapter = createOpenAiAdapter({ detectIdentity: async () => ({ installed: false }) })
+    await adapter.ready
+    expect(adapter.capability.methods.find(m => m.id === 'oauth')).toBeUndefined()
+    expect(adapter.capability.methods.find(m => m.id === 'api-key')).toBeDefined()
+  })
+
+  it('exposes the oauth method when Codex CLI is installed', async () => {
+    const adapter = createOpenAiAdapter({ detectIdentity: installedCodex })
+    await adapter.ready
+    expect(adapter.capability.methods.find(m => m.id === 'oauth')).toBeDefined()
+  })
+
+  it('uses the borrowed identity (not hardcoded codex_vscode) for oauth runtime headers', async () => {
+    const createLlmMock = vi.mocked(createLlm)
+    createLlmMock.mockClear()
+    const adapter = createOpenAiAdapter({ detectIdentity: installedCodex })
+    await adapter.ready
+    adapter.createRuntime({ authMode: 'oauth' } as never, { accessToken: 't' } as never, {} as never)
+    const headers = createLlmMock.mock.calls.at(-1)?.[3] as Record<string, string>
+    expect(headers['user-agent']).toBe('codex_cli/0.155.0')
+    expect(headers['originator']).toBe('codex_cli')
+    expect(headers['user-agent']).not.toContain('codex_vscode')
+  })
+
+  it('keeps tool-calling enabled for oauth and api-key models', async () => {
+    const adapter = createOpenAiAdapter({ detectIdentity: installedCodex })
+    const oauthModels = await adapter.listModels({ authMode: 'oauth' } as never, {} as never)
+    const apiModels = await adapter.listModels({ authMode: 'api-key' } as never, {} as never)
+    expect(oauthModels.every(m => m.capabilities?.supportsTools)).toBe(true)
+    expect(apiModels.every(m => m.capabilities?.supportsTools)).toBe(true)
   })
 })

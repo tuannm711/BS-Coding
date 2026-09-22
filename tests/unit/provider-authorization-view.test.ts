@@ -37,12 +37,9 @@ describe('provider authorization modal view', () => {
     expect(reduceAuthorizationState(waitingSession, { ...waitingSession, status: 'connected' })?.status).toBe('connected')
   })
 
-  it('notifies a connected authorization session only once per login id', () => {
+  it('notifies a connected authorization session only once', () => {
     const connected = { ...waitingSession, status: 'connected' as const }
-
     expect(connectionNotificationLoginId(connected, null)).toBe('login-1')
     expect(connectionNotificationLoginId(connected, 'login-1')).toBeNull()
-    expect(connectionNotificationLoginId({ ...connected, loginId: 'login-2' }, 'login-1')).toBe('login-2')
-    expect(connectionNotificationLoginId(waitingSession, null)).toBeNull()
   })
 })

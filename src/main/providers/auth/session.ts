@@ -6,14 +6,15 @@ import type {
 } from '../../../shared/providers'
 
 export interface PendingAuthorizationInput {
+  loginId?: string
   providerId: string
   methodId: string
   reconnectAccountId?: string
   authUrl: string
   expiresAt: number
-  verifier: string
-  expectedState: string
-  callbackUrl: string
+  verifier?: string
+  expectedState?: string
+  callbackUrl?: string
   close: () => void
 }
 
@@ -27,33 +28,74 @@ interface AuthorizationRecord {
   closed: boolean
 }
 
+export interface AuthSessionCoordinatorOptions {
+  now?: () => number
+  onExpired?: (session: ProviderAuthorizationSession) => void
+}
+
 export class AuthSessionCoordinator {
   private readonly sessions = new Map<string, AuthorizationRecord>()
+  private readonly timers = new Map<string, ReturnType<typeof setTimeout>>()
+  private readonly now: () => number
+  private readonly onExpired?: (session: ProviderAuthorizationSession) => void
 
-  constructor(private readonly now: () => number = Date.now) {}
+  constructor(
+    nowOrOptions?: (() => number) | AuthSessionCoordinatorOptions,
+    onExpired?: (session: ProviderAuthorizationSession) => void
+  ) {
+    if (typeof nowOrOptions === 'function') {
+      this.now = nowOrOptions
+      this.onExpired = onExpired
+    } else if (nowOrOptions && typeof nowOrOptions === 'object') {
+      this.now = nowOrOptions.now ?? Date.now
+      this.onExpired = nowOrOptions.onExpired ?? onExpired
+    } else {
+      this.now = Date.now
+      this.onExpired = onExpired
+    }
+  }
 
   start(input: PendingAuthorizationInput): ProviderAuthorizationSession {
-    const loginId = randomUUID()
+    const loginId = input.loginId ?? randomUUID()
     const publicSession: ProviderAuthorizationSession = {
       loginId,
       providerId: input.providerId,
       methodId: input.methodId,
+      reconnectAccountId: input.reconnectAccountId,
       authUrl: input.authUrl,
       expiresAt: input.expiresAt,
       status: 'waiting'
     }
     this.sessions.set(loginId, {
       public: publicSession,
-      pending: { ...input, loginId },
+      pending: {
+        ...input,
+        verifier: input.verifier ?? '',
+        expectedState: input.expectedState ?? '',
+        callbackUrl: input.callbackUrl ?? '',
+        loginId
+      },
       closed: false
     })
+
+    const delay = Math.max(0, input.expiresAt - this.now())
+    const timer = setTimeout(() => {
+      this.timers.delete(loginId)
+      const expired = this.expire(loginId)
+      if (expired && this.onExpired) {
+        this.onExpired(expired)
+      }
+    }, delay)
+    this.timers.set(loginId, timer)
+
     return { ...publicSession }
   }
 
   public(loginId: string): ProviderAuthorizationSession | undefined {
     this.expireIfNeeded(loginId)
     const session = this.sessions.get(loginId)?.public
-    return session ? { ...session } : undefined
+    if (!session) return undefined
+    return { ...session }
   }
 
   pending(loginId: string): PendingAuthorizationSession | undefined {
@@ -63,8 +105,8 @@ export class AuthSessionCoordinator {
     return { ...record.pending }
   }
 
-  complete(loginId: string, accountId: string): ProviderAuthorizationSession | undefined {
-    return this.finish(loginId, 'connected', { accountId })
+  complete(loginId: string, accountId?: string): ProviderAuthorizationSession | undefined {
+    return this.finish(loginId, 'connected', accountId ? { accountId } : {})
   }
 
   fail(loginId: string, error: ProviderAuthorizationError): ProviderAuthorizationSession | undefined {
@@ -97,6 +139,12 @@ export class AuthSessionCoordinator {
     status: Exclude<ProviderAuthorizationStatus, 'waiting'>,
     patch: Partial<ProviderAuthorizationSession> = {}
   ): ProviderAuthorizationSession | undefined {
+    const timer = this.timers.get(loginId)
+    if (timer) {
+      clearTimeout(timer)
+      this.timers.delete(loginId)
+    }
+
     const record = this.sessions.get(loginId)
     if (!record || record.public.status !== 'waiting') return undefined
     if (!record.closed) {

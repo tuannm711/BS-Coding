@@ -6,16 +6,20 @@ export class ProviderRegistry {
 
   register(adapter: ProviderAdapter): void {
     if (this.adapters.has(adapter.capability.id)) throw new Error(`[bs] Provider ${adapter.capability.id} already registered`)
-    if (adapter.capability.status !== 'unavailable' && !['openai-responses', 'openai-compatible', 'cloud-code'].includes(adapter.capability.chatTransport)) {
+    if (adapter.capability.status !== 'unavailable' && !['openai-responses', 'openai-compatible', 'cloud-code', 'google'].includes(adapter.capability.chatTransport)) {
       throw new Error(`[bs] Provider ${adapter.capability.id} must declare a supported chat transport`)
     }
     const oauthMethods = adapter.capability.methods.filter(method => method.kind === 'oauth')
-    if (oauthMethods.length > 0 && (
-      oauthMethods.length !== 1
-      || !adapter.authorization
-      || adapter.authorization.methodId !== oauthMethods[0].id
-    )) {
-      throw new Error(`[bs] Provider ${adapter.capability.id} exposes OAuth without an authorization strategy`)
+    if (oauthMethods.length > 0) {
+      const strategies = Array.isArray(adapter.authorization)
+        ? adapter.authorization
+        : adapter.authorization ? [adapter.authorization] : []
+      const hasAllStrategies = oauthMethods.every(method =>
+        strategies.some(s => s.methodId === method.id)
+      )
+      if (!hasAllStrategies) {
+        throw new Error(`[bs] Provider ${adapter.capability.id} exposes OAuth without an authorization strategy`)
+      }
     }
     this.adapters.set(adapter.capability.id, adapter)
   }

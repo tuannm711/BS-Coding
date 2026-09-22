@@ -34,7 +34,7 @@ describe('provider adapter contract', () => {
     expect(calledUrl).toBe('https://chatgpt.com/backend-api/codex/responses')
     expect(calledHeaders.authorization).toBe('Bearer oauth-token')
     expect(calledHeaders['ChatGPT-Account-ID']).toBe('chatgpt-account')
-    expect(calledHeaders.originator).toBe('codex_vscode')
+    expect(calledHeaders.originator).toBe('codex_cli')
   })
 
   it('keeps provider-specific OAuth and header logic out of BsAgentManager', () => {

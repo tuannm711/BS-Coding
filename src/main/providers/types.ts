@@ -29,7 +29,8 @@ export interface ProviderAuthorizationCompleteResult {
   secrets: ProviderSecrets
 }
 
-export interface ProviderAuthorizationStrategy {
+export interface ProviderCallbackAuthorizationStrategy {
+  kind?: 'callback'
   methodId: string
   callback: { port: number; path: string; timeoutMs: number }
   build(input: ProviderAuthorizationBuildInput): ProviderAuthorizationBuildResult
@@ -37,9 +38,13 @@ export interface ProviderAuthorizationStrategy {
   afterPersist?(account: ProviderAccount, secrets: ProviderSecrets): Promise<void> | void
 }
 
+export type ProviderAuthorizationStrategy = ProviderCallbackAuthorizationStrategy
+
 export interface ProviderAdapter {
   capability: ProviderCapability
-  authorization?: ProviderAuthorizationStrategy
+  /** Resolves once one-time async setup (e.g. borrowed-identity detection) completes. */
+  ready?: Promise<void>
+  authorization?: ProviderAuthorizationStrategy | ProviderAuthorizationStrategy[]
   definition(): ProviderCapability
   connect(request: ProviderConnectRequest, context: ProviderAdapterContext): Promise<{ account: ProviderAccount; login?: { loginId: string; authUrl: string; expiresIn: number } }>
   refreshAccount(account: ProviderAccount, secret: ProviderSecrets): Promise<ProviderAccount>
@@ -52,6 +57,8 @@ export interface ProviderAdapter {
   quotaGroupForModel?(modelId: string): string | undefined
   /** Spend one provider-side quota reset. Irreversible. */
   consumeResetCredit?(account: ProviderAccount, secret: ProviderSecrets): Promise<void>
+  /** Provider-specific cleanup when an account is removed by the user. */
+  removeAccount?(account: ProviderAccount, secret?: ProviderSecrets): Promise<void> | void
 }
 
 export type ProviderAuthMethod = AuthMethodDescriptor

@@ -41,6 +41,7 @@ import { ProviderUsageLedger } from './connections/usage-ledger'
 import { UsageScheduler } from './connections/usage'
 import { ProviderRegistry } from './providers/registry'
 import { createOpenAiAdapter } from './providers/adapters/openai'
+import { createGoogleAdapter } from './providers/adapters/google'
 import { createOpenAiCompatibleAdapter } from './providers/adapters/openai-compatible'
 import { createGitHubCopilotAdapter } from './providers/adapters/github-copilot'
 import { createAntigravityAdapter } from './providers/adapters/antigravity'
@@ -214,12 +215,18 @@ class MainApp {
   private updater: Updater
 
   constructor() {
-    this.providerRegistry.register(createOpenAiAdapter({
-      codexAuthFile: path.join(os.homedir(), '.codex', 'auth.json'),
-      codexBackupFile: path.join(app.getPath('userData'), 'connections', 'codex-auth.json.backup')
-    }))
+    const openaiAdapter = createOpenAiAdapter()
+    const antigravityAdapter = createAntigravityAdapter()
+    this.providerRegistry.register(openaiAdapter)
+    this.providerRegistry.register(createGoogleAdapter())
     this.providerRegistry.register(createGitHubCopilotAdapter())
-    this.providerRegistry.register(createAntigravityAdapter())
+    this.providerRegistry.register(antigravityAdapter)
+    // Subscription methods surface only once installed-client detection resolves;
+    // push a fresh snapshot then so the renderer reveals them without a manual refresh.
+    void Promise.allSettled([openaiAdapter.ready, antigravityAdapter.ready]).then(() => {
+      this.providerManager.markSnapshotChanged()
+      win?.webContents.send(Channels.EventProviderSnapshotChanged, mainApp?.providerSnapshot())
+    })
     const compatibleProviders: Array<[string, string, boolean]> = [
       ['cursor', 'Cursor', false], ['windsurf', 'Windsurf', false],
       ['kiro', 'Kiro', false], ['grok', 'Grok / xAI', true], ['codebuddy', 'CodeBuddy', false],

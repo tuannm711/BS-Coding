@@ -1,6 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { antigravityAuthorizeUrl, exchangeAntigravityCode } from '../../src/main/providers/auth/antigravity-oauth'
 import { createAntigravityAdapter } from '../../src/main/providers/adapters/antigravity'
+import type { ProviderCallbackAuthorizationStrategy } from '../../src/main/providers/types'
+
+const callbackAuth = (adapter: ReturnType<typeof createAntigravityAdapter>) =>
+  adapter.authorization as ProviderCallbackAuthorizationStrategy
+const installedAntigravity = async () => ({ installed: true, version: '1.20.7', userAgent: 'antigravity/1.20.7', originator: 'antigravity' })
 
 describe('Antigravity OAuth', () => {
   afterEach(() => vi.unstubAllGlobals())
@@ -35,11 +40,11 @@ describe('Antigravity OAuth', () => {
       : new Response(JSON.stringify({ email: 'pro@example.com', name: 'Pro User' }), { status: 200 })))
     const adapter = createAntigravityAdapter()
 
-    const built = adapter.authorization!.build({
+    const built = callbackAuth(adapter).build({
       pkce: { verifier: 'verifier', challenge: 'challenge', state: 'state-value' },
       callbackUrl: 'http://127.0.0.1:1457/auth/callback'
     })
-    const result = await adapter.authorization!.complete({
+    const result = await callbackAuth(adapter).complete({
       code: 'code',
       verifier: 'verifier',
       callbackUrl: 'http://127.0.0.1:1457/auth/callback'
@@ -70,5 +75,35 @@ describe('Antigravity OAuth', () => {
     })
     for await (const _part of runtime.stream({ model: 'claude-sonnet-4-6', system: '', messages: [{ role: 'user', content: 'hello' }], tools: [] })) { /* consume */ }
     expect(requestBody).toMatchObject({ project: 'project-1', model: 'claude-sonnet-4-6' })
+  })
+})
+
+describe('Antigravity subscription gate and borrowed identity', () => {
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('hides the oauth method until an installed Antigravity client is detected', async () => {
+    const adapter = createAntigravityAdapter({ detectIdentity: async () => ({ installed: false }) })
+    await adapter.ready
+    expect(adapter.capability.methods.find(m => m.id === 'oauth')).toBeUndefined()
+  })
+
+  it('exposes the oauth method when Antigravity is installed', async () => {
+    const adapter = createAntigravityAdapter({ detectIdentity: installedAntigravity })
+    await adapter.ready
+    expect(adapter.capability.methods.find(m => m.id === 'oauth')).toBeDefined()
+  })
+
+  it('sends the borrowed Antigravity identity as user-agent, not the hardcoded 1.20.5', async () => {
+    let seenUa = ''
+    vi.stubGlobal('fetch', vi.fn(async (_url: string, init?: RequestInit) => {
+      const ua = (init?.headers as Record<string, string> | undefined)?.['user-agent']
+      if (ua) seenUa = ua
+      return new Response('{}', { status: 500 })
+    }))
+    const adapter = createAntigravityAdapter({ detectIdentity: installedAntigravity })
+    await adapter.ready
+    await adapter.listModels({} as never, { accessToken: 'tok' } as never).catch(() => {})
+    expect(seenUa).toContain('antigravity/1.20.7')
+    expect(seenUa).not.toContain('1.20.5')
   })
 })

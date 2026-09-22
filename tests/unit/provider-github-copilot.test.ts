@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { copilotRuntimeCredential, createGitHubCopilotAdapter } from '../../src/main/providers/adapters/github-copilot'
 import { githubCopilotAuthorizeUrl } from '../../src/main/providers/auth/github-copilot-oauth'
+import type { ProviderCallbackAuthorizationStrategy } from '../../src/main/providers/types'
 
 describe('GitHub Copilot adapter', () => {
   afterEach(() => vi.unstubAllGlobals())
@@ -46,7 +47,7 @@ describe('GitHub Copilot adapter', () => {
     }))
     const adapter = createGitHubCopilotAdapter()
 
-    const result = await adapter.authorization!.complete({
+    const result = await (adapter.authorization as ProviderCallbackAuthorizationStrategy).complete({
       code: 'oauth-code',
       verifier: 'verifier',
       callbackUrl: 'http://127.0.0.1:61280/callback?nonce=nonce-value'
@@ -68,7 +69,7 @@ describe('GitHub Copilot adapter', () => {
     }))
     const adapter = createGitHubCopilotAdapter()
 
-    await expect(adapter.authorization!.complete({
+    await expect((adapter.authorization as ProviderCallbackAuthorizationStrategy).complete({
       code: 'oauth-code',
       verifier: 'verifier',
       callbackUrl: 'http://127.0.0.1:61280/callback?nonce=nonce-value'

@@ -36,7 +36,9 @@ describe('provider authorization full flows', () => {
       throw new Error(`Unexpected URL ${url}`)
     }))
     const registry = new ProviderRegistry()
-    registry.register(createOpenAiAdapter())
+    const adapter = createOpenAiAdapter({ detectIdentity: async () => ({ installed: true, version: '0.155.0', userAgent: 'codex_cli/0.155.0', originator: 'codex_cli' }) })
+    await adapter.ready
+    registry.register(adapter)
     const openExternal = vi.fn()
     const manager = new ProviderManager({
       accountsFile: path.join(mkdtempSync(path.join(tmpdir(), 'bs-openai-flow-')), 'accounts.json'),

@@ -22,7 +22,6 @@ export interface ProviderModelCapabilities {
 export interface ProviderModel {
   id: string
   name: string
-  /** Provider transport identifier when it differs from the persisted assignment id. */
   runtimeId?: string
   capabilities?: ProviderModelCapabilities
 }
@@ -37,7 +36,7 @@ export interface ProviderCapability {
   logo?: string
 }
 
-export type ProviderChatTransport = 'openai-responses' | 'openai-compatible' | 'cloud-code'
+export type ProviderChatTransport = 'openai-responses' | 'openai-compatible' | 'cloud-code' | 'google'
 
 export interface ProviderConnectRequest {
   providerId: string
@@ -83,6 +82,7 @@ export interface ProviderAuthorizationSession {
   loginId: string
   providerId: string
   methodId: string
+  reconnectAccountId?: string
   authUrl: string
   expiresAt: number
   status: ProviderAuthorizationStatus
@@ -90,10 +90,28 @@ export interface ProviderAuthorizationSession {
   error?: ProviderAuthorizationError
 }
 
+export function providerCanUseMethod(capability: ProviderCapability, methodId: string): boolean {
+  return capability.methods.some(method => method.id === methodId)
+}
+
+export function providerModelKey(providerId: string, accountId: string, modelId: string): string {
+  return `${providerId}/${accountId}/${modelId}`
+}
+
 export function sanitizeProviderAuthorizationSession(
   session: ProviderAuthorizationSession & Record<string, unknown>
 ): ProviderAuthorizationSession {
-  const { loginId, providerId, methodId, authUrl, expiresAt, status, accountId, error } = session
+  const {
+    loginId,
+    providerId,
+    methodId,
+    authUrl,
+    expiresAt,
+    status,
+    accountId,
+    error,
+    reconnectAccountId
+  } = session
   return {
     loginId,
     providerId,
@@ -101,15 +119,8 @@ export function sanitizeProviderAuthorizationSession(
     authUrl,
     expiresAt,
     status,
+    ...(reconnectAccountId ? { reconnectAccountId } : {}),
     ...(accountId ? { accountId } : {}),
     ...(error ? { error } : {})
   }
-}
-
-export function providerCanUseMethod(capability: ProviderCapability, methodId: string): boolean {
-  return capability.status !== 'unavailable' && capability.methods.some(method => method.id === methodId)
-}
-
-export function providerModelKey(providerId: string, accountId: string | undefined, modelId: string): string {
-  return `${providerId}/${accountId ?? 'default'}/${modelId}`
 }

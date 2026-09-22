@@ -1,9 +1,10 @@
 import { randomUUID } from 'node:crypto'
-import type { ProviderModel } from '../../../shared/providers'
+import type { ProviderModel, ProviderCapability } from '../../../shared/providers'
 import type { ProviderAdapter } from '../types'
 import { createLlm } from '../../agent/llm'
 import { OPENAI_OAUTH_MODELS } from '../../../shared/openai-oauth'
 import { extractOpenAISubscriptionMetadata, normalizeOpenAICodexUsage } from '../../connections/usage'
+import { detectCodexIdentity, type BorrowedIdentity } from '../identity/client-identity'
 import {
   codexAuthorizeUrl,
   decodeJwtProfile,
@@ -17,16 +18,18 @@ const models: ProviderModel[] = OPENAI_OAUTH_MODELS.map(id => ({ id, name: id, c
 interface OpenAiAdapterOptions {
   codexAuthFile?: string
   codexBackupFile?: string
+  /** Injectable for tests; defaults to detecting the installed Codex CLI. */
+  detectIdentity?: () => Promise<BorrowedIdentity>
 }
 
 const CONSUME_RESET_CREDIT_URL = 'https://chatgpt.com/backend-api/wham/rate-limit-reset-credits/consume'
 
 // One definition, so the usage read and the consume post cannot drift apart.
-function codexHeaders(secret: { accessToken?: string; accountId?: string }): Record<string, string> {
+function codexHeaders(secret: { accessToken?: string; accountId?: string }, identity: BorrowedIdentity): Record<string, string> {
   const headers: Record<string, string> = {
     authorization: `Bearer ${secret.accessToken}`,
-    originator: 'codex_vscode',
-    'user-agent': 'codex_vscode/0.146.0',
+    originator: identity.originator ?? 'codex_cli',
+    'user-agent': identity.userAgent ?? 'codex_cli',
     accept: 'application/json',
     origin: 'https://chatgpt.com',
     referer: 'https://chatgpt.com/'
@@ -36,18 +39,34 @@ function codexHeaders(secret: { accessToken?: string; accountId?: string }): Rec
 }
 
 export function createOpenAiAdapter(options: OpenAiAdapterOptions = {}): ProviderAdapter {
+  const detectIdentity = options.detectIdentity ?? (() => detectCodexIdentity())
+  // The transport identity is borrowed from the installed Codex CLI. It resolves
+  // asynchronously; until then the subscription (oauth) method stays hidden so
+  // the app never offers a login it cannot back with a real installed client.
+  let identity: BorrowedIdentity = { installed: false }
+
+  const oauthMethod = { id: 'oauth', label: 'Sign in with ChatGPT', description: 'Sign in with ChatGPT in your browser (requires Codex CLI installed)', kind: 'oauth' as const, fields: [], opensBrowser: true, supportsMultipleAccounts: true }
+  const apiKeyMethod = { id: 'api-key', label: 'API key', description: 'Use an OpenAI API key', kind: 'api-key' as const, fields: ['apiKey', 'baseUrl'] }
+
+  const capability: ProviderCapability = {
+    id: 'openai',
+    displayName: 'OpenAI / ChatGPT',
+    description: 'ChatGPT OAuth or OpenAI API key for coding agents',
+    methods: [apiKeyMethod],
+    status: 'ready',
+    chatTransport: 'openai-responses'
+  }
+
+  const ready = detectIdentity().then(resolved => {
+    identity = resolved
+    if (resolved.installed && !capability.methods.some(method => method.id === 'oauth')) {
+      capability.methods.unshift(oauthMethod)
+    }
+  }).catch(() => { /* detection failure keeps oauth hidden; api-key still works */ })
+
   return {
-    capability: {
-      id: 'openai',
-      displayName: 'OpenAI / ChatGPT',
-      description: 'ChatGPT OAuth or OpenAI API key for coding agents',
-      methods: [
-        { id: 'oauth', label: 'OAuth sign-in', description: 'Sign in with ChatGPT in your browser', kind: 'oauth', fields: [], opensBrowser: true, supportsMultipleAccounts: true },
-        { id: 'api-key', label: 'API key', description: 'Use an OpenAI API key', kind: 'api-key', fields: ['apiKey', 'baseUrl'] }
-      ],
-      status: 'ready',
-      chatTransport: 'openai-responses'
-    },
+    ready,
+    capability,
     authorization: {
       methodId: 'oauth',
       callback: { port: 1455, path: '/auth/callback', timeoutMs: 300_000 },
@@ -104,7 +123,8 @@ export function createOpenAiAdapter(options: OpenAiAdapterOptions = {}): Provide
         if (!secret.accessToken) throw new Error('[bs] ChatGPT OAuth access token unavailable')
         return createLlm('openai', secret.accessToken, 'https://chatgpt.com/backend-api/codex', {
           ...(secret.accountId ? { 'ChatGPT-Account-ID': secret.accountId } : {}),
-          originator: 'codex_vscode',
+          originator: identity.originator ?? 'codex_cli',
+          'user-agent': identity.userAgent ?? 'codex_cli',
           'OpenAI-Beta': 'responses_websockets=2026-02-06',
           'x-openai-internal-codex-residency': 'us',
           accept: 'text/event-stream'
@@ -123,7 +143,7 @@ export function createOpenAiAdapter(options: OpenAiAdapterOptions = {}): Provide
       const redeemRequestId = randomUUID()
       const post = async (): Promise<Response> => fetch(CONSUME_RESET_CREDIT_URL, {
         method: 'POST',
-        headers: { ...codexHeaders(secret), 'content-type': 'application/json' },
+        headers: { ...codexHeaders(secret, identity), 'content-type': 'application/json' },
         body: JSON.stringify({ redeem_request_id: redeemRequestId })
       })
       let response = await post()
@@ -143,7 +163,7 @@ export function createOpenAiAdapter(options: OpenAiAdapterOptions = {}): Provide
       if (!secret.accountId && claim.accountId) Object.assign(secret, { accountId: claim.accountId })
       let lastStatus = 0
       for (let authAttempt = 0; authAttempt < 2; authAttempt++) {
-        const headers = codexHeaders(secret)
+        const headers = codexHeaders(secret, identity)
         for (const endpoint of ['https://chatgpt.com/backend-api/wham/usage', 'https://chatgpt.com/backend-api/codex/usage']) {
           const response = await fetch(endpoint, { headers })
           const body = await response.text()
