@@ -8,7 +8,6 @@ import type { ConsumeResetCreditResult } from './reset-credit'
 import type { BrowserStatusInfo, PairingInfo } from './browser-types'
 import type { AgentAssignmentSetRequest, AgentAssignmentSnapshot } from './provider-state'
 import type { ProviderSnapshot } from './provider-state'
-import type { RemoteStatus } from './remote-types'
 import type {
   ProviderAuthorizationRequest,
   ProviderAuthorizationSession,
@@ -143,12 +142,6 @@ export const Channels = {
   BrowserGetConsoleLogs: 'browser:get-console-logs',
   BrowserGetNetworkLogs: 'browser:get-network-logs',
   EventBrowserStatus: 'browser:status',
-  RemoteGetStatus: 'remote:get-status',
-  RemoteSetEnabled: 'remote:set-enabled',
-  RemoteSetRelayUrl: 'remote:set-relay-url',
-  RemoteStartPairing: 'remote:start-pairing',
-  RemoteRevokeToken: 'remote:revoke-token',
-  EventRemoteStatus: 'remote:status',
   EventBrowserOpenInstallGuide: 'browser:install-guide',
   TraceList: 'trace:list',
   TraceRead: 'trace:read',
@@ -333,11 +326,5 @@ export interface AgentApi {
   getBrowserConsoleLogs(limit?: number): Promise<unknown[]>
   getBrowserNetworkLogs(limit?: number): Promise<unknown[]>
   onBrowserStatus(cb: (info: BrowserStatusInfo) => void): () => void
-  getRemoteStatus(): Promise<RemoteStatus>
-  setRemoteEnabled(enabled: boolean): Promise<void>
-  setRemoteRelayUrl(url: string): Promise<void>
-  startRemotePairing(): Promise<{ code: string; expiresAt: number } | null>
-  revokeRemoteToken(): Promise<void>
-  onRemoteStatus(cb: (s: RemoteStatus) => void): () => void
   onBrowserOpenInstallGuide(cb: (e: BrowserInstallGuideEvent) => void): () => void
 }
