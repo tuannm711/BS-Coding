@@ -213,6 +213,7 @@ class MainApp {
       win?.webContents.send(Channels.EventProviderSnapshotChanged, mainApp?.providerSnapshot())
     })
     const compatibleProviders: Array<[string, string, boolean]> = [
+      ['deepseek', 'DeepSeek', true], ['custom', 'Custom API', true],
       ['cursor', 'Cursor', false], ['windsurf', 'Windsurf', false],
       ['kiro', 'Kiro', false], ['grok', 'Grok / xAI', true], ['codebuddy', 'CodeBuddy', false],
       ['codebuddy-cn', 'CodeBuddy CN', false], ['qoder', 'Qoder', false], ['trae', 'Trae', false],
