@@ -15,9 +15,7 @@ export class ProviderRegistry {
         ? adapter.authorization
         : adapter.authorization ? [adapter.authorization] : []
       const hasAllStrategies = oauthMethods.every(method =>
-        strategies.some(s =>
-          Array.isArray(s.methodId) ? s.methodId.includes(method.id) : s.methodId === method.id
-        )
+        strategies.some(s => s.methodId === method.id)
       )
       if (!hasAllStrategies) {
         throw new Error(`[bs] Provider ${adapter.capability.id} exposes OAuth without an authorization strategy`)

@@ -38,10 +38,8 @@ export interface ProviderManagerDeps {
 function findAuthorizationStrategy(adapter: { authorization?: ProviderAuthorizationStrategy | ProviderAuthorizationStrategy[] }, methodId: string): ProviderAuthorizationStrategy | undefined {
   const auth = adapter.authorization
   if (!auth) return undefined
-  if (Array.isArray(auth)) {
-    return auth.find(s => Array.isArray(s.methodId) ? s.methodId.includes(methodId) : s.methodId === methodId)
-  }
-  return (Array.isArray(auth.methodId) ? auth.methodId.includes(methodId) : auth.methodId === methodId) ? auth : undefined
+  const strategies = Array.isArray(auth) ? auth : [auth]
+  return strategies.find(strategy => strategy.methodId === methodId)
 }
 
 export class ProviderManager {
