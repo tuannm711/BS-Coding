@@ -2,7 +2,7 @@
 
 Date: 2026-09-22
 Branch: `feat/v1-3-4` (off `develop/v1` @ 980fee7 = v1.3.3)
-Owner decisions captured below; **§3+4 task-tool removal flagged for review.**
+Owner decisions captured below (all scope points resolved).
 
 Seven independent work items. Each is its own phase in the plan; they share no
 state beyond the version bump.
@@ -57,32 +57,36 @@ restarts immediately** — no installer window.
 Risk: changing nsis mode affects the first-install UX too; confirm acceptable
 in the plan's manual check. macOS/Linux flows unchanged.
 
-## Item 3 + 4 — Remove the sub-agent role settings and the `task` mechanism
+## Item 3 + 4 — Remove the sub-agent *model-override settings* only
 
-Scope confirmed by owner: remove the **"Sub-agent model overrides"** settings
-section (`AgentsTab.tsx` ~L233: roles `research`/`general`/`reviewer` mapped to
-models). The coordinator/`delegate` coordination group is **kept**.
+Scope confirmed by owner (narrowed): remove **only** the "Sub-agent model
+overrides" settings section (`AgentsTab.tsx` ~L233: roles
+`research`/`general`/`reviewer` → model). The `task` tool stays — an agent
+calling a sub-agent is the agent's own prerogative, bounded by project rules;
+roles are clarified through orchestration/coordination, so the per-role model
+picker in Settings has no value.
 
-**⚠ For review:** the approved approach also removes the `task` sub-agent
-*mechanism* (each agent independent, coordination replaces sub-agents). If the
-owner wants only the settings surface gone with `task` kept running on a default
-model, that narrows this item. Proceeding as: remove the mechanism.
+**Keep (do NOT touch):** `task` tool (`src/main/agent/tools/task.ts`),
+`SubagentType` and `SUBAGENT_CONFIGS` (the role prompts/behaviours the tool
+uses), the `delegate` tool, coordinator/worker roles, Fleet, Live coordination,
+and trace's `SubagentTree` (it shows `task` sub-agents, which remain).
 
-Remove:
-- `AgentsTab.tsx` sub-agent section + `subagentModels`/`onChangeSubagentModels`
-  props and their wiring in `SettingsDialog.tsx`.
-- `subagentModels` from `BsSettings` (`src/shared/types.ts:509`) and
-  `SubagentType` (`:512`), plus `BsConfig` and `config.ts` normalization.
-- The `task` tool (`src/main/agent/tools/task.ts`) and its registration in the
-  tools factory; any `subagentModels` reads in the agent runtime.
-- Sub-agent surfaces in trace (`trace/SubagentTree.tsx` and its use in
-  `TracePanel`/`TraceLedger`) — or reduce to nothing if they only served `task`.
+Remove `subagentModels` (the per-role model override) everywhere:
+- UI: `AgentsTab.tsx` sub-agent section + `subagentModels`/`onChangeSubagentModels`
+  props; the wiring in `SettingsDialog.tsx` (~L127).
+- Settings/config: `subagentModels` in `BsSettings` (`src/shared/types.ts:509`),
+  `BsConfig` (`config.ts:57`), and normalization/merge
+  (`config.ts:265,363,417-418`, `normalizeSubagentModels`).
+- Runtime: `bs-agent-manager.ts:1394` `cfg.subagentModels?.[type]` — drop the
+  per-role override lookup so `resolveSubagent` returns nothing and the sub-agent
+  inherits the main agent's model (the existing "leave empty to inherit"
+  behaviour, now the only behaviour).
 
-Keep: `delegate` tool, coordinator/worker roles, Fleet, Live coordination.
+`SubagentType` remains exported from `src/shared/types.ts` because `task.ts`
+imports it. Adjust/remove only the tests that asserted `subagentModels`.
 
-Deliverable: Settings › Agents has no sub-agent role section; no agent is
-main/sub by default; typecheck + tests green after removals (adjust/remove tests
-that asserted `task`/subagentModels).
+Deliverable: Settings › Agents has no sub-agent model-override section; `task`
+still spawns sub-agents (inheriting the main model); typecheck + tests green.
 
 ## Item 5 — Fix Antigravity detection (GUI app, not CLI)
 
@@ -149,4 +153,5 @@ tag `v1.3.4`, let CI publish, verify.
 - Placeholders: none; every item names concrete files and the decision.
 - Consistency: `client-identity` two-kind model (§5) matches the Codex path kept
   from v1.3.3; `/compact` reuses the existing system-command dispatch (§7).
-- Open scope point: §3+4 task-tool removal, flagged for the owner at review.
+- §3+4 scope resolved with the owner: keep `task`; remove only the
+  `subagentModels` settings/config/runtime-override.
