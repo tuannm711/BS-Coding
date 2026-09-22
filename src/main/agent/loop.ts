@@ -450,6 +450,40 @@ export class SessionRunner {
     this.deps.onEvent({ type: 'compacted', agentId: this.deps.agentId, summary })
   }
 
+  /**
+   * Force a compaction now, ignoring the auto setting and the token threshold.
+   * Backs the `/compact` command. Returns true when a summary replaced the head.
+   */
+  async compactNow(signal?: AbortSignal): Promise<boolean> {
+    const { compaction, replaceItems } = this.deps
+    if (!compaction || !replaceItems) return false
+    const items = this.deps.getItems()
+    if (pruneToolOutputs(items, compaction)) replaceItems(items)
+    const current = this.deps.getItems()
+    const { head, tail } = selectHeadTail(current, compaction.keepTokens, compaction.tailTurns)
+    if (head.length === 0) return false
+    const previousSummary = this.findPreviousSummary(current)
+    const prompt = buildCompactionPrompt(previousSummary, serializeItems(head, compaction.toolOutputMaxChars))
+    const summary = await compactTranscript({ llm: this.deps.llm, model: this.deps.model, prompt, signal })
+    if (signal?.aborted) return false
+    if (!summary) {
+      this.deps.onEvent({ type: 'compaction-failed', agentId: this.deps.agentId })
+      return false
+    }
+    const now = Date.now()
+    const markerItem: TranscriptItem = {
+      kind: 'message',
+      message: { id: randomUUID(), role: 'user', text: COMPACTION_MARKER, createdAt: now }
+    }
+    const summaryItem: TranscriptItem = {
+      kind: 'message',
+      message: { id: randomUUID(), role: 'assistant', text: summary, createdAt: now }
+    }
+    replaceItems([markerItem, summaryItem, ...tail])
+    this.deps.onEvent({ type: 'compacted', agentId: this.deps.agentId, summary })
+    return true
+  }
+
   private truncationOpts(): { truncate?: (toolId: string, text: string) => string } {
     const store = this.deps.truncation
     const cfg = this.deps.toolOutput

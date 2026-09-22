@@ -32,7 +32,6 @@ export default function App() {
   const [workspaces, setWorkspaces] = useState<WorkspaceSummary[]>([])
   const [templates, setTemplates] = useState<Template[]>([])
   const [showSettings, setShowSettings] = useState(false)
-  const [showModelRouter, setShowModelRouter] = useState(false)
   const [runtime, setRuntime] = useState<WorkspaceRuntime | null>(null)
   const [selectedNativeAgentId, setSelectedNativeAgentId] = useState<string | null>(null)
   const [activeProjectSessionId, setActiveProjectSessionId] = useState<string | null>(null)
@@ -383,7 +382,6 @@ export default function App() {
           onRefresh={refreshWorkspaces}
           onOpenTerminal={addTerminal}
           onOpenSettings={() => setShowSettings(true)}
-          onOpenModelRouter={() => setShowModelRouter(true)}
           onCheckUpdate={handleCheckUpdate}
           updateChecking={updateChecking}
         />
@@ -482,9 +480,6 @@ export default function App() {
           runtimeAgents={allPanes.filter(pane => pane.agent.kind === 'native').map(pane => ({ id: pane.agent.id, name: pane.agent.name }))}
         />
       )}
-      {showModelRouter && (
-        <ModelRouterComingSoon onClose={() => setShowModelRouter(false)} />
-      )}
     </div>
   )
 }
@@ -514,25 +509,3 @@ function UpToDateDialog({ version, onClose }: { version?: string; onClose: () =>
   )
 }
 
-function ModelRouterComingSoon({ onClose }: { onClose: () => void }) {
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
-
-  return (
-    <div className="dialog-backdrop">
-      <div className="dialog">
-        <h3>Model Router</h3>
-        <button className="dialog-close" aria-label="Close" onClick={onClose}>✕</button>
-        <p className="settings-hint">Coming soon.</p>
-        <div className="dialog-actions">
-          <button className="btn" onClick={onClose}>Close</button>
-        </div>
-      </div>
-    </div>
-  )
-}

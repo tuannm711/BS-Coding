@@ -34,7 +34,6 @@ describe('Agents settings table', () => {
         agents={agents}
         runtimeAgents={[]}
         onChangeAgents={vi.fn()}
-        onChangeSubagentModels={vi.fn()}
       />
     )
 
@@ -55,7 +54,6 @@ describe('Agents settings table', () => {
         agents={agents}
         runtimeAgents={[]}
         onChangeAgents={vi.fn()}
-        onChangeSubagentModels={vi.fn()}
       />
     )
 

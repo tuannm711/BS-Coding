@@ -1090,7 +1090,7 @@ describe('BsAgentManager', () => {
     expect(stats.perSession).toHaveLength(2)
   })
 
-  it('task tool resolves a configured subagent model to a dedicated llm', async () => {
+  it('task tool runs the subagent on the main model (no per-role override)', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'bs-subagent-'))
     try {
       const configPath = path.join(dir, 'bs.json')
@@ -1099,41 +1099,7 @@ describe('BsAgentManager', () => {
           test: { apiKey: 'sk-test', models: ['test-model'] },
           p1: { apiKey: 'sk-p1', models: ['m1', 'm2'] }
         },
-        model: 'test',
-        subagentModels: { research: { provider: 'p1', model: 'm2' } }
-      }))
-      const { manager, llmModels, createLlm } = await makeManager({
-        configPath,
-        partsQueue: [
-          [
-            { kind: 'tool-call', toolCallId: 'tc1', toolName: 'task', toolInput: { description: 'research x', prompt: 'research x', subagent_type: 'research' } },
-            { kind: 'finish' }
-          ],
-          [{ kind: 'text', text: 'sub result' }, { kind: 'finish' }],
-          [{ kind: 'text', text: 'done' }, { kind: 'finish' }]
-        ]
-      })
-      manager.newSession('a1')
-      await manager.send('a1', 'research x')
-      // The subagent ran on a dedicated p1 client using the configured m2 model.
-      expect(createLlm.mock.calls.some(c => c[0] === 'p1' && c[1] === 'sk-p1')).toBe(true)
-      expect(llmModels).toContain('m2')
-    } finally {
-      rmSync(dir, { recursive: true, force: true })
-    }
-  })
-
-  it('task tool falls back to the main model when the subagent provider has no api key', async () => {
-    const dir = mkdtempSync(path.join(tmpdir(), 'bs-subagent-'))
-    try {
-      const configPath = path.join(dir, 'bs.json')
-      writeFileSync(configPath, JSON.stringify({
-        provider: {
-          test: { apiKey: 'sk-test', models: ['test-model'] },
-          p1: { apiKeyEnv: 'BS_UNSET_KEY', models: ['m1', 'm2'] }
-        },
-        model: 'test',
-        subagentModels: { research: { provider: 'p1', model: 'm2' } }
+        model: 'test'
       }))
       const { manager, llmModels, createLlm } = await makeManager({
         configPath,
@@ -1151,6 +1117,33 @@ describe('BsAgentManager', () => {
       // No dedicated subagent client: the task tool inherits the main model/llm.
       expect(createLlm.mock.calls.some(c => c[0] === 'p1')).toBe(false)
       expect(llmModels.every(m => m === 'test-model')).toBe(true)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('runs compaction when /compact is dispatched', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'bs-compact-'))
+    try {
+      const configPath = path.join(dir, 'bs.json')
+      // tailTurns: 0 makes the whole transcript the head, so a manual compact
+      // fires even on a short session.
+      writeFileSync(configPath, JSON.stringify({
+        provider: { test: { apiKey: 'sk-test', models: ['test-model'] } },
+        model: 'test',
+        compaction: { tailTurns: 0 }
+      }))
+      const { manager, events } = await makeManager({
+        configPath,
+        partsQueue: [
+          [{ kind: 'text', text: 'first reply' }, { kind: 'finish' }],
+          [{ kind: 'text', text: 'A COMPACTED SUMMARY' }, { kind: 'finish' }]
+        ]
+      })
+      manager.newSession('a1')
+      await manager.send('a1', 'a message worth compacting')
+      await manager.runCommand('a1', '/compact', '')
+      expect(events.some(e => e.type === 'compacted')).toBe(true)
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }

@@ -14,12 +14,12 @@ should be checked against.
 | Section | Lines | Names |
 | --- | --- | --- |
 | [How the domains relate](#how-the-domains-relate) | 25-41 | `LlmClient` |
-| [The documents](#the-documents) | 42-59 |  |
-| [Finding a name](#finding-a-name) | 60-264 | `--output`, `.cmd`, `.exe`, `.github/workflows/build.yml`, `.ico`, `'near-limit'` |
-| [What is here and what is history](#what-is-here-and-what-is-history) | 265-274 | `docs/design/`, `docs/superpowers/`, `docs/evidence/` |
-| [Current work](#current-work) | 275-286 | `tests/`, `statusReason`, `docs/superpowers/specs/2026-08-25-narrated-tool-calls-design.md` |
-| [Next work](#next-work) | 287-301 | `docs/technical-debt.md` |
-| [Debt](#debt) | 302-308 | `docs/technical-debt.md` |
+| [The documents](#the-documents) | 42-58 |  |
+| [Finding a name](#finding-a-name) | 59-252 | `--output`, `.cmd`, `.exe`, `.github/workflows/build.yml`, `.ico`, `'near-limit'` |
+| [What is here and what is history](#what-is-here-and-what-is-history) | 253-262 | `docs/design/`, `docs/superpowers/`, `docs/evidence/` |
+| [Current work](#current-work) | 263-274 | `tests/`, `statusReason`, `docs/superpowers/specs/2026-08-25-narrated-tool-calls-design.md` |
+| [Next work](#next-work) | 275-289 | `docs/technical-debt.md` |
+| [Debt](#debt) | 290-296 | `docs/technical-debt.md` |
 <!-- /toc -->
 
 ## How the domains relate
@@ -51,7 +51,6 @@ share one conversation without interleaving.
 | 05 | [Sessions](05-sessions.md) | Transcripts, the shared-session lock, snapshots, artifacts |
 | 06 | [UI shell](06-ui-shell.md) | Window chrome, sidebar, right panel, settings, tray |
 | 07 | [Build and release](07-build-release.md) | Packaging, signing, the tag-driven workflow, updates |
-| 08 | [Remote control](08-remote-control.md) | The relay, pairing, the command gate |
 
 Every document opens with a generated table of contents giving each section's
 line range and the names it mentions, so one section can be read on its own
@@ -96,7 +95,6 @@ Generated from every domain document: which one introduces a name, and where.
 | `buildFleet` | [06-ui-shell.md#the-fleet-panel](06-ui-shell.md#the-fleet-panel) | 153 |
 | `buildSpawnCommand` | [04-terminal-panes.md#design-decisions](04-terminal-panes.md#design-decisions) | 59 |
 | `Channels.EventPtyData` | [04-terminal-panes.md#data-flow](04-terminal-panes.md#data-flow) | 29 |
-| `Channels.EventRemoteStatus` | [08-remote-control.md#data-flow](08-remote-control.md#data-flow) | 30 |
 | `Channels` | [01-process-model.md#types-that-carry-it](01-process-model.md#types-that-carry-it) | 54 |
 | `ChatEvent` | [06-ui-shell.md#types-that-carry-it](06-ui-shell.md#types-that-carry-it) | 55 |
 | `ChatPanel` | [06-ui-shell.md#data-flow](06-ui-shell.md#data-flow) | 36 |
@@ -175,17 +173,12 @@ Generated from every domain document: which one introduces a name, and where.
 | `registerIpcHandlers` | [01-process-model.md#data-flow](01-process-model.md#data-flow) | 33 |
 | `registerTerminal` | [06-ui-shell.md#data-flow](06-ui-shell.md#data-flow) | 36 |
 | `release/` | [07-build-release.md#data-flow](07-build-release.md#data-flow) | 29 |
-| `remote-commands.ts` | [08-remote-control.md#data-flow](08-remote-control.md#data-flow) | 30 |
-| `RemoteManager` | [08-remote-control.md#pieces](08-remote-control.md#pieces) | 17 |
-| `RemotePairing` | [08-remote-control.md#pieces](08-remote-control.md#pieces) | 17 |
-| `RemoteStatus` | [08-remote-control.md#data-flow](08-remote-control.md#data-flow) | 30 |
 | `resolveShell` | [04-terminal-panes.md#pieces](04-terminal-panes.md#pieces) | 18 |
 | `resources/tray-icon.png` | [07-build-release.md#data-flow](07-build-release.md#data-flow) | 29 |
 | `RightPanel` | [06-ui-shell.md#the-coordination-view](06-ui-shell.md#the-coordination-view) | 100 |
 | `runAssignment` | [02-agent-runtime.md#two-ways-to-hand-work-off](02-agent-runtime.md#two-ways-to-hand-work-off) | 120 |
 | `scripts/build-windows-icon.mjs` | [07-build-release.md#pieces](07-build-release.md#pieces) | 17 |
 | `sendInSession` | [02-agent-runtime.md#one-conversation-format](02-agent-runtime.md#one-conversation-format) | 146 |
-| `server/README.md` | [08-remote-control.md#known-limits](08-remote-control.md#known-limits) | 84 |
 | `SessionExecutionState` | [05-sessions.md#data-flow](05-sessions.md#data-flow) | 29 |
 | `SessionRunner` | [02-agent-runtime.md#pieces](02-agent-runtime.md#pieces) | 22 |
 | `sessions.json` | [05-sessions.md#pieces](05-sessions.md#pieces) | 17 |
@@ -211,10 +204,6 @@ Generated from every domain document: which one introduces a name, and where.
 | `src/main/providers/registry.ts` | [03-providers.md#pieces](03-providers.md#pieces) | 19 |
 | `src/main/providers/types.ts` | [03-providers.md#pieces](03-providers.md#pieces) | 19 |
 | `src/main/pty-manager.ts` | [04-terminal-panes.md#pieces](04-terminal-panes.md#pieces) | 18 |
-| `src/main/remote/remote-commands.ts` | [08-remote-control.md#pieces](08-remote-control.md#pieces) | 17 |
-| `src/main/remote/remote-manager.ts` | [08-remote-control.md#pieces](08-remote-control.md#pieces) | 17 |
-| `src/main/remote/remote-pairing.ts` | [08-remote-control.md#pieces](08-remote-control.md#pieces) | 17 |
-| `src/main/remote/remote-relay-client.ts` | [08-remote-control.md#pieces](08-remote-control.md#pieces) | 17 |
 | `src/main/terminal-shell.ts` | [04-terminal-panes.md#pieces](04-terminal-panes.md#pieces) | 18 |
 | `src/preload/index.ts` | [01-process-model.md#pieces](01-process-model.md#pieces) | 18 |
 | `src/renderer/AGENTS.md` | [06-ui-shell.md#design-decisions](06-ui-shell.md#design-decisions) | 65 |
@@ -230,7 +219,6 @@ Generated from every domain document: which one introduces a name, and where.
 | `src/shared/agent-fallback.ts` | [03-providers.md#choosing-a-replacement-when-a-pool-is-refused](03-providers.md#choosing-a-replacement-when-a-pool-is-refused) | 127 |
 | `src/shared/AGENTS.md` | [01-process-model.md#design-decisions](01-process-model.md#design-decisions) | 70 |
 | `src/shared/ipc.ts` | [01-process-model.md#types-that-carry-it](01-process-model.md#types-that-carry-it) | 54 |
-| `src/shared/remote-types.ts` | [08-remote-control.md#types-that-carry-it](08-remote-control.md#types-that-carry-it) | 49 |
 | `src/shared/types.ts` | [06-ui-shell.md#types-that-carry-it](06-ui-shell.md#types-that-carry-it) | 55 |
 | `src/shared` | [01-process-model.md#design-decisions](01-process-model.md#design-decisions) | 70 |
 | `StoredSession` | [05-sessions.md#types-that-carry-it](05-sessions.md#types-that-carry-it) | 50 |

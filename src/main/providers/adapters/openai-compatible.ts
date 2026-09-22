@@ -15,7 +15,14 @@ const DEFAULT_MODELS: Record<string, string[]> = {
   qoder: ['qoder-default'],
   trae: ['trae-default'],
   zed: ['zed-default'],
-  zcode: ['glm-4.5']
+  zcode: ['glm-4.5'],
+  deepseek: ['deepseek-chat', 'deepseek-reasoner']
+}
+
+// Providers whose endpoint is fixed and known, so the user need not type it.
+// A provider absent here (e.g. `custom`) must be given a base URL by the user.
+const DEFAULT_BASE_URLS: Record<string, string> = {
+  deepseek: 'https://api.deepseek.com'
 }
 
 export function createOpenAiCompatibleAdapter(providerId: string, displayName: string, apiKey = false): ProviderAdapter {
@@ -26,7 +33,9 @@ export function createOpenAiCompatibleAdapter(providerId: string, displayName: s
     capability,
     definition() { return capability },
     async connect(request: ProviderConnectRequest, context) {
-      const secret = request.methodId === 'imported' ? normalizeProviderImport(providerId, request.fields.credentialJson ?? '') : { apiKey: request.fields.apiKey, baseUrl: request.fields.baseUrl }
+      const secret = request.methodId === 'imported'
+        ? normalizeProviderImport(providerId, request.fields.credentialJson ?? '')
+        : { apiKey: request.fields.apiKey, baseUrl: request.fields.baseUrl?.trim() || DEFAULT_BASE_URLS[providerId] }
       if (!secret.apiKey && !secret.accessToken) throw new Error('[bs] Credential không có apiKey hoặc accessToken')
       if (!secret.baseUrl) throw new Error('[bs] Credential cần baseUrl OpenAI-compatible')
       const label = request.fields.label?.trim() || `${displayName} account`

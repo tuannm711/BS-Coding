@@ -6,12 +6,11 @@ import PermissionsTab from './PermissionsTab'
 import McpTab from './McpTab'
 import ContextTab from './ContextTab'
 import CommandsTab from './CommandsTab'
-import RemoteTab from './RemoteTab'
 import TemplatesTab from './TemplatesTab'
 import UpdatesTab from './UpdatesTab'
 import StatsTab from './StatsTab'
 
-type TabId = 'providers' | 'agents' | 'permissions' | 'mcp' | 'context' | 'commands' | 'remote' | 'templates' | 'updates' | 'stats'
+type TabId = 'providers' | 'agents' | 'permissions' | 'mcp' | 'context' | 'commands' | 'templates' | 'updates' | 'stats'
 
 const TABS: Array<{ id: TabId; label: string }> = [
   { id: 'providers', label: 'Providers' },
@@ -124,9 +123,7 @@ export default function SettingsDialog({ onClose, projectPath, templates, onTemp
               <AgentsTab
                 agents={draft.agents}
                 runtimeAgents={runtimeAgents}
-                subagentModels={draft.subagentModels}
                 onChangeAgents={agents => patch({ agents })}
-                onChangeSubagentModels={subagentModels => patch({ subagentModels })}
               />
             )}
             {draft && tab === 'permissions' && (
@@ -150,7 +147,6 @@ export default function SettingsDialog({ onClose, projectPath, templates, onTemp
               />
             )}
             {tab === 'commands' && <CommandsTab projectPath={projectPath} />}
-            {tab === 'remote' && <RemoteTab />}
             {tab === 'templates' && <TemplatesTab templates={templates} onChange={onTemplatesChange} />}
             {tab === 'updates' && <UpdatesTab />}
             {tab === 'stats' && <StatsTab />}
