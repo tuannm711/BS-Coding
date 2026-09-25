@@ -1,89 +1,77 @@
 # BS Coding — Branching and Release Strategy
 
-This document defines the canonical dual-track branching, release, and auto-update strategy for BS Coding V1 and V2.
+BS Coding is a single-track repository. The former V2 track moved on 2026-09-25 to the
+separate product **BS Workflow** (`tuannm711/BS-Workflow`), which has its own branches,
+releases, update feed and install identity.
 
 ---
 
-## 1. Canonical Topology
+## 1. Topology
 
 ```text
-                         BS Coding Repository
-                                  │
-                                 main (Repository Governance / Default)
-                                  │
-                    ┌─────────────┴─────────────┐
-                    │                           │
-                V1 Track                    V2 Track
-                    │                           │
-               develop/v1                  develop/v2 (2.0.0 in dev)
-                    │                           │
-               release/v1                  release/v2 (future release branch)
-                    │                           │
-               v1.* tags                   v2.* tags (future releases)
+BS Coding Repository
+        │
+       main (Repository Governance / Default)
+        │
+   develop/v1 ── development
+        │
+   release/v1 ── release
+        │
+    v1.* tags ── published releases
 ```
 
 ---
 
 ## 2. Branch Roles & Rules
 
-| Branch | Role | Product Line | Release Publishing | Tag Pattern |
-|--------|------|-------------------|-------------|
-| **`main`** | Repository Governance & Default Branch | Governance | **NO** | **NO** |
-| **`develop/v1`** | V1 Active Development | BS Coding V1 | **NO** | **NO** |
-| **`release/v1`** | V1 Stable & Maintenance Release | BS Coding V1 | **YES** | `v1.*` (from `release/v1` only) |
-| **`develop/v2`** | V2 Active Development (Target: 2.0.0) | BS Coding V2 | **NO** | **NO** |
-| **`release/v2`** | V2 Stable & Production Release | BS Coding V2 | **YES** *(when created)* | `v2.*` (from `release/v2` only) |
+| Branch | Role | Release Publishing | Tag Pattern |
+|--------|------|--------------------|-------------|
+| **`main`** | Repository Governance & Default Branch | **NO** | **NO** |
+| **`develop/v1`** | Active development | **NO** | **NO** |
+| **`release/v1`** | Stable & maintenance releases | **YES** | `v1.*` (from `release/v1` only) |
 
 ---
 
 ## 3. Governance Hard Rules
 
-1. **MAXIMUM REMOTE BRANCHES = 5**:
-   The GitHub repository must NEVER have more than 5 canonical remote branches (`main`, `develop/v1`, `release/v1`, `develop/v2`, `release/v2`).
-   *(Current state: 4 remote branches before `release/v2` is established).*
-
-2. **TEMPORARY BRANCHES ARE LOCAL-ONLY**:
-   Feature, bugfix, hotfix, codex, or task branches (`feature/*`, `bugfix/*`, `hotfix/*`, `codex/*`, `task/*`, `v1/p*`, `v2/p*`) MUST remain local. Never push temporary branches to GitHub.
-
-3. **MAIN BRANCH IS GOVERNANCE-ONLY**:
-   Do NOT develop product code or trigger product releases from `main`.
-
-4. **FORBIDDEN CROSS-VERSION MERGES**:
-   Do NOT merge V1 code into V2 or V2 code into V1. `release/v1` and `develop/v2` are independent product tracks.
-
-5. **RELEASE SOURCES**:
-   - V1 releases are published exclusively from `release/v1` via `v1.*` tags.
-   - V2 releases will be published exclusively from `release/v2` via `v2.*` tags once `release/v2` is established. `develop/v2` MUST NOT publish stable V2 releases.
+1. **MAXIMUM REMOTE BRANCHES = 3**: `main`, `develop/v1`, `release/v1`.
+2. **TEMPORARY BRANCHES ARE LOCAL-ONLY**: feature, bugfix, hotfix, codex or task branches
+   (`feature/*`, `bugfix/*`, `hotfix/*`, `codex/*`, `task/*`, `v1/p*`) MUST remain local.
+3. **MAIN BRANCH IS GOVERNANCE-ONLY**: do not develop product code or trigger releases from `main`.
+4. **NO V2 BRANCHES HERE**: V2 work lives in BS Workflow. Do not recreate `develop/v2` or
+   `release/v2`, and do not merge BS Workflow code into this repository.
+5. **RELEASE SOURCE**: releases are published exclusively from `release/v1` via `v1.*` tags.
+   Merging `develop/v1` into `release/v1` can overwrite `release/v1`'s tag-publish `build.yml` —
+   verify `on: push: tags: ['v1.*']` survives before tagging.
 
 ---
 
-## 4. Multi-Layer Auto-Update Isolation
-
-Auto-update operates using three defensive layers:
+## 4. Auto-Update
 
 ```text
-Layer 1: Update Discovery Isolation
+Layer 1: Update Discovery
   - Queries https://github.com/tuannm711/BS-Coding/releases.atom
-  - Filters release tags for current major version (v1.* for V1, v2.* for V2)
-  - Finds the highest semver tag matching current major
-  - Directs electron-updater setFeedURL() to fetch update manifests directly from that tag
-
-        ↓
+  - Keeps release tags with the running app's major version
+  - Points electron-updater setFeedURL() at the highest matching tag
 
 Layer 2: Major-Version Guard
-  - parseMajor(currentVersion) === parseMajor(updateInfo.version)
   - Rejects any update payload whose major version differs from the running app
 
-        ↓
-
 Layer 3: Download & Installation
-  - Safe download and quitAndInstall execution
 ```
+
+BS Workflow publishes to its own repository, so BS Coding never sees its releases.
 
 ---
 
-## 5. Installer Coexistence Identity
+## 5. Coexistence with BS Workflow
 
-- **V1 (`release/v1`)**: `appId: 'com.bs.coding'`, Product Name: `BS Coding`
-- **V2 (`develop/v2`)**: `appId: 'com.bs.coding.v2'`, Product Name: `BS Coding`, NSIS Installer: `BS.Coding.V2.Setup.${version}.exe`
-- **Coexistence**: V1 and V2 use distinct `appId` identities, allowing both applications to run side-by-side on Windows, macOS, and Linux without shortcut or registry uninstallation conflicts.
+| | BS Coding | BS Workflow |
+|---|---|---|
+| appId / AppUserModelID | `com.bs.coding` | `com.bs.workflow` |
+| userData (Windows) | `%APPDATA%\bs-coding` | `%APPDATA%\bs-workflow` |
+| Browser bridge port | 3927 | 3937 |
+| Dev server port | 1305 | 1306 |
+| Update source | BS-Coding releases | BS-Workflow releases |
+
+Both apps can be installed and run at the same time; neither reads or writes the other's data.

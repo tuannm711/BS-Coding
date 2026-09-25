@@ -6,10 +6,12 @@ BS Coding — Repository Governance & Root Instructions
 
 - **Branch**: `main` (Repository Governance & Default Branch)
 - **Rule**: **DO NOT develop product code here.**
-- **Development tracks**:
-  - **BS Coding V1**: `develop/v1` → `release/v1` (tag `v1.*`)
-  - **BS Coding V2**: `develop/v2` → `release/v2` (tag `v2.*`)
-- **Maximum Remote Branches**: 5 (`main`, `release/v1`, `develop/v1`, `release/v2`, `develop/v2`).
+- **Development track**:
+  - **BS Coding (V1)**: `develop/v1` → `release/v1` (tag `v1.*`)
+- **V2 moved out (2026-09-25)**: the V2 rebuild is now the separate product **BS Workflow**
+  in `tuannm711/BS-Workflow`. It installs alongside BS Coding and shares no data, identity or
+  releases with it. Do not recreate `develop/v2` or `release/v2` here.
+- **Maximum Remote Branches**: 3 (`main`, `develop/v1`, `release/v1`).
 
 ## Công nghệ
 
@@ -19,7 +21,8 @@ BS Coding — Repository Governance & Root Instructions
 
 ## Cấu trúc
 
-- `release/v1` & `develop/v1` — BS Coding V1 maintenance line.
-- `develop/v2` — BS Coding V2 active development line.
-- `docs/v2/` — V2 architecture documentation pack.
-- `docs/BRANCHING_AND_RELEASE_STRATEGY.md` — Dual-track branching policy.
+- `release/v1` & `develop/v1` — BS Coding maintenance line.
+- `docs/v2/` — historical copy of the V2 architecture pack as of the move; the living copy is
+  in `tuannm711/BS-Workflow`.
+- `docs/BRANCHING_AND_RELEASE_STRATEGY.md` — branching and release policy.
+- `docs/RELEASES.md` — latest released version.
