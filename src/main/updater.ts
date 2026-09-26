@@ -11,7 +11,7 @@ export interface UpdaterEnv {
   fetchFeed?: (url: string) => Promise<string>
 }
 
-// Extract major version from semver string (e.g. "1.3.2" -> 1, "v2.0.0" -> 2).
+// Extract major version from semver string (e.g. "1.3.2" -> 1, "v10.1.0" -> 10).
 export function parseMajor(version: string): number {
   const m = /^v?(\d+)/.exec(version)
   return m ? Number(m[1]) : NaN
@@ -137,7 +137,7 @@ export class Updater {
       const currentMajor = parseMajor(currentVersion)
 
       // Layer 1: Update Discovery Isolation
-      // Fetch release feed and find the latest release tag matching currentMajor (v1.* for V1, v2.* for V2).
+      // Fetch release feed and find the latest release tag matching currentMajor.
       const fetchFn = this.env.fetchFeed || (typeof fetch !== 'undefined' ? (url: string) => fetch(url).then(r => r.text()) : undefined)
       if (fetchFn) {
         const discovered = await discoverLatestMatchingRelease(currentVersion, fetchFn)
