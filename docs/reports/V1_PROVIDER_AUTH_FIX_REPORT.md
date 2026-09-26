@@ -120,8 +120,8 @@
    - Tests run exclusively in temp directories via `mkdtempSync` and `BS_USER_DATA=<isolatedDir>`.
 3. **Global `%USERPROFILE%\.codex` Configuration**:
    - Global `~/.codex` was **NEVER written or modified**. Verified by unit test `codex-app-server.test.ts`.
-4. **Other Branches (`develop/v2`, `main`, `release/v1`)**:
-   - `develop/v2`, `main`, and `release/v1` were **NOT modified**.
+4. **Other Branches (`main`, `release/v1`)**:
+   - `main` and `release/v1` were **NOT modified**.
    - Worktree `BS-Coding-v1-provider-auth` is strictly isolated on branch `fix/v1-provider-auth` created from `develop/v1`.
 
 ---
