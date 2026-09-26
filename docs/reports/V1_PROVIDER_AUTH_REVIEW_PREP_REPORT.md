@@ -23,10 +23,9 @@
 ## B. Branch Isolation
 
 - **Merge Base with `develop/v1`**: `2f16deb968f24201fa2b5899f6f0f553361c202a`
-- **Merge Base with `develop/v2`**: `31f865340a6c3fc85cdc3925b09705b300d60f6e`
 - **Merge Base with `main`**: `31f865340a6c3fc85cdc3925b09705b300d60f6e`
 - **Merge Base with `release/v1`**: `75a2a98655e5a8e66b0510a1628e03120cbc6122`
-- **Confirmation**: Zero commits or files from `develop/v2`, `main`, or `release/v1` were modified. Work is strictly confined to `fix/v1-provider-auth`.
+- **Confirmation**: Zero commits or files from `main` or `release/v1` were modified. Work is strictly confined to `fix/v1-provider-auth`.
 
 ---
 
@@ -144,5 +143,5 @@
    - Tests run exclusively in temp directories via `mkdtempSync` and isolated `userDataDir`.
 3. **Global `%USERPROFILE%\.codex` Configuration**:
    - Global `~/.codex` was **NEVER written or modified**. Verified by automated smoke test `tests/integration/isolated-smoke.test.ts`.
-4. **Other Branches (`develop/v2`, `main`, `release/v1`)**:
+4. **Other Branches (`main`, `release/v1`)**:
    - Zero commits or files from other branches touched.
