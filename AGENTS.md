@@ -5,16 +5,15 @@ aider, ...) chạy song song trong các pane terminal trên một cửa sổ.
 
 ## Branch Governance & Context
 
-- **Product Track**: BS Coding V1
+- **Product**: BS Coding
 - **Current Version**: 1.3.4
 - **Development Branch**: `develop/v1`
 - **Stable / Release Branch**: `release/v1`
 - **Release Tags**: `v1.*` (triggered from `release/v1` only)
 - **Rules**:
-  - All V1 feature development lands in `develop/v1`.
+  - All feature development lands in `develop/v1`.
   - Releases are merged from `develop/v1` to `release/v1` and tagged `v1.*`.
-  - Do not merge V2 code into this branch.
-  - Maximum remote branches for repo = 5 (`main`, `release/v1`, `develop/v1`, `release/v2`, `develop/v2`).
+  - Maximum remote branches for repo = 3 (`main`, `develop/v1`, `release/v1`).
 
 ## Công nghệ
 

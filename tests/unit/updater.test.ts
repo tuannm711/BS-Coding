@@ -80,8 +80,8 @@ describe('Semver & Major utilities', () => {
       { tag: 'v1.3.3', version: '1.3.3' }
     ])
 
-    const v2Tags = parseReleaseTagsFromAtomFeed(sampleFeedXml, 2)
-    expect(v2Tags).toEqual([
+    const otherMajorTags = parseReleaseTagsFromAtomFeed(sampleFeedXml, 2)
+    expect(otherMajorTags).toEqual([
       { tag: 'v2.0.1', version: '2.0.1' },
       { tag: 'v2.0.0', version: '2.0.0' }
     ])
@@ -89,13 +89,13 @@ describe('Semver & Major utilities', () => {
 })
 
 describe('Update Discovery Isolation (Layer 1)', () => {
-  it('T1/T2: Installed 1.3.2 discovers v1.4.1 (highest V1 release) ignoring V2 releases in feed', async () => {
+  it('T1/T2: Installed 1.3.2 discovers v1.4.1 (highest same-major release) ignoring another major in feed', async () => {
     const fetchFeed = vi.fn().mockResolvedValue(sampleFeedXml)
     const discovered = await discoverLatestMatchingRelease('1.3.2', fetchFeed)
     expect(discovered).toEqual({ targetTag: 'v1.4.1', targetVersion: '1.4.1' })
   })
 
-  it('T1: Installed 1.3.2 discovers v1.3.3 when v1.3.3 is the latest V1 release', async () => {
+  it('T1: Installed 1.3.2 discovers v1.3.3 when v1.3.3 is the latest same-major release', async () => {
     const feedXml = `
       <feed xmlns="http://www.w3.org/2005/Atom">
         <entry><link href="https://github.com/tuannm711/BS-Coding/releases/tag/v2.0.0"/><title>v2.0.0</title></entry>
@@ -107,14 +107,14 @@ describe('Update Discovery Isolation (Layer 1)', () => {
     expect(discovered).toEqual({ targetTag: 'v1.3.3', targetVersion: '1.3.3' })
   })
 
-  it('T3: Installed 1.4.0 with only V2 releases in feed returns null (no V1 update)', async () => {
-    const v2OnlyFeed = `
+  it('T3: Installed 1.4.0 with only another major in feed returns null', async () => {
+    const otherMajorFeed = `
       <feed xmlns="http://www.w3.org/2005/Atom">
         <entry><link href="https://github.com/tuannm711/BS-Coding/releases/tag/v2.0.1"/><title>v2.0.1</title></entry>
         <entry><link href="https://github.com/tuannm711/BS-Coding/releases/tag/v2.0.0"/><title>v2.0.0</title></entry>
       </feed>
     `
-    const fetchFeed = vi.fn().mockResolvedValue(v2OnlyFeed)
+    const fetchFeed = vi.fn().mockResolvedValue(otherMajorFeed)
     const discovered = await discoverLatestMatchingRelease('1.4.0', fetchFeed)
     expect(discovered).toBeNull()
   })
@@ -164,7 +164,7 @@ describe('Updater with Discovery & Major Guard', () => {
     expect(events).toEqual([{ type: 'checking' }, { type: 'up-to-date', currentVersion: '1.3.2' }])
   })
 
-  it('T2: V1 1.3.2 discovers v1.3.3 via feed even when GitHub latest is v2.0.0', async () => {
+  it('T2: Installed 1.3.2 discovers v1.3.3 via feed even when GitHub latest is another major', async () => {
     const fetchFeed = vi.fn().mockResolvedValue(`
       <feed xmlns="http://www.w3.org/2005/Atom">
         <entry><link href="https://github.com/tuannm711/BS-Coding/releases/tag/v2.0.0"/><title>v2.0.0</title></entry>
@@ -194,7 +194,7 @@ describe('Updater with Discovery & Major Guard', () => {
     ])
   })
 
-  it('T3: V1 1.4.0 with only V2 releases in feed emits up-to-date', async () => {
+  it('T3: Installed 1.4.0 with only another major in feed emits up-to-date', async () => {
     const fetchFeed = vi.fn().mockResolvedValue(`
       <feed xmlns="http://www.w3.org/2005/Atom">
         <entry><link href="https://github.com/tuannm711/BS-Coding/releases/tag/v2.0.1"/><title>v2.0.1</title></entry>
