@@ -11,11 +11,11 @@ panel, settings and the tray. The terminal inside a pane is in
 | [Pieces](#pieces) | 21-35 | `src/renderer/src/App.tsx`, `PaneModel`, `src/renderer/src/components/TitleBar.tsx`, `src/renderer/src/components/Sidebar.tsx`, `src/renderer/src/components/RightPanel.tsx`, `src/renderer/src/components/fleet/` |
 | [Data flow](#data-flow) | 36-54 | `App.tsx`, `PaneModel`, `XtermHost`, `buffersRef`, `registerTerminal`, `ChatPanel` |
 | [Types that carry it](#types-that-carry-it) | 55-64 | `PaneModel`, `ChatEvent`, `src/shared/types.ts`, `QuotaAccountUiState`, `src/renderer/src/components/quota/quota-view.ts` |
-| [Design decisions](#design-decisions) | 65-104 | `getWindowChromeOptions`, `titleBarOverlay`, `tests/unit/window-chrome.test.ts`, `src/renderer/AGENTS.md`, `MainApp`, `app.setAppUserModelId` |
-| [The coordination view](#the-coordination-view) | 105-157 | `src/renderer/src/components/coordinator/CoordinatorView.tsx`, `App.tsx`, `setMode`, `RightPanel`, `ChatPanel`, `listSessionTranscript` |
-| [The fleet panel](#the-fleet-panel) | 158-230 | `RightPanel`, `buildFleet`, `ProviderQuotaGroup`, `FleetBoard`, `provider/account/quotaPoolId`, `FleetAgentRow` |
-| [Sessions live in the sidebar](#sessions-live-in-the-sidebar) | 231-254 | `activeSessionId`, `groupSessions` |
-| [Known limits](#known-limits) | 255-261 | `docs/technical-debt.md` |
+| [Design decisions](#design-decisions) | 65-132 | `getWindowChromeOptions`, `titleBarOverlay`, `tests/unit/window-chrome.test.ts`, `src/renderer/AGENTS.md`, `src/shared/appearance.ts`, `src/renderer/src/useAppearance.ts` |
+| [The coordination view](#the-coordination-view) | 133-185 | `src/renderer/src/components/coordinator/CoordinatorView.tsx`, `App.tsx`, `setMode`, `RightPanel`, `ChatPanel`, `listSessionTranscript` |
+| [The fleet panel](#the-fleet-panel) | 186-258 | `RightPanel`, `buildFleet`, `ProviderQuotaGroup`, `FleetBoard`, `provider/account/quotaPoolId`, `FleetAgentRow` |
+| [Sessions live in the sidebar](#sessions-live-in-the-sidebar) | 259-282 | `activeSessionId`, `groupSessions` |
+| [Known limits](#known-limits) | 283-289 | `docs/technical-debt.md` |
 <!-- /toc -->
 
 ## Pieces
@@ -81,11 +81,39 @@ response the view follows the output until the user scrolls away, after which it
 stops fighting them. The geometry is a pure module so the rule is testable
 without rendering.
 
-**Settings is one dialog with tabs.** Providers, Agents, Quick Messages,
+**Settings is one dialog with tabs.** Appearance, Providers, Agents, Quick Messages,
 Permissions, MCP, Context, Commands, Updates and Usage share a draft/Save/Cancel
 shell. Native agent profiles select account/quota; model selection is in chat.
 Every profile, including the initial `bs`, can be removed. An empty profile list
 stays empty on reload. The shared modal owns focus and unsaved-discard behavior.
+
+The shell is up to 1120px wide and bounded by the window. At 760px and below,
+section navigation becomes a horizontal scroller. Content owns vertical scrolling;
+header, feedback and Save/Cancel remain reachable. Loading and retry are explicit.
+
+`src/shared/appearance.ts` normalizes saved background/text/button HEX colors and
+derives renderer CSS variables. `src/renderer/src/useAppearance.ts` applies them
+after loading or saving settings. `AppearanceTab` uses the same adapter for a
+scoped preview; Save applies it to the workspace. Restore defaults changes only
+the draft. Primary button text chooses black/white automatically, while the UI
+warns on low text/background contrast.
+
+**Projects can be edited.** Add and Edit share `AddProjectDialog` and the focused
+`Modal` shell. `Channels.WorkspaceUpdate` validates folder existence and uniqueness
+in main. Name changes keep runtime state; folder changes require idle project
+agents/sessions and closed project terminals. `WorkspaceStore` rebases agent cwd,
+`BsAgentManager` relocates stored sessions/snapshots and rebinds idle runners, and
+`ArtifactStore` rebases artifact paths. IDs and transcript contents are retained.
+The app changes metadata, not files. The active renderer adopts the returned
+runtime directly so an edit does not restart agents.
+
+**Chat distinguishes work from a final response.** Real reasoning/text/tool/prompt
+events drive Thinking, Responding, Working and waiting states. Buffered text is
+flushed at activity boundaries. `turn-finished` follows persisted execution status;
+`chat-presentation.ts` selects the final text after the last tool in a successful
+turn. It receives elapsed turn time and Copy; stopped/failed turns do not. Copy
+writes the original Markdown, reports clipboard failure, and keeps row identity
+stable through completion. Finished turns retain the user's scroll ownership.
 
 Quick Messages persist an ID, name and content. Their buttons sit between Mode
 and agent/model selection, send to the active session's selected agent, and use

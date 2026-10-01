@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { ChevronDown } from 'lucide-react'
 import type { AgentConfig, AgentMode, BsSettings, ChatEvent, ChatMessage, Command, ImageAttachment, QuestionOption, QueuedMessage, QuickMessage, TodoItem, TodoStatus, ToolCallData, TurnExecutionSnapshot } from '@shared/types'
 import { appendStreamDelta } from '@shared/text'
@@ -14,6 +14,7 @@ import { FeedRow, feedItemKey, type FeedItem } from './FeedRow'
 import { withNarrationNotices } from './transcript-notices'
 import { acceptChatEvent } from './chat-event-scope'
 import { useChatScroll } from './useChatScroll'
+import { finalResponseIds, mergeTranscriptSnapshot } from './chat-presentation'
 
 interface PendingPrompt {
   promptId: string
@@ -42,6 +43,8 @@ interface Props {
 function ChatPanel({ agentId, agents, onAgentChange, projectPath, sessionId, onSessionChange, cwd, mode = 'build', variant, onModeChange, onVariantChange }: Props) {
   const [items, setItems] = useState<FeedItem[]>([])
   const [running, setRunning] = useState(false)
+  const [activity, setActivity] = useState('Working')
+  const [workingAgentId, setWorkingAgentId] = useState(agentId)
   const [quickMessages, setQuickMessages] = useState<QuickMessage[]>([])
   const [quickSending, setQuickSending] = useState(false)
   const quickSendingRef = useRef(false)
@@ -88,7 +91,13 @@ function ChatPanel({ agentId, agents, onAgentChange, projectPath, sessionId, onS
   // UI thread on every token and make typing in the input lag.
   const deltaBufRef = useRef<{ text: string; reasoning: string }>({ text: '', reasoning: '' })
   const rafRef = useRef<number | null>(null)
+  const streamRowSequence = useRef(0)
   const activeTurnIdRef = useRef<string | undefined>(undefined)
+  const viewRevisionRef = useRef(0)
+  const historyRequestRef = useRef(0)
+  const initialTranscriptRef = useRef(true)
+  const viewScopeRef = useRef({ projectPath, sessionId })
+  viewScopeRef.current = { projectPath, sessionId }
 
   const refreshVariants = useCallback(() => {
     void window.api.getAgentVariants(agentId).then(list => {
@@ -138,16 +147,26 @@ function ChatPanel({ agentId, agents, onAgentChange, projectPath, sessionId, onS
     }
   }, [pendingPrompt])
 
-  const loadTranscript = useCallback(() => {
+  const loadTranscript = useCallback((merge = false) => {
+    const request = ++historyRequestRef.current
+    const revision = viewRevisionRef.current
+    const initial = initialTranscriptRef.current
     void window.api.listSessionTranscript(projectPath, sessionId).then(items => {
-      setItems(withNarrationNotices(items.map(it => it.kind === 'message'
+      if (request !== historyRequestRef.current || viewScopeRef.current.projectPath !== projectPath || viewScopeRef.current.sessionId !== sessionId) return
+      if (!initial && !merge && viewRevisionRef.current !== revision) return
+      const snapshot = withNarrationNotices(items.map(it => it.kind === 'message'
         ? {
             kind: 'message', id: it.message.id, role: it.message.role,
             text: it.message.displayText ?? it.message.text,
-            reasoning: it.message.reasoning, images: it.message.images, execution: it.message.execution
+            reasoning: it.message.reasoning, images: it.message.images, execution: it.message.execution, turnId: it.message.turnId
           }
         : { kind: 'tool', id: it.tool.id, call: { ...it.tool } }
-      )))
+      ))
+      setItems(previous => merge || viewRevisionRef.current !== revision ? mergeTranscriptSnapshot(snapshot, previous) : snapshot)
+      if (!activeTurnIdRef.current && viewRevisionRef.current === revision && initial) {
+        const active = [...items].reverse().find(item => (item.kind === 'message' ? item.message.execution : item.tool.execution)?.status === 'running')
+        if (active) activeTurnIdRef.current = active.kind === 'message' ? active.message.turnId : active.tool.turnId
+      }
       // Mức chiếm dụng context = token của assistant message cuối cùng có output,
       // giống cách opencode chọn (subagent-footer.tsx:35).
       let used: number | null = null
@@ -158,7 +177,7 @@ function ChatPanel({ agentId, agents, onAgentChange, projectPath, sessionId, onS
         if (it.message.role === 'assistant' && t && t.output > 0) { used = contextTokens(t); break }
       }
       setContextUsed(used)
-      pinSessionToEnd()
+      if (initialTranscriptRef.current) { pinSessionToEnd(); initialTranscriptRef.current = false }
     })
   }, [projectPath, sessionId, pinSessionToEnd])
 
@@ -167,8 +186,14 @@ function ChatPanel({ agentId, agents, onAgentChange, projectPath, sessionId, onS
   }, [projectPath, sessionId])
 
   const resetView = useCallback(() => {
+    initialTranscriptRef.current = true
+    viewRevisionRef.current++
+    activeTurnIdRef.current = undefined
+    deltaBufRef.current = { text: '', reasoning: '' }
+    if (rafRef.current != null) { cancelAnimationFrame(rafRef.current); rafRef.current = null }
     setItems([])
     setRunning(false)
+    setActivity('Working')
     setPendingPrompt(null)
     setSelectedAction(0)
     setQuestionText('')
@@ -189,12 +214,23 @@ function ChatPanel({ agentId, agents, onAgentChange, projectPath, sessionId, onS
   }, [loadTranscript, loadTodos, loadContextInfo, loadSessionUsage])
 
   useEffect(() => {
+    activeTurnIdRef.current = undefined
+    initialTranscriptRef.current = true
+    deltaBufRef.current = { text: '', reasoning: '' }
+    if (rafRef.current != null) { cancelAnimationFrame(rafRef.current); rafRef.current = null }
+    viewRevisionRef.current++
+    setItems([])
+    setPendingPrompt(null)
+    setActivity('Working')
     loadTranscript()
     loadTodos()
     void window.api.listCommands(cwd).then(setCommands)
     // The agent may already be mid-turn from before a project switch/remount;
     // restore the running state so the Stop button and indicator come back.
-    void window.api.isSessionChatRunning(projectPath, sessionId).then(setRunning)
+    const runningRevision = viewRevisionRef.current
+    void window.api.isSessionChatRunning(projectPath, sessionId).then(value => {
+      if (viewScopeRef.current.projectPath === projectPath && viewScopeRef.current.sessionId === sessionId && viewRevisionRef.current === runningRevision) setRunning(value)
+    })
     const off = window.api.onChatEvent(e => applyEvent(e))
     return off
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -218,6 +254,7 @@ function ChatPanel({ agentId, agents, onAgentChange, projectPath, sessionId, onS
     const { text, reasoning } = deltaBufRef.current
     if (!text && !reasoning) return
     deltaBufRef.current = { text: '', reasoning: '' }
+    const turnId = activeTurnIdRef.current
     setItems(prev => {
       const next = [...prev]
       if (text) {
@@ -225,7 +262,7 @@ function ChatPanel({ agentId, agents, onAgentChange, projectPath, sessionId, onS
         if (last && last.kind === 'message' && last.role === 'assistant') {
           next[next.length - 1] = { ...last, text: appendStreamDelta(last.text, text) }
         } else {
-          next.push({ kind: 'message', id: 'a-' + Date.now(), role: 'assistant', text })
+          next.push({ kind: 'message', id: `a-${Date.now()}-${++streamRowSequence.current}`, role: 'assistant', text, turnId })
         }
       }
       if (reasoning) {
@@ -233,7 +270,7 @@ function ChatPanel({ agentId, agents, onAgentChange, projectPath, sessionId, onS
         if (last && last.kind === 'message' && last.role === 'assistant') {
           next[next.length - 1] = { ...last, reasoning: appendStreamDelta(last.reasoning ?? '', reasoning) }
         } else {
-          next.push({ kind: 'message', id: 'a-' + Date.now(), role: 'assistant', text: '', reasoning })
+          next.push({ kind: 'message', id: `a-${Date.now()}-${++streamRowSequence.current}`, role: 'assistant', text: '', reasoning, turnId })
         }
       }
       return next
@@ -256,6 +293,28 @@ function ChatPanel({ agentId, agents, onAgentChange, projectPath, sessionId, onS
 
   const applyEvent = useCallback((e: ChatEvent) => {
     if (!acceptChatEvent({ projectPath, sessionId, turnId: activeTurnIdRef.current }, e)) return
+    if (e.turnId && !activeTurnIdRef.current && (e.type === 'text-delta' || e.type === 'reasoning-delta' || e.type === 'tool-start' || e.type === 'tool-result' || e.type === 'prompt-request')) {
+      activeTurnIdRef.current = e.turnId
+      setRunning(true)
+      setWorkingAgentId(e.agentId)
+    }
+    // Commit prose before a tool/notice boundary so rAF batching cannot move
+    // an earlier progress message below a later tool call.
+    if (e.type !== 'text-delta' && e.type !== 'reasoning-delta') flushDeltas()
+    if (e.type !== 'usage' && e.type !== 'queue-updated') viewRevisionRef.current++
+    if (e.type === 'turn-finished') {
+      flushDeltas()
+      setItems(previous => previous.map(item => {
+        if (item.kind === 'message' && (item.turnId ?? item.execution?.turnId) === e.execution.turnId) return { ...item, execution: e.execution }
+        if (item.kind === 'tool' && (item.call.turnId ?? item.call.execution?.turnId) === e.execution.turnId) return { ...item, call: { ...item.call, execution: e.execution } }
+        return item
+      }))
+      // The live rows already contain the full response. Preserve their IDs
+      // (and Copy state) instead of replacing them with disk IDs mid-click.
+      loadTranscript(true)
+      loadSessionUsage()
+      return
+    }
     if (e.type === 'turn-started' || e.type === 'queue-updated' || e.type === 'done' || e.type === 'error') {
       quickSendingRef.current = false
       setQuickSending(false)
@@ -309,7 +368,7 @@ function ChatPanel({ agentId, agents, onAgentChange, projectPath, sessionId, onS
             break
           }
         }
-        const row = { kind: 'message' as const, id: e.message.id, role: 'user' as const, text: e.message.displayText ?? e.message.text, images: e.message.images }
+        const row = { kind: 'message' as const, id: e.message.id, role: 'user' as const, text: e.message.displayText ?? e.message.text, images: e.message.images, turnId: e.message.turnId, execution: e.message.execution }
         if (idx >= 0) {
           const next = [...prev]
           next[idx] = row
@@ -334,6 +393,7 @@ if (e.type === 'usage') {
       return
     }
     if (e.type === 'agent-fallback') {
+      setWorkingAgentId(e.toAgentId)
       setItems(prev => [...prev, {
         kind: 'notice',
         id: 'f-' + Date.now(),
@@ -365,7 +425,7 @@ if (e.type === 'usage') {
       if (e.type === 'error') {
         setItems(prev => [...prev, { kind: 'error', id: 'err-' + Date.now(), text: e.message }])
       }
-      if (e.type === 'done') { loadTranscript(); loadSessionUsage() }
+      if (e.type === 'done') loadSessionUsage()
       return
     }
     if (e.type === 'session-created') {
@@ -375,9 +435,12 @@ if (e.type === 'usage') {
     if (e.type === 'turn-started') {
       activeTurnIdRef.current = (e as ChatEvent & { turnId?: string }).turnId
       setRunning(true)
+      setWorkingAgentId(e.agentId)
+      setActivity('Working')
       return
     }
     if (e.type === 'prompt-request') {
+      setActivity(e.kind === 'permission' ? 'Waiting for approval' : 'Waiting for your answer')
       setPendingPrompt({
         promptId: e.promptId,
         promptType: e.kind,
@@ -395,6 +458,7 @@ if (e.type === 'usage') {
       return
     }
     if (e.type === 'text-delta' || e.type === 'reasoning-delta') {
+      setActivity(e.type === 'reasoning-delta' ? 'Thinking' : 'Responding')
       const buf = deltaBufRef.current
       if (e.type === 'text-delta') buf.text += e.delta
       else buf.reasoning += e.delta
@@ -406,13 +470,17 @@ if (e.type === 'usage') {
       }
       return
     }
+    if (e.type === 'tool-start') setActivity(`Working · ${e.call.tool}`)
+    else if (e.type === 'tool-result') setActivity('Working')
     setItems(prev => {
       const next = [...prev]
       if (e.type === 'tool-start') {
-        next.push({ kind: 'tool', id: e.call.id, call: { ...e.call } })
+        next.push({ kind: 'tool', id: e.call.id, call: { ...e.call, turnId: e.turnId ?? e.call.turnId } })
       } else if (e.type === 'tool-result') {
         const idx = next.findIndex(i => i.kind === 'tool' && i.id === e.call.id)
-        if (idx >= 0) next[idx] = { kind: 'tool', id: e.call.id, call: { ...e.call } }
+        const row: FeedItem = { kind: 'tool', id: e.call.id, call: { ...e.call, turnId: e.turnId ?? e.call.turnId } }
+        if (idx >= 0) next[idx] = row
+        else next.push(row)
       }
       return next
     })
@@ -609,6 +677,8 @@ if (e.type === 'usage') {
   }
 
   const doneCount = todos.filter(t => t.status === 'completed' || t.status === 'cancelled').length
+  const finals = useMemo(() => finalResponseIds(items), [items])
+  const workingName = agents.find(agent => agent.id === workingAgentId)?.name ?? 'Agent'
 
   return (
     <div className="chat-panel" data-testid="chat-panel" data-project-path={projectPath} data-session-id={sessionId} onKeyDown={onPanelKeyDown}>
@@ -683,13 +753,14 @@ if (e.type === 'usage') {
           <FeedRow
             key={feedItemKey(item)}
             item={item}
+            isFinal={finals.has(feedItemKey(item))}
             commands={commands}
             onOpenImage={setLightboxUrl}
             onOpenFile={openFile}
             onOpenSubagent={setLiveTaskId}
           />
         ))}
-        {running && <div className="chat-running">Bs is working…</div>}
+        {running && <div className="chat-running" role="status"><span className="chat-activity-dot" aria-hidden="true" /><strong>{activity}</strong><span>{workingName}</span></div>}
         {queue.length > 0 && (
           <div className="chat-queue">
             {queue.map(q => (

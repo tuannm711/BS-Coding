@@ -2,6 +2,7 @@ import { memo } from 'react'
 import { ChevronRight } from 'lucide-react'
 import type { ToolCallData } from '@shared/types'
 import DiffView from './DiffView'
+import { toolActivityStatus } from './chat-presentation'
 
 interface Props {
   call: ToolCallData
@@ -39,7 +40,7 @@ function describeInput(call: ToolCallData): string {
 // call objects are replaced wholesale on tool-start/tool-result, so memo keeps
 // finished cards from re-rendering (and re-stringifying) on every stream delta.
 export default memo(function ToolCallCard({ call }: Props) {
-  const pending = call.permission === 'pending'
+  const status = toolActivityStatus(call)
   const input = call.input ?? {}
   const editDiff = call.tool === 'edit'
     && typeof input.old_string === 'string'
@@ -48,17 +49,12 @@ export default memo(function ToolCallCard({ call }: Props) {
     ? input.patch
     : null
   return (
-    <details className="tool-call" open={pending}>
+    <details className={`tool-call activity-${status.toLowerCase()}`}>
       <summary className="tool-call-header">
         <ChevronRight className="tool-call-chevron" />
         <span className={`tool-call-name ${call.permission}`}>{call.tool}</span>
         <span className="tool-call-summary">{describeInput(call)}</span>
-        {pending && <span className="tool-call-running">running…</span>}
-        {!pending && (
-          <span className={`tool-call-status ${call.permission === 'denied' ? 'err' : 'ok'}`}>
-            {call.permission === 'denied' ? '✗' : '✓'}
-          </span>
-        )}
+        <span className={`tool-call-status ${status === 'Running' ? 'running' : status === 'Completed' ? 'ok' : 'err'}`}>{status}</span>
       </summary>
       {patch !== null ? (
         <pre className="tool-call-input tool-call-diff">{patch}</pre>

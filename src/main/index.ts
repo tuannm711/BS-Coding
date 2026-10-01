@@ -9,6 +9,7 @@ import { createJsonStore } from './json-store'
 import { TemplateManager } from './template-manager'
 import { DEFAULT_TEMPLATES } from './default-templates'
 import { WorkspaceStore } from './workspace-store'
+import { canonicalProjectPath, rebaseProjectPath } from './project-path'
 import { PtyManager } from './pty-manager'
 import { resolveShell } from './terminal-shell'
 import { LogManager } from './log-manager'
@@ -191,6 +192,7 @@ class MainApp {
   private usageScheduler = new UsageScheduler()
   private usageRefreshTimer: ReturnType<typeof setTimeout> | null = null
   private activeProject: string | null = null
+  private preparingProjects = new Map<string, number>()
   private watcher: FileWatcher | null = null
   artifacts = new ArtifactStore((projectPath, artifacts) => {
     win?.webContents.send(Channels.EventArtifactsChanged, { projectPath, artifacts })
@@ -391,6 +393,43 @@ class MainApp {
     this.logs.remove(agentId)
   }
 
+  async updateWorkspace(projectPath: string, nextPath: string, name: string): Promise<WorkspaceRuntime> {
+    // Validate again after the async stat: the source may have been removed meanwhile.
+    let next = this.workspaces.validateUpdate(projectPath, nextPath, name)
+    const folderChanged = next.projectPath !== projectPath
+    if (folderChanged) {
+      try {
+        if (!(await stat(next.projectPath)).isDirectory()) throw new Error('not a directory')
+      } catch {
+        throw new Error('Choose an existing, accessible project folder.')
+      }
+      next = this.workspaces.validateUpdate(projectPath, next.projectPath, name)
+      const current = this.workspaces.get(projectPath)!
+      if (this.preparingProjects.has(projectPath) || current.agents.some(agent => this.pty.isRunning(agent.id) || this.bsAgent.isRunning(agent.id))
+        || this.pty.terminalCwds().some(cwd => canonicalProjectPath(cwd) === canonicalProjectPath(projectPath)
+          || rebaseProjectPath(cwd, projectPath, next.projectPath) !== cwd)) {
+        throw new Error('This project is still working. Stop its agents and close its terminals before changing the folder.')
+      }
+    }
+    const rollback = folderChanged ? this.bsAgent.relocateProject(projectPath, next.projectPath, next.agents.map(agent => agent.id)) : undefined
+    try {
+      next = this.workspaces.update(projectPath, next.projectPath, name)
+    } catch (error) {
+      rollback?.()
+      throw error
+    }
+    if (folderChanged) {
+      this.artifacts.relocateProject(projectPath, next.projectPath)
+      if (this.activeProject === projectPath) {
+        this.activeProject = next.projectPath
+        this.bsAgent.setProjectPath(next.projectPath)
+        this.startGitPoll(next.projectPath)
+        this.startFileWatcher(next.projectPath)
+      }
+    }
+    return this.runtimeFor(next)
+  }
+
   async startAgent(agentId: string): Promise<void> {
     if (this.pty.isRunning(agentId)) return
     const ws = this.findWorkspaceByAgent(agentId)
@@ -472,15 +511,32 @@ class MainApp {
     return rt
   }
 
+  async initializeWorkspaceAgents(ws: Workspace): Promise<void> {
+    this.preparingProjects.set(ws.projectPath, (this.preparingProjects.get(ws.projectPath) ?? 0) + 1)
+    try { await this.bsAgent.init(ws.agents) }
+    finally {
+      const remaining = (this.preparingProjects.get(ws.projectPath) ?? 1) - 1
+      if (remaining > 0) this.preparingProjects.set(ws.projectPath, remaining)
+      else this.preparingProjects.delete(ws.projectPath)
+    }
+  }
+
   private async prepareWorkspace(ws: Workspace): Promise<void> {
-    // Hydrate OAuth account model catalogs before native agents resolve their
-    // provider/model assignments. This also migrates accounts created by older
-    // builds to the current provider model list on the first workspace open.
-    await this.providerManager.refreshModels()
-    const current = this.workspaces.get(ws.projectPath)
-    if (!current) return
-    await this.bsAgent.init(current.agents)
-    await Promise.all(current.agents.map(a => this.startAgent(a.id)))
+    this.preparingProjects.set(ws.projectPath, (this.preparingProjects.get(ws.projectPath) ?? 0) + 1)
+    try {
+      // Hydrate OAuth account model catalogs before native agents resolve their
+      // provider/model assignments. This also migrates accounts created by older
+      // builds to the current provider model list on the first workspace open.
+      await this.providerManager.refreshModels()
+      const current = this.workspaces.get(ws.projectPath)
+      if (!current) return
+      await this.bsAgent.init(current.agents)
+      await Promise.all(current.agents.map(a => this.startAgent(a.id)))
+    } finally {
+      const remaining = (this.preparingProjects.get(ws.projectPath) ?? 1) - 1
+      if (remaining > 0) this.preparingProjects.set(ws.projectPath, remaining)
+      else this.preparingProjects.delete(ws.projectPath)
+    }
   }
 
   private startFileWatcher(projectPath: string): void {
@@ -736,9 +792,12 @@ function registerIpcHandlers(): void {
       })
     }
     const fresh = mainApp.workspaces.get(projectPath)!
-    void mainApp.bsAgent.init(fresh.agents)
+    void mainApp.initializeWorkspaceAgents(fresh).catch(error => console.error('[bs] initializeWorkspaceAgents:', error))
     return mainApp.runtimeFor(fresh)
   })
+
+  ipcMain.handle(Channels.WorkspaceUpdate, (_e, projectPath: string, nextPath: string, name: string) =>
+    mainApp.updateWorkspace(projectPath, nextPath, name))
 
   ipcMain.handle(Channels.WorkspaceRemove, async (_e, projectPath: string) => {
     const ws = mainApp.workspaces.get(projectPath)

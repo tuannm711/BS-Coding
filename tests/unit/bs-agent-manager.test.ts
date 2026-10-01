@@ -143,6 +143,60 @@ async function makeManager(opts: StubLlmOptions & {
 }
 
 describe('BsAgentManager', () => {
+  it('does not restore the old cwd when initialization completes after a relocation', async () => {
+    const catalog = new ModelsCatalog('/unused')
+    vi.spyOn(catalog, 'fetch').mockResolvedValue({})
+    const { manager } = await makeManager({ catalog })
+    let release!: (value: {}) => void
+    vi.spyOn(catalog, 'fetch').mockImplementationOnce(() => new Promise(resolve => { release = resolve }))
+    try {
+      const initializing = manager.init([{ ...BS_AGENT }])
+      await vi.waitFor(() => expect(release).toBeDefined())
+      manager.relocateProject('/proj', '/moved', ['a1'])
+      release({})
+      await initializing
+      expect(manager.listAgents().find(agent => agent.id === 'a1')?.cwd).toBe(path.resolve('/moved'))
+    } finally { release?.({}); await manager.dispose() }
+  })
+  it('publishes finished turn metadata after its execution status has been persisted', async () => {
+    const { manager, store, events } = await makeManager()
+    try {
+      const session = manager.createProjectSession('/proj', 'a1')
+      await manager.sendInSession('/proj', session.id, 'a1', 'Finish this turn')
+      const finished = events.find(event => event.type === 'turn-finished')
+      expect(finished).toMatchObject({ type: 'turn-finished', projectPath: '/proj', sessionId: session.id, execution: { status: 'completed', completedAt: expect.any(Number) } })
+      expect(store.transcript(session.id).filter(item => item.kind === 'message').every(item => item.kind === 'message' && item.message.execution?.status === 'completed')).toBe(true)
+    } finally { await manager.dispose() }
+  })
+  it('relocates idle project sessions and agents and can roll back without losing transcripts', async () => {
+    const { manager, store } = await makeManager()
+    try {
+      const session = manager.createProjectSession('/proj', 'a1')
+      await manager.sendInSession('/proj', session.id, 'a1', 'Keep this history')
+      const before = store.transcript(session.id)
+      const rollback = manager.relocateProject('/proj', '/moved')
+      expect(manager.listProjectSessions('/proj')).toEqual([])
+      expect(manager.listSessionTranscript('/moved', session.id)).toEqual(before)
+      expect(manager.listAgents().find(agent => agent.id === 'a1')?.cwd).toBe(path.resolve('/moved'))
+      rollback()
+      expect(manager.listSessionTranscript('/proj', session.id)).toEqual(before)
+      expect(manager.listProjectSessions('/moved')).toEqual([])
+    } finally { await manager.dispose() }
+  })
+
+  it('rejects relocating a project with a running turn including another selected session', async () => {
+    const { manager } = await makeManager({ hangUntilAbort: true })
+    try {
+      const session = manager.createProjectSession('/proj', 'a1')
+      const turn = manager.sendInSession('/proj', session.id, 'a1', 'Working')
+      await vi.waitFor(() => expect(manager.isSessionChatRunning('/proj', session.id)).toBe(true))
+      manager.createProjectSession('/proj', 'a1')
+      expect(() => manager.relocateProject('/proj', '/moved')).toThrow(/running/i)
+      manager.stopSessionChat('/proj', session.id)
+      await turn
+      expect(manager.listProjectSessions('/proj')).toHaveLength(2)
+    } finally { await manager.dispose() }
+  })
   it('drains every queued shared-session message and publishes an empty queue', async () => {
     const { manager, store, events } = await makeManager()
     try {

@@ -19,7 +19,8 @@ import { loadUserTools } from './agent/plugin'
 import { instructionsText, loadInstructions } from './agent/instructions'
 import { referenceHints } from './agent/references'
 import { suggestFiles } from './file-suggest'
-import { SnapshotStore } from './agent/snapshot'
+import { SnapshotStore, relocateSnapshot } from './agent/snapshot'
+import { canonicalProjectPath, rebaseProjectPath } from './project-path'
 import type { SnapshotTurn } from './agent/snapshot'
 import { TruncationStore } from './agent/truncation'
 import { CommandStore, uniqueCommands, projectCommands, resolveCommand } from './agent/commands'
@@ -118,6 +119,7 @@ export class BsAgentManager {
   private modelVariants = new Map<string, Record<string, VariantBody>>()
   private redoStacks = new Map<string, Array<{ items: ChatTranscriptItem[]; turn?: SnapshotTurn; agentId: string; turnId: string }>>()
   private backgrounds = new Map<string, boolean>()
+  private activeSubagents = new Map<string, string>()
   private queues = new Map<string, QueuedMessage[]>()
   // Kept beside the queue, never inside it: emitQueue sends the array itself
   // over IPC, and a function field would fail structured clone.
@@ -182,6 +184,47 @@ export class BsAgentManager {
     this.deps = { ...this.deps, projectPath }
   }
 
+  /** Called synchronously after validation; no turn may enter between the check and migration. */
+  relocateProject(previous: string, next: string, agentIds?: string[]): () => void {
+    const sessions = this.deps.store.listProject(previous)
+    const ids = new Set(sessions.map(session => session.id))
+    const agents = [...this.agents.values()].filter(agent => agentIds ? agentIds.includes(agent.id) : canonicalProjectPath(agent.cwd) === canonicalProjectPath(previous))
+    if (sessions.some(session => this.coordinator.state(session.id) !== null || this.controllers.has(session.id))
+      || agents.some(agent => this.isRunning(agent.id) || this.compacting.has(agent.id) || [...this.activeSubagents.values()].includes(agent.id))) {
+      throw new Error('This project has a running turn. Stop all sessions before changing its folder.')
+    }
+    const rollbacks: Array<() => void> = []
+    const projectPath = this.deps.projectPath
+    const active = this.activeProjectSessions.get(previous)
+    const redo = new Map([...this.redoStacks].filter(([id]) => ids.has(id)))
+    try {
+      rollbacks.push(this.deps.store.relocateProject(previous, next))
+      rollbacks.push(this.deps.snapshots.relocateProject(previous, next, new Set([...ids, ...agents.map(agent => agent.id)])))
+      for (const [id, stack] of redo) {
+        this.redoStacks.set(id, stack.map(entry => ({ ...entry, turn: entry.turn ? relocateSnapshot(entry.turn, previous, next) : undefined })))
+      }
+      if (active) { this.activeProjectSessions.delete(previous); this.activeProjectSessions.set(next, active) }
+      if (projectPath && canonicalProjectPath(projectPath) === canonicalProjectPath(previous)) this.setProjectPath(next)
+      for (const agent of agents) this.register({ ...agent, cwd: rebaseProjectPath(agent.cwd, previous, next) }, true)
+    } catch (error) {
+      for (const rollback of rollbacks.reverse()) rollback()
+      for (const [id, stack] of redo) this.redoStacks.set(id, stack)
+      this.deps = { ...this.deps, projectPath }
+      this.activeProjectSessions.delete(next)
+      if (active) this.activeProjectSessions.set(previous, active)
+      for (const agent of agents) this.register(agent, true)
+      throw error
+    }
+    return () => {
+      for (const rollback of rollbacks.reverse()) rollback()
+      for (const [id, stack] of redo) this.redoStacks.set(id, stack)
+      this.deps = { ...this.deps, projectPath }
+      this.activeProjectSessions.delete(next)
+      if (active) this.activeProjectSessions.set(previous, active)
+      for (const agent of agents) this.register(agent, true)
+    }
+  }
+
   isNative(agentId: string): boolean {
     return this.agents.has(agentId)
   }
@@ -229,7 +272,7 @@ export class BsAgentManager {
     await this.syncTools()
     await this.refreshModelLimits()
     for (const agent of agents) {
-      if (agent.kind === 'native') this.register(agent, true)
+      if (agent.kind === 'native') this.register(this.agents.get(agent.id) ?? agent, true)
     }
     this.deps.store.backfillLegacyExecution(agentId => {
       const agent = this.agents.get(agentId)
@@ -441,7 +484,9 @@ export class BsAgentManager {
       await this.runTurn(agentId, text, images, displayText)
     } finally {
       const finalStatus = execution.status === 'running' ? 'completed' : execution.status
-      this.deps.store.finishExecution(execution.turnId, finalStatus, Date.now())
+      const completedAt = Date.now()
+      this.deps.store.finishExecution(execution.turnId, finalStatus, completedAt)
+      this.emit({ type: 'turn-finished', agentId, execution: { ...execution, status: finalStatus, completedAt } })
       const context = this.sessionExecutions.get(sessionId)
       if (finalStatus === 'completed' && context) this.deps.store.addUsage(sessionId, context.usage)
       const next = finalStatus === 'completed' ? this.coordinator.dequeue(sessionId) : undefined
@@ -2135,6 +2180,10 @@ export class BsAgentManager {
   }
 
   private emit(e: ChatEvent): void {
+    if (e.type === 'subagent-event') {
+      if (e.sub === 'start') this.activeSubagents.set(e.taskId, e.agentId)
+      else if (e.sub === 'done') this.activeSubagents.delete(e.taskId)
+    }
     const context = this.executionForAgent(e.agentId)
     if (!context) {
       this.onEvent(e)

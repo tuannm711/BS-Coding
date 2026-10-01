@@ -1,4 +1,6 @@
 import { randomUUID } from 'node:crypto'
+import path from 'node:path'
+import { canonicalProjectPath, rebaseProjectPath } from './project-path'
 import type { AgentConfig, NewAgentInput, Workspace, WorkspaceSummary } from '../shared/types'
 import type { JsonStore } from './json-store'
 
@@ -30,6 +32,25 @@ export class WorkspaceStore {
 
   remove(projectPath: string): void {
     this.store.save(this.store.load().filter(w => w.projectPath !== projectPath))
+  }
+
+  validateUpdate(projectPath: string, nextPath: string, name: string): Workspace {
+    const ws = this.get(projectPath)
+    if (!ws) throw new Error('Project no longer exists. Refresh the project list.')
+    if (typeof name !== 'string' || !name.trim()) throw new Error('Project name is required.')
+    if (typeof nextPath !== 'string' || !nextPath.trim()) throw new Error('Project folder is required.')
+    const resolved = path.resolve(nextPath.trim())
+    if (this.list().some(other => other.projectPath !== projectPath && canonicalProjectPath(other.projectPath) === canonicalProjectPath(resolved))) {
+      throw new Error('This folder is already registered as another project.')
+    }
+    return { ...ws, name: name.trim(), projectPath: resolved,
+      agents: ws.agents.map(agent => ({ ...agent, cwd: rebaseProjectPath(agent.cwd, projectPath, resolved) })) }
+  }
+
+  update(projectPath: string, nextPath: string, name: string): Workspace {
+    const next = this.validateUpdate(projectPath, nextPath, name)
+    this.store.save(this.store.load().map(ws => ws.projectPath === projectPath ? next : ws))
+    return next
   }
 
   addAgent(projectPath: string, input: NewAgentInput): Workspace {

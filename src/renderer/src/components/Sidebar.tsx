@@ -22,6 +22,7 @@ interface Props {
   onOpen: (path: string) => void
   onRemove: (path: string) => void
   onRefresh: () => void
+  onEdit: (projectPath: string, nextPath: string, name: string) => Promise<void>
   onOpenTerminal: (path: string) => void
   onOpenSettings: () => void
   onCheckUpdate: () => void
@@ -30,9 +31,10 @@ interface Props {
 
 export default function Sidebar({
   workspaces, templates, activePath, sessions, activeSessionId, onSelectSession, onCreateSession, onDeleteSession,
-  onOpen, onRemove, onRefresh, onOpenTerminal, onOpenSettings, onCheckUpdate, updateChecking
+  onOpen, onRemove, onRefresh, onEdit, onOpenTerminal, onOpenSettings, onCheckUpdate, updateChecking
 }: Props) {
   const [showAddProject, setShowAddProject] = useState(false)
+  const [editProject, setEditProject] = useState<WorkspaceSummary | null>(null)
   const [addAgentPath, setAddAgentPath] = useState<string | null>(null)
   const [openProjectMenu, setOpenProjectMenu] = useState<string | null>(null)
   const [projectMenuPos, setProjectMenuPos] = useState<{ x: number; y: number } | null>(null)
@@ -86,7 +88,7 @@ export default function Sidebar({
       onRefresh()
       onOpen(projectPath)
     } catch (err) {
-      setError(String(err))
+      throw err
     }
   }
 
@@ -180,6 +182,9 @@ export default function Sidebar({
                     >
                       Open
                     </button>
+                    <button className="menu-item" onClick={() => { setOpenProjectMenu(null); setEditProject(ws) }}>
+                      Edit project
+                    </button>
                     <button
                       className="menu-item"
                       onClick={() => { setOpenProjectMenu(null); setAddAgentPath(ws.projectPath) }}
@@ -230,8 +235,12 @@ export default function Sidebar({
       </ul>
       )}
       {showAddProject && (
-        <AddProjectDialog onAdd={(p, n) => void handleAddProject(p, n)} onClose={() => setShowAddProject(false)} />
+        <AddProjectDialog onAdd={handleAddProject} onClose={() => setShowAddProject(false)} />
       )}
+      {editProject && <AddProjectDialog project={editProject} onClose={() => setEditProject(null)} onAdd={async (nextPath, name) => {
+        await onEdit(editProject.projectPath, nextPath, name)
+        setEditProject(null)
+      }} />}
       {addAgentPath && (
         <AddAgentDialog
           projectPath={addAgentPath}

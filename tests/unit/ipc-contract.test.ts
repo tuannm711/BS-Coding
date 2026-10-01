@@ -14,7 +14,7 @@ const emptySnapshot: ProviderSnapshot = { revision: 0, providers: [], accounts: 
 describe('IPC contract', () => {
   it('defines all channels used by the preload api', () => {
     const required: (keyof AgentApi)[] = [
-      'listWorkspaces', 'addWorkspace', 'removeWorkspace', 'openWorkspace', 'openInEditor',
+      'listWorkspaces', 'addWorkspace', 'updateWorkspace', 'removeWorkspace', 'openWorkspace', 'openInEditor',
       'onWorkspaceRuntimeChanged',
       'openFolder', 'openTerminal', 'closeTerminal',
       'addAgent', 'removeAgent', 'setAgentMode', 'setAgentVariant', 'getAgentVariants', 'setAgentModel', 'setAgentSpeed', 'getAgentModel', 'getContextInfo', 'getProviderModels', 'fetchProviderModels',
@@ -72,6 +72,7 @@ describe('IPC contract', () => {
       }),
       listWorkspaces: async () => [],
       addWorkspace: async () => null,
+      updateWorkspace: async () => ({ workspace: { projectPath: '', name: '', agents: [] }, agents: [], git: null }),
       removeWorkspace: async () => {},
       openWorkspace: async () => ({ workspace: { projectPath: '', name: '', agents: [] }, agents: [], git: null }),
       onWorkspaceRuntimeChanged: () => () => {},
@@ -231,6 +232,7 @@ describe('IPC contract', () => {
     expect(Channels.ChatRunCommand).toBe('chat:run-command')
     expect(Channels.AgentSetMode).toBe('agent:set-mode')
     expect(Channels.AgentSetVariant).toBe('agent:set-variant')
+    expect(Channels.WorkspaceUpdate).toBe('workspace:update')
     expect(Channels.AgentGetVariants).toBe('agent:get-variants')
     expect(Channels.AgentSetModel).toBe('agent:set-model')
     expect(Channels.AgentSetSpeed).toBe('agent:set-speed')

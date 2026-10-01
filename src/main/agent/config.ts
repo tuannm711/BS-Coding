@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import type { AgentSettings, CompactionSettings, BsSettings, NotificationsSettings, PermissionRule, QuickMessage } from '../../shared/types'
+import type { AgentSettings, AppearanceSettings, CompactionSettings, BsSettings, NotificationsSettings, PermissionRule, QuickMessage } from '../../shared/types'
+import { DEFAULT_APPEARANCE, isHexColor, normalizeAppearance } from '../../shared/appearance'
 import type { McpServerConfig } from './mcp/manager'
 
 export type { PermissionRule }
@@ -43,6 +44,7 @@ export interface TraceConfig {
 }
 
 export interface BsConfig {
+  appearance?: AppearanceSettings
   provider: Record<string, BsProviderConfig>
   model: string
   agents: Record<string, BsAgentConfig>
@@ -97,6 +99,7 @@ export const DEFAULT_NOTIFICATIONS: NotificationsConfig = {
 }
 
 export const DEFAULT_BS_CONFIG: BsConfig = {
+  appearance: DEFAULT_APPEARANCE,
   provider: {},
   model: '',
   agents: {
@@ -247,6 +250,7 @@ function mergeDefaults(raw: Partial<BsConfig>): BsConfig {
   }
   return {
     provider: providers,
+    appearance: normalizeAppearance(raw.appearance),
     model: raw.model ?? DEFAULT_BS_CONFIG.model,
     agents: normalizeAgents(raw.agents),
     quickMessages: normalizeQuickMessages(raw.quickMessages),
@@ -331,6 +335,7 @@ export function resolveAgentConfig(
 
 export function configToSettings(cfg: BsConfig): BsSettings {
   return {
+    appearance: normalizeAppearance(cfg.appearance),
     providers: Object.entries(cfg.provider).map(([id, p]) => ({
       id,
       apiKey: p.apiKey ?? '',
@@ -370,6 +375,9 @@ export function configToSettings(cfg: BsConfig): BsSettings {
 export type SettingsInput = Pick<BsSettings, 'providers' | 'defaultProvider'> & Partial<BsSettings>
 
 export function settingsToConfig(settings: SettingsInput, base: BsConfig = DEFAULT_BS_CONFIG): BsConfig {
+  if (settings.appearance && !Object.values(settings.appearance).every(isHexColor)) {
+    throw new Error('Appearance colors must use six-digit HEX codes, for example #4da3ff.')
+  }
   const quickMessages = normalizeQuickMessages(settings.quickMessages ?? base.quickMessages)
   if (settings.quickMessages && quickMessages.length !== settings.quickMessages.length) {
     throw new Error('Quick messages need a unique ID, a name and message content.')
@@ -401,6 +409,7 @@ export function settingsToConfig(settings: SettingsInput, base: BsConfig = DEFAU
   }
   return {
     provider: providers,
+    appearance: normalizeAppearance(settings.appearance ?? base.appearance),
     model: defaultProvider,
     agents: settings.agents === undefined ? (base.agents ?? DEFAULT_BS_CONFIG.agents) : agents,
     quickMessages,

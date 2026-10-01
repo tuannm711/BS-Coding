@@ -12,10 +12,13 @@ import StatsTab from './StatsTab'
 import QuickMessagesTab from './QuickMessagesTab'
 import Modal from './Modal'
 import { useDialogFocus } from './useDialogFocus'
+import AppearanceTab from './AppearanceTab'
+import { isHexColor } from '@shared/appearance'
 
-type TabId = 'providers' | 'agents' | 'quick-messages' | 'permissions' | 'mcp' | 'context' | 'commands' | 'templates' | 'updates' | 'stats'
+type TabId = 'appearance' | 'providers' | 'agents' | 'quick-messages' | 'permissions' | 'mcp' | 'context' | 'commands' | 'templates' | 'updates' | 'stats'
 
 const TABS: Array<{ id: TabId; label: string }> = [
+  { id: 'appearance', label: 'Appearance' },
   { id: 'providers', label: 'Providers' },
   { id: 'agents', label: 'Agents' },
   { id: 'quick-messages', label: 'Quick Messages' },
@@ -65,6 +68,7 @@ export default function SettingsDialog({ onClose, projectPath, templates, onTemp
   }, [refresh])
 
   const isDirty = draft !== null && saved !== null && JSON.stringify(draft) !== JSON.stringify(saved)
+  const invalidAppearance = draft?.appearance && !Object.values(draft.appearance).every(isHexColor)
 
   // Closing with unsaved changes (Escape, Cancel) would otherwise discard
   // them silently — nothing auto-saves until the Save button is clicked.
@@ -82,7 +86,7 @@ export default function SettingsDialog({ onClose, projectPath, templates, onTemp
   }, [])
 
   const save = async () => {
-    if (!draft || saving) return
+    if (!draft || saving || invalidAppearance) return
     setSaving(true)
     setStatus('')
     setError('')
@@ -91,8 +95,8 @@ export default function SettingsDialog({ onClose, projectPath, templates, onTemp
       setDraft(result)
       setSaved(result)
       window.dispatchEvent(new CustomEvent('bs:settings-saved', { detail: result }))
-      setMcpStatus(await window.api.getMcpStatus())
       setStatus('Settings saved.')
+      void window.api.getMcpStatus().then(setMcpStatus).catch(() => {})
     } catch (err) {
       setError(String(err))
     } finally {
@@ -104,20 +108,27 @@ export default function SettingsDialog({ onClose, projectPath, templates, onTemp
     <div className="dialog-backdrop">
       <div className="dialog settings-dialog" role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} {...focus}>
         <h3 id={titleId}>Settings</h3>
+        <p className="settings-subtitle">Configure your workspace and agents.</p>
         <button className="dialog-close" aria-label="Close" onClick={closeGuarded}>✕</button>
         <div className="settings-body">
-          <nav className="settings-nav">
+          <nav className="settings-nav" aria-label="Settings sections">
             {TABS.map(t => (
               <button
                 key={t.id}
                 className={`settings-nav-item ${tab === t.id ? 'active' : ''}`}
-                onClick={() => setTab(t.id)}
+                aria-current={tab === t.id ? 'page' : undefined}
+                disabled={saving}
+                onClick={() => { setTab(t.id); setStatus('') }}
               >
                 {t.label}
               </button>
             ))}
           </nav>
-          <div className="settings-content">
+          <fieldset className="settings-content" disabled={saving} aria-busy={saving}>
+            <h4 className="settings-section-title">{TABS.find(t => t.id === tab)?.label}</h4>
+            {!draft && !error && <p role="status" className="settings-hint">Loading settings…</p>}
+            {!draft && error && <button className="btn" onClick={() => { setError(''); void refresh() }}>Retry loading settings</button>}
+            {draft && tab === 'appearance' && <AppearanceTab appearance={draft.appearance} onChange={appearance => patch({ appearance })} />}
             {draft && tab === 'providers' && (
               <ProvidersTab />
             )}
@@ -153,13 +164,16 @@ export default function SettingsDialog({ onClose, projectPath, templates, onTemp
             {tab === 'templates' && <TemplatesTab templates={templates} onChange={onTemplatesChange} />}
             {tab === 'updates' && <UpdatesTab />}
             {tab === 'stats' && <StatsTab />}
-          </div>
+          </fieldset>
         </div>
-        {status && <div className="settings-status" role="status">{status}</div>}
-        {error && <div className="settings-error" role="alert">{error}</div>}
-        <div className="dialog-actions">
+        <div className="settings-feedback">
+          {status && <div className="settings-status" role="status">{status}</div>}
+          {error && <div className="settings-error" role="alert">{error}</div>}
+          {!status && !error && <span className="settings-hint">{isDirty ? 'Unsaved changes' : 'All changes saved'}</span>}
+        </div>
+        <div className="dialog-actions settings-footer">
           <button className="btn" disabled={saving} onClick={closeGuarded}>Cancel</button>
-          <button className="btn primary" disabled={!draft || saving} onClick={() => void save()}>
+          <button className="btn primary" disabled={!draft || saving || !!invalidAppearance} onClick={() => void save()}>
             {saving ? 'Saving…' : 'Save'}
           </button>
         </div>

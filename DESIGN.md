@@ -45,11 +45,13 @@ A coding studio console: cool slate layers, quiet blue controls, readable agent 
 
 The primary users run multiple coding agents in an Electron desktop window. The register is product utility with dense but readable controls. UI labels are English; main-process notices may be Vietnamese as specified in AGENTS.md. No country-specific market positioning is assumed. The memorable signature is a dark console framed by fixed rails; forms and agent controls favor familiar behavior.
 
-Runtime CSS variables in `src/renderer/src/styles.css` own colors, fonts, radii and geometry. This file mirrors those tokens. Existing Settings tables, quota windows and Mode controls provide the component baseline. Avoid unrelated visual changes when extending one workflow.
+Runtime CSS variables in `src/renderer/src/styles.css` own fonts, radii and geometry and provide the startup color fallback. `src/shared/appearance.ts` owns saved color defaults and the color-to-variable adapter; `useAppearance.ts` applies the saved palette to the document. This file mirrors those tokens. Existing Settings tables, quota windows and Mode controls provide the component baseline.
 
 ## Colors
 
 Blue indicates selection and primary actions. Layered panel/raised surfaces express hierarchy. Yellow communicates recoverable quota or validation warnings; red marks destructive actions. Text labels accompany semantic color. Keyboard focus uses the accent token.
+
+Appearance exposes background, text and primary button colors as six-digit HEX values. Surface layers derive from the background. Primary button foreground automatically chooses black or white; accent text is adjusted for readability on the chosen background. The default secondary text is `#8b93a3`. Semantic warning/danger colors keep their meaning. A scoped preview uses the same adapter as the document; draft colors apply globally only after Save. Restore defaults is a draft operation.
 
 ## Typography
 
@@ -58,6 +60,8 @@ Instrument Sans is the UI face, Bricolage Grotesque is used for display labels, 
 ## Layout
 
 The existing stylesheet uses a 4px spacing rhythm. Both rails are 279px. Fleet scrolls inside its rail and displays one card per agent. Settings content owns its scrolling; tables allow horizontal overflow. The chat toolbar wraps at constrained widths, keeping Mode, quick messages and agent/model controls usable.
+
+Settings is up to 1120px wide and 88dvh tall, bounded by the window. At 760px and below its section navigation becomes a horizontal scroller. Header, feedback and Save/Cancel stay outside the content scroller. Chat uses compact progress prose and expandable tool activity, with an open text surface for the final response.
 
 ## Elevation & Depth
 
@@ -85,6 +89,8 @@ Fleet identifies agents before their provider/account metadata. Show only quota 
 
 Settings uses draft/Save/Cancel. Native selects deliberately retain platform keyboard and popup behavior. Modal dialogs own focus, Escape and restoration; unsaved changes use an app-owned discard dialog. Quick-message textareas have sufficient fixed minimum height and no manual resize.
 
+Add and Edit project share the modal form. Editing a name updates the existing project; changing its folder also keeps agent/session IDs and relocates app metadata. The destination must exist and not belong to another registered project. Folder changes require idle sessions/agents and closed project terminals; the app does not move project files.
+
 ### Iconography
 
 Use lucide-react with accessible labels and tooltip descriptions for icon actions. Preserve text for important primary actions and agent identities.
@@ -92,6 +98,8 @@ Use lucide-react with accessible labels and tooltip descriptions for icon action
 ### Motion
 
 Streaming updates remain immediate. Avoid decorative animation in chat hot paths. Existing reduced-motion preferences apply.
+
+Thinking is displayed only for provider-supplied reasoning. Working, Responding and input-wait states follow real events. Flush batched prose before a tool boundary so activity stays chronological. A persisted `turn-finished` event identifies successful completion. Only the final text after the last tool of a completed turn receives Response, elapsed turn time and Copy; stopped/failed turns never receive a success label. Copy preserves Markdown and reports clipboard failures inline. Completion does not take scroll ownership from a user reading earlier messages.
 
 ### Content and data visualization
 

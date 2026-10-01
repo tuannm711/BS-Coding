@@ -23,6 +23,17 @@ beforeEach(() => {
 afterEach(() => rmSync(dir, { recursive: true, force: true }))
 
 describe('loadBsConfig', () => {
+  it('persists custom appearance across settings conversion and restart', () => {
+    const appearance = { background: '#20242a', text: '#fafafa', button: '#76aaff' }
+    writeBsConfig(file, settingsToConfig({ ...configToSettings(loadBsConfig(file)), appearance }))
+    expect(configToSettings(loadBsConfig(file)).appearance).toEqual(appearance)
+  })
+
+  it('recovers invalid stored colors and rejects invalid colors on save', () => {
+    writeFileSync(file, JSON.stringify({ appearance: { background: 'url(bad)', text: '#ABCDEF', button: null } }))
+    expect(configToSettings(loadBsConfig(file)).appearance).toEqual({ background: '#0b0e13', text: '#abcdef', button: '#4da3ff' })
+    expect(() => settingsToConfig({ ...configToSettings(loadBsConfig(file)), appearance: { background: 'red', text: '#ffffff', button: '#000000' } })).toThrow(/color/i)
+  })
   it('does not recreate bs after saving a custom-only or empty agent list', () => {
     const settings = configToSettings(loadBsConfig(file))
     for (const agents of [[{ name: 'custom', systemPrompt: 'Custom prompt' }], []]) {
