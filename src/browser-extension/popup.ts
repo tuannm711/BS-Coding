@@ -1,61 +1,28 @@
-const STORAGE_KEY = 'bsBridge'
-const DEFAULT_PORT = 3927
+import type { NativeConnectionStatus } from './native-transport'
 
-function $(id: string): HTMLElement {
-  return document.getElementById(id)!
-}
-
-function refreshStatus(): void {
-  void chrome.runtime.sendMessage({ kind: 'status' }).then((res: { paired?: boolean; connected?: boolean }) => {
-    const dot = $('dot')
-    const text = $('statusText')
-    if (res?.paired) {
-      dot.className = 'dot green'
-      text.textContent = 'Paired & connected'
-    } else if (res?.connected) {
-      dot.className = 'dot amber'
-      text.textContent = 'Connected (chưa pair)'
-    } else {
-      dot.className = 'dot red'
-      text.textContent = 'Disconnected'
-    }
-  }).catch(() => {
-    $('dot').className = 'dot red'
-    $('statusText').textContent = 'Disconnected'
-  })
-}
-
-async function detect(): Promise<void> {
-  const portInput = $('port') as HTMLInputElement
-  try {
-    const res = await fetch(`http://127.0.0.1:${DEFAULT_PORT}/api/status`)
-    if (res.ok) {
-      const body = await res.json() as { port?: number }
-      if (typeof body.port === 'number') portInput.value = String(body.port)
-      $('hint').textContent = `Detected Bs bridge on port ${body.port}.`
-    } else {
-      $('hint').textContent = 'Không tìm thấy bridge tại port mặc định.'
-    }
-  } catch {
-    $('hint').textContent = 'Bs chưa chạy? Không kết nối được bridge.'
+function $(id: string): HTMLElement { return document.getElementById(id)! }
+function renderStatus(status: NativeConnectionStatus & { label?: string }): void {
+  const descriptions: Record<NativeConnectionStatus['status'], string> = {
+    connecting: 'Connecting…', connected: 'Connected to BS Coding', host_missing: 'Browser helper is not installed', app_offline: 'BS Coding is offline', error: 'Connection failed'
   }
+  $('dot').className = `dot ${status.connected ? 'green' : status.status === 'connecting' ? 'amber' : 'red'}`
+  $('statusText').textContent = descriptions[status.status] ?? 'Disconnected'
+  $('hint').textContent = status.status === 'host_missing' ? 'Open BS Coding → Browser → Install or repair helper, then connect again.'
+    : status.status === 'app_offline' ? 'Open BS Coding, then select Connect.'
+      : status.status === 'error' ? status.error ?? 'Update BS Coding and reload its browser extension, then connect again.'
+        : status.connected ? 'Select this connection in BS Coding Browser settings and assign a tab to your chat.' : 'Use a label to identify this Chrome profile in BS Coding.'
+  if (status.label && document.activeElement !== $('label')) ($('label') as HTMLInputElement).value = status.label
 }
-
-void chrome.storage.local.get(STORAGE_KEY).then((res: Record<string, { port?: number; code?: string } | undefined>) => {
-  const cur = res[STORAGE_KEY]
-  if (cur?.port) ($('port') as HTMLInputElement).value = String(cur.port)
-  if (cur?.code) ($('code') as HTMLInputElement).value = cur.code
-  refreshStatus()
+function refreshStatus(): void {
+  void chrome.runtime.sendMessage({ kind: 'status' }).then(renderStatus).catch(() => renderStatus({ connected: false, status: 'error', error: 'The extension worker is unavailable. Reload this extension in Chrome and try again.' }))
+}
+$('connectBtn').addEventListener('click', () => {
+  const button = $('connectBtn') as HTMLButtonElement
+  button.disabled = true
+  void chrome.runtime.sendMessage({ kind: 'connect', label: ($('label') as HTMLInputElement).value }).then(response => {
+    if (response?.ok === false) renderStatus({ connected: false, status: 'error', error: response.error })
+    else renderStatus(response)
+  }).catch(error => renderStatus({ connected: false, status: 'error', error: String(error) })).finally(() => { button.disabled = false })
 })
-
-$('detectBtn').addEventListener('click', () => void detect())
-$('saveBtn').addEventListener('click', () => {
-  const port = Number(($('port') as HTMLInputElement).value) || DEFAULT_PORT
-  const code = ($('code') as HTMLInputElement).value.trim()
-  void chrome.storage.local.set({ [STORAGE_KEY]: { port, code } }).then(() => {
-    void chrome.runtime.sendMessage({ kind: 'pair', code }).then(() => {
-      $('hint').textContent = 'Saved. Đang kết nối...'
-      setTimeout(refreshStatus, 800)
-    })
-  })
-})
+chrome.runtime.onMessage.addListener(message => { if (message?.kind === 'status-update') renderStatus(message) })
+refreshStatus()

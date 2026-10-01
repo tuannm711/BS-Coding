@@ -11,11 +11,11 @@ panel, settings and the tray. The terminal inside a pane is in
 | [Pieces](#pieces) | 21-35 | `src/renderer/src/App.tsx`, `PaneModel`, `src/renderer/src/components/TitleBar.tsx`, `src/renderer/src/components/Sidebar.tsx`, `src/renderer/src/components/RightPanel.tsx`, `src/renderer/src/components/fleet/` |
 | [Data flow](#data-flow) | 36-54 | `App.tsx`, `PaneModel`, `XtermHost`, `buffersRef`, `registerTerminal`, `ChatPanel` |
 | [Types that carry it](#types-that-carry-it) | 55-64 | `PaneModel`, `ChatEvent`, `src/shared/types.ts`, `QuotaAccountUiState`, `src/renderer/src/components/quota/quota-view.ts` |
-| [Design decisions](#design-decisions) | 65-135 | `getWindowChromeOptions`, `titleBarOverlay`, `tests/unit/window-chrome.test.ts`, `src/renderer/AGENTS.md`, `src/shared/appearance.ts`, `src/renderer/src/useAppearance.ts` |
-| [The coordination view](#the-coordination-view) | 136-188 | `src/renderer/src/components/coordinator/CoordinatorView.tsx`, `App.tsx`, `setMode`, `RightPanel`, `ChatPanel`, `listSessionTranscript` |
-| [The fleet panel](#the-fleet-panel) | 189-261 | `RightPanel`, `buildFleet`, `ProviderQuotaGroup`, `FleetBoard`, `provider/account/quotaPoolId`, `FleetAgentRow` |
-| [Sessions live in the sidebar](#sessions-live-in-the-sidebar) | 262-285 | `activeSessionId`, `groupSessions` |
-| [Known limits](#known-limits) | 286-292 | `docs/technical-debt.md` |
+| [Design decisions](#design-decisions) | 65-144 | `getWindowChromeOptions`, `titleBarOverlay`, `tests/unit/window-chrome.test.ts`, `src/renderer/AGENTS.md`, `src/shared/appearance.ts`, `src/renderer/src/useAppearance.ts` |
+| [The coordination view](#the-coordination-view) | 145-197 | `src/renderer/src/components/coordinator/CoordinatorView.tsx`, `App.tsx`, `setMode`, `RightPanel`, `ChatPanel`, `listSessionTranscript` |
+| [The fleet panel](#the-fleet-panel) | 198-270 | `RightPanel`, `buildFleet`, `ProviderQuotaGroup`, `FleetBoard`, `provider/account/quotaPoolId`, `FleetAgentRow` |
+| [Sessions live in the sidebar](#sessions-live-in-the-sidebar) | 271-294 | `activeSessionId`, `groupSessions` |
+| [Known limits](#known-limits) | 295-301 | `docs/technical-debt.md` |
 <!-- /toc -->
 
 ## Pieces
@@ -116,11 +116,20 @@ writes the original Markdown, reports clipboard failure, and keeps row identity
 stable through completion. Finished turns retain the user's scroll ownership.
 
 Quick Messages persist an ID, name and content. Their buttons have a wrapping
-row below Mode and agent/model selection and above the composer. They send to
+row below Mode and agent/model selection and above the composer, centered on
+every wrapping row. They send to
 the active session's selected agent. Running sends become pending steering,
 accepted at the next step within the same execution; pending text can be edited
 or removed. The composer reads Steer while running and Send while idle. Saving
 only quick messages does not restart agents.
+
+Browser settings use the shared modal. Install / Repair registers the native
+helper for the current OS user and explains loading/reloading the stable-ID
+extension in the desired Chrome profile. A profile chooser selects a default
+connection; existing chat/profile bindings stay independent. Assign tab targets
+the current project session explicitly, and Disable profile blocks reconnect
+until enabled. Native mode has no port or pairing-code entry. Setup failures
+remain visible while the rest of the application stays usable.
 
 **The window claims the installed AppUserModelID on Windows.** `MainApp` calls
 `app.setAppUserModelId` before creating the window, matching the id

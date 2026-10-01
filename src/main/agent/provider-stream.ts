@@ -24,11 +24,11 @@ function parseSseFrame(frame: string): ProviderDecodedItem | null {
   }
 }
 
-function takeSseFrame(buffer: string): { frame: string; rest: string } | null {
+function takeSseFrame(buffer: string): { frame: string; rest: string; separatorBytes: number } | null {
   const separator = /\r?\n\r?\n/.exec(buffer)
   if (!separator || separator.index === undefined) return null
   const end = separator.index + separator[0].length
-  return { frame: buffer.slice(0, separator.index), rest: buffer.slice(end) }
+  return { frame: buffer.slice(0, separator.index), rest: buffer.slice(end), separatorBytes: separator[0].length }
 }
 
 export async function* decodeProviderResponse(
@@ -45,59 +45,75 @@ export async function* decodeProviderResponse(
   const contentType = (response.headers.get('content-type') ?? '').toLowerCase()
   let mode: 'sse' | 'json' | undefined = contentType.includes('text/event-stream') ? 'sse' : undefined
   let buffer = ''
-  let bytes = 0
+  // The limit bounds one frame (or a JSON response), not an entire stream.
+  // SSE overhead grows with delta count even when every frame is tiny.
+  let bufferBytes = 0
 
-  while (true) {
-    const next = await reader.read()
-    if (next.value) {
-      bytes += next.value.byteLength
-      if (bytes > options.maxBytes) {
-        await reader.cancel()
-        yield { kind: 'parse-error', message: `[bs] Provider response exceeded ${options.maxBytes} bytes` }
+  try {
+    while (true) {
+      const next = await reader.read()
+      if (next.value) {
+        const decoded = decoder.decode(next.value, { stream: !next.done })
+        buffer += decoded
+        bufferBytes += Buffer.byteLength(decoded, 'utf8')
+      }
+
+      if (!mode) {
+        const prefix = buffer.trimStart()
+        if (/^(?:event|data):|^:/.test(prefix)) mode = 'sse'
+        else if (prefix.startsWith('{') || prefix.startsWith('[') || (next.done && prefix)) mode = 'json'
+      }
+
+      if (mode === 'sse') {
+        let extracted = takeSseFrame(buffer)
+        while (extracted) {
+          const frameBytes = Buffer.byteLength(extracted.frame, 'utf8')
+          if (frameBytes > options.maxBytes) {
+            yield { kind: 'parse-error', message: `[bs] Provider frame exceeded ${options.maxBytes} bytes` }
+            return
+          }
+          buffer = extracted.rest
+          bufferBytes -= frameBytes + extracted.separatorBytes
+          const item = parseSseFrame(extracted.frame)
+          if (item) yield item
+          extracted = takeSseFrame(buffer)
+        }
+      }
+
+      if (bufferBytes > options.maxBytes) {
+        yield { kind: 'parse-error', message: `[bs] Provider buffered response exceeded ${options.maxBytes} bytes` }
         return
       }
-      buffer += decoder.decode(next.value, { stream: !next.done })
+
+      if (next.done) break
     }
 
-    if (!mode) {
-      const prefix = buffer.trimStart()
-      if (/^(?:event|data):|^:/.test(prefix)) mode = 'sse'
-      else if (prefix.startsWith('{') || prefix.startsWith('[') || (next.done && prefix)) mode = 'json'
-    }
-
+    buffer += decoder.decode()
     if (mode === 'sse') {
-      let extracted = takeSseFrame(buffer)
-      while (extracted) {
-        buffer = extracted.rest
-        const item = parseSseFrame(extracted.frame)
-        if (item) yield item
-        extracted = takeSseFrame(buffer)
-      }
-    }
-
-    if (next.done) break
-  }
-
-  buffer += decoder.decode()
-  if (mode === 'sse') {
-    const item = parseSseFrame(buffer)
-    if (item) yield item
-    return
-  }
-
-  const raw = buffer.trim()
-  if (!raw) {
-    yield { kind: 'parse-error', message: '[bs] Provider response body was empty' }
-    return
-  }
-  try {
-    const value = JSON.parse(raw) as unknown
-    if (!value || typeof value !== 'object' || Array.isArray(value)) {
-      yield { kind: 'parse-error', message: '[bs] Provider JSON response was not an object' }
+      const item = parseSseFrame(buffer)
+      if (item) yield item
       return
     }
-    yield { kind: 'json', value: value as Record<string, unknown> }
-  } catch (error) {
-    yield { kind: 'parse-error', message: `[bs] Provider response was invalid JSON: ${String(error)}` }
+
+    const raw = buffer.trim()
+    if (!raw) {
+      yield { kind: 'parse-error', message: '[bs] Provider response body was empty' }
+      return
+    }
+    try {
+      const value = JSON.parse(raw) as unknown
+      if (!value || typeof value !== 'object' || Array.isArray(value)) {
+        yield { kind: 'parse-error', message: '[bs] Provider JSON response was not an object' }
+        return
+      }
+      yield { kind: 'json', value: value as Record<string, unknown> }
+    } catch (error) {
+      yield { kind: 'parse-error', message: `[bs] Provider response was invalid JSON: ${String(error)}` }
+    }
+  } finally {
+    // A consumer can stop after a terminal event or error before EOF.
+    // Cancel unread data and release the fetch body's lock on every path.
+    try { await reader.cancel() } catch { /* a disconnected body is already closed */ }
+    reader.releaseLock()
   }
 }

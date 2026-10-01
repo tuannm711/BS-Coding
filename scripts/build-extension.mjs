@@ -1,4 +1,5 @@
 import { build } from 'esbuild'
+import './build-native-host.mjs'
 import { cpSync, mkdirSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'

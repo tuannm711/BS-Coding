@@ -29,6 +29,7 @@ export interface LlmStreamOptions {
   signal?: AbortSignal
   variantOptions?: Record<string, unknown>
   serviceTier?: 'priority'
+  maxOutputTokens?: number
   cwd?: string
 }
 
@@ -53,18 +54,21 @@ interface SdkUsage {
 }
 
 export function toMessageTokens(usage: SdkUsage | undefined): MessageTokens | undefined {
-  if (!usage) return undefined
+  const valid = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value) && value >= 0
+  if (!usage || !valid(usage.inputTokens) || !valid(usage.outputTokens)) return undefined
   // SDK v6 reports inputTokens as the total prompt size (including cached
   // tokens) and breaks down noCache/cacheRead/cacheWrite in inputTokenDetails.
   // The plain input counter is what's actually billed at full price.
   const details = usage.inputTokenDetails
+  const cacheRead = details?.cacheReadTokens ?? usage.cachedInputTokens
+  const cacheWrite = details?.cacheWriteTokens ?? usage.cacheCreationInputTokens
   return {
-    input: details?.noCacheTokens ?? usage.inputTokens ?? 0,
-    output: usage.outputTokens ?? 0,
-    total: usage.totalTokens ?? 0,
+    input: details?.noCacheTokens ?? Math.max(0, usage.inputTokens - (cacheRead ?? 0) - (cacheWrite ?? 0)),
+    output: usage.outputTokens,
+    total: valid(usage.totalTokens) ? usage.totalTokens : usage.inputTokens + usage.outputTokens,
     reasoning: usage.reasoningTokens,
-    cacheRead: details?.cacheReadTokens ?? usage.cachedInputTokens,
-    cacheWrite: details?.cacheWriteTokens ?? usage.cacheCreationInputTokens
+    cacheRead,
+    cacheWrite
   }
 }
 
@@ -81,6 +85,9 @@ function convertDeepSeekUsage(usage: unknown) {
     completion_tokens?: number | null
     prompt_cache_hit_tokens?: number | null
     completion_tokens_details?: { reasoning_tokens?: number | null } | null
+  }
+  if (!Number.isFinite(u.prompt_tokens) || !Number.isFinite(u.completion_tokens)) {
+    return { inputTokens: { total: undefined, noCache: undefined, cacheRead: undefined, cacheWrite: undefined }, outputTokens: { total: undefined, text: undefined, reasoning: undefined } }
   }
   const promptTokens = u.prompt_tokens ?? 0
   const completionTokens = u.completion_tokens ?? 0
@@ -144,7 +151,7 @@ export function createLlm(provider: string, apiKey: string, baseUrl?: string, he
     return new OpenAIResponsesClient({ apiKey, baseUrl, headers })
   }
   const isDeepSeek = provider === 'deepseek' || isDeepSeekEndpoint(baseUrl)
-  const model = (modelId: string) => {
+  const model = (modelId: string, includeUsage: boolean) => {
     if (provider === 'anthropic') {
       const anthropicClient = createAnthropic({
         apiKey,
@@ -163,8 +170,9 @@ export function createLlm(provider: string, apiKey: string, baseUrl?: string, he
       name: provider,
       baseURL: baseUrl ?? 'https://api.openai.com/v1',
       apiKey,
+      includeUsage,
       ...(isDeepSeek
-        ? { includeUsage: true, convertUsage: (usage: unknown) => convertDeepSeekUsage(usage) }
+        ? { convertUsage: (usage: unknown) => convertDeepSeekUsage(usage) }
         : {})
     }).chatModel(modelId)
   }
@@ -186,43 +194,72 @@ export function createLlm(provider: string, apiKey: string, baseUrl?: string, he
       } else {
         providerOptions = variant
       }
-      const result = streamText({
-        model: model(opts.model),
-        system: opts.system,
-        messages: withCacheBreakpoints(opts.messages, provider),
-        tools,
-        abortSignal: opts.signal,
-        ...(providerOptions ? { providerOptions } : {})
-      })
-      for await (const part of result.fullStream) {
-        switch (part.type) {
-          case 'text-delta':
-            yield { kind: 'text', text: part.text }
-            break
-          case 'reasoning-delta':
-            yield { kind: 'reasoning', text: part.text }
-            break
-          case 'tool-call':
-            yield {
-              kind: 'tool-call',
-              toolName: part.toolName,
-              toolCallId: part.toolCallId,
-              toolInput: normalizeToolInput(part.input)
+      const compatible = provider !== 'anthropic' && provider !== 'google'
+      let includeUsage = compatible
+      let emitted = false
+      const unsupportedUsage = (error: unknown) => {
+        const e = error as { statusCode?: number; message?: string; responseBody?: string } | undefined
+        return compatible && includeUsage && !emitted && [400, 422].includes(e?.statusCode ?? 0)
+          && /stream_options|include_usage/i.test(`${e?.message ?? ''} ${e?.responseBody ?? ''}`)
+          && /unsupported|unknown|unrecognized|not (?:allowed|supported)|extra (?:field|input)/i.test(`${e?.message ?? ''} ${e?.responseBody ?? ''}`)
+      }
+      while (true) {
+        let retryWithoutUsage = false
+        try {
+          const result = streamText({
+            model: model(opts.model, includeUsage),
+            system: opts.system,
+            messages: withCacheBreakpoints(opts.messages, provider),
+            tools,
+            abortSignal: opts.signal,
+            ...(opts.maxOutputTokens ? { maxOutputTokens: opts.maxOutputTokens } : {}),
+            ...(providerOptions ? { providerOptions } : {})
+          })
+          for await (const part of result.fullStream) {
+            switch (part.type) {
+              case 'text-delta':
+                emitted = true
+                yield { kind: 'text', text: part.text }
+                break
+              case 'reasoning-delta':
+                emitted = true
+                yield { kind: 'reasoning', text: part.text }
+                break
+              case 'tool-call':
+                emitted = true
+                yield {
+                  kind: 'tool-call',
+                  toolName: part.toolName,
+                  toolCallId: part.toolCallId,
+                  toolInput: normalizeToolInput(part.input)
+                }
+                break
+              case 'finish':
+                emitted = true
+                yield {
+                  kind: 'finish',
+                  finishReason: part.finishReason,
+                  tokens: toMessageTokens(part.totalUsage)
+                }
+                break
+              case 'error':
+                if (unsupportedUsage(part.error)) {
+                  retryWithoutUsage = true
+                  break
+                }
+                yield { kind: 'error', error: formatLlmError(part.error) }
+                break
+              default:
+                break
             }
-            break
-          case 'finish':
-            yield {
-              kind: 'finish',
-              finishReason: part.finishReason,
-              tokens: toMessageTokens(part.totalUsage)
-            }
-            break
-          case 'error':
-            yield { kind: 'error', error: formatLlmError(part.error) }
-            break
-          default:
-            break
+            if (retryWithoutUsage) break
+          }
+        } catch (error) {
+          if (unsupportedUsage(error)) retryWithoutUsage = true
+          else throw error
         }
+        if (!retryWithoutUsage || opts.signal?.aborted) return
+        includeUsage = false
       }
     }
   }

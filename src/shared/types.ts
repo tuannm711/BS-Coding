@@ -111,6 +111,7 @@ export interface MessageTokens {
 
 export interface ContextInfo {
   limit: number | null
+  limitSource?: 'provider' | 'catalog' | 'configured'
   compactThreshold: number | null
   sessionCost: number
 }

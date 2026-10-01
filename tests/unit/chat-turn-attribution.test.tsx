@@ -24,4 +24,14 @@ describe('immutable chat turn attribution', () => {
     expect(html).toContain('data-testid="context-session-tokens"')
     expect(html).toContain('1,250')
   })
+
+  it('describes a configured context budget separately from the last measured request', () => {
+    const html = renderToStaticMarkup(<ContextFooter
+      tokens={120} limit={128000} limitSource="configured" compactThreshold={108000} cost={0}
+      sessionTokens={{ input: 300, output: 40 }}
+    />)
+    expect(html).toContain('Configured context budget')
+    expect(html).toContain('Last provider-reported request')
+    expect(html).toContain('Cumulative provider-reported tokens')
+  })
 })

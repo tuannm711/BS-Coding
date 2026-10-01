@@ -48,7 +48,9 @@ import { createGitHubCopilotAdapter } from './providers/adapters/github-copilot'
 import { createAntigravityAdapter } from './providers/adapters/antigravity'
 import { planNativeAgentReconciliation } from './agent/workspace-reconcile'
 import { TrayManager } from './tray-manager'
-import { BrowserBridge } from './browser/bridge'
+import { BrowserService } from './browser/service'
+import { getNativeConnectionConfig, prepareNativeHost, refreshNativeHostIfInstalled } from './browser/native-install'
+import { NATIVE_EXTENSION_ID } from '../shared/browser-native'
 import { createChromeLauncher, ensureExtensionInstalled } from './browser/chrome-launcher'
 import { migrateLegacyUserData, resolveUserDataDir } from './bs-migration'
 import { Channels } from '../shared/ipc'
@@ -57,6 +59,19 @@ import type { AgentState, Command, FileViewerPayload, ImageAttachment, BsSetting
 let win: BrowserWindow | null = null
 let isQuitting = false
 let tray: TrayManager | null = null
+
+function createBrowserService(): BrowserService {
+  const userData = app.getPath('userData')
+  const artifacts = { stateFile: path.join(userData, 'browser-connections.json'), screenshotDir: path.join(userData, 'browser-screenshots'), snapshotDir: path.join(userData, 'browser-snapshots') }
+  try { return new BrowserService({ ...getNativeConnectionConfig(userData), ...artifacts }) }
+  catch {
+    // Browser setup must fail closed without preventing other coding workflows
+    // from opening the application and its explicit repair control.
+    const service = new BrowserService({ endpoint: '', token: '', extensionId: NATIVE_EXTENSION_ID, ...artifacts })
+    service.setSetup(false, 'Browser credentials could not be loaded. Use Install / Repair helper to repair browser setup.')
+    return service
+  }
+}
 
 if (process.env.BS_USER_DATA) app.setPath('userData', process.env.BS_USER_DATA)
 
@@ -107,14 +122,35 @@ class MainApp {
   builtinSkillsDir = app.isPackaged
     ? path.join(process.resourcesPath, 'skills')
     : path.join(app.getAppPath(), 'resources', 'skills')
-  browserBridge = new BrowserBridge({
-    screenshotDir: path.join(app.getPath('userData'), 'browser-screenshots'),
-    snapshotDir: path.join(app.getPath('userData'), 'browser-snapshots')
-  })
+  browserBridge = createBrowserService()
   browserLauncher = createChromeLauncher({
     getWindow: () => win,
     extensionDir: path.join(app.getPath('userData'), 'browser-extension')
   })
+  async setupNativeBrowser() {
+    const result = await prepareNativeHost({
+      userDataDir: app.getPath('userData'),
+      sourceDir: app.isPackaged ? path.join(process.resourcesPath, 'browser-native-host') : path.join(app.getAppPath(), 'out', 'browser-native-host'),
+      runtimePath: process.execPath,
+      repairConfig: true
+    })
+    if (result.installed) {
+      try {
+        await this.browserBridge.configure(getNativeConnectionConfig(app.getPath('userData')))
+        await this.browserBridge.start()
+      } catch { this.browserBridge.setSetup(false, 'Browser IPC could not start. Close other BS Coding instances and try Repair again.'); return this.browserBridge.getStatus() }
+    }
+    this.browserBridge.setSetup(result.installed, result.error)
+    return this.browserBridge.getStatus()
+  }
+  async refreshNativeBrowser() {
+    const result = await refreshNativeHostIfInstalled({
+      userDataDir: app.getPath('userData'),
+      sourceDir: app.isPackaged ? path.join(process.resourcesPath, 'browser-native-host') : path.join(app.getAppPath(), 'out', 'browser-native-host'),
+      runtimePath: process.execPath
+    })
+    if (result) this.browserBridge.setSetup(result.installed, result.error)
+  }
   traces = new TraceStore(path.join(app.getPath('userData'), 'traces'))
   vault = new Vault(path.join(app.getPath('userData'), 'connections', 'vault.json'))
   usageLedger = new ProviderUsageLedger(path.join(app.getPath('userData'), 'connections', 'usage-ledger.json'))
@@ -1035,6 +1071,18 @@ function registerIpcHandlers(): void {
   ipcMain.handle(Channels.WindowClose, () => win?.close())
   ipcMain.handle(Channels.WindowIsMaximized, () => win?.isMaximized() ?? false)
   ipcMain.handle(Channels.BrowserGetStatus, () => mainApp.browserBridge.getStatus())
+  ipcMain.handle(Channels.BrowserNativeSetup, () => mainApp.setupNativeBrowser())
+  ipcMain.handle(Channels.BrowserSelectConnection, (_e, connectionId: string) => mainApp.browserBridge.selectConnection(connectionId))
+  ipcMain.handle(Channels.BrowserSetConnectionEnabled, (_e, connectionId: string, enabled: boolean) => {
+    if (typeof enabled !== 'boolean') throw new Error('Invalid browser connection state')
+    mainApp.browserBridge.setConnectionEnabled(connectionId, enabled)
+  })
+  ipcMain.handle(Channels.BrowserListTabs, (_e, connectionId: string) => mainApp.browserBridge.listTabs(connectionId))
+  ipcMain.handle(Channels.BrowserAssignTab, (_e, projectPath: string, sessionId: string, connectionId: string, tabId: number) => {
+    if (!mainApp.bsAgent.listProjectSessions(projectPath).some(session => session.id === sessionId)) throw new Error('Browser session does not belong to this project')
+    if (mainApp.bsAgent.isSessionChatRunning(projectPath, sessionId)) throw new Error('Wait for the running turn to finish before assigning a browser tab')
+    return mainApp.browserBridge.assignTab(sessionId, connectionId, tabId)
+  })
   ipcMain.handle(Channels.BrowserPair, () => mainApp.browserBridge.pair())
   ipcMain.handle(Channels.BrowserOpenInstallGuide, () => mainApp.browserLauncher.showInstallGuide())
   ipcMain.handle(Channels.BrowserOpenExtensionFolder, () => mainApp.browserLauncher.openExtensionFolder())
@@ -1052,6 +1100,7 @@ app.whenReady().then(async () => {
   })
   mainApp = new MainApp()
   mainApp.bsAgent.truncationCleanup()
+  await mainApp.refreshNativeBrowser().catch(() => mainApp.browserBridge.setSetup(false, 'Browser helper could not be refreshed. Use Install / Repair helper.'))
   await mainApp.browserBridge.start().catch(err => {
     console.error('[bs] browser bridge start failed:', err)
   })

@@ -6,6 +6,11 @@ export interface BrowserStatusInfo {
   paired: boolean
   pairingCode?: string
   pairingExpiresAt?: number
+  transport?: 'native' | 'legacy-ws'
+  nativeHostInstalled?: boolean
+  error?: string
+  selectedConnectionId?: string
+  connections?: Array<{ id: string; label: string; connected: boolean; extensionVersion: string; enabled?: boolean }>
 }
 
 export type BrowserReadMode = 'interactive' | 'full'

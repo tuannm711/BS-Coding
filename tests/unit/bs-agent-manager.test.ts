@@ -1275,6 +1275,70 @@ describe('BsAgentManager', () => {
     expect(info.sessionCost).toBe(0)
   })
 
+  it('identifies the configured context budget when the exact model has no published limit', async () => {
+    const { manager } = await makeManager()
+    expect(manager.getContextInfo('a1')).toMatchObject({ limit: 128000, limitSource: 'configured' })
+  })
+
+  it('uses exact account model limits for context and output even without a catalog provider', async () => {
+    const requests: LlmStreamOptions[] = []
+    const { manager } = await makeManager({ providerAccounts: [{
+      providerId: 'antigravity', activeAccountId: 'anti', accounts: [{
+        id: 'anti', providerId: 'antigravity', label: 'Fixture', authMode: 'oauth', status: 'active', createdAt: 1, lastUsedAt: 1,
+        models: ['claude-sonnet-4-6'], modelCatalog: [{ id: 'claude-sonnet-4-6', name: 'Fixture', capabilities: { contextWindow: 200000, maxOutputTokens: 16000 } }]
+      }]
+    }], providerRuntime: () => ({ async *stream(request) {
+      requests.push(request)
+      yield { kind: 'text', text: 'fixture' }
+      yield { kind: 'finish' }
+    } }) })
+    manager.setModel('a1', 'antigravity', 'claude-sonnet-4-6')
+    expect(manager.getContextInfo('a1')).toMatchObject({ limit: 200000, compactThreshold: 180000, limitSource: 'provider' })
+    await manager.send('a1', 'hello')
+    expect(requests[0]?.model).toBe('claude-sonnet-4-6')
+    expect(requests[0]?.maxOutputTokens).toBe(16000)
+  })
+
+  it('uses the exact catalog model limits and ignores another model limits after switching', async () => {
+    const catalog = new ModelsCatalog('/unused')
+    vi.spyOn(catalog, 'fetch').mockResolvedValue({ test: { name: 'Fixture', models: ['test-model', 'other'], limits: { 'test-model': { context: 50000, output: 4000 } } } })
+    const { manager, llmRequests } = await makeManager({ catalog })
+    expect(manager.getContextInfo('a1')).toMatchObject({ limit: 50000, limitSource: 'catalog' })
+    await manager.send('a1', 'hello')
+    expect(llmRequests[0]?.maxOutputTokens).toBe(4000)
+    manager.setModel('a1', 'test', 'other')
+    expect(manager.getContextInfo('a1')).toMatchObject({ limit: 128000, limitSource: 'configured' })
+  })
+
+  it('keeps provider-reported usage after a shared-session turn fails', async () => {
+    const { manager, store } = await makeManager({ partsQueue: [[
+      { kind: 'text', text: 'partial' },
+      { kind: 'finish', tokens: { input: 100, output: 20, total: 120 } },
+      { kind: 'error', error: 'fixture failure' }
+    ]] })
+    const session = manager.createProjectSession('/proj', 'a1')
+    await manager.sendInSession('/proj', session.id, 'a1', 'hello')
+    expect(store.getUsage(session.id)).toMatchObject({ input: 100, output: 20 })
+  })
+
+  it('persists measured usage before stopping a shared-session turn while awaiting permission', async () => {
+    const { manager, store } = await makeManager({ partsQueue: [[
+      { kind: 'tool-call', toolName: 'bash', toolCallId: 'fixture-call', toolInput: { command: 'echo fixture' } },
+      { kind: 'finish', tokens: { input: 100, output: 20, total: 120 } }
+    ]] })
+    const session = manager.createProjectSession('/proj', 'a1')
+    let reachedPrompt!: () => void
+    const prompted = new Promise<void>(resolve => { reachedPrompt = resolve })
+    manager.setOnEvent(event => { if (event.type === 'prompt-request') reachedPrompt() })
+    const sending = manager.sendInSession('/proj', session.id, 'a1', 'hello')
+    await prompted
+    const recordedBeforeStop = store.getUsage(session.id)
+    manager.stopSessionChat('/proj', session.id)
+    await sending
+    expect(recordedBeforeStop).toMatchObject({ input: 100, output: 20 })
+    expect(store.getUsage(session.id)).toMatchObject({ input: 100, output: 20 })
+  })
+
   it('getContextInfo returns nulls for an unknown agent', async () => {
     const { manager } = await makeManager()
     expect(manager.getContextInfo('nope')).toEqual({ limit: null, compactThreshold: null, sessionCost: 0 })

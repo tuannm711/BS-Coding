@@ -1,7 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import type { ModelMessage } from 'ai'
 import type { ArtifactEntry, ChatEvent, ChatMessage, MessageTokens, PromptResponse, QuestionPrompt, QueuedMessage, TodoItem, ToolCallData } from '../../shared/types'
-import { appendStreamDelta } from '../../shared/text'
 import type { LlmClient, LlmStreamPart } from './llm'
 import { formatLlmError } from './llm'
 import { toLlmMessages } from './message'
@@ -24,7 +23,7 @@ export interface LoopDeps {
   model: string
   system: string
   /** Overrides llm, model and system for this step when present. */
-  currentTarget?: () => { llm: LlmClient; model: string; system: string; variantOptions?: Record<string, unknown> } | undefined
+  currentTarget?: () => { llm: LlmClient; model: string; system: string; variantOptions?: Record<string, unknown>; maxOutputTokens?: number } | undefined
   /** Returns true when another target took over and the turn should continue. */
   handoff?: (message: string) => Promise<boolean>
   // Appended at stream time, so the caller can vary it per turn. The shared
@@ -39,6 +38,7 @@ export interface LoopDeps {
   ask: (promptId: string, tool?: string) => Promise<PromptResponse | null>
   maxSteps?: number
   maxContextTokens?: number
+  maxOutputTokens?: number
   compaction?: CompactionSettings
   toolOutput?: { maxBytes: number; maxLines: number }
   truncation?: TruncationStore
@@ -65,6 +65,8 @@ export interface LoopDeps {
 const DEFAULT_MAX_STEPS = 50
 const MAX_COMPACT_PER_RUN = 2
 const MAX_STEPS_PROMPT = 'Final step: wrap up and provide your final answer now. Tool calls are disabled.'
+const MAX_FINAL_CONTINUATIONS = 2
+const CONTINUE_FINAL_PROMPT = 'Your previous response reached its output token budget. Continue the same final answer exactly where it ended. Do not repeat any text already written, restart the answer, or use tools.'
 
 export class SessionRunner {
   /**
@@ -73,8 +75,8 @@ export class SessionRunner {
    * assembly would drift, and half a turn would run under a prompt nobody
    * intended.
    */
-  target(): { llm: LlmClient; model: string; system: string; variantOptions?: Record<string, unknown> } {
-    return { llm: this.deps.llm, model: this.deps.model, system: this.deps.system, variantOptions: this.deps.variantOptions }
+  target(): { llm: LlmClient; model: string; system: string; variantOptions?: Record<string, unknown>; maxOutputTokens?: number } {
+    return { llm: this.deps.llm, model: this.deps.model, system: this.deps.system, variantOptions: this.deps.variantOptions, maxOutputTokens: this.deps.maxOutputTokens }
   }
 
   private readonly maxSteps: number
@@ -120,8 +122,9 @@ export class SessionRunner {
       let reasoningBuffer = ''
       let tokens: MessageTokens | undefined
       const calls: ToolCallData[] = []
+      let continuations = 0
       const persistPartial = () => {
-        if (!textBuffer && !reasoningBuffer) return
+        if (!textBuffer && !reasoningBuffer && !tokens) return
         this.deps.appendMessage({
           id: randomUUID(),
           role: 'assistant',
@@ -139,73 +142,106 @@ export class SessionRunner {
         // work. Borrowing them dropped a plan-mode turn's read-only note the
         // moment it moved to a build agent's account.
         const target = this.deps.currentTarget?.()
-        const stream = (target?.llm ?? this.deps.llm).stream({
-          model: target?.model ?? this.deps.model,
-          system: this.deps.system + (this.deps.systemSuffix?.() ?? ''),
-          messages: llmMessages,
-          tools: isLastStep ? [] : this.visibleToolDefs(),
-          signal,
-          variantOptions: target?.variantOptions ?? this.deps.variantOptions,
-          serviceTier: this.deps.serviceTier,
-          cwd: this.deps.cwd
-        })
-        for await (const part of stream) {
-          if (signal?.aborted) {
-            persistPartial()
-            this.deps.onEvent({ type: 'done', agentId, reason: 'stopped' })
-            return
+        while (true) {
+          // A continuation is a new provider request. Earlier measured usage
+          // stays in run/session totals, but cannot describe this response if
+          // it is interrupted before its own usage arrives.
+          tokens = undefined
+          this.lastTokens = undefined
+          let finished = false
+          let finishReason: string | undefined
+          const recordTokens = (measured: MessageTokens | undefined) => {
+            tokens = measured
+            this.lastTokens = measured
+            if (!measured) return
+            runUsage.input += measured.input
+            runUsage.output += measured.output
+            runUsage.total += measured.total
+            runUsage.cacheRead += measured.cacheRead ?? 0
+            runUsage.cacheWrite += measured.cacheWrite ?? 0
+            this.deps.onUsage?.(measured)
           }
-          if (part.kind === 'text') {
-            const next = appendStreamDelta(textBuffer, part.text ?? '')
-            const delta = next.slice(textBuffer.length)
-            textBuffer = next
-            this.deps.onEvent({ type: 'text-delta', agentId, delta })
-          } else if (part.kind === 'reasoning') {
-            const next = appendStreamDelta(reasoningBuffer, part.text ?? '')
-            const delta = next.slice(reasoningBuffer.length)
-            reasoningBuffer = next
-            this.deps.onEvent({ type: 'reasoning-delta', agentId, delta })
-          } else if (part.kind === 'tool-call') {
-            hasToolCall = true
-            const call: ToolCallData = {
-              id: part.toolCallId ?? randomUUID(),
-              tool: part.toolName ?? 'unknown',
-              input: part.toolInput ?? {},
-              thoughtSignature: part.thoughtSignature,
-              permission: 'pending'
+          const stream = (target?.llm ?? this.deps.llm).stream({
+            model: target?.model ?? this.deps.model,
+            system: this.deps.system + (this.deps.systemSuffix?.() ?? ''),
+            messages: continuations === 0 ? llmMessages : [
+              ...llmMessages,
+              ...(textBuffer ? [{ role: 'assistant' as const, content: textBuffer }] : []),
+              { role: 'user', content: CONTINUE_FINAL_PROMPT }
+            ],
+            tools: isLastStep || continuations > 0 ? [] : this.visibleToolDefs(),
+            signal,
+            variantOptions: target?.variantOptions ?? this.deps.variantOptions,
+            serviceTier: this.deps.serviceTier,
+            maxOutputTokens: target ? target.maxOutputTokens : this.deps.maxOutputTokens,
+            cwd: this.deps.cwd
+          })
+          for await (const part of stream) {
+            if (signal?.aborted) {
+              // A Stop can arrive between the network read and this handler.
+              // Already received usage still represents provider spending.
+              if (!finished && (part.kind === 'finish' || part.kind === 'error') && part.tokens) recordTokens(part.tokens)
+              persistPartial()
+              this.deps.onEvent({ type: 'done', agentId, reason: 'stopped' })
+              return
             }
-            calls.push(call)
-            this.deps.onEvent({ type: 'tool-start', agentId, call })
-          } else if (part.kind === 'finish') {
-            tokens = part.tokens
-            if (part.tokens) {
-              this.lastTokens = part.tokens
-              runUsage.input += part.tokens.input
-              runUsage.output += part.tokens.output
-              runUsage.total += part.tokens.total
-              runUsage.cacheRead += part.tokens.cacheRead ?? 0
-              runUsage.cacheWrite += part.tokens.cacheWrite ?? 0
-              // Báo usage ngay mỗi step: nếu user bấm Stop hoặc gặp lỗi giữa
-              // chừng, chi phí đã tiêu vẫn được ghi nhận.
-              this.deps.onUsage?.(part.tokens)
+            if (part.kind === 'text') {
+              const delta = part.text ?? ''
+              textBuffer += delta
+              this.deps.onEvent({ type: 'text-delta', agentId, delta })
+            } else if (part.kind === 'reasoning') {
+              const delta = part.text ?? ''
+              reasoningBuffer += delta
+              this.deps.onEvent({ type: 'reasoning-delta', agentId, delta })
+            } else if (part.kind === 'tool-call') {
+              if (continuations > 0) throw new Error('[bs] Final answer continuation returned a tool call; no tool was executed.')
+              hasToolCall = true
+              const call: ToolCallData = {
+                id: part.toolCallId ?? randomUUID(),
+                tool: part.toolName ?? 'unknown',
+                input: part.toolInput ?? {},
+                thoughtSignature: part.thoughtSignature,
+                permission: 'pending'
+              }
+              calls.push(call)
+              this.deps.onEvent({ type: 'tool-start', agentId, call })
+            } else if (part.kind === 'finish') {
+              if (finished) continue
+              finished = true
+              finishReason = part.finishReason?.toLowerCase().replaceAll('_', '-')
+              // Account each request once, including a budget-limited segment.
+              recordTokens(part.tokens)
+            } else if (part.kind === 'error') {
+              if (!finished && part.tokens) recordTokens(part.tokens)
+              const message = part.error ?? 'llm error'
+              if (!textBuffer && !reasoningBuffer && calls.length === 0 && await this.recoverFromOverflow(message, retriedOverflow, signal)) {
+                retriedOverflow = true
+                overflowRetry = true
+                break
+              }
+              // Beside the overflow recovery that already lives here: another
+              // target may be able to carry the same turn.
+              if (!textBuffer && !reasoningBuffer && calls.length === 0 && await this.deps.handoff?.(message)) {
+                overflowRetry = true
+                break
+              }
+              persistPartial()
+              this.deps.onEvent({ type: 'error', agentId, message })
+              return
             }
-          } else if (part.kind === 'error') {
-            const message = part.error ?? 'llm error'
-            if (await this.recoverFromOverflow(message, retriedOverflow, signal)) {
-              retriedOverflow = true
-              overflowRetry = true
-              break
-            }
-            // Beside the overflow recovery that already lives here: another
-            // target may be able to carry the same turn.
-            if (await this.deps.handoff?.(message)) {
-              overflowRetry = true
-              break
-            }
-            persistPartial()
-            this.deps.onEvent({ type: 'error', agentId, message })
-            return
           }
+          if (overflowRetry || signal?.aborted) break
+          if (!finished) throw new Error('[bs] Provider stream ended before a completion marker. The partial response was saved.')
+          if (finishReason === 'length' || finishReason === 'max-tokens' || finishReason === 'max-output-tokens') {
+            if (hasToolCall) throw new Error('[bs] Provider output budget ended during a tool step; no tool was executed.')
+            if (continuations >= MAX_FINAL_CONTINUATIONS) throw new Error('[bs] Final answer still exceeds the output budget after two continuation requests. The partial response was saved.')
+            continuations++
+            continue
+          }
+          if (finishReason && !['stop', 'end-turn', 'tool-calls', 'tool-use', 'function-call'].includes(finishReason)) {
+            throw new Error(`[bs] Provider response did not complete (${finishReason}). The partial response was saved.`)
+          }
+          break
         }
       } catch (err) {
         if (signal?.aborted) {
@@ -214,10 +250,10 @@ export class SessionRunner {
           return
         }
         const message = formatLlmError(err)
-        if (await this.recoverFromOverflow(message, retriedOverflow, signal)) {
+        if (!textBuffer && !reasoningBuffer && calls.length === 0 && await this.recoverFromOverflow(message, retriedOverflow, signal)) {
           retriedOverflow = true
           overflowRetry = true
-        } else if (await this.deps.handoff?.(message)) {
+        } else if (!textBuffer && !reasoningBuffer && calls.length === 0 && await this.deps.handoff?.(message)) {
           overflowRetry = true
         } else {
           persistPartial()
@@ -233,7 +269,7 @@ export class SessionRunner {
         return
       }
 
-      if (textBuffer || calls.length > 0 || reasoningBuffer) {
+      if (textBuffer || calls.length > 0 || reasoningBuffer || tokens) {
         this.deps.appendMessage({
           id: randomUUID(),
           role: 'assistant',

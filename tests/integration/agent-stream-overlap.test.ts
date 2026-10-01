@@ -8,7 +8,7 @@ import { createDefaultTools } from '../../src/main/agent/tools/registry'
 import type { ChatEvent, ChatMessage, ToolCallData } from '../../src/shared/types'
 import type { TranscriptItem } from '../../src/main/agent/message'
 
-function startOverlapServer(chunks: string[]): Promise<{ port: number; close: () => void }> {
+function startStreamServer(chunks: string[]): Promise<{ port: number; close: () => void }> {
   return new Promise(resolve => {
     const server = http.createServer((req, res) => {
       res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' })
@@ -18,6 +18,7 @@ function startOverlapServer(chunks: string[]): Promise<{ port: number; close: ()
           const c = chunks[i++]
           res.write(`data: {"choices":[{"delta":{"content":${JSON.stringify(c)}},"index":0}]}\n\n`)
         } else {
+          res.write('data: {"choices":[{"delta":{},"index":0,"finish_reason":"stop"}]}\n\n')
           res.write('data: [DONE]\n\n')
           clearInterval(timer)
           res.end()
@@ -33,19 +34,17 @@ function startOverlapServer(chunks: string[]): Promise<{ port: number; close: ()
   })
 }
 
-describe('agent stream overlap handling', () => {
+describe('agent incremental stream handling', () => {
   const servers: Array<{ close: () => void }> = []
   afterEach(() => {
     for (const s of servers) s.close()
     servers.length = 0
   })
 
-  it('dedupes overlapping stream deltas so the rendered text stays clean', async () => {
-    const intended = 'Tất nhiên!! Bạn muốn tôi giúp phần nào??'
-    const overlappingChunks = [
-      'Tất', 'ất nhi', 'nhiên!!', 'ên!! ', '!! Bạn', 'n muốn', 'ốn tôi', 'ôi giúp', 'úp phần', 'ần nào', 'o??'
-    ]
-    const srv = await startOverlapServer(overlappingChunks)
+  it('preserves repeated text and Markdown across provider delta boundaries', async () => {
+    const intended = 'Tất nhiên!! **bookkeeper** Bạn muốn tôi giúp phần nào??'
+    const chunks = ['Tất', ' nhiên!', '!', ' *', '*book', 'keeper*', '* Bạn', ' muốn tôi', ' giúp phần nào?', '?']
+    const srv = await startStreamServer(chunks)
     servers.push(srv)
 
     const items: TranscriptItem[] = []

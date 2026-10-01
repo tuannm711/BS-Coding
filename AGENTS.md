@@ -6,7 +6,7 @@ aider, ...) chạy song song trong các pane terminal trên một cửa sổ.
 ## Branch Governance & Context
 
 - **Product**: BS Coding
-- **Current Version**: 1.3.7
+- **Current Version**: 1.3.8
 - **Development Branch**: `develop/v1`
 - **Stable / Release Branch**: `release/v1`
 - **Release Tags**: `v1.*` (triggered from `release/v1` only)
@@ -31,7 +31,8 @@ aider, ...) chạy song song trong các pane terminal trên một cửa sổ.
 - `src/shared` — types + IPC contract chung. **KHÔNG** import Node/Electron ở đây.
 - `src/browser-extension` — Chrome MV3 extension (build riêng bằng esbuild → `out/browser-extension`,
   copy sang `userData/browser-extension/` để Load unpacked trên profile Chrome thật).
-- `src/main/browser` — BrowserBridge (WS server local + pairing code) + Chrome launcher/hướng dẫn cài.
+- `src/main/browser` — BrowserService (Native Messaging qua OS IPC, profile/session ownership) + native host installer + Chrome launcher/hướng dẫn cài.
+- `src/browser-native-host` — helper stdio đóng gói riêng và Windows launcher; không cần Node cài ngoài.
 
 Alias `@shared` → `src/shared` (đã cấu hình trong electron.vite.config.ts, vitest.config.ts, tsconfig).
 

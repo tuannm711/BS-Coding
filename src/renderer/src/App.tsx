@@ -465,7 +465,7 @@ export default function App() {
         onBrowserClick={() => setBrowserDialogOpen(true)}
       />
       {browserDialogOpen && (
-        <BrowserDialog status={browser} onClose={() => setBrowserDialogOpen(false)} />
+        <BrowserDialog status={browser} projectPath={runtime?.workspace.projectPath} sessionId={activeProjectSessionId ?? undefined} onClose={() => setBrowserDialogOpen(false)} />
       )}
       {installGuide && (
         <InstallGuideDialog guide={installGuide} onClose={() => setInstallGuide(null)} />

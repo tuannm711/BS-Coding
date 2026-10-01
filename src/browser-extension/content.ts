@@ -1,18 +1,12 @@
 import type { BrowserCommandName } from '../../src/shared/browser-types'
 
-declare global {
-  interface XMLHttpRequest {
-    __bsMethod?: string
-    __bsUrl?: string
-  }
-}
-
 type CmdResult = { ok: boolean; data?: unknown; error?: string }
 
 interface CmdRequest {
-  kind: 'cmd'
+  kind: 'cmd' | 'probe'
   name: BrowserCommandName
   params: Record<string, unknown>
+  deadline?: number
 }
 
 function query(selector: string): Element | null {
@@ -128,59 +122,8 @@ async function execute(name: BrowserCommandName, params: Record<string, unknown>
   }
 }
 
-// ---- console intercept ----
 function sendEvent(name: string, data: unknown): void {
-  chrome.runtime.sendMessage({ kind: 'event', name, data }).catch(() => {})
-}
-
-const consoleLevels = ['log', 'info', 'warn', 'error', 'debug'] as const
-const originalConsole: Record<string, (...args: unknown[]) => void> = {}
-for (const level of consoleLevels) {
-  originalConsole[level] = console[level].bind(console)
-  console[level] = (...args: unknown[]) => {
-    originalConsole[level](...args)
-    sendEvent('console', { level, text: args.map(String).join(' ').slice(0, 4000), ts: Date.now() })
-  }
-}
-
-window.addEventListener('error', (e) => {
-  sendEvent('console', { level: 'error', text: String(e.message), ts: Date.now() })
-})
-window.addEventListener('unhandledrejection', (e) => {
-  sendEvent('console', { level: 'error', text: `Unhandled rejection: ${String(e.reason)}`, ts: Date.now() })
-})
-
-// ---- network intercept ----
-const originalFetch = window.fetch.bind(window)
-window.fetch = (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
-  const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
-  const method = (init?.method ?? (typeof input === 'object' && 'method' in input ? input.method : undefined) ?? 'GET')
-  const start = performance.now()
-  return originalFetch(input, init).then(res => {
-    sendEvent('network', { method, url, status: res.status, ms: Math.round(performance.now() - start), ts: Date.now() })
-    return res
-  }).catch(err => {
-    sendEvent('network', { method, url, status: 0, ms: Math.round(performance.now() - start), error: String(err), ts: Date.now() })
-    throw err
-  })
-}
-
-const origOpen = XMLHttpRequest.prototype.open
-const origSend = XMLHttpRequest.prototype.send
-XMLHttpRequest.prototype.open = function (
-  this: XMLHttpRequest, method: string, url: string | URL, async: boolean = true,
-  username?: string | null, password?: string | null
-): void {
-  this.__bsMethod = method
-  this.__bsUrl = String(url)
-  origOpen.call(this, method, url, async, username, password)
-}
-XMLHttpRequest.prototype.send = function (this: XMLHttpRequest, body?: Document | XMLHttpRequestBodyInit | null): void {
-  const start = performance.now()
-  this.addEventListener('loadend', () => {
-    sendEvent('network', { method: this.__bsMethod, url: this.__bsUrl, status: this.status, ms: Math.round(performance.now() - start), ts: Date.now() })
-  })
-  origSend.call(this, body)
+  void chrome.runtime.sendMessage({ kind: 'event', name, data }).catch(() => {})
 }
 
 // ---- MutationObserver (watch) ----
@@ -213,14 +156,9 @@ window.addEventListener('load', () => {
 })
 
 chrome.runtime.onMessage.addListener((msg: CmdRequest, _sender, sendResponse) => {
+  if (msg?.kind === 'probe') { sendResponse({ ok: true }); return false }
   if (msg?.kind !== 'cmd') return false
+  if (!Number.isFinite(msg.deadline) || Date.now() >= msg.deadline!) { sendResponse({ ok: false, error: 'COMMAND_EXPIRED: browser command deadline passed' }); return false }
   void execute(msg.name, msg.params ?? {}).then(sendResponse)
   return true
-})
-
-// Keep the MV3 service worker alive while a page is open so its WebSocket to the app
-// survives Chrome's idle suspension (otherwise the bridge drops to "not connected").
-const keepalivePort = chrome.runtime.connect({ name: 'bs-keepalive' })
-keepalivePort.onDisconnect.addListener(() => {
-  if (!chrome.runtime.lastError) void chrome.runtime.connect({ name: 'bs-keepalive' })
 })

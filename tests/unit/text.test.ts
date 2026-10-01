@@ -9,19 +9,15 @@ describe('appendStreamDelta', () => {
     expect(buf).toBe('Tất nhiên!!')
   })
 
-  it('strips an overlapping suffix from the incoming delta', () => {
-    let buf = appendStreamDelta('', 'Tất')
-    buf = appendStreamDelta(buf, 'ất nhi')
-    buf = appendStreamDelta(buf, 'nhiên!!')
-    buf = appendStreamDelta(buf, 'ên!! ')
-    buf = appendStreamDelta(buf, '!! Bạn')
-    expect(buf).toBe('Tất nhiên!! Bạn')
+  it('preserves an overlapping suffix as new incremental text', () => {
+    expect(appendStreamDelta('book', 'keeper')).toBe('bookkeeper')
+    expect(appendStreamDelta('*', '*bold**')).toBe('**bold**')
   })
 
-  it('handles full duplicate delivery (exact same delta twice)', () => {
+  it('preserves identical consecutive deltas', () => {
     let buf = appendStreamDelta('', 'hello')
     buf = appendStreamDelta(buf, 'hello')
-    expect(buf).toBe('hello')
+    expect(buf).toBe('hellohello')
   })
 
   it('handles empty buffer and empty delta', () => {

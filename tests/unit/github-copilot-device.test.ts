@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { startGitHubCopilotDeviceAuthorization } from '../../src/main/providers/auth/github-copilot-oauth'
+import { startGitHubCopilotDeviceAuthorization, refreshGitHubCopilotCredentials } from '../../src/main/providers/auth/github-copilot-oauth'
 
 describe('Copilot device authorization', () => {
   beforeEach(() => vi.useFakeTimers())
@@ -19,6 +19,30 @@ describe('Copilot device authorization', () => {
     }) as typeof fetch
     return { calls, fetchImpl }
   }
+
+  it('uses a supported REST version for profile, private email and Copilot credentials', async () => {
+    const f = fixture()
+    const restRequests: Array<{ url: string; apiVersion: string | null }> = []
+    const strictFetch: typeof fetch = async (input, init) => {
+      const url = String(input)
+      if (url.startsWith('https://api.github.com/')) {
+        const apiVersion = new Headers(init?.headers).get('x-github-api-version')
+        restRequests.push({ url, apiVersion })
+        if (apiVersion !== '2022-11-28') return Response.json({ message: 'Bad Request' }, { status: 400 })
+        if (url === 'https://api.github.com/user') return Response.json({ login: 'octocat', email: null })
+        if (url === 'https://api.github.com/user/emails') return Response.json([{ email: 'private@example.com', primary: true, verified: true }])
+      }
+      return f.fetchImpl(input, init)
+    }
+    const handle = await startGitHubCopilotDeviceAuthorization(new AbortController().signal, strictFetch)
+    const completion = handle.complete().then(result => ({ result }), error => ({ error }))
+    await vi.advanceTimersByTimeAsync(5000)
+    expect(await completion).toMatchObject({ result: { profile: { login: 'octocat', email: 'private@example.com' }, secrets: { accessToken: 'runtime' } } })
+    expect(restRequests.map(request => request.url)).toEqual(['https://api.github.com/user', 'https://api.github.com/user/emails', 'https://api.github.com/copilot_internal/v2/token', 'https://api.github.com/copilot_internal/user'])
+    expect(restRequests.every(request => request.apiVersion === '2022-11-28')).toBe(true)
+    expect(await refreshGitHubCopilotCredentials('github-token', strictFetch)).toMatchObject({ accessToken: 'runtime' })
+    expect(restRequests).toHaveLength(6)
+  })
 
   it('waits for the minimum interval, handles pending and slow_down and exchanges the device grant', async () => {
     const f = fixture(['authorization_pending', 'slow_down'])
