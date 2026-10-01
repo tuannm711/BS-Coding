@@ -1,5 +1,6 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 import type { JsonStore } from '../json-store'
+import { rebaseProjectPath } from '../project-path'
 
 export interface SnapshotFile {
   filePath: string
@@ -21,6 +22,13 @@ export interface SnapshotTurn {
 }
 
 export const MAX_SNAPSHOTS = 50
+
+export function relocateSnapshot(turn: SnapshotTurn, previous: string, next: string): SnapshotTurn {
+  const rebase = (files: Record<string, string>) => Object.fromEntries(Object.entries(files)
+    .map(([file, text]) => [rebaseProjectPath(file, previous, next), text]))
+  return { ...turn, projectPath: next, before: rebase(turn.before), after: rebase(turn.after),
+    ...(turn.calls ? { calls: Object.fromEntries(Object.entries(turn.calls).map(([id, files]) => [id, rebase(files)])) } : {}) }
+}
 
 type RawEntry = Partial<SnapshotTurn> & { filePath?: string; content?: string }
 
@@ -54,6 +62,13 @@ export class SnapshotStore {
   }>()
 
   constructor(private store: JsonStore<SnapshotTurn>) {}
+
+  relocateProject(previous: string, next: string, sessionIds: Set<string>): () => void {
+    const before = this.loadTurns()
+    this.saveTurns(before.map(turn => turn.projectPath === previous || sessionIds.has(turn.sessionId ?? turn.agentId)
+      ? relocateSnapshot(turn, previous, next) : turn))
+    return () => this.saveTurns(before)
+  }
 
   private loadTurns(): SnapshotTurn[] {
     return (this.store.load() as unknown as RawEntry[]).map(normalize)

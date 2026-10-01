@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import type { ArtifactEntry } from '../shared/types'
+import { rebaseProjectPath } from './project-path'
 
 export type ArtifactInput = Omit<ArtifactEntry, 'id' | 'ts'>
 
@@ -41,5 +42,14 @@ export class ArtifactStore {
   clear(projectPath: string): void {
     this.byProject.delete(projectPath)
     this.onChange(projectPath, [])
+  }
+
+  relocateProject(previous: string, next: string): void {
+    const old = this.byProject.get(previous)
+    if (!old) return
+    this.byProject.delete(previous)
+    this.byProject.set(next, new Map([...old].map(([key, entry]) => [key, { ...entry, absPath: rebaseProjectPath(entry.absPath, previous, next) }])))
+    this.onChange(previous, [])
+    this.onChange(next, this.list(next))
   }
 }

@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import path from 'node:path'
+import { canonicalProjectPath as projectKey } from '../project-path'
 import type { JsonStore } from '../json-store'
 import {
   CHAT_SESSION_SCHEMA_VERSION,
@@ -110,8 +111,16 @@ export class SessionStore {
   }
 
   private saveSessions(sessions: StoredSession[]): void {
-    this.cache = sessions
     this.store.save(sessions)
+    this.cache = sessions
+  }
+
+  relocateProject(previous: string, next: string): () => void {
+    const before = this.loadSessions()
+    const relocated = before.map(session => projectKey(session.projectPath) === projectKey(previous)
+      ? { ...session, projectPath: next } : session)
+    this.saveSessions(relocated)
+    return () => this.saveSessions(before)
   }
 
   private nextUpdatedAt(): number {

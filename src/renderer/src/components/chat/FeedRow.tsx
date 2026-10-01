@@ -1,7 +1,9 @@
-import { memo } from 'react'
+import { memo, useEffect, useRef, useState } from 'react'
+import { Check, Copy } from 'lucide-react'
 import type { ChatMessage, Command, ImageAttachment, ToolCallData, TurnExecutionSnapshot } from '@shared/types'
 import ToolCallCard from './ToolCallCard'
 import MarkdownText from './MarkdownText'
+import { workedDuration } from './chat-presentation'
 
 // Splits user text on @path tokens and highlights them, matching the main-side
 // @reference syntax (bare or quoted forms).
@@ -10,7 +12,7 @@ const MENTION_SPLIT_RE = /(@[\w./\\-]+)/g
 const SLASH_RE = /^(\/[\w-]+)/
 
 export type FeedItem =
-  | { kind: 'message'; id: string; role: ChatMessage['role']; text: string; reasoning?: string; images?: ImageAttachment[]; execution?: TurnExecutionSnapshot }
+  | { kind: 'message'; id: string; role: ChatMessage['role']; text: string; reasoning?: string; images?: ImageAttachment[]; execution?: TurnExecutionSnapshot; turnId?: string }
   | { kind: 'tool'; id: string; call: ToolCallData }
   | { kind: 'error'; id: string; text: string }
   | { kind: 'compaction'; id: string; failed?: boolean }
@@ -52,22 +54,47 @@ function MentionText({ text, commands }: { text: string; commands: Command[] }) 
 // Owns the per-message subtree so streamed deltas only re-render the message
 // that changed, not the whole feed. Props are primitives or stable state
 // references (commands), so React.memo works.
-const FeedMessage = memo(function FeedMessage({ messageId, role, text, reasoning, images, execution, commands, onOpenImage, onOpenFile }: {
+const FeedMessage = memo(function FeedMessage({ messageId, role, text, reasoning, images, execution, isFinal, commands, onOpenImage, onOpenFile }: {
   messageId: string
   role: ChatMessage['role']
   text: string
   reasoning?: string
   images?: ImageAttachment[]
   execution?: TurnExecutionSnapshot
+  isFinal?: boolean
   commands: Command[]
   onOpenImage?: (dataUrl: string) => void
   onOpenFile?: (path: string) => void
 }) {
+  const [copyStatus, setCopyStatus] = useState<'idle' | 'copying' | 'copied' | 'error'>('idle')
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const mounted = useRef(true)
+  const copying = useRef(false)
+  useEffect(() => {
+    mounted.current = true
+    return () => { mounted.current = false; if (timer.current) clearTimeout(timer.current) }
+  }, [])
+  const copy = async () => {
+    if (copying.current) return
+    copying.current = true
+    if (timer.current) clearTimeout(timer.current)
+    setCopyStatus('copying')
+    try {
+      await navigator.clipboard.writeText(text)
+      if (mounted.current) {
+        setCopyStatus('copied')
+        timer.current = setTimeout(() => setCopyStatus('idle'), 2000)
+      }
+    } catch {
+      if (mounted.current) setCopyStatus('error')
+    } finally { copying.current = false }
+  }
   return (
-    <div className={`chat-msg ${role}`} data-chat-message-id={messageId}>
+    <div className={`chat-msg ${role}${role === 'assistant' ? isFinal ? ' final' : ' update' : ''}`} data-chat-message-id={messageId}>
       {role === 'assistant' ? (
         <>
           {execution ? <TurnAttributionBadge execution={execution} /> : null}
+          {isFinal && <div className="chat-response-heading">Response{execution?.completedAt !== undefined && <span>Worked for {workedDuration(execution.startedAt, execution.completedAt)}</span>}</div>}
           {reasoning ? (
             <details className="chat-reasoning">
               <summary>Thinking</summary>
@@ -75,6 +102,13 @@ const FeedMessage = memo(function FeedMessage({ messageId, role, text, reasoning
             </details>
           ) : null}
           {text.trim() !== '' && <MarkdownText text={text} onOpenFile={onOpenFile} />}
+          {isFinal && text.trim() !== '' && <div className="chat-response-actions">
+            <button type="button" className="btn ghost small chat-copy-response" aria-label="Copy response" title="Copy response as Markdown" disabled={copyStatus === 'copying'} onClick={() => void copy()}>
+              {copyStatus === 'copied' ? <Check size={14} aria-hidden="true" /> : <Copy size={14} aria-hidden="true" />}
+              <span>{copyStatus === 'copied' ? 'Copied' : copyStatus === 'copying' ? 'Copying…' : 'Copy'}</span>
+            </button>
+            <span role="status" className={copyStatus === 'error' ? 'settings-error' : 'chat-copy-status'}>{copyStatus === 'error' ? 'Could not copy. Try again or select the response text.' : copyStatus === 'copied' ? 'Response copied.' : ''}</span>
+          </div>}
         </>
       ) : (
         <>
@@ -99,6 +133,7 @@ const FeedMessage = memo(function FeedMessage({ messageId, role, text, reasoning
 })
 
 export interface FeedRowProps {
+  isFinal?: boolean
   item: FeedItem
   commands: Command[]
   onOpenImage: (dataUrl: string) => void
@@ -109,7 +144,7 @@ export interface FeedRowProps {
 // One transcript row. Holds no state, so every kind can be asserted with
 // renderToStaticMarkup — the notice row shipped in v1.1.6 without ever
 // having been rendered.
-export function FeedRow({ item, commands, onOpenImage, onOpenFile, onOpenSubagent }: FeedRowProps) {
+export function FeedRow({ item, isFinal, commands, onOpenImage, onOpenFile, onOpenSubagent }: FeedRowProps) {
   if (item.kind === 'notice') {
     return <div className="chat-notice">{item.text}</div>
   }
@@ -132,6 +167,7 @@ export function FeedRow({ item, commands, onOpenImage, onOpenFile, onOpenSubagen
         reasoning={item.reasoning}
         images={item.images}
         execution={item.execution}
+        isFinal={isFinal}
         commands={commands}
         onOpenImage={onOpenImage}
         onOpenFile={onOpenFile}

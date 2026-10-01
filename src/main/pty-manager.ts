@@ -64,6 +64,10 @@ export class PtyManager extends EventEmitter {
     return [...this.sessions.values()].filter(s => s.kind === 'terminal').map(s => s.agentId)
   }
 
+  terminalCwds(): string[] {
+    return [...this.sessions.values()].filter(session => session.kind === 'terminal').map(session => session.cwd)
+  }
+
   private spawnSession(
     id: string,
     name: string,

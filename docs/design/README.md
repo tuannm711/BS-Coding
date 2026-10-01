@@ -15,11 +15,11 @@ should be checked against.
 | --- | --- | --- |
 | [How the domains relate](#how-the-domains-relate) | 25-41 | `LlmClient` |
 | [The documents](#the-documents) | 42-58 |  |
-| [Finding a name](#finding-a-name) | 59-253 | `--output`, `.cmd`, `.exe`, `.github/workflows/build.yml`, `.ico`, `'near-limit'` |
-| [What is here and what is history](#what-is-here-and-what-is-history) | 254-263 | `docs/design/`, `docs/superpowers/`, `docs/evidence/` |
-| [Current work](#current-work) | 264-275 | `tests/`, `statusReason`, `docs/superpowers/specs/2026-08-25-narrated-tool-calls-design.md` |
-| [Next work](#next-work) | 276-290 | `docs/technical-debt.md` |
-| [Debt](#debt) | 291-297 | `docs/technical-debt.md` |
+| [Finding a name](#finding-a-name) | 59-254 | `--output`, `.cmd`, `.exe`, `.github/workflows/build.yml`, `.ico`, `'near-limit'` |
+| [What is here and what is history](#what-is-here-and-what-is-history) | 255-264 | `docs/design/`, `docs/superpowers/`, `docs/evidence/` |
+| [Current work](#current-work) | 265-276 | `tests/`, `statusReason`, `docs/superpowers/specs/2026-08-25-narrated-tool-calls-design.md` |
+| [Next work](#next-work) | 277-291 | `docs/technical-debt.md` |
+| [Debt](#debt) | 292-298 | `docs/technical-debt.md` |
 <!-- /toc -->
 
 ## How the domains relate
@@ -73,13 +73,12 @@ Generated from every domain document: which one introduces a name, and where.
 | `$SHELL` | [04-terminal-panes.md#known-limits](04-terminal-panes.md#known-limits) | 91 |
 | `0N-*.md` | [00-goals.md#what-this-document-is-not](00-goals.md#what-this-document-is-not) | 179 |
 | `action-gh-release` | [07-build-release.md#design-decisions](07-build-release.md#design-decisions) | 58 |
-| `activeSessionId` | [06-ui-shell.md#sessions-live-in-the-sidebar](06-ui-shell.md#sessions-live-in-the-sidebar) | 231 |
+| `activeSessionId` | [06-ui-shell.md#sessions-live-in-the-sidebar](06-ui-shell.md#sessions-live-in-the-sidebar) | 259 |
 | `adapter.fetchUsage` | [03-providers.md#data-flow](03-providers.md#data-flow) | 39 |
 | `adapter.refreshCredentials` | [03-providers.md#data-flow](03-providers.md#data-flow) | 39 |
 | `AgentApi` | [01-process-model.md#pieces](01-process-model.md#pieces) | 18 |
 | `AgentStateEvent` | [01-process-model.md#types-that-carry-it](01-process-model.md#types-that-carry-it) | 54 |
 | `antigravity.ts` | [03-providers.md#known-limits](03-providers.md#known-limits) | 166 |
-| `app.setAppUserModelId` | [06-ui-shell.md#design-decisions](06-ui-shell.md#design-decisions) | 65 |
 | `App.tsx` | [06-ui-shell.md#data-flow](06-ui-shell.md#data-flow) | 36 |
 | `appendMessage` | [02-agent-runtime.md#types-that-carry-it](02-agent-runtime.md#types-that-carry-it) | 71 |
 | `appendTool` | [02-agent-runtime.md#types-that-carry-it](02-agent-runtime.md#types-that-carry-it) | 71 |
@@ -90,7 +89,7 @@ Generated from every domain document: which one introduces a name, and where.
 | `bankedUsed` | [00-goals.md#group-b-the-quota-surface-landed-v119](00-goals.md#group-b-the-quota-surface-landed-v119) | 137 |
 | `BsAgentManager` | [02-agent-runtime.md#pieces](02-agent-runtime.md#pieces) | 22 |
 | `buffersRef` | [06-ui-shell.md#data-flow](06-ui-shell.md#data-flow) | 36 |
-| `buildFleet` | [06-ui-shell.md#the-fleet-panel](06-ui-shell.md#the-fleet-panel) | 158 |
+| `buildFleet` | [06-ui-shell.md#the-fleet-panel](06-ui-shell.md#the-fleet-panel) | 186 |
 | `buildSpawnCommand` | [04-terminal-panes.md#design-decisions](04-terminal-panes.md#design-decisions) | 59 |
 | `Channels.EventPtyData` | [04-terminal-panes.md#data-flow](04-terminal-panes.md#data-flow) | 29 |
 | `Channels` | [01-process-model.md#types-that-carry-it](01-process-model.md#types-that-carry-it) | 54 |
@@ -120,11 +119,11 @@ Generated from every domain document: which one introduces a name, and where.
 | `electron.vite.config.ts` | [07-build-release.md#pieces](07-build-release.md#pieces) | 17 |
 | `Event*` | [01-process-model.md#data-flow](01-process-model.md#data-flow) | 33 |
 | `fetchUsage` | [03-providers.md#known-limits](03-providers.md#known-limits) | 166 |
-| `FleetAgentRow` | [06-ui-shell.md#the-fleet-panel](06-ui-shell.md#the-fleet-panel) | 158 |
-| `FleetBoard` | [06-ui-shell.md#the-fleet-panel](06-ui-shell.md#the-fleet-panel) | 158 |
+| `FleetAgentRow` | [06-ui-shell.md#the-fleet-panel](06-ui-shell.md#the-fleet-panel) | 186 |
+| `FleetBoard` | [06-ui-shell.md#the-fleet-panel](06-ui-shell.md#the-fleet-panel) | 186 |
 | `getItems` | [02-agent-runtime.md#types-that-carry-it](02-agent-runtime.md#types-that-carry-it) | 71 |
 | `getWindowChromeOptions` | [06-ui-shell.md#design-decisions](06-ui-shell.md#design-decisions) | 65 |
-| `groupSessions` | [06-ui-shell.md#sessions-live-in-the-sidebar](06-ui-shell.md#sessions-live-in-the-sidebar) | 231 |
+| `groupSessions` | [06-ui-shell.md#sessions-live-in-the-sidebar](06-ui-shell.md#sessions-live-in-the-sidebar) | 259 |
 | `hasRemainingQuota` | [03-providers.md#design-decisions](03-providers.md#design-decisions) | 83 |
 | `icon.ico` | [07-build-release.md#pieces](07-build-release.md#pieces) | 17 |
 | `ipcRenderer.on` | [01-process-model.md#data-flow](01-process-model.md#data-flow) | 33 |
@@ -132,7 +131,7 @@ Generated from every domain document: which one introduces a name, and where.
 | `latest.yml` | [07-build-release.md#design-decisions](07-build-release.md#design-decisions) | 58 |
 | `latest*.yml` | [07-build-release.md#design-decisions](07-build-release.md#design-decisions) | 58 |
 | `listModels` | [03-providers.md#types-that-carry-it](03-providers.md#types-that-carry-it) | 62 |
-| `listSessionTranscript` | [06-ui-shell.md#the-coordination-view](06-ui-shell.md#the-coordination-view) | 105 |
+| `listSessionTranscript` | [06-ui-shell.md#the-coordination-view](06-ui-shell.md#the-coordination-view) | 133 |
 | `LlmClient` | [02-agent-runtime.md#pieces](02-agent-runtime.md#pieces) | 22 |
 | `LoopDeps` | [02-agent-runtime.md#data-flow](02-agent-runtime.md#data-flow) | 42 |
 | `MainApp.startUsagePoll` | [03-providers.md#data-flow](03-providers.md#data-flow) | 39 |
@@ -149,13 +148,13 @@ Generated from every domain document: which one introduces a name, and where.
 | `primaryUsedPercent` | [03-providers.md#design-decisions](03-providers.md#design-decisions) | 83 |
 | `proc.onData` | [04-terminal-panes.md#data-flow](04-terminal-panes.md#data-flow) | 29 |
 | `productName` | [07-build-release.md#types-that-carry-it](07-build-release.md#types-that-carry-it) | 46 |
-| `provider/account/quotaPoolId` | [06-ui-shell.md#the-fleet-panel](06-ui-shell.md#the-fleet-panel) | 158 |
+| `provider/account/quotaPoolId` | [06-ui-shell.md#the-fleet-panel](06-ui-shell.md#the-fleet-panel) | 186 |
 | `ProviderAdapter` | [03-providers.md#pieces](03-providers.md#pieces) | 20 |
 | `ProviderAuthorizationStrategy` | [03-providers.md#data-flow](03-providers.md#data-flow) | 39 |
 | `providerError` | [03-providers.md#design-decisions](03-providers.md#design-decisions) | 83 |
 | `ProviderManager.connect` | [03-providers.md#data-flow](03-providers.md#data-flow) | 39 |
 | `ProviderManager.refreshUsage` | [03-providers.md#data-flow](03-providers.md#data-flow) | 39 |
-| `ProviderQuotaGroup` | [06-ui-shell.md#the-fleet-panel](06-ui-shell.md#the-fleet-panel) | 158 |
+| `ProviderQuotaGroup` | [06-ui-shell.md#the-fleet-panel](06-ui-shell.md#the-fleet-panel) | 186 |
 | `ProviderQuotaWindow` | [00-goals.md#the-three-quota-models](00-goals.md#the-three-quota-models) | 117 |
 | `ProviderUsage.resetCredits` | [00-goals.md#group-b-the-quota-surface-landed-v119](00-goals.md#group-b-the-quota-surface-landed-v119) | 137 |
 | `ProviderUsage.status` | [03-providers.md#design-decisions](03-providers.md#design-decisions) | 83 |
@@ -175,7 +174,7 @@ Generated from every domain document: which one introduces a name, and where.
 | `release/` | [07-build-release.md#data-flow](07-build-release.md#data-flow) | 29 |
 | `resolveShell` | [04-terminal-panes.md#pieces](04-terminal-panes.md#pieces) | 18 |
 | `resources/tray-icon.png` | [07-build-release.md#data-flow](07-build-release.md#data-flow) | 29 |
-| `RightPanel` | [06-ui-shell.md#the-coordination-view](06-ui-shell.md#the-coordination-view) | 105 |
+| `RightPanel` | [06-ui-shell.md#the-coordination-view](06-ui-shell.md#the-coordination-view) | 133 |
 | `runAssignment` | [02-agent-runtime.md#two-ways-to-hand-work-off](02-agent-runtime.md#two-ways-to-hand-work-off) | 120 |
 | `scripts/build-windows-icon.mjs` | [07-build-release.md#pieces](07-build-release.md#pieces) | 17 |
 | `sendInSession` | [02-agent-runtime.md#one-conversation-format](02-agent-runtime.md#one-conversation-format) | 146 |
@@ -183,7 +182,7 @@ Generated from every domain document: which one introduces a name, and where.
 | `SessionRunner` | [02-agent-runtime.md#pieces](02-agent-runtime.md#pieces) | 22 |
 | `sessions.json` | [05-sessions.md#pieces](05-sessions.md#pieces) | 17 |
 | `SessionStore` | [05-sessions.md#pieces](05-sessions.md#pieces) | 17 |
-| `setMode` | [06-ui-shell.md#the-coordination-view](06-ui-shell.md#the-coordination-view) | 105 |
+| `setMode` | [06-ui-shell.md#the-coordination-view](06-ui-shell.md#the-coordination-view) | 133 |
 | `SharedSessionCoordinator` | [05-sessions.md#pieces](05-sessions.md#pieces) | 17 |
 | `SnapshotFile[]` | [05-sessions.md#types-that-carry-it](05-sessions.md#types-that-carry-it) | 50 |
 | `SnapshotStore.snapshot` | [05-sessions.md#data-flow](05-sessions.md#data-flow) | 29 |
@@ -208,7 +207,7 @@ Generated from every domain document: which one introduces a name, and where.
 | `src/preload/index.ts` | [01-process-model.md#pieces](01-process-model.md#pieces) | 18 |
 | `src/renderer/AGENTS.md` | [06-ui-shell.md#design-decisions](06-ui-shell.md#design-decisions) | 65 |
 | `src/renderer/src/App.tsx` | [06-ui-shell.md#pieces](06-ui-shell.md#pieces) | 21 |
-| `src/renderer/src/components/coordinator/CoordinatorView.tsx` | [06-ui-shell.md#the-coordination-view](06-ui-shell.md#the-coordination-view) | 105 |
+| `src/renderer/src/components/coordinator/CoordinatorView.tsx` | [06-ui-shell.md#the-coordination-view](06-ui-shell.md#the-coordination-view) | 133 |
 | `src/renderer/src/components/fleet/` | [06-ui-shell.md#pieces](06-ui-shell.md#pieces) | 21 |
 | `src/renderer/src/components/Pane.tsx` | [04-terminal-panes.md#pieces](04-terminal-panes.md#pieces) | 18 |
 | `src/renderer/src/components/quota/quota-view.ts` | [06-ui-shell.md#types-that-carry-it](06-ui-shell.md#types-that-carry-it) | 55 |
@@ -216,9 +215,11 @@ Generated from every domain document: which one introduces a name, and where.
 | `src/renderer/src/components/Sidebar.tsx` | [06-ui-shell.md#pieces](06-ui-shell.md#pieces) | 21 |
 | `src/renderer/src/components/TitleBar.tsx` | [06-ui-shell.md#pieces](06-ui-shell.md#pieces) | 21 |
 | `src/renderer/src/components/XtermHost.tsx` | [04-terminal-panes.md#pieces](04-terminal-panes.md#pieces) | 18 |
+| `src/renderer/src/useAppearance.ts` | [06-ui-shell.md#design-decisions](06-ui-shell.md#design-decisions) | 65 |
 | `src/shared/agent-fallback.ts` | [03-providers.md#agent-quota-reservations](03-providers.md#agent-quota-reservations) | 130 |
 | `src/shared/agent-quota-binding.ts` | [03-providers.md#agent-quota-reservations](03-providers.md#agent-quota-reservations) | 130 |
 | `src/shared/AGENTS.md` | [01-process-model.md#design-decisions](01-process-model.md#design-decisions) | 70 |
+| `src/shared/appearance.ts` | [06-ui-shell.md#design-decisions](06-ui-shell.md#design-decisions) | 65 |
 | `src/shared/ipc.ts` | [01-process-model.md#types-that-carry-it](01-process-model.md#types-that-carry-it) | 54 |
 | `src/shared/types.ts` | [06-ui-shell.md#types-that-carry-it](06-ui-shell.md#types-that-carry-it) | 55 |
 | `src/shared` | [01-process-model.md#design-decisions](01-process-model.md#design-decisions) | 70 |

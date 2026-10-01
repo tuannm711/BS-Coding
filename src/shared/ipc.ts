@@ -19,6 +19,7 @@ import type {
 export const Channels = {
   WorkspaceList: 'workspace:list',
   WorkspaceAdd: 'workspace:add',
+  WorkspaceUpdate: 'workspace:update',
   WorkspaceRemove: 'workspace:remove',
   WorkspaceOpen: 'workspace:open',
   EventWorkspaceRuntimeChanged: 'workspace:runtime-changed',
@@ -184,6 +185,7 @@ export interface ArtifactsChangedEvent {
 export interface AgentApi {
   listWorkspaces(): Promise<WorkspaceSummary[]>
   addWorkspace(projectPath: string, name: string): Promise<WorkspaceRuntime | null>
+  updateWorkspace(projectPath: string, nextPath: string, name: string): Promise<WorkspaceRuntime>
   removeWorkspace(projectPath: string): Promise<void>
   openWorkspace(projectPath: string): Promise<WorkspaceRuntime>
   onWorkspaceRuntimeChanged(cb: (runtime: WorkspaceRuntime) => void): () => void

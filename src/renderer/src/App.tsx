@@ -19,6 +19,7 @@ import InstallGuideDialog from './components/InstallGuideDialog'
 import UpdateDialog from './components/UpdateDialog'
 import { migrateBrandStorage } from './brand-storage'
 import { projectVisiblePanes, resolveSelectedNativeAgent } from './shared-chat-selection'
+import { useAppearance } from './useAppearance'
 
 migrateBrandStorage(window.localStorage)
 
@@ -29,6 +30,7 @@ export interface PaneModel {
 }
 
 export default function App() {
+  useAppearance()
   const [workspaces, setWorkspaces] = useState<WorkspaceSummary[]>([])
   const [templates, setTemplates] = useState<Template[]>([])
   const [showSettings, setShowSettings] = useState(false)
@@ -60,6 +62,12 @@ export default function App() {
   const refreshWorkspaces = useCallback(async () => {
     setWorkspaces(await window.api.listWorkspaces())
   }, [])
+
+  const editWorkspace = useCallback(async (previous: string, nextPath: string, name: string) => {
+    const next = await window.api.updateWorkspace(previous, nextPath, name)
+    setRuntime(current => current?.workspace.projectPath === previous ? { ...next, git: next.workspace.projectPath === previous ? current.git : null } : current)
+    await refreshWorkspaces()
+  }, [refreshWorkspaces])
 
   useEffect(() => {
     localStorage.setItem('bs.rightpanel.open', rightOpen ? '1' : '0')
@@ -380,6 +388,7 @@ export default function App() {
           onOpen={openWorkspace}
           onRemove={removeWorkspace}
           onRefresh={refreshWorkspaces}
+          onEdit={editWorkspace}
           onOpenTerminal={addTerminal}
           onOpenSettings={() => setShowSettings(true)}
           onCheckUpdate={handleCheckUpdate}

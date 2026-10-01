@@ -1,7 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { FeedRow, type FeedItem } from '../../src/renderer/src/components/chat/FeedRow'
+
+// Markdown sanitization needs a browser DOM; the copy control is tested here,
+// while actual Markdown and clipboard behavior are exercised in Electron E2E.
+vi.mock('../../src/renderer/src/components/chat/MarkdownText', () => ({ default: ({ text }: { text: string }) => React.createElement('p', {}, text) }))
 
 const render = (item: FeedItem) => renderToStaticMarkup(
   React.createElement(FeedRow, {
@@ -10,6 +14,12 @@ const render = (item: FeedItem) => renderToStaticMarkup(
 )
 
 describe('FeedRow', () => {
+  it('renders copy for a final response and keeps it absent for updates', () => {
+    const item: FeedItem = { kind: 'message', id: 'final', role: 'assistant', text: 'Answer' }
+    const markup = renderToStaticMarkup(React.createElement(FeedRow, { item, commands: [], onOpenImage: () => {}, onOpenFile: () => {}, onOpenSubagent: () => {}, isFinal: true }))
+    expect(markup).toContain('Copy response')
+    expect(render(item)).not.toContain('Copy response')
+  })
   it('renders a notice', () => {
     const markup = render({ kind: 'notice', id: 'n1', text: 'Nothing ran.' })
     expect(markup).toContain('chat-notice')

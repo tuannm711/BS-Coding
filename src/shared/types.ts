@@ -217,6 +217,7 @@ export type ChatEvent = Partial<Omit<ChatEventScope, 'agentId'>> & (
       kind: 'permission' | 'question'; call?: ToolCallData; question?: string
       options?: QuestionOption[]; multiple?: boolean; custom?: boolean }
   | { type: 'turn-started'; agentId: string }
+  | { type: 'turn-finished'; agentId: string; execution: TurnExecutionSnapshot }
   | { type: 'done'; agentId: string; reason: string; tokens?: TokenUsage; cost?: number }
   | { type: 'error'; agentId: string; message: string }
   | { type: 'compacted'; agentId: string; summary: string }
@@ -494,6 +495,7 @@ export interface AgentSettings {
 }
 
 export interface BsSettings {
+  appearance?: AppearanceSettings
   providers: ProviderSettings[]
   defaultProvider: string
   agents: AgentSettings[]
@@ -507,6 +509,12 @@ export interface BsSettings {
   lsp: LspSettings
   notifications?: NotificationsSettings
   trace?: { enabled: boolean }
+}
+
+export interface AppearanceSettings {
+  background: string
+  text: string
+  button: string
 }
 
 export interface QuickMessage {
