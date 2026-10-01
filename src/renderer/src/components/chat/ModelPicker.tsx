@@ -1,99 +1,62 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { ModelRef } from '@shared/types'
-import { isOpenAiGenericModel } from '@shared/openai-oauth'
+import { useCallback, useEffect, useState } from 'react'
+import { shouldAcceptSnapshot, type ProviderSnapshot } from '@shared/provider-state'
+import { modelsForAgentQuota } from '@shared/agent-quota-binding'
+import { mergeAssignmentEvent } from '../RightPanelQuota'
 
 interface Props {
   agentId: string
+  disabled?: boolean
 }
 
-export default function ModelPicker({ agentId }: Props) {
-  const [open, setOpen] = useState(false)
-  const [current, setCurrent] = useState<ModelRef | null>(null)
-  const [models, setModels] = useState<ModelRef[]>([])
-  const [search, setSearch] = useState('')
-  const rootRef = useRef<HTMLDivElement>(null)
+export function agentQuotaModelOptions(agentId: string, snapshot: ProviderSnapshot | null) {
+  const assignment = snapshot?.assignments.find(item => item.agentId === agentId)
+  if (!assignment) return []
+  const account = snapshot?.accounts.find(item => item.providerId === assignment.providerId && item.id === assignment.accountId && item.status === 'active')
+  if (!account) return []
+  const allowed = new Set(modelsForAgentQuota({ provider: assignment.providerId, accountId: account.id, quotaPoolId: assignment.quotaPoolId, model: assignment.modelId }, [account]))
+  return account.models.filter(model => allowed.has(model.id))
+}
 
-  const refresh = useCallback(() => {
-    void window.api.getAgentModel(agentId).then(setCurrent)
-    void window.api.getProviderModels().then(setModels)
-  }, [agentId])
-
-  useEffect(() => {
-    refresh()
-  }, [refresh])
-
-  useEffect(() => {
-    if (open) refresh()
-  }, [open, refresh])
-
-  useEffect(() => window.api.onProviderAccountsChanged(() => refresh()), [refresh])
-
-  useEffect(() => {
-    const onDocClick = (e: MouseEvent) => {
-      const target = e.target as Node
-      if (!rootRef.current?.contains(target)) setOpen(false)
-    }
-    document.addEventListener('mousedown', onDocClick)
-    return () => document.removeEventListener('mousedown', onDocClick)
+export default function ModelPicker({ agentId, disabled = false }: Props) {
+  const [snapshot, setSnapshot] = useState<ProviderSnapshot | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const refresh = useCallback(async () => {
+    const next = await window.api.getProviderSnapshot()
+    setSnapshot(current => !current || shouldAcceptSnapshot(current.revision, next.revision) ? next : current)
   }, [])
 
-  const groups = useMemo(() => {
-    const q = search.trim().toLowerCase()
-    const byProvider = new Map<string, string[]>()
-    for (const m of models) {
-      if (m.provider === 'openai' && isOpenAiGenericModel(m.model)) continue
-      if (q && !m.model.toLowerCase().includes(q) && !m.provider.toLowerCase().includes(q)) continue
-      const list = byProvider.get(m.provider) ?? []
-      list.push(m.model)
-      byProvider.set(m.provider, list)
-    }
-    return [...byProvider.entries()]
-  }, [models, search])
+  useEffect(() => {
+    void refresh().catch(err => setError(String(err)))
+    const unsubscribeSnapshot = window.api.onProviderSnapshotChanged(next => setSnapshot(current => !current || shouldAcceptSnapshot(current.revision, next.revision) ? next : current))
+    const unsubscribeAssignment = window.api.onAgentAssignmentChanged(event => setSnapshot(previous => previous ? mergeAssignmentEvent(previous, event) : previous))
+    return () => { unsubscribeSnapshot(); unsubscribeAssignment() }
+  }, [refresh])
+  useEffect(() => setError(''), [agentId])
 
-  const label = current?.model ?? 'no model'
+  const assignment = snapshot?.assignments.find(item => item.agentId === agentId)
+  const models = agentQuotaModelOptions(agentId, snapshot)
+  const reason = disabled ? 'Model locked while running' : models.length === 0 ? 'Assign an available account quota in Settings → Agents' : 'Switch model within this agent quota'
 
-  return (
-    <div className="model-picker" ref={rootRef}>
-      <button
-        className="model-trigger"
-        title="Switch model"
-        onClick={() => { refresh(); setSearch(''); setOpen(v => !v) }}
-      >
-        <span className="model-label">{label}</span>
-        <span className="model-caret">▾</span>
-      </button>
-      {open && (
-        <div className="model-menu">
-          <input
-            className="input model-search"
-            placeholder="Search model..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
-          <div className="model-list">
-            {groups.length === 0 && <span className="model-empty">No providers configured</span>}
-            {groups.map(([provider, list]) => (
-              <div key={provider} className="model-group">
-                <div className="model-group-head">{provider}</div>
-                {list.map(m => (
-                  <button
-                    key={provider + '/' + m}
-                    className={`model-item ${current?.provider === provider && current?.model === m ? 'active' : ''}`}
-                    onClick={() => {
-                      setOpen(false)
-                      setCurrent({ provider, model: m })
-                      void window.api.setAgentModel(agentId, provider, m)
-                      window.dispatchEvent(new CustomEvent('bs:model-changed', { detail: { agentId } }))
-                    }}
-                  >
-                    {m}
-                  </button>
-                ))}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  )
+  return <div className="model-picker">
+    <select className="model-trigger" aria-label="Agent model" title={reason}
+      disabled={disabled || busy || models.length === 0 || assignment?.status !== 'ready'} value={assignment?.modelId ?? ''}
+      onChange={event => {
+        const model = event.target.value
+        if (!assignment || busy) return
+        setBusy(true)
+        setError('')
+        void window.api.setAgentModel(agentId, assignment.providerId, model)
+          .then(async () => {
+            await refresh()
+            window.dispatchEvent(new CustomEvent('bs:model-changed', { detail: { agentId } }))
+          })
+          .catch(err => setError(String(err)))
+          .finally(() => setBusy(false))
+      }}>
+      {!models.some(model => model.id === assignment?.modelId) && <option value={assignment?.modelId ?? ''}>{assignment?.modelId || 'Select quota in Settings'}</option>}
+      {models.map(model => <option key={model.id} value={model.id}>{model.name}</option>)}
+    </select>
+    {error && <span className="model-picker-error" role="alert">{error}</span>}
+  </div>
 }

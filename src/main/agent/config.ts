@@ -1,6 +1,6 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import type { AgentSettings, CompactionSettings, BsSettings, NotificationsSettings, PermissionRule } from '../../shared/types'
+import type { AgentSettings, CompactionSettings, BsSettings, NotificationsSettings, PermissionRule, QuickMessage } from '../../shared/types'
 import type { McpServerConfig } from './mcp/manager'
 
 export type { PermissionRule }
@@ -19,6 +19,7 @@ export interface BsAgentConfig {
   provider?: string
   model?: string
   accountId?: string
+  quotaPoolId?: string
   speed?: 'standard' | 'fast'
   systemPrompt: string
 }
@@ -45,6 +46,7 @@ export interface BsConfig {
   provider: Record<string, BsProviderConfig>
   model: string
   agents: Record<string, BsAgentConfig>
+  quickMessages?: QuickMessage[]
   permission: Record<string, PermissionRule>
   mcp: Record<string, McpServerConfig>
   maxContextTokens: number
@@ -164,11 +166,24 @@ function normalizeAgents(raw: Record<string, unknown> | undefined): Record<strin
       provider: typeof v.provider === 'string' ? v.provider : (isProviderRef ? legacyModel : undefined),
       model: typeof v.model === 'string' && !isProviderRef ? v.model : undefined,
       accountId: typeof v.accountId === 'string' ? v.accountId : undefined,
+      quotaPoolId: typeof v.quotaPoolId === 'string' ? v.quotaPoolId : undefined,
       speed: v.speed === 'fast' ? 'fast' : 'standard',
       systemPrompt: typeof v.systemPrompt === 'string' ? v.systemPrompt : (base[name]?.systemPrompt ?? base.bs.systemPrompt)
     }
   }
-  return { ...defaults, ...out }
+  return out
+}
+
+function normalizeQuickMessages(raw: unknown): QuickMessage[] {
+  if (!Array.isArray(raw)) return []
+  const seen = new Set<string>()
+  return raw.flatMap(value => {
+    if (!value || typeof value.id !== 'string' || !value.id.trim() || seen.has(value.id)
+      || typeof value.name !== 'string' || !value.name.trim()
+      || typeof value.message !== 'string' || !value.message.trim()) return []
+    seen.add(value.id)
+    return [{ id: value.id, name: value.name.trim(), message: value.message }]
+  })
 }
 
 function normalizeCompaction(raw: Partial<BsCompactionConfig> | undefined): BsCompactionConfig {
@@ -234,6 +249,7 @@ function mergeDefaults(raw: Partial<BsConfig>): BsConfig {
     provider: providers,
     model: raw.model ?? DEFAULT_BS_CONFIG.model,
     agents: normalizeAgents(raw.agents),
+    quickMessages: normalizeQuickMessages(raw.quickMessages),
     permission: { ...DEFAULT_BS_CONFIG.permission, ...(raw.permission ?? {}) },
     mcp: normalizeMcp(raw.mcp),
     maxContextTokens: raw.maxContextTokens ?? DEFAULT_MAX_CONTEXT_TOKENS,
@@ -278,7 +294,7 @@ export function resolveAgentConfig(
   agentModel?: string,
   getSecret?: (ref: string) => string | null
 ): ResolvedAgentConfig {
-  const agent = cfg.agents[agentName] ?? cfg.agents.bs
+  const agent = cfg.agents[agentName] ?? { systemPrompt: DEFAULT_BS_CONFIG.agents.bs.systemPrompt }
   let providerName = agent.provider ?? cfg.model
   let modelName: string | undefined
   if (agentModel) {
@@ -323,12 +339,14 @@ export function configToSettings(cfg: BsConfig): BsSettings {
       models: p.models
     })),
     defaultProvider: cfg.model,
+    quickMessages: normalizeQuickMessages(cfg.quickMessages),
     agents: Object.entries(cfg.agents).map(([name, a]) => ({
       name,
       systemPrompt: a.systemPrompt,
       provider: a.provider,
       model: a.model,
       accountId: a.accountId,
+      quotaPoolId: a.quotaPoolId,
       speed: a.speed
     })),
     permission: cfg.permission,
@@ -352,6 +370,10 @@ export function configToSettings(cfg: BsConfig): BsSettings {
 export type SettingsInput = Pick<BsSettings, 'providers' | 'defaultProvider'> & Partial<BsSettings>
 
 export function settingsToConfig(settings: SettingsInput, base: BsConfig = DEFAULT_BS_CONFIG): BsConfig {
+  const quickMessages = normalizeQuickMessages(settings.quickMessages ?? base.quickMessages)
+  if (settings.quickMessages && quickMessages.length !== settings.quickMessages.length) {
+    throw new Error('Quick messages need a unique ID, a name and message content.')
+  }
   const providers: Record<string, BsProviderConfig> = {}
   for (const p of settings.providers) {
     const models = (p.models ?? []).filter(m => typeof m === 'string' && m.trim() !== '')
@@ -372,6 +394,7 @@ export function settingsToConfig(settings: SettingsInput, base: BsConfig = DEFAU
       provider: a.provider,
       model: a.model,
       accountId: a.accountId,
+      quotaPoolId: a.quotaPoolId,
       speed: a.speed,
       systemPrompt: a.systemPrompt
     }
@@ -379,7 +402,8 @@ export function settingsToConfig(settings: SettingsInput, base: BsConfig = DEFAU
   return {
     provider: providers,
     model: defaultProvider,
-    agents: Object.keys(agents).length > 0 ? agents : (base.agents ?? DEFAULT_BS_CONFIG.agents),
+    agents: settings.agents === undefined ? (base.agents ?? DEFAULT_BS_CONFIG.agents) : agents,
+    quickMessages,
     permission: settings.permission
       ? { ...DEFAULT_BS_CONFIG.permission, ...settings.permission }
       : (base.permission ?? DEFAULT_BS_CONFIG.permission),
@@ -397,6 +421,12 @@ export function settingsToConfig(settings: SettingsInput, base: BsConfig = DEFAU
 }
 
 export function writeBsConfig(filePath: string, cfg: BsConfig): void {
+  writeBsConfigText(filePath, JSON.stringify(cfg, null, 2))
+}
+
+export function writeBsConfigText(filePath: string, text: string): void {
   mkdirSync(path.dirname(filePath), { recursive: true })
-  writeFileSync(filePath, JSON.stringify(cfg, null, 2))
+  const temp = `${filePath}.${process.pid}.${Date.now()}.tmp`
+  writeFileSync(temp, text)
+  renameSync(temp, filePath)
 }

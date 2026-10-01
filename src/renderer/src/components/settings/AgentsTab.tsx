@@ -4,6 +4,7 @@ import type { AgentSettings } from '@shared/types'
 import { shouldAcceptSnapshot, type AgentAssignmentSetRequest, type ProviderSnapshot } from '@shared/provider-state'
 import AgentPromptModal from './AgentPromptModal'
 import Modal from './Modal'
+import { agentQuotaConflicts, boundQuotaPool, quotaPoolsForAccount } from '@shared/agent-quota-binding'
 
 const defaultPrompt = (name: string) =>
   `You are ${name}, a coding agent running inside the BS Coding desktop app. ` +
@@ -39,23 +40,24 @@ export function hydrateAgentsFromAssignments(
     if (editedAgentNames.has(agent.name)) return agent
     const agentId = runtimeBindings[agent.name]
     const assignment = agentId ? snapshot?.assignments.find(item => item.agentId === agentId) : undefined
-    return assignment ? { ...agent, provider: assignment.providerId || undefined, accountId: assignment.accountId, model: assignment.modelId || undefined, speed: assignment.speed } : agent
+    return assignment ? { ...agent, provider: assignment.providerId || undefined, accountId: assignment.accountId, quotaPoolId: assignment.quotaPoolId, model: assignment.modelId || undefined, speed: assignment.speed } : agent
   })
 }
 
 export function assignmentRequestForAgent(agentId: string, agent: AgentSettings): AgentAssignmentSetRequest | null {
   if (!agent.provider || !agent.accountId || !agent.model) return null
-  return { agentId, providerId: agent.provider ?? '', accountId: agent.accountId, modelId: agent.model ?? '', speed: agent.speed ?? 'standard' }
+  return { agentId, providerId: agent.provider ?? '', accountId: agent.accountId, modelId: agent.model ?? '', speed: agent.speed ?? 'standard', ...(agent.quotaPoolId ? { quotaPoolId: agent.quotaPoolId } : {}) }
 }
 
 export function reconcileAgentProviderSelection(agent: AgentSettings, provider: string | undefined): AgentSettings {
-  return { ...agent, provider, accountId: undefined, model: undefined }
+  return { ...agent, provider, accountId: undefined, quotaPoolId: undefined, model: undefined }
 }
 
 export function reconcileAgentAccountSelection(agent: AgentSettings, accountId: string | undefined, offeredModelIds: string[]): AgentSettings {
   return {
     ...agent,
     accountId,
+    quotaPoolId: undefined,
     model: agent.model && offeredModelIds.includes(agent.model) ? agent.model : undefined
   }
 }
@@ -64,6 +66,10 @@ export default function AgentsTab({ agents, runtimeAgents, onChangeAgents }: Pro
   const [adding, setAdding] = useState(false)
   const [newName, setNewName] = useState('')
   const [newPrompt, setNewPrompt] = useState('')
+  const [newProvider, setNewProvider] = useState('')
+  const [newAccount, setNewAccount] = useState('')
+  const [newQuota, setNewQuota] = useState('')
+  const [deletingIndex, setDeletingIndex] = useState<number | null>(null)
   const [editingIndex, setEditingIndex] = useState<number | null>(null)
   const [snapshot, setSnapshot] = useState<ProviderSnapshot | null>(null)
   const [editedAgentNames, setEditedAgentNames] = useState<ReadonlySet<string>>(new Set())
@@ -89,34 +95,39 @@ export default function AgentsTab({ agents, runtimeAgents, onChangeAgents }: Pro
     const next = visibleAgents.map((a, i) => (i === index ? { ...a, ...patch } : a))
     setEditedAgentNames(current => new Set(current).add(next[index].name))
     onChangeAgents(next)
-    const agentId = runtimeBindings[next[index].name]
-    if (!agentId) return
-    const request = assignmentRequestForAgent(agentId, next[index])
-    if (!request) return
-    void window.api.setAgentAssignmentSnapshot(request).then(assignment => {
-      setSnapshot(previous => {
-        if (!previous) return previous
-        const current = previous.assignments.find(item => item.agentId === assignment.agentId)
-        if (current && current.revision > assignment.revision) return previous
-        return { ...previous, assignments: [...previous.assignments.filter(item => item.agentId !== assignment.agentId), assignment] }
-      })
-    })
   }
+
+  const quotaOptions = (provider?: string, accountId?: string, name?: string) => {
+    const account = snapshot?.accounts.find(item => item.providerId === provider && item.id === accountId && item.status === 'active')
+    return account ? quotaPoolsForAccount(account).map(pool => {
+      const owner = visibleAgents.find(agent => agent.name !== name && agent.provider === provider && agent.accountId === accountId && boundQuotaPool(agent, account) === pool.id)
+      return { ...pool, owner: owner?.name }
+    }) : []
+  }
+  const newPool = quotaOptions(newProvider, newAccount).find(pool => pool.id === newQuota && !pool.owner && pool.modelIds.length > 0)
+  const conflicts = agentQuotaConflicts(visibleAgents, snapshot?.accounts ?? [])
 
   const openAdd = () => {
     setNewName('')
     setNewPrompt('')
+    setNewProvider('')
+    setNewAccount('')
+    setNewQuota('')
     setAdding(true)
   }
 
   const addAgent = () => {
     const name = newName.trim()
-    if (!name || agents.some(a => a.name === name)) return
+    if (!name || agents.some(a => a.name === name) || !newPool) return
     onChangeAgents([
-      ...agents,
+      ...visibleAgents,
       {
         name,
-        systemPrompt: newPrompt.trim() || defaultPrompt(name)
+        systemPrompt: newPrompt.trim() || defaultPrompt(name),
+        provider: newProvider,
+        accountId: newAccount,
+        quotaPoolId: newQuota,
+        model: newPool.modelIds[0]
       }
     ])
     setAdding(false)
@@ -124,18 +135,21 @@ export default function AgentsTab({ agents, runtimeAgents, onChangeAgents }: Pro
 
   const removeAgent = (index: number) => {
     const name = agents[index]?.name
-    if (name === 'bs') return
-    onChangeAgents(agents.filter((_, i) => i !== index))
+    if (!name) return
+    onChangeAgents(visibleAgents.filter((_, i) => i !== index))
+    setDeletingIndex(null)
   }
 
   return (
     <div className="settings-tab agents-tab">
       <div className="agents-head">
         <p className="settings-hint">
-          Agent system prompts. "bs" is the default native agent and cannot be removed.
+          One agent per account quota. Choose models from that quota in chat. Every agent can be removed.
         </p>
         <button className="btn primary small" onClick={openAdd}>+ Add agent</button>
       </div>
+      {conflicts.map(conflict => <p key={conflict.key} className="settings-error" role="alert">Quota conflict: {conflict.agentNames.join(', ')}. Assign a different account or quota, or remove an agent before saving.</p>)}
+      {visibleAgents.length === 0 && <p className="settings-hint">No agents configured. Add an agent to start a chat.</p>}
       <div className="agent-table-wrap">
         <table className="agent-table">
           <thead>
@@ -143,7 +157,7 @@ export default function AgentsTab({ agents, runtimeAgents, onChangeAgents }: Pro
               <th scope="col">Name</th>
               <th scope="col">Provider</th>
               <th scope="col">Account</th>
-              <th scope="col">Model</th>
+              <th scope="col">Quota</th>
               <th scope="col">Mode</th>
               <th scope="col"><span className="sr-only">Actions</span></th>
             </tr>
@@ -172,7 +186,7 @@ export default function AgentsTab({ agents, runtimeAgents, onChangeAgents }: Pro
                     onChange={event => {
                       const accountId = event.target.value || undefined
                       const modelIds = snapshot?.accounts.find(account => account.id === accountId)?.models.map(model => model.id) ?? []
-                      updateAgent(index, reconcileAgentAccountSelection(agent, accountId, modelIds))
+                      updateAgent(index, { ...reconcileAgentAccountSelection(agent, accountId, modelIds), model: undefined })
                     }}
                   >
                     <option value="">Select account</option>
@@ -184,13 +198,17 @@ export default function AgentsTab({ agents, runtimeAgents, onChangeAgents }: Pro
                 <td>
                   <select
                     className="input"
-                    aria-label={`Model for ${agent.name}`}
-                    value={agent.model ?? ''}
+                    aria-label={`Quota for ${agent.name}`}
+                    value={agent.quotaPoolId ?? (agent.accountId ? boundQuotaPool(agent, { id: agent.accountId, providerId: agent.provider ?? '' }) : '') ?? ''}
                     disabled={!agent.provider || !agent.accountId}
-                    onChange={event => updateAgent(index, { model: event.target.value || undefined })}
+                    onChange={event => {
+                      const pool = quotaOptions(agent.provider, agent.accountId, agent.name).find(item => item.id === event.target.value)
+                      if (!pool || pool.owner) return
+                      updateAgent(index, { quotaPoolId: pool.id, model: pool.modelIds.includes(agent.model ?? '') ? agent.model : pool.modelIds[0] })
+                    }}
                   >
-                    <option value="">Select model</option>
-                    {agentModelOptions(agent, snapshot).map(model => <option key={model.id} value={model.id}>{model.name}{model.needsReview ? ' (needs review)' : ''}</option>)}
+                    <option value="">Select quota</option>
+                    {quotaOptions(agent.provider, agent.accountId, agent.name).map(pool => <option key={pool.id} value={pool.id} disabled={!!pool.owner || !pool.modelIds.length}>{pool.label}{pool.owner ? ` · used by ${pool.owner}` : !pool.modelIds.length ? ' · no models' : ''}</option>)}
                   </select>
                 </td>
                 <td>
@@ -209,7 +227,7 @@ export default function AgentsTab({ agents, runtimeAgents, onChangeAgents }: Pro
                     <button className="agent-icon-button" type="button" aria-label={`Edit system prompt for ${agent.name}`} title="Edit system prompt" onClick={() => setEditingIndex(index)}>
                       <Pencil size={14} aria-hidden="true" />
                     </button>
-                    <button className="agent-icon-button danger" type="button" aria-label={`Delete ${agent.name}`} title={agent.name === 'bs' ? 'The default Agent cannot be deleted' : 'Delete Agent'} disabled={agent.name === 'bs'} onClick={() => removeAgent(index)}>
+                    <button className="agent-icon-button danger" type="button" aria-label={`Delete ${agent.name}`} title="Delete agent" onClick={() => setDeletingIndex(index)}>
                       <Trash2 size={14} aria-hidden="true" />
                     </button>
                   </div>
@@ -219,6 +237,10 @@ export default function AgentsTab({ agents, runtimeAgents, onChangeAgents }: Pro
           </tbody>
         </table>
       </div>
+      {deletingIndex !== null && visibleAgents[deletingIndex] && <Modal title={`Delete ${visibleAgents[deletingIndex].name}?`} onClose={() => setDeletingIndex(null)} showDefaultActions={false}>
+        <p>This removes the agent from all projects and releases its quota when you save settings. Session history is kept.</p>
+        <div className="dialog-actions"><button className="btn" onClick={() => setDeletingIndex(null)}>Cancel</button><button className="btn danger" onClick={() => removeAgent(deletingIndex)}>Delete agent</button></div>
+      </Modal>}
       {editingIndex !== null && visibleAgents[editingIndex] && (
         <AgentPromptModal
           agent={visibleAgents[editingIndex]}
@@ -235,7 +257,7 @@ export default function AgentsTab({ agents, runtimeAgents, onChangeAgents }: Pro
           onClose={() => setAdding(false)}
           onSubmit={addAgent}
           submitLabel="Add"
-          submitDisabled={!newName.trim()}
+          submitDisabled={!newName.trim() || agents.some(agent => agent.name === newName.trim()) || !newPool}
         >
           <div className="settings-field">
             <label className="label" htmlFor="agent-name">Name</label>
@@ -248,11 +270,28 @@ export default function AgentsTab({ agents, runtimeAgents, onChangeAgents }: Pro
               autoFocus
             />
           </div>
+          {agents.some(agent => agent.name === newName.trim()) && <p className="settings-error" role="alert">An agent with this name already exists.</p>}
+          <label className="label" htmlFor="new-agent-provider">Provider</label>
+          <select id="new-agent-provider" className="input" value={newProvider} onChange={event => { setNewProvider(event.target.value); setNewAccount(''); setNewQuota('') }}>
+            <option value="">Select provider</option>
+            {providerOptions.map(provider => <option key={provider.id} value={provider.id}>{provider.displayName}</option>)}
+          </select>
+          <label className="label" htmlFor="new-agent-account">Account</label>
+          <select id="new-agent-account" className="input" value={newAccount} disabled={!newProvider} onChange={event => { setNewAccount(event.target.value); setNewQuota('') }}>
+            <option value="">Select account</option>
+            {snapshot?.accounts.filter(account => account.providerId === newProvider && account.status === 'active').map(account => <option key={account.id} value={account.id}>{account.label}</option>)}
+          </select>
+          <label className="label" htmlFor="new-agent-quota">Quota</label>
+          <select id="new-agent-quota" className="input" value={newQuota} disabled={!newAccount} onChange={event => setNewQuota(event.target.value)}>
+            <option value="">Select quota</option>
+            {quotaOptions(newProvider, newAccount).map(pool => <option key={pool.id} value={pool.id} disabled={!!pool.owner || !pool.modelIds.length}>{pool.label}{pool.owner ? ` · used by ${pool.owner}` : !pool.modelIds.length ? ' · no models' : ''}</option>)}
+          </select>
+          <p className="settings-hint">Choose the model later in chat. Quotas already assigned to another agent are unavailable.</p>
           <div className="settings-field">
             <label className="label" htmlFor="agent-prompt">System prompt</label>
             <textarea
               id="agent-prompt"
-              className="input agents-prompt"
+              className="input agents-prompt resize-none"
               placeholder="System prompt for this agent. Leave empty to use the default."
               value={newPrompt}
               onChange={e => setNewPrompt(e.target.value)}

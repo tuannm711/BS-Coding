@@ -2,6 +2,7 @@ import { test, expect, _electron as electron } from '@playwright/test'
 import { mkdtempSync, readFileSync, rmSync, writeFileSync, mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { seedOpenAiFixtureAccount, writeOpenAiFixtureVault } from '../fixtures/electron-provider-account'
 
 test('app launches and shows the main window', async () => {
   const userData = mkdtempSync(path.join(tmpdir(), 'bs-ud-launch-'))
@@ -221,6 +222,7 @@ test('settings agent list immediately reconciles the active workspace', async ()
   const userData = mkdtempSync(path.join(tmpdir(), 'bs-ud-'))
   const project = mkdtempSync(path.join(tmpdir(), 'bs-e2e-'))
   try {
+    seedOpenAiFixtureAccount(userData, 'sync-account')
     writeFileSync(path.join(userData, 'workspaces.json'), JSON.stringify([{
       projectPath: project,
       name: 'Agent Sync Project',
@@ -232,6 +234,7 @@ test('settings agent list immediately reconciles the active workspace', async ()
     })
     const window = await app.firstWindow()
     try {
+      await writeOpenAiFixtureVault(app, userData)
       await window.locator('.project-row').click()
       await expect(window.locator('.pane-title', { hasText: 'bs' })).toBeVisible()
       await window.getByRole('button', { name: 'Menu', exact: true }).click()
@@ -242,6 +245,9 @@ test('settings agent list immediately reconciles the active workspace', async ()
       await settings.getByRole('button', { name: '+ Add agent' }).click()
       const addDialog = window.locator('.dialog:not(.settings-dialog)')
       await addDialog.locator('#agent-name').fill('reviewer')
+      await addDialog.getByLabel('Provider', { exact: true }).selectOption('openai')
+      await addDialog.getByLabel('Account', { exact: true }).selectOption('sync-account')
+      await addDialog.getByLabel('Quota', { exact: true }).selectOption('account')
       await addDialog.getByRole('button', { name: 'Add' }).click()
       const createdRow = settings.locator('.agent-table-row').filter({ hasText: 'reviewer' })
       await createdRow.getByRole('button', { name: 'Edit system prompt for reviewer' }).click()
@@ -263,6 +269,7 @@ test('settings agent list immediately reconciles the active workspace', async ()
       await window.locator('.agent-picker-trigger').click()
       const agentMenu = window.locator('.agent-picker-menu-portal')
       await expect(agentMenu.locator('.agent-picker-item', { hasText: 'reviewer' })).toBeVisible()
+      await expect(agentMenu).toBeFocused()
       expect(await agentMenu.evaluate(element => {
         const rect = element.getBoundingClientRect()
         // globalThis, not window: in this file `window` is the Electron Page,
@@ -285,6 +292,7 @@ test('settings agent list immediately reconciles the active workspace', async ()
       await reopenedSettings.locator('.settings-nav-item', { hasText: 'Agents' }).click()
       const reviewerRow = reopenedSettings.locator('.agent-table-row').filter({ hasText: 'reviewer' })
       await reviewerRow.getByRole('button', { name: 'Delete reviewer' }).click()
+      await window.getByRole('dialog', { name: 'Delete reviewer?', exact: true }).getByRole('button', { name: 'Delete agent', exact: true }).click()
       await reopenedSettings.getByRole('button', { name: 'Save' }).click()
       await expect(reopenedSettings.locator('.settings-status')).toHaveText('Settings saved.')
 

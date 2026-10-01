@@ -304,7 +304,7 @@ export default memo(function ChatInput({
         )}
         <textarea
           ref={fieldRef}
-          className={`chat-input-field mode-${mode}`}
+          className={`chat-input-field resize-none mode-${mode}`}
           placeholder="Message Bs...  ( / for commands )"
           rows={2}
           onInput={e => onInput((e.target as HTMLTextAreaElement).value)}

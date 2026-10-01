@@ -1,4 +1,5 @@
-import { useEffect, type ReactNode } from 'react'
+import { useId, type ReactNode } from 'react'
+import { useDialogFocus } from './useDialogFocus'
 
 interface Props {
   title: string
@@ -13,18 +14,13 @@ interface Props {
 export default function Modal({
   title, onClose, children, submitLabel = 'Save', onSubmit, submitDisabled = false, showDefaultActions = true
 }: Props) {
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
+  const titleId = useId()
+  const focus = useDialogFocus(onClose)
 
   return (
     <div className="dialog-backdrop">
-      <div className="dialog">
-        <h3>{title}</h3>
+      <div className="dialog" role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} {...focus}>
+        <h3 id={titleId}>{title}</h3>
         <button className="dialog-close" aria-label="Close" onClick={onClose}>✕</button>
         {children}
         {showDefaultActions && (

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useId, useState } from 'react'
 import type { McpServerStatus, BsSettings, Template } from '@shared/types'
 import ProvidersTab from './ProvidersTab'
 import AgentsTab from './AgentsTab'
@@ -9,12 +9,16 @@ import CommandsTab from './CommandsTab'
 import TemplatesTab from './TemplatesTab'
 import UpdatesTab from './UpdatesTab'
 import StatsTab from './StatsTab'
+import QuickMessagesTab from './QuickMessagesTab'
+import Modal from './Modal'
+import { useDialogFocus } from './useDialogFocus'
 
-type TabId = 'providers' | 'agents' | 'permissions' | 'mcp' | 'context' | 'commands' | 'templates' | 'updates' | 'stats'
+type TabId = 'providers' | 'agents' | 'quick-messages' | 'permissions' | 'mcp' | 'context' | 'commands' | 'templates' | 'updates' | 'stats'
 
 const TABS: Array<{ id: TabId; label: string }> = [
   { id: 'providers', label: 'Providers' },
   { id: 'agents', label: 'Agents' },
+  { id: 'quick-messages', label: 'Quick Messages' },
   { id: 'permissions', label: 'Permissions' },
   { id: 'mcp', label: 'MCP' },
   { id: 'context', label: 'Context' },
@@ -39,6 +43,8 @@ export default function SettingsDialog({ onClose, projectPath, templates, onTemp
   const [status, setStatus] = useState('')
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
+  const [discarding, setDiscarding] = useState(false)
+  const titleId = useId()
 
   const refresh = useCallback(async () => {
     try {
@@ -63,18 +69,13 @@ export default function SettingsDialog({ onClose, projectPath, templates, onTemp
   // Closing with unsaved changes (Escape, Cancel) would otherwise discard
   // them silently — nothing auto-saves until the Save button is clicked.
   const closeGuarded = useCallback(() => {
-    if (isDirty && !window.confirm('Discard unsaved settings changes?')) return
+    if (saving) return
+    if (isDirty) { setDiscarding(true); return }
     onClose()
-  }, [isDirty, onClose])
+  }, [isDirty, onClose, saving])
 
   // Close on Escape only — the backdrop no longer closes on outside click.
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') closeGuarded()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [closeGuarded])
+  const focus = useDialogFocus(closeGuarded)
 
   const patch = useCallback((patch: Partial<BsSettings>) => {
     setDraft(prev => (prev ? { ...prev, ...patch } : prev))
@@ -89,6 +90,7 @@ export default function SettingsDialog({ onClose, projectPath, templates, onTemp
       const result = await window.api.saveSettings(draft)
       setDraft(result)
       setSaved(result)
+      window.dispatchEvent(new CustomEvent('bs:settings-saved', { detail: result }))
       setMcpStatus(await window.api.getMcpStatus())
       setStatus('Settings saved.')
     } catch (err) {
@@ -100,8 +102,8 @@ export default function SettingsDialog({ onClose, projectPath, templates, onTemp
 
   return (
     <div className="dialog-backdrop">
-      <div className="dialog settings-dialog">
-        <h3>Settings</h3>
+      <div className="dialog settings-dialog" role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} {...focus}>
+        <h3 id={titleId}>Settings</h3>
         <button className="dialog-close" aria-label="Close" onClick={closeGuarded}>✕</button>
         <div className="settings-body">
           <nav className="settings-nav">
@@ -126,6 +128,7 @@ export default function SettingsDialog({ onClose, projectPath, templates, onTemp
                 onChangeAgents={agents => patch({ agents })}
               />
             )}
+            {draft && tab === 'quick-messages' && <QuickMessagesTab messages={draft.quickMessages ?? []} onChange={quickMessages => patch({ quickMessages })} />}
             {draft && tab === 'permissions' && (
               <PermissionsTab permission={draft.permission} onChange={permission => patch({ permission })} />
             )}
@@ -152,14 +155,18 @@ export default function SettingsDialog({ onClose, projectPath, templates, onTemp
             {tab === 'stats' && <StatsTab />}
           </div>
         </div>
-        {status && <div className="settings-status">{status}</div>}
-        {error && <div className="settings-error">{error}</div>}
+        {status && <div className="settings-status" role="status">{status}</div>}
+        {error && <div className="settings-error" role="alert">{error}</div>}
         <div className="dialog-actions">
-          <button className="btn" onClick={closeGuarded}>Cancel</button>
+          <button className="btn" disabled={saving} onClick={closeGuarded}>Cancel</button>
           <button className="btn primary" disabled={!draft || saving} onClick={() => void save()}>
             {saving ? 'Saving…' : 'Save'}
           </button>
         </div>
+        {discarding && <Modal title="Discard unsaved settings?" onClose={() => setDiscarding(false)} showDefaultActions={false}>
+          <p>Your unsaved changes will be lost.</p>
+          <div className="dialog-actions"><button type="button" className="btn" onClick={() => setDiscarding(false)}>Keep editing</button><button type="button" className="btn danger" onClick={onClose}>Discard changes</button></div>
+        </Modal>}
       </div>
     </div>
   )

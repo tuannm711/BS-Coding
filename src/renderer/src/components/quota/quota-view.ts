@@ -1,5 +1,6 @@
 import type { ProviderAccountSnapshot } from '@shared/provider-state'
 import type { ProviderQuotaGroup, ProviderQuotaWindow, ProviderUsage } from '@shared/types'
+export { quotaFamilyFor, groupClaimsModel } from '@shared/agent-quota-binding'
 
 export function remainingPercent(used?: number): number | undefined {
   if (used === undefined || !Number.isFinite(used)) return undefined
@@ -105,19 +106,9 @@ export function providerQuotaGroups(usage?: ProviderUsage): ProviderQuotaGroup[]
 // parsed from it has `modelIds: []` and nothing matches it by id. The family is
 // read off the model name instead. Shared rather than duplicated: the fleet
 // panel needs the same answer, and a second copy would drift.
-export function quotaFamilyFor(modelId: string): 'gemini' | 'claude-gpt' | undefined {
-  const normalized = modelId.toLowerCase()
-  if (normalized.includes('gemini')) return 'gemini'
-  if (normalized.includes('claude') || normalized.includes('gpt') || normalized.startsWith('3p-')) return 'claude-gpt'
-  return undefined
-}
 
 // True when this group is the one that model draws on — by explicit modelIds
 // where the provider gave them, by family where it did not.
-export function groupClaimsModel(group: ProviderQuotaGroup, modelId: string): boolean {
-  if (group.modelIds.includes(modelId)) return true
-  return group.modelIds.length === 0 && quotaFamilyFor(modelId) === group.id
-}
 
 export function chatQuotaGroups(usage: ProviderUsage | undefined, modelIds: string[]): ProviderQuotaGroup[] {
   if (!usage) return []

@@ -1,11 +1,12 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { ChevronDown } from 'lucide-react'
-import type { AgentConfig, AgentMode, ChatEvent, ChatMessage, Command, ImageAttachment, QuestionOption, QueuedMessage, TodoItem, TodoStatus, ToolCallData, TurnExecutionSnapshot } from '@shared/types'
+import type { AgentConfig, AgentMode, BsSettings, ChatEvent, ChatMessage, Command, ImageAttachment, QuestionOption, QueuedMessage, QuickMessage, TodoItem, TodoStatus, ToolCallData, TurnExecutionSnapshot } from '@shared/types'
 import { appendStreamDelta } from '@shared/text'
 import { contextTokens } from '@shared/usage'
 import ChatInput from './ChatInput'
 import { buildQuestionAnswer } from './questionAnswer'
 import ModelPicker from './ModelPicker'
+import QuickMessageButtons from './QuickMessageButtons'
 import AgentPicker from './AgentPicker'
 import VariantPicker from './VariantPicker'
 import ContextFooter from './ContextFooter'
@@ -41,6 +42,18 @@ interface Props {
 function ChatPanel({ agentId, agents, onAgentChange, projectPath, sessionId, onSessionChange, cwd, mode = 'build', variant, onModeChange, onVariantChange }: Props) {
   const [items, setItems] = useState<FeedItem[]>([])
   const [running, setRunning] = useState(false)
+  const [quickMessages, setQuickMessages] = useState<QuickMessage[]>([])
+  const [quickSending, setQuickSending] = useState(false)
+  const quickSendingRef = useRef(false)
+  const [sendError, setSendError] = useState('')
+  useEffect(() => {
+    let active = true
+    const apply = (settings: BsSettings) => { if (active) setQuickMessages(settings.quickMessages ?? []) }
+    void window.api.getSettings().then(apply)
+    const saved = (event: Event) => apply((event as CustomEvent<BsSettings>).detail)
+    window.addEventListener('bs:settings-saved', saved)
+    return () => { active = false; window.removeEventListener('bs:settings-saved', saved) }
+  }, [])
   const [currentMode, setCurrentMode] = useState<AgentMode>(mode)
   const [currentVariant, setCurrentVariant] = useState<string>(variant ?? '')
   // Keep local state in sync with the authoritative main-process config pushed
@@ -243,6 +256,10 @@ function ChatPanel({ agentId, agents, onAgentChange, projectPath, sessionId, onS
 
   const applyEvent = useCallback((e: ChatEvent) => {
     if (!acceptChatEvent({ projectPath, sessionId, turnId: activeTurnIdRef.current }, e)) return
+    if (e.type === 'turn-started' || e.type === 'queue-updated' || e.type === 'done' || e.type === 'error') {
+      quickSendingRef.current = false
+      setQuickSending(false)
+    }
     if (e.type === 'subagent-event') {
       setItems(prev => {
         const idx = prev.findIndex(i => i.kind === 'subagent' && i.taskId === e.taskId)
@@ -271,18 +288,8 @@ function ChatPanel({ agentId, agents, onAgentChange, projectPath, sessionId, onS
       return
     }
     if (e.type === 'queue-updated') {
-      const prev = queueRef.current
       queueRef.current = e.queue
       setQueue(e.queue)
-      const started = prev.find(p => !e.queue.some(q => q.id === p.id))
-      if (started) {
-        const optimisticId = 'u-' + started.id
-        startTurnAnchor(optimisticId)
-        setItems(prevItems => [...prevItems, {
-          kind: 'message', id: optimisticId, role: 'user',
-          text: started.displayText ?? started.text, images: started.images
-        }])
-      }
       return
     }
     if (e.type === 'user-message') {
@@ -413,19 +420,35 @@ if (e.type === 'usage') {
 
   const send = useCallback((text: string, images?: ImageAttachment[]) => {
     const trimmed = text.trim()
-    if (!trimmed && (!images || images.length === 0)) return
+    if (!trimmed && (!images || images.length === 0)) return Promise.resolve()
+    setSendError('')
+    let optimisticId: string | undefined
     // When a turn is already running the message is queued in main; the
     // user message row appears only once the queue drains and the turn starts.
     if (!running) {
-      const optimisticId = 'u-' + Date.now()
-      startTurnAnchor(optimisticId)
+      optimisticId = 'u-' + Date.now()
+      const messageId = optimisticId
+      startTurnAnchor(messageId)
       setItems(prev => [...prev, {
-        kind: 'message', id: optimisticId, role: 'user', text: trimmed, images
+        kind: 'message', id: messageId, role: 'user', text: trimmed, images
       }])
       setRunning(true)
     }
-    void window.api.sendSessionChat(projectPath, sessionId, agentId, trimmed, images)
+    return window.api.sendSessionChat(projectPath, sessionId, agentId, trimmed, images).catch(error => {
+      setSendError(String(error))
+      if (optimisticId) {
+        setItems(previous => previous.filter(item => !(item.kind === 'message' && item.id === optimisticId)))
+        setRunning(false)
+      }
+    })
   }, [projectPath, sessionId, agentId, running, startTurnAnchor])
+
+  const sendQuickMessage = useCallback((text: string) => {
+    if (quickSendingRef.current) return
+    quickSendingRef.current = true
+    setQuickSending(true)
+    void send(text).finally(() => { quickSendingRef.current = false; setQuickSending(false) })
+  }, [send])
 
   const handleStop = useCallback(() => {
     void window.api.stopSessionChat(projectPath, sessionId)
@@ -802,6 +825,7 @@ if (e.type === 'usage') {
             )}
           </div>
         )}
+      {sendError && <p className="settings-error" role="alert">{sendError}</p>}
       <div className="chat-mode">
           <span className="chat-mode-label">mode</span>
           <button
@@ -822,6 +846,7 @@ if (e.type === 'usage') {
               row is what let a project end up with two coordinators. */}
           {currentMode === 'plan' && <span className="chat-mode-hint">read-only — edits denied</span>}
           {currentMode === 'coordinate' && <span className="chat-mode-hint">coordinating — set in Fleet</span>}
+          <QuickMessageButtons messages={quickMessages} onSend={sendQuickMessage} disabled={pendingPrompt !== null || quickSending} />
           <div className="chat-mode-tools">
             <AgentPicker
               agents={agents}
@@ -830,6 +855,7 @@ if (e.type === 'usage') {
               disabled={pickerLocked}
               disabledReason={pickerLocked ? 'Agent locked while running' : undefined}
             />
+            <ModelPicker agentId={agentId} disabled={pickerLocked} />
             {availableVariants.length > 0 && (
               <VariantPicker
                 variants={availableVariants}

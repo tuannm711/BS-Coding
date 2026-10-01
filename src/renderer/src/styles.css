@@ -68,6 +68,9 @@
   --shadow-3: 0 12px 40px rgba(4, 6, 12, 0.55);
 }
 * { box-sizing: border-box; border-radius: var(--radius); }
+* { scrollbar-color: rgba(160, 170, 188, .5) transparent; scrollbar-width: thin; }
+@media (forced-colors: active) { * { scrollbar-color: auto; } }
+.resize-none { resize: none; }
 html, body, #root { height: 100%; margin: 0; }
 body {
   background: radial-gradient(1400px 900px at 50% -12%, var(--bg-raised) 0%, var(--bg) 58%);
@@ -1043,7 +1046,7 @@ select.input { width: 100%; }
 .agent-icon-button:disabled { opacity: .38; cursor: not-allowed; }
 .agents-row-head { display: flex; align-items: center; gap: 8px; }
 .agent-name { font-weight: var(--fw-semibold); flex: 1; min-width: 0; }
-.agents-prompt { min-height: 72px; resize: vertical; font-family: var(--font-mono); font-size: var(--fs-md); }
+.agents-prompt { min-height: 100px; resize: none; font-family: var(--font-mono); font-size: var(--fs-md); }
 .agents-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .agents-head .settings-hint { flex: 1; min-width: 0; }
 .agents-head .btn { flex: 0 0 auto; }
@@ -1127,7 +1130,15 @@ select.input { width: 100%; }
 /* Two buttons now, not three: Coordinate moved to Fleet, where the project's
    own settings live. No flex-wrap — the row fits, and wrapping would hide the
    next thing crowded into it rather than showing it. */
-.chat-mode { display: flex; align-items: center; gap: 6px; }
+.chat-mode { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.quick-message-buttons { display: flex; flex: 1; justify-content: center; flex-wrap: wrap; gap: 4px; min-width: 0; }
+.quick-message-button { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.quick-message-button:disabled { opacity: .5; cursor: default; }
+.quick-message-settings-list { display: flex; flex-direction: column; gap: 8px; }
+.quick-message-setting { display: flex; align-items: flex-start; gap: 12px; padding: 12px; border: 1px solid var(--hairline); background: var(--bg-panel); }
+.quick-message-setting > div:first-child { flex: 1; min-width: 0; }
+.quick-message-setting p { margin: 4px 0 0; color: var(--text-dim); white-space: pre-wrap; overflow-wrap: anywhere; }
+.quick-message-content { width: 100%; min-height: 150px; resize: none; }
 .title-bar-views { display: flex; gap: 2px; padding: 2px; border-radius: var(--radius); background: var(--bg-raised); }
 .title-bar-views .titlebar-btn.active { background: var(--accent); color: #ffffff; }
 .chat-mode-label { font-size: var(--fs-base); font-weight: var(--fw-semibold); text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-strong); font-family: var(--font-display); }
@@ -1764,6 +1775,18 @@ select.input { width: 100%; }
    sharing one pool cannot read as two independent choices. */
 .fleet-panel { display: flex; flex-direction: column; min-height: 0; height: 100%; overflow-y: auto; }
 .fleet-board { display: flex; flex-direction: column; gap: 8px; padding: 8px; }
+.fleet-agent-card { padding: 8px; background: var(--bg-panel); border: 1px solid var(--hairline); }
+.fleet-agent-card .fleet-agent { padding: 0; }
+.fleet-agent-card .fleet-agent-name code { color: var(--text-dim); }
+.fleet-agent-card .fleet-toggle { opacity: 1; }
+.fleet-agent-source { display: flex; align-items: center; gap: 4px; margin-top: 6px; color: var(--text-dim); font-size: var(--fs-xs); }
+.fleet-agent-source > span { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fleet-agent-quota { margin-top: 8px; }
+.fleet-agent-quota h6 { margin: 0 0 4px; color: var(--text-dim); font-size: var(--fs-xs); }
+.fleet-agent-warning { margin: 6px 0; font-size: var(--fs-sm); color: var(--yellow); overflow-wrap: anywhere; }
+.fleet-unassigned-list { display: flex; flex-direction: column; gap: 8px; }
+.model-trigger:disabled { opacity: .55; cursor: default; }
+.model-picker-error { color: var(--red); font-size: var(--fs-sm); overflow-wrap: anywhere; }
 .fleet-pool-agents { display: flex; flex-direction: column; gap: 2px; margin-top: 6px; padding-left: 10px; border-left: 1px solid var(--hairline); }
 .quota-account-refresh { flex: none; display: grid; place-items: center; width: 22px; height: 22px; padding: 0; border-radius: var(--radius-sm); background: var(--bg-input); border: 1px solid var(--hairline); color: var(--text-dim); cursor: pointer; }
 .quota-account-refresh:hover:not(:disabled) { background: var(--bg-input-hover); color: var(--text-strong); }

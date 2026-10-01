@@ -104,7 +104,7 @@ export default function CommandsTab({ projectPath }: Props) {
             onChange={e => setDescription(e.target.value)}
           />
           <textarea
-            className="input commands-template"
+            className="input commands-template resize-none"
             placeholder="template — e.g. Run the linter and fix any errors ($1 = path)"
             value={template}
             onChange={e => setTemplate(e.target.value)}

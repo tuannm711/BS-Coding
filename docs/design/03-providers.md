@@ -8,12 +8,13 @@ presentation.
 <!-- toc -->
 | Section | Lines | Names |
 | --- | --- | --- |
-| [Pieces](#pieces) | 19-37 | `src/main/providers/types.ts`, `ProviderAdapter`, `src/main/providers/registry.ts`, `src/main/providers/adapters/openai.ts`, `src/main/providers/adapters/antigravity.ts`, `src/main/providers/adapters/github-copilot.ts` |
-| [Data flow](#data-flow) | 38-60 | `ProviderManager.connect`, `ProviderAuthorizationStrategy`, `MainApp.startUsagePoll`, `ProviderManager.refreshUsage`, `adapter.refreshCredentials`, `adapter.fetchUsage` |
-| [Types that carry it](#types-that-carry-it) | 61-81 | `ProviderAdapter`, `refreshAccount`, `listModels`, `createRuntime`, `refreshCredentials`, `recoverRuntimeContext` |
-| [Design decisions](#design-decisions) | 82-126 | `ProviderUsage.status`, `'near-limit'`, `docs/technical-debt.md`, `primaryUsedPercent`, `providerError`, `hasRemainingQuota` |
-| [Choosing a replacement when a pool is refused](#choosing-a-replacement-when-a-pool-is-refused) | 127-149 | `rankFallbackAgents`, `src/shared/agent-fallback.ts`, `poolState`, `SessionRunner`, `currentTarget` |
-| [Known limits](#known-limits) | 150-160 | `openai.ts`, `antigravity.ts`, `fetchUsage`, `poolErrors` |
+| [Pieces](#pieces) | 20-38 | `src/main/providers/types.ts`, `ProviderAdapter`, `src/main/providers/registry.ts`, `src/main/providers/adapters/openai.ts`, `src/main/providers/adapters/antigravity.ts`, `src/main/providers/adapters/github-copilot.ts` |
+| [Data flow](#data-flow) | 39-61 | `ProviderManager.connect`, `ProviderAuthorizationStrategy`, `MainApp.startUsagePoll`, `ProviderManager.refreshUsage`, `adapter.refreshCredentials`, `adapter.fetchUsage` |
+| [Types that carry it](#types-that-carry-it) | 62-82 | `ProviderAdapter`, `refreshAccount`, `listModels`, `createRuntime`, `refreshCredentials`, `recoverRuntimeContext` |
+| [Design decisions](#design-decisions) | 83-127 | `ProviderUsage.status`, `'near-limit'`, `docs/technical-debt.md`, `primaryUsedPercent`, `providerError`, `hasRemainingQuota` |
+| [Choosing a replacement when a pool is refused](#choosing-a-replacement-when-a-pool-is-refused) | 128-129 |  |
+| &nbsp;&nbsp;[Agent quota reservations](#agent-quota-reservations) | 130-165 | `src/shared/agent-quota-binding.ts`, `quotaPoolId`, `rankFallbackAgents`, `src/shared/agent-fallback.ts`, `poolState`, `SessionRunner` |
+| [Known limits](#known-limits) | 166-176 | `openai.ts`, `antigravity.ts`, `fetchUsage`, `poolErrors` |
 <!-- /toc -->
 
 ## Pieces
@@ -125,6 +126,21 @@ from the tier id — debt item 3.
 another process even as the same user. The renderer receives masked values only.
 
 ## Choosing a replacement when a pool is refused
+
+### Agent quota reservations
+
+`src/shared/agent-quota-binding.ts` defines account/pool bindings and allowed
+models for both Settings and the main process. Distinct agent profiles cannot
+reserve the same provider/account/pool. Antigravity provides Gemini and
+Claude/GPT pools; current other providers use one account pool. Different time
+windows constrain the same quota and do not provide additional agent slots.
+
+`quotaPoolId` is persisted with the profile and assignment. Model switching in
+chat is limited to the pool's current account catalog. Missing catalogs and
+unknown Antigravity model families never widen the selection. Existing
+duplicate profiles are kept; conflicting assignments require Settings review.
+The same global profile may appear in multiple projects, with a separate
+runtime ID, without claiming another quota slot.
 
 A quota or capacity refusal does not end the turn while another agent can carry
 it. `rankFallbackAgents` in `src/shared/agent-fallback.ts` orders the project's

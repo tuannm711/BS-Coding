@@ -48,7 +48,7 @@ const resetCreditLabel = (available: number): string => `${available} reset${ava
 
 // One agent inside the pool it draws on. The speed control is the same one the
 // chat variant carries — moving the panel must not drop a function.
-function FleetAgent({ agent, coordinatorName, onSelect, onSpeedChange, onSetRole }: {
+export function FleetAgent({ agent, coordinatorName, onSelect, onSpeedChange, onSetRole }: {
   agent: FleetAgentRow
   coordinatorName?: string
   onSelect?: (agentId: string) => void
@@ -292,7 +292,7 @@ function PoolBadge({ group, poolErrors }: { group: ProviderQuotaGroup; poolError
   return <span className="quota-pool-error" role="status">{STATE_LABELS[state]}</span>
 }
 
-function QuotaWindow({ window }: { window: ProviderQuotaGroup['windows'][number] }) {
+export function QuotaWindow({ window }: { window: ProviderQuotaGroup['windows'][number] }) {
   const known = window.usageKnown && window.remainingPercent !== undefined
   const state = quotaWindowState(window)
   // One line, then the bar. The percentage, the bar and the countdown are the

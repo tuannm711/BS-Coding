@@ -352,9 +352,19 @@ class MainApp {
   async saveSettings(settings: BsSettings): Promise<BsSettings> {
     const saved = await this.bsAgent.saveSettings(settings)
     const projectPath = this.activeProject
+    const desiredNames = saved.agents.map(agent => agent.name)
+    // Profiles are global. Release removed profiles in every saved project,
+    // including agents registered during an earlier visit to another project.
+    for (const summary of this.workspaces.list()) {
+      if (summary.projectPath === projectPath) continue
+      const other = this.workspaces.get(summary.projectPath)
+      if (!other) continue
+      const reconciliation = planNativeAgentReconciliation(other.agents, desiredNames)
+      for (const agentId of reconciliation.remove) await this.removeWorkspaceAgent(other.projectPath, agentId)
+    }
     const workspace = projectPath ? this.workspaces.get(projectPath) : undefined
     if (!projectPath || !workspace) return saved
-    const fresh = await this.reconcileWorkspaceAgents(projectPath, saved.agents.map(agent => agent.name))
+    const fresh = await this.reconcileWorkspaceAgents(projectPath, desiredNames)
     if (fresh) win?.webContents.send(Channels.EventWorkspaceRuntimeChanged, this.runtimeFor(fresh))
     return saved
   }
@@ -467,8 +477,10 @@ class MainApp {
     // provider/model assignments. This also migrates accounts created by older
     // builds to the current provider model list on the first workspace open.
     await this.providerManager.refreshModels()
-    await this.bsAgent.init(ws.agents)
-    await Promise.all(ws.agents.map(a => this.startAgent(a.id)))
+    const current = this.workspaces.get(ws.projectPath)
+    if (!current) return
+    await this.bsAgent.init(current.agents)
+    await Promise.all(current.agents.map(a => this.startAgent(a.id)))
   }
 
   private startFileWatcher(projectPath: string): void {
@@ -716,8 +728,8 @@ function registerIpcHandlers(): void {
   ipcMain.handle(Channels.WorkspaceAdd, (_e, projectPath: string, name: string) => {
     const ws = mainApp.workspaces.add(projectPath, name)
     if (ws.agents.length === 0) {
-      mainApp.workspaces.addAgent(projectPath, {
-        name: 'bs',
+      for (const profile of mainApp.bsAgent.getSettings().agents) mainApp.workspaces.addAgent(projectPath, {
+        name: profile.name,
         templateId: 'bs',
         cwd: projectPath,
         kind: 'native'
@@ -1026,6 +1038,9 @@ app.whenReady().then(async () => {
 let cleaningUp = false
 app.on('before-quit', (event) => {
   if (cleaningUp) return
+  // Playwright, a secondary instance, or the OS can quit during startup.
+  // There are no MainApp resources to dispose until construction finishes.
+  if (!mainApp) { isQuitting = true; return }
   event.preventDefault()
   cleaningUp = true
   isQuitting = true

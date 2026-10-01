@@ -53,23 +53,29 @@ export class AssignmentStore {
   }
 
   set(input: Omit<AgentAssignmentSnapshot, 'revision'> & { revision?: number }): AgentAssignmentSnapshot {
-    const current = this.state.assignments[input.agentId]
-    const next: AgentAssignmentSnapshot = {
-      ...input,
-      revision: Math.max(current?.revision ?? 0, input.revision ?? 0) + 1
-    }
-    this.state.assignments[input.agentId] = next
-    this.persistence.save(this.state)
-    return next
+    return this.batch([input], [])[0]
   }
 
   remove(agentId: string): void {
-    delete this.state.assignments[agentId]
-    this.persistence.save(this.state)
+    this.batch([], [agentId])
+  }
+
+  batch(inputs: Array<Omit<AgentAssignmentSnapshot, 'revision'> & { revision?: number }>, removeIds: string[]): AgentAssignmentSnapshot[] {
+    const assignments = { ...this.state.assignments }
+    for (const id of removeIds) delete assignments[id]
+    const updated = inputs.map(input => {
+      const next = { ...input, revision: Math.max(assignments[input.agentId]?.revision ?? 0, input.revision ?? 0) + 1 }
+      assignments[input.agentId] = next
+      return next
+    })
+    const nextState = { ...this.state, assignments }
+    this.persistence.save(nextState)
+    this.state = nextState
+    return updated
   }
 
   migrate(
-    settings: { agents?: Record<string, { provider?: string; model?: string; accountId?: string; speed?: 'standard' | 'fast' }> },
+    settings: { agents?: Record<string, { provider?: string; model?: string; accountId?: string; quotaPoolId?: string; speed?: 'standard' | 'fast' }> },
     workspaceAgents: Array<{ id: string; name: string; model?: string; accountId?: string; speed?: 'standard' | 'fast' }>,
     isCompatible?: (assignment: Pick<AgentAssignmentSnapshot, 'providerId' | 'accountId' | 'modelId'>) => boolean
   ): { migrated: number; needsReview: string[] } {
@@ -86,7 +92,7 @@ export class AssignmentStore {
       const status = complete && (!isCompatible || isCompatible({ providerId, modelId, accountId: profile?.accountId ?? agent.accountId }))
         ? 'ready' as const
         : 'needs-review' as const
-      this.state.assignments[agent.id] = { agentId: agent.id, profileName: agent.name, providerId, modelId, accountId: profile?.accountId ?? agent.accountId, speed: profile?.speed ?? agent.speed ?? 'standard', revision: 1, status }
+      this.state.assignments[agent.id] = { agentId: agent.id, profileName: agent.name, providerId, modelId, accountId: profile?.accountId ?? agent.accountId, quotaPoolId: profile?.quotaPoolId, speed: profile?.speed ?? agent.speed ?? 'standard', revision: 1, status }
       migrated++
       if (status === 'needs-review') needsReview.push(agent.id)
     }
