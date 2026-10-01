@@ -11,11 +11,11 @@ panel, settings and the tray. The terminal inside a pane is in
 | [Pieces](#pieces) | 21-35 | `src/renderer/src/App.tsx`, `PaneModel`, `src/renderer/src/components/TitleBar.tsx`, `src/renderer/src/components/Sidebar.tsx`, `src/renderer/src/components/RightPanel.tsx`, `src/renderer/src/components/fleet/` |
 | [Data flow](#data-flow) | 36-54 | `App.tsx`, `PaneModel`, `XtermHost`, `buffersRef`, `registerTerminal`, `ChatPanel` |
 | [Types that carry it](#types-that-carry-it) | 55-64 | `PaneModel`, `ChatEvent`, `src/shared/types.ts`, `QuotaAccountUiState`, `src/renderer/src/components/quota/quota-view.ts` |
-| [Design decisions](#design-decisions) | 65-99 | `getWindowChromeOptions`, `titleBarOverlay`, `tests/unit/window-chrome.test.ts`, `src/renderer/AGENTS.md`, `MainApp`, `app.setAppUserModelId` |
-| [The coordination view](#the-coordination-view) | 100-152 | `src/renderer/src/components/coordinator/CoordinatorView.tsx`, `App.tsx`, `setMode`, `RightPanel`, `ChatPanel`, `listSessionTranscript` |
-| [The fleet panel](#the-fleet-panel) | 153-227 | `RightPanel`, `buildFleet`, `ProviderQuotaGroup`, `modelIds`, `anti-claude-opus`, `anti-claude-sonnet` |
-| [Sessions live in the sidebar](#sessions-live-in-the-sidebar) | 228-251 | `activeSessionId`, `groupSessions` |
-| [Known limits](#known-limits) | 252-258 | `docs/technical-debt.md` |
+| [Design decisions](#design-decisions) | 65-104 | `getWindowChromeOptions`, `titleBarOverlay`, `tests/unit/window-chrome.test.ts`, `src/renderer/AGENTS.md`, `MainApp`, `app.setAppUserModelId` |
+| [The coordination view](#the-coordination-view) | 105-157 | `src/renderer/src/components/coordinator/CoordinatorView.tsx`, `App.tsx`, `setMode`, `RightPanel`, `ChatPanel`, `listSessionTranscript` |
+| [The fleet panel](#the-fleet-panel) | 158-230 | `RightPanel`, `buildFleet`, `ProviderQuotaGroup`, `FleetBoard`, `provider/account/quotaPoolId`, `FleetAgentRow` |
+| [Sessions live in the sidebar](#sessions-live-in-the-sidebar) | 231-254 | `activeSessionId`, `groupSessions` |
+| [Known limits](#known-limits) | 255-261 | `docs/technical-debt.md` |
 <!-- /toc -->
 
 ## Pieces
@@ -81,10 +81,15 @@ response the view follows the output until the user scrolls away, after which it
 stops fighting them. The geometry is a pure module so the rule is testable
 without rendering.
 
-**Settings is one dialog with tabs, not a route.** Twelve tabs — agents,
-providers, commands, MCP, permissions, templates, context, remote, updates — over
-a single modal. The app has one window and no router; a settings route would
-require both.
+**Settings is one dialog with tabs.** Providers, Agents, Quick Messages,
+Permissions, MCP, Context, Commands, Updates and Usage share a draft/Save/Cancel
+shell. Native agent profiles select account/quota; model selection is in chat.
+Every profile, including the initial `bs`, can be removed. An empty profile list
+stays empty on reload. The shared modal owns focus and unsaved-discard behavior.
+
+Quick Messages persist an ID, name and content. Their buttons sit between Mode
+and agent/model selection, send to the active session's selected agent, and use
+the running session queue. Saving only quick messages does not restart agents.
 
 **The window claims the installed AppUserModelID on Windows.** `MainApp` calls
 `app.setAppUserModelId` before creating the window, matching the id
@@ -161,17 +166,17 @@ the shell had been mixing them wherever there was room.
 Artifacts · Fleet**. The pinned *Session models* block above the tabs is gone;
 quota is not a file view and was stapled to the top of one.
 
-**Fleet groups by pool, not by agent.** `buildFleet` puts each agent inside the
-`ProviderQuotaGroup` whose `modelIds` claim its model:
+**Fleet renders one compact card per agent.** `buildFleet` resolves the
+account and applicable `ProviderQuotaGroup`; `FleetBoard` makes the agent name
+and current model primary, with provider/account metadata below. Only that
+agent's quota windows are shown. Unused pools do not create empty cards.
 
-```
-account → quota group (the pool) → the agents drawing on it
-```
-
-`anti-claude-opus` and `anti-claude-sonnet` are different models drawing on one
-pool. Listed flat they read as alternatives — pick the other when the first is
-spent — when exhausting one exhausts both. The account card already knew both
-halves and rendered them apart; its `fleet` variant nests them.
+Agents reserve `provider/account/quotaPoolId`. Antigravity has independent
+Gemini and Claude/GPT pools; other current providers use one shared account
+quota. Settings chooses the account and pool. The chat model picker offers
+only models belonging to that pool. Main-process validation rejects duplicate
+ownership and models outside the selected pool. Legacy conflicts stay visible
+for review; their profiles and session history are retained.
 
 Two kinds of agent are kept rather than dropped: a **stray**, configured for an
 account but running a model no reported pool claims, and an **unassigned**
@@ -218,11 +223,9 @@ in a footer costs a whole row to say what an icon says.
 **Both rails are `--rail-width` and neither is draggable.** The right panel
 could be widened to 600px, which took that space from the centre — and the
 centre is where several live agent panes now sit at once. Fixed at the
-sidebar's width — 279px — the card carries no horizontal slack, so the fleet variant
-drops what the wider variants can afford: the Active badge, whose absence
-carries it, and the plan name, which the account's own email already
-identifies. Subscription expiry moves to the row's tooltip; freshness stays
-visible, because a stale reading changes what the bars above it are worth.
+sidebar's width — 279px — cards carry no horizontal slack. The primary row shows
+the agent name/model and operational toggles; the secondary row shows account
+metadata and an icon refresh action. Provider administration stays in Settings.
 The tab strip is 30px rather than 44 for the same reason.
 
 ## Sessions live in the sidebar

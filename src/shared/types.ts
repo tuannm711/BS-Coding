@@ -489,6 +489,7 @@ export interface AgentSettings {
   provider?: string
   model?: string
   accountId?: string
+  quotaPoolId?: string
   speed?: AgentSpeed
 }
 
@@ -496,6 +497,7 @@ export interface BsSettings {
   providers: ProviderSettings[]
   defaultProvider: string
   agents: AgentSettings[]
+  quickMessages?: QuickMessage[]
   permission: Record<string, PermissionRule>
   mcp: Record<string, McpServerConfig>
   maxContextTokens: number
@@ -505,6 +507,12 @@ export interface BsSettings {
   lsp: LspSettings
   notifications?: NotificationsSettings
   trace?: { enabled: boolean }
+}
+
+export interface QuickMessage {
+  id: string
+  name: string
+  message: string
 }
 
 export type SubagentType = 'research' | 'general' | 'reviewer'

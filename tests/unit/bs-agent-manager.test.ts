@@ -15,6 +15,7 @@ import type { SnapshotTurn } from '../../src/main/agent/snapshot'
 import { TruncationStore } from '../../src/main/agent/truncation'
 import { CommandStore } from '../../src/main/agent/commands'
 import { SavedPermissions } from '../../src/main/agent/saved-permissions'
+import { AssignmentStore } from '../../src/main/agent/assignments'
 import type { SavedPermission } from '../../src/main/agent/saved-permissions'
 import type { LlmClient, LlmStreamOptions, LlmStreamPart } from '../../src/main/agent/llm'
 import type { AgentConfig, ChatEvent, PromptResponse, ProviderConnection } from '../../src/shared/types'
@@ -142,6 +143,89 @@ async function makeManager(opts: StubLlmOptions & {
 }
 
 describe('BsAgentManager', () => {
+  it('drains every queued shared-session message and publishes an empty queue', async () => {
+    const { manager, store, events } = await makeManager()
+    try {
+      const session = manager.createProjectSession('/proj', 'a1')
+      const first = manager.sendInSession('/proj', session.id, 'a1', 'first')
+      await manager.sendInSession('/proj', session.id, 'a1', 'second')
+      await manager.sendInSession('/proj', session.id, 'a1', 'third')
+      await first
+      expect(store.transcript(session.id).filter(item => item.kind === 'message' && item.message.role === 'user').map(item => item.kind === 'message' ? item.message.text : '')).toEqual(['first', 'second', 'third'])
+      expect(events.filter(event => event.type === 'queue-updated').at(-1)).toMatchObject({ projectPath: '/proj', sessionId: session.id, queue: [] })
+    } finally { await manager.dispose() }
+  })
+
+  it('keeps settings and assignments unchanged when assignment persistence fails', async () => {
+    const { manager } = await makeManager()
+    const before = manager.getSettings()
+    const persistence = vi.spyOn(AssignmentStore.prototype, 'batch').mockImplementationOnce(() => { throw new Error('disk write denied') })
+    try {
+      await expect(manager.saveSettings({ ...before, maxContextTokens: before.maxContextTokens + 1000, quickMessages: [{ id: 'next', name: 'Next', message: 'Continue' }] })).rejects.toThrow('disk write denied')
+      expect(manager.getSettings()).toEqual(before)
+    } finally { persistence.mockRestore(); await manager.dispose() }
+  })
+
+  it('does not resurrect a removed agent when a pending catalog refresh completes', async () => {
+    const catalog = new ModelsCatalog('/unused')
+    vi.spyOn(catalog, 'fetch').mockResolvedValue({})
+    const { manager } = await makeManager({ catalog })
+    let release!: (value: {}) => void
+    vi.spyOn(catalog, 'fetch').mockImplementationOnce(() => new Promise(resolve => { release = resolve }))
+    try {
+      const reload = manager.reload()
+      await vi.waitFor(() => expect(release).toBeDefined())
+      manager.removeAgent('a1')
+      release({})
+      await reload
+      expect(manager.listAgents()).toEqual([])
+    } finally { await manager.dispose() }
+  })
+
+  it('rejects duplicate ownership through account and profile IPC operations', async () => {
+    const account = (id: string) => ({ id, providerId: 'openai', label: id, authMode: 'oauth' as const, status: 'active' as const, models: ['gpt-a'], createdAt: 1, lastUsedAt: 1 })
+    const { manager } = await makeManager({ secondAgent: true, providerAccounts: [{ providerId: 'openai', activeAccountId: 'one', accounts: [account('one'), account('two')] }] })
+    try {
+      manager.setAgentAssignmentSnapshot({ agentId: 'a1', providerId: 'openai', accountId: 'one', modelId: 'gpt-a', speed: 'standard' })
+      manager.setAgentAssignmentSnapshot({ agentId: 'a3', providerId: 'openai', accountId: 'two', modelId: 'gpt-a', speed: 'standard' })
+      expect(() => manager.setAccount('a3', 'one')).toThrow(/quota/i)
+      expect(() => manager.setProfile('a3', 'bs')).toThrow(/already exists/i)
+      expect(manager.getAgentAssignmentSnapshot('a3')?.accountId).toBe('two')
+      expect(manager.listAgents().map(agent => agent.name)).toEqual(['bs', 'helper'])
+    } finally { await manager.dispose() }
+  })
+
+  it('reserves each account quota for one agent and limits model changes to that pool', async () => {
+    const accounts: ProviderConnection[] = [{ providerId: 'antigravity', activeAccountId: 'anti', accounts: [{
+      id: 'anti', providerId: 'antigravity', label: 'Anti', authMode: 'oauth', status: 'active',
+      models: ['claude-sonnet-4-6', 'gpt-oss-120b-medium', 'gemini-3-flash'], createdAt: 1, lastUsedAt: 1
+    }] }]
+    const { manager } = await makeManager({ secondAgent: true, providerAccounts: accounts })
+    try {
+      manager.setAgentAssignmentSnapshot({ agentId: 'a1', providerId: 'antigravity', accountId: 'anti', modelId: 'claude-sonnet-4-6', quotaPoolId: 'claude-gpt', speed: 'standard' })
+      expect(() => manager.setAgentAssignmentSnapshot({ agentId: 'a3', providerId: 'antigravity', accountId: 'anti', modelId: 'gpt-oss-120b-medium', quotaPoolId: 'claude-gpt', speed: 'standard' })).toThrow(/quota.*bs/i)
+      expect(manager.getAgentAssignmentSnapshot('a3')).toBeNull()
+      manager.setAgentAssignmentSnapshot({ agentId: 'a3', providerId: 'antigravity', accountId: 'anti', modelId: 'gemini-3-flash', quotaPoolId: 'gemini', speed: 'standard' })
+      manager.setModel('a1', 'antigravity', 'gpt-oss-120b-medium')
+      expect(manager.getAgentAssignmentSnapshot('a1')?.modelId).toBe('gpt-oss-120b-medium')
+      expect(() => manager.setModel('a1', 'antigravity', 'gemini-3-flash')).toThrow(/quota/i)
+      expect(manager.getAgentAssignmentSnapshot('a1')?.modelId).toBe('gpt-oss-120b-medium')
+    } finally { await manager.dispose() }
+  })
+
+  it('rejects duplicate quota profiles before writing settings', async () => {
+    const account = { id: 'oa', providerId: 'openai', label: 'OpenAI', authMode: 'oauth' as const, status: 'active' as const, models: ['gpt-a', 'gpt-b'], createdAt: 1, lastUsedAt: 1 }
+    const { manager } = await makeManager({ providerAccounts: [{ providerId: 'openai', activeAccountId: 'oa', accounts: [account] }] })
+    try {
+      const settings = manager.getSettings()
+      await expect(manager.saveSettings({ ...settings, agents: [
+        { name: 'one', systemPrompt: 'one', provider: 'openai', accountId: 'oa', model: 'gpt-a', quotaPoolId: 'account' },
+        { name: 'two', systemPrompt: 'two', provider: 'openai', accountId: 'oa', model: 'gpt-b', quotaPoolId: 'account' }
+      ] })).rejects.toThrow(/quota/i)
+      expect(manager.getSettings().agents.map(agent => agent.name)).toEqual(['bs'])
+    } finally { await manager.dispose() }
+  })
+
   it('registers native agents and ignores pty agents', async () => {
     const { manager } = await makeManager()
     expect(manager.isNative('a1')).toBe(true)
@@ -180,10 +264,9 @@ describe('BsAgentManager', () => {
     const assignment = manager.setAgentAssignmentSnapshot({ agentId: 'a1', providerId: 'test', accountId: 'acct-1', modelId: 'test-model', speed: 'fast' })
     expect(assignment).toMatchObject({ providerId: 'test', accountId: 'acct-1', modelId: 'test-model', speed: 'fast', status: 'ready' })
     expect(manager.getAgentAssignmentSnapshot('a1')).toEqual(assignment)
-    const invalid = manager.setAgentAssignmentSnapshot({ agentId: 'a1', providerId: 'test', accountId: 'missing', modelId: 'missing-model', speed: 'standard' })
-    expect(invalid).toMatchObject({ accountId: 'missing', modelId: 'missing-model', status: 'needs-review' })
-    expect(manager.getAgentAssignmentSnapshot('a1')).toEqual(invalid)
-    expect(manager.getAgentModel('a1')).toBeNull()
+    expect(() => manager.setAgentAssignmentSnapshot({ agentId: 'a1', providerId: 'test', accountId: 'missing', modelId: 'missing-model', speed: 'standard' })).toThrow()
+    expect(manager.getAgentAssignmentSnapshot('a1')).toEqual(assignment)
+    expect(manager.getAgentModel('a1')).toEqual({ provider: 'test', model: 'test-model' })
   })
 
   it('does not silently normalize an unsupported OpenAI model to the first code model', async () => {

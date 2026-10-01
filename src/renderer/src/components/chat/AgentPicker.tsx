@@ -69,7 +69,6 @@ export default function AgentPicker({ agents, value, onChange, disabled = false,
     reposition()
     const frame = requestAnimationFrame(() => {
       reposition()
-      menuRef.current?.focus()
     })
     window.addEventListener('resize', reposition)
     window.addEventListener('scroll', reposition, true)
@@ -79,6 +78,13 @@ export default function AgentPicker({ agents, value, onChange, disabled = false,
       window.removeEventListener('scroll', reposition, true)
     }
   }, [open, reposition])
+
+  const positioned = position !== null
+  useLayoutEffect(() => {
+    // The portal is visibility:hidden until its position is committed.
+    // Focusing before that commit has no effect in Chromium.
+    if (open && positioned) menuRef.current?.focus()
+  }, [open, positioned])
 
   useEffect(() => {
     if (!open) return

@@ -1,9 +1,9 @@
 import { randomUUID } from 'node:crypto'
-import { writeFileSync } from 'node:fs'
-import type { CoordinationAssignment, ChatEvent, ChatMessage, ChatTranscriptItem, ContextInfo, FileSuggestion, ImageAttachment, McpServerStatus, BsSettings, MessageTokens, ModelUsage, NotificationsSettings, ProjectSessionSummary, PromptResponse, QueuedMessage, ResolvedTurnExecutionSnapshot, StatsSummary, TodoItem, TraceEvent, UsageSummary, ProviderConnection } from '../shared/types'
+import { existsSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
+import type { CoordinationAssignment, ChatEvent, ChatMessage, ChatTranscriptItem, ContextInfo, FileSuggestion, ImageAttachment, McpServerStatus, BsSettings, MessageTokens, ModelUsage, NotificationsSettings, ProjectSessionSummary, PromptResponse, QueuedMessage, SessionQueuedMessage, ResolvedTurnExecutionSnapshot, StatsSummary, TodoItem, TraceEvent, UsageSummary, ProviderConnection } from '../shared/types'
 import type { AgentConfig, AgentMode, ArtifactEntry, CatalogProviderSummary, Command, ModelRef } from '../shared/types'
 import {
-  configToSettings, loadBsConfig, resolveAgentConfig, settingsToConfig, writeBsConfig,
+  configToSettings, loadBsConfig, resolveAgentConfig, settingsToConfig, writeBsConfig, writeBsConfigText,
   type BsConfig, type ResolvedAgentConfig
 } from './agent/config'
 import { SessionRunner } from './agent/loop'
@@ -45,6 +45,7 @@ import { createDelegateTool } from './agent/tools/delegate'
 import { compileNeutralContext } from './agent/neutral-context'
 import { rankFallbackAgents, type FallbackCandidate } from '../shared/agent-fallback'
 import { poolState } from '../shared/quota-pool'
+import { agentQuotaConflicts, boundQuotaPool, modelsForAgentQuota, quotaPoolForModel, type QuotaAccount } from '../shared/agent-quota-binding'
 import { partitionSteers } from '../shared/queue-steer'
 import { looksLikeNarratedToolCall } from '../shared/narrated-tool-call'
 import { toLlmMessages } from './agent/message'
@@ -93,6 +94,7 @@ function unavailableProviderRuntime(providerId: string): LlmClient {
 export class BsAgentManager {
   private runners = new Map<string, SessionRunner>()
   private agents = new Map<string, AgentConfig>()
+  private removedAgents = new Set<string>()
   // Who is serving the running turn, and who has already been tried. Keyed by
   // lifecycle key so a turn stays one turn across a handover.
   private turnTargets = new Map<string, { agentId: string; tried: Set<string> }>()
@@ -223,6 +225,7 @@ export class BsAgentManager {
       }
       return cfg.provider[assignment.providerId]?.models.includes(assignment.modelId) ?? false
     })
+    this.reconcileQuotaBindings(agents)
     await this.syncTools()
     await this.refreshModelLimits()
     for (const agent of agents) {
@@ -245,7 +248,19 @@ export class BsAgentManager {
   }
 
   addAgent(agent: AgentConfig): void {
-    if (agent.kind === 'native') this.register(agent)
+    if (agent.kind !== 'native') return
+    this.removedAgents.delete(agent.id)
+    this.register(agent)
+    const cfg = loadBsConfig(this.deps.configPath)
+    const profile = cfg.agents[agent.name]
+    if (!profile?.provider || !profile.model) return
+    this.assignments.migrate(cfg, [agent], assignment => {
+      const connection = this.deps.providerAccounts?.().find(item => item.providerId === assignment.providerId)
+      return connection ? connection.accounts.some(account => account.status === 'active' && (!assignment.accountId || account.id === assignment.accountId) && account.models?.includes(assignment.modelId))
+        : cfg.provider[assignment.providerId]?.models.includes(assignment.modelId) ?? false
+    })
+    this.reconcileQuotaBindings([...this.agents.values()])
+    this.register(agent, true)
   }
 
   listAgents(): AgentConfig[] {
@@ -253,6 +268,7 @@ export class BsAgentManager {
   }
 
   removeAgent(agentId: string): void {
+    this.removedAgents.add(agentId)
     for (const context of [...this.sessionExecutions.values()]) {
       if (context.execution.agentId !== agentId) continue
       context.execution.status = 'stopped'
@@ -376,7 +392,8 @@ export class BsAgentManager {
     agentId: string,
     text: string,
     images?: ImageAttachment[],
-    displayText?: string
+    displayText?: string,
+    pendingMessages: SessionQueuedMessage[] = []
   ): Promise<void> {
     const agent = this.agents.get(agentId)
     if (!agent || !this.deps.store.listProject(projectPath).some(session => session.id === sessionId)) return
@@ -397,7 +414,7 @@ export class BsAgentManager {
     const modelId = assignment?.modelId || resolved?.model
     if (!providerId || !modelId) {
       this.coordinator.fail(sessionId)
-      this.emit({ type: 'error', agentId, message: '[bs] Agent assignment cần được review trong Settings trước khi chat.' })
+      this.emit({ type: 'error', agentId, projectPath, sessionId, message: '[bs] Agent assignment cần được review trong Settings trước khi chat.' })
       return
     }
     const connection = this.deps.providerAccounts?.().find(item => item.providerId === providerId)
@@ -419,6 +436,7 @@ export class BsAgentManager {
     this.activeSessions.set(agentId, sessionId)
     this.activeProjectSessions.set(projectPath, sessionId)
     this.sessionExecutions.set(sessionId, { projectPath, sessionId, execution, usage: { ...EMPTY_USAGE } })
+    for (const message of pendingMessages) this.coordinator.enqueue(sessionId, message)
     try {
       await this.runTurn(agentId, text, images, displayText)
     } finally {
@@ -427,13 +445,15 @@ export class BsAgentManager {
       const context = this.sessionExecutions.get(sessionId)
       if (finalStatus === 'completed' && context) this.deps.store.addUsage(sessionId, context.usage)
       const next = finalStatus === 'completed' ? this.coordinator.dequeue(sessionId) : undefined
+      const remaining = next ? this.coordinator.state(sessionId)?.queue ?? [] : []
       if (finalStatus === 'completed') this.coordinator.complete(sessionId)
       else if (finalStatus === 'stopped') this.coordinator.stop(sessionId)
       else this.coordinator.fail(sessionId)
+      this.emit({ type: 'queue-updated', agentId, queue: remaining })
       this.sessionExecutions.delete(sessionId)
       if (next) {
         this.coordinator.stop(sessionId)
-        await this.sendInSession(projectPath, sessionId, next.agentId, next.text, next.images, next.displayText)
+        await this.sendInSession(projectPath, sessionId, next.agentId, next.text, next.images, next.displayText, remaining)
       }
     }
   }
@@ -851,6 +871,11 @@ export class BsAgentManager {
   setModel(agentId: string, provider: string, model: string): void {
     const agent = this.agents.get(agentId)
     if (!agent) return
+    const current = this.assignments.get(agentId)
+    if (current?.quotaPoolId && (current.providerId !== provider
+      || quotaPoolForModel({ id: current.accountId ?? '', providerId: provider }, model) !== current.quotaPoolId)) {
+      throw new Error('[bs] Choose a model within this agent quota. Change the quota in Settings → Agents.')
+    }
     const connection = this.deps.providerAccounts?.().find(item => item.providerId === provider)
     if (connection) {
       this.setAgentAssignmentSnapshot({ agentId, providerId: provider, accountId: agent.accountId ?? connection.activeAccountId ?? undefined, modelId: model, speed: agent.speed ?? 'standard' })
@@ -962,13 +987,12 @@ export class BsAgentManager {
   setSpeed(agentId: string, speed: 'standard' | 'fast'): void {
     const agent = this.agents.get(agentId)
     if (!agent) return
-    agent.speed = speed
     const current = this.assignments.get(agentId)
     if (current) {
-      const assignment = this.assignments.set({ ...current, speed })
-      this.syncProfileAssignment(assignment)
+      const assignment = this.commitProfileAssignment({ ...current, speed })
       this.deps.onAssignmentChanged?.(assignment)
     }
+    agent.speed = speed
     this.agents.set(agentId, agent)
     this.runners.delete(agentId)
     this.resolved.delete(agentId)
@@ -978,9 +1002,14 @@ export class BsAgentManager {
   setProfile(agentId: string, profileName: string): void {
     const agent = this.agents.get(agentId)
     if (!agent) return
+    if (this.isRunning(agent.id)) throw new Error('[bs] Agent profile is locked while running.')
+    if ([...this.agents.values()].some(other => other.id !== agent.id && other.cwd === agent.cwd && other.name === profileName)) {
+      throw new Error(`[bs] Agent profile ${profileName} already exists in this project.`)
+    }
     const cfg = loadBsConfig(this.deps.configPath)
     const profile = cfg.agents[profileName]
     if (!profile) return
+    const previous = { ...agent }
     agent.name = profileName
     agent.model = profile.provider && profile.model ? `${profile.provider}/${profile.model}` : undefined
     agent.accountId = profile.accountId
@@ -989,13 +1018,18 @@ export class BsAgentManager {
     if (profile.provider && profile.model) {
       const connection = this.deps.providerAccounts?.().find(item => item.providerId === profile.provider)
       if (connection) {
-        this.setAgentAssignmentSnapshot({ agentId, providerId: profile.provider, accountId: profile.accountId, modelId: profile.model, speed: agent.speed })
+        try {
+          this.setAgentAssignmentSnapshot({ agentId, providerId: profile.provider, accountId: profile.accountId, quotaPoolId: profile.quotaPoolId, modelId: profile.model, speed: agent.speed })
+        } catch (error) {
+          Object.assign(agent, previous)
+          this.agents.set(agent.id, agent)
+          throw error
+        }
         return
       }
       this.persistAssignment(agentId, profile.provider, profile.model, profile.accountId, agent.speed)
     } else if (profile.provider) {
-      const assignment = this.assignments.set({ agentId, profileName, providerId: profile.provider, accountId: profile.accountId, modelId: '', speed: agent.speed, status: 'needs-review' })
-      this.syncProfileAssignment(assignment)
+      const assignment = this.commitProfileAssignment({ agentId, profileName, providerId: profile.provider, accountId: profile.accountId, quotaPoolId: profile.quotaPoolId, modelId: '', speed: agent.speed, status: 'needs-review' })
       this.deps.onAssignmentChanged?.(assignment)
     }
     this.runners.delete(agentId)
@@ -1006,8 +1040,14 @@ export class BsAgentManager {
   setAccount(agentId: string, accountId: string | null): void {
     const agent = this.agents.get(agentId)
     if (!agent) return
-    agent.accountId = accountId || undefined
     const current = this.assignments.get(agentId)
+    if (current?.quotaPoolId) {
+      if (!accountId) throw new Error('[bs] Choose an account quota in Settings → Agents.')
+      this.setAgentAssignmentSnapshot({ agentId, providerId: current.providerId, accountId, modelId: current.modelId, quotaPoolId: current.quotaPoolId, speed: current.speed })
+      return
+    }
+    if (this.isRunning(agent.id)) throw new Error('[bs] Account is locked while the agent is running.')
+    agent.accountId = accountId || undefined
     if (current) this.persistAssignment(agentId, current.providerId, current.modelId, agent.accountId, current.speed)
     this.agents.set(agentId, agent)
     this.runners.delete(agentId)
@@ -1033,6 +1073,7 @@ export class BsAgentManager {
   }
 
   revalidateAssignments(): void {
+    this.reconcileQuotaBindings([...this.agents.values()])
     for (const assignment of Object.values(this.assignments.load())) {
       if (assignment.status !== 'ready') continue
       const connection = this.deps.providerAccounts?.().find(item => item.providerId === assignment.providerId)
@@ -1054,21 +1095,47 @@ export class BsAgentManager {
   setAgentAssignmentSnapshot(request: AgentAssignmentSetRequest): AgentAssignmentSnapshot {
     const agent = this.agents.get(request.agentId)
     if (!agent) throw new Error('[bs] Agent không tồn tại')
+    if (this.isRunning(agent.id)) throw new Error('[bs] Model and quota are locked while the agent is running.')
     const connection = this.deps.providerAccounts?.().find(item => item.providerId === request.providerId)
     const account = request.accountId ? connection?.accounts.find(item => item.id === request.accountId && item.status === 'active') : connection?.accounts.find(item => item.status === 'active')
     const models = account?.models ?? connection?.accounts.filter(item => item.status === 'active').flatMap(item => item.models ?? [])
+    const previous = this.assignments.get(agent.id)
+    if (previous?.quotaPoolId && !request.quotaPoolId && (previous.providerId !== request.providerId
+      || previous.accountId !== account?.id
+      || previous.quotaPoolId !== quotaPoolForModel(account ?? { id: '', providerId: request.providerId }, request.modelId))) {
+      throw new Error('[bs] Model selection must stay within this agent quota.')
+    }
     if (!connection || (request.accountId && !account) || !models?.includes(request.modelId)) {
-      const assignment = this.assignments.set({ ...request, profileName: agent.name, status: 'needs-review' })
-      this.syncProfileAssignment(assignment)
+      if (previous?.status === 'ready' && previous.quotaPoolId) throw new Error('[bs] Model or account is unavailable. The current assignment was kept.')
+      const assignment = this.commitProfileAssignment({ ...request, profileName: agent.name, status: 'needs-review' })
       this.deps.onAssignmentChanged?.(assignment)
       return assignment
     }
+    const quotaPoolId = request.quotaPoolId ?? quotaPoolForModel(account!, request.modelId)
+    const binding = { name: agent.name, provider: request.providerId, accountId: account?.id, model: request.modelId, quotaPoolId }
+    if (!quotaPoolId || !modelsForAgentQuota(binding, [account!]).includes(request.modelId)) {
+      throw new Error('[bs] This model does not belong to the selected quota.')
+    }
+    const cfg = loadBsConfig(this.deps.configPath)
+    const bindings = [
+      ...Object.entries(cfg.agents).filter(([name]) => name !== agent.name).map(([name, profile]) => ({ name, ...profile })),
+      ...Object.values(this.assignments.load()).filter(item => item.agentId !== agent.id && item.profileName !== agent.name && item.status === 'ready')
+        .map(item => ({ name: item.profileName ?? item.agentId, provider: item.providerId, accountId: item.accountId, quotaPoolId: item.quotaPoolId, model: item.modelId })),
+      binding
+    ]
+    const conflict = agentQuotaConflicts(bindings, this.quotaAccounts()).find(item => item.agentNames.includes(agent.name))
+    if (conflict) throw new Error(`[bs] Quota is already assigned to ${conflict.agentNames.filter(name => name !== agent.name).join(', ')}.`)
+    const duplicate = [...this.agents.values()].find(other => other.id !== agent.id && other.cwd === agent.cwd
+      && this.assignments.get(other.id)?.status === 'ready'
+      && this.assignments.get(other.id)?.providerId === request.providerId
+      && this.assignments.get(other.id)?.accountId === account?.id
+      && this.assignments.get(other.id)?.quotaPoolId === quotaPoolId)
+    if (duplicate) throw new Error(`[bs] Quota is already assigned to ${duplicate.name}.`)
+    const assignment = this.commitProfileAssignment({ ...request, quotaPoolId, profileName: agent.name, accountId: account?.id, status: 'ready' })
     agent.model = `${request.providerId}/${request.modelId}`
     agent.accountId = account?.id
     agent.speed = request.speed
     this.agents.set(agent.id, agent)
-    const assignment = this.assignments.set({ ...request, profileName: agent.name, accountId: account?.id, status: 'ready' })
-    this.syncProfileAssignment(assignment)
     this.runners.delete(agent.id)
     this.resolved.delete(agent.id)
     this.register(agent)
@@ -1188,7 +1255,13 @@ export class BsAgentManager {
   }
 
   getSettings(): BsSettings {
-    return configToSettings(loadBsConfig(this.deps.configPath))
+    const settings = configToSettings(loadBsConfig(this.deps.configPath))
+    const assignments = Object.values(this.assignments.load())
+    settings.agents = settings.agents.map(profile => {
+      const assignment = assignments.find(item => item.profileName === profile.name && item.providerId && item.modelId)
+      return assignment ? { ...profile, provider: profile.provider ?? assignment.providerId, accountId: profile.accountId ?? assignment.accountId, model: profile.model ?? assignment.modelId, quotaPoolId: profile.quotaPoolId ?? assignment.quotaPoolId, speed: profile.speed ?? assignment.speed } : profile
+    })
+    return settings
   }
 
   getMcpStatus(): McpServerStatus[] {
@@ -1270,13 +1343,59 @@ export class BsAgentManager {
 
   async saveSettings(settings: BsSettings): Promise<BsSettings> {
     const current = loadBsConfig(this.deps.configPath)
+    const originalSource = existsSync(this.deps.configPath) ? readFileSync(this.deps.configPath, 'utf8') : null
     const cfg = settingsToConfig(settings, current)
+    const runtimeChanged = JSON.stringify({ ...cfg, quickMessages: undefined }) !== JSON.stringify({ ...current, quickMessages: undefined })
+    if (!runtimeChanged) {
+      writeBsConfig(this.deps.configPath, cfg)
+      return configToSettings(cfg)
+    }
+    if ([...this.agents.values()].some(agent => this.isRunning(agent.id))) {
+      throw new Error('[bs] Stop running agents before saving settings.')
+    }
+    const accounts = this.quotaAccounts()
+    const profiles = Object.entries(cfg.agents).map(([name, profile]) => ({ name, ...profile }))
+    const conflict = agentQuotaConflicts(profiles, accounts)[0]
+    if (conflict) throw new Error(`[bs] One agent per quota: ${conflict.agentNames.join(', ')} share the same account quota.`)
+    for (const profile of profiles) {
+      if (!profile.provider && !profile.accountId && !profile.quotaPoolId) continue
+      const account = accounts.find(item => item.providerId === profile.provider && item.id === profile.accountId)
+      const connection = this.deps.providerAccounts?.().find(item => item.providerId === profile.provider)
+      if (connection && (!profile.accountId || !boundQuotaPool(profile, account ?? { id: profile.accountId, providerId: profile.provider ?? '' }))) {
+        throw new Error(`[bs] Select an account and quota for ${profile.name} before saving.`)
+      }
+      if (!profile.quotaPoolId) continue
+      const allowed = modelsForAgentQuota(profile, accounts)
+      if (!allowed.length) throw new Error(`[bs] No models available for ${profile.name}'s quota. Select an active account and quota.`)
+      if (!profile.model || !allowed.includes(profile.model)) profile.model = cfg.agents[profile.name].model = allowed[0]
+    }
+    const updates: Array<Omit<AgentAssignmentSnapshot, 'revision'>> = []
+    const removals: string[] = []
+    for (const agent of this.agents.values()) {
+      const profile = cfg.agents[agent.name]
+      if (!profile) {
+        removals.push(agent.id)
+        continue
+      }
+      const account = accounts.find(item => item.providerId === profile.provider && item.id === profile.accountId)
+      if (!profile.provider || !profile.model) {
+        removals.push(agent.id)
+        continue
+      }
+      updates.push({ agentId: agent.id, profileName: agent.name, providerId: profile.provider, accountId: profile.accountId, modelId: profile.model, quotaPoolId: account ? boundQuotaPool(profile, account) : profile.quotaPoolId, speed: profile.speed ?? 'standard', status: account || cfg.provider[profile.provider]?.models.includes(profile.model) ? 'ready' : 'needs-review' })
+    }
     writeBsConfig(this.deps.configPath, cfg)
+    let committed: AgentAssignmentSnapshot[]
+    try { committed = this.assignments.batch(updates, removals) }
+    catch (error) { this.restoreConfigSource(originalSource); throw error }
     this.deps = { ...this.deps, notifications: cfg.notifications }
     for (const agent of this.agents.values()) {
       const profile = cfg.agents[agent.name]
-      if (profile?.provider && profile.model) this.setAgentAssignmentSnapshot({ agentId: agent.id, providerId: profile.provider, accountId: profile.accountId, modelId: profile.model, speed: profile.speed ?? 'standard' })
+      agent.model = profile?.provider && profile.model ? `${profile.provider}/${profile.model}` : undefined
+      agent.accountId = profile?.accountId
+      agent.speed = profile?.speed ?? 'standard'
     }
+    for (const assignment of committed) this.deps.onAssignmentChanged?.(assignment)
     await this.reload()
     return configToSettings(cfg)
   }
@@ -1373,6 +1492,7 @@ export class BsAgentManager {
   }
 
   private register(agent: AgentConfig, force = false): void {
+    if (this.removedAgents.has(agent.id)) return
     this.agents.set(agent.id, agent)
     if (agent.background !== undefined) this.backgrounds.set(agent.id, agent.background)
     if (this.runners.has(agent.id)) {
@@ -1627,6 +1747,7 @@ export class BsAgentManager {
     if (agent?.accountId) resolved.accountId = agent.accountId
     if (resolved.provider) {
       const connection = this.deps.providerAccounts?.().find(c => c.providerId === resolved.provider)
+      if (connection && !storedAssignment) return { ...resolved, model: '', accountId: undefined, apiKey: null }
       if (resolved.accountId) {
         const selected = connection?.accounts.find(account => account.id === resolved.accountId && account.status === 'active' && account.models?.includes(resolved.model))
         if (!selected) {
@@ -1642,25 +1763,58 @@ export class BsAgentManager {
   }
 
   private persistAssignment(agentId: string, providerId: string, modelId: string, accountId?: string, speed: 'standard' | 'fast' = 'standard'): void {
-    const assignment = this.assignments.set({ agentId, profileName: this.agents.get(agentId)?.name, providerId, modelId, accountId, speed, status: 'ready' })
-    this.syncProfileAssignment(assignment)
+    const assignment = this.commitProfileAssignment({ agentId, profileName: this.agents.get(agentId)?.name, providerId, modelId, accountId, speed, status: 'ready' })
     this.deps.onAssignmentChanged?.(assignment)
   }
 
-  private syncProfileAssignment(assignment: AgentAssignmentSnapshot): void {
+  private commitProfileAssignment(assignment: Omit<AgentAssignmentSnapshot, 'revision'> & { revision?: number }): AgentAssignmentSnapshot {
     const profileName = assignment.profileName ?? this.agents.get(assignment.agentId)?.name
-    if (!profileName) return
+    if (!profileName) return this.assignments.set(assignment)
     const cfg = loadBsConfig(this.deps.configPath)
     const profile = cfg.agents[profileName]
-    if (!profile) return
+    if (!profile) return this.assignments.set(assignment)
+    const originalSource = existsSync(this.deps.configPath) ? readFileSync(this.deps.configPath, 'utf8') : null
     cfg.agents[profileName] = {
       ...profile,
       provider: assignment.providerId || undefined,
       model: assignment.modelId || undefined,
       accountId: assignment.accountId,
+      quotaPoolId: assignment.quotaPoolId,
       speed: assignment.speed
     }
     writeBsConfig(this.deps.configPath, cfg)
+    try { return this.assignments.set(assignment) }
+    catch (error) { this.restoreConfigSource(originalSource); throw error }
+  }
+
+  private restoreConfigSource(source: string | null): void {
+    if (source === null) { if (existsSync(this.deps.configPath)) unlinkSync(this.deps.configPath) }
+    else writeBsConfigText(this.deps.configPath, source)
+  }
+
+  private quotaAccounts(): QuotaAccount[] {
+    return this.deps.providerAccounts?.().flatMap(connection => connection.accounts.filter(account => account.status === 'active')) ?? []
+  }
+
+  private reconcileQuotaBindings(agents: AgentConfig[]): void {
+    const accounts = this.quotaAccounts()
+    const occupied = new Map<string, string>()
+    for (const agent of agents) {
+      const assignment = this.assignments.get(agent.id)
+      if (!assignment || assignment.status !== 'ready') continue
+      const account = accounts.find(item => item.providerId === assignment.providerId
+        && (assignment.accountId ? item.id === assignment.accountId : item.models?.some(model => (typeof model === 'string' ? model : model.id) === assignment.modelId)))
+      if (!account) continue
+      const quotaPoolId = assignment.quotaPoolId ?? quotaPoolForModel(account, assignment.modelId)
+      const binding = { provider: assignment.providerId, accountId: account.id, model: assignment.modelId, quotaPoolId }
+      const key = `${account.providerId}/${account.id}/${quotaPoolId}`
+      const owner = occupied.get(key)
+      const status = !modelsForAgentQuota(binding, [account]).includes(assignment.modelId) || (owner && owner !== agent.name) ? 'needs-review' : 'ready'
+      if (status === 'ready') occupied.set(key, agent.name)
+      if (assignment.quotaPoolId === quotaPoolId && assignment.accountId === account.id && assignment.status === status) continue
+      const next = this.assignments.set({ ...assignment, quotaPoolId, accountId: account.id, status })
+      this.deps.onAssignmentChanged?.(next)
+    }
   }
 
   private materializeConnectedProviders(cfg: BsConfig): BsConfig {

@@ -41,14 +41,14 @@ describe('Agents settings table', () => {
     expect(html).toContain('<th scope="col">Name</th>')
     expect(html).toContain('<th scope="col">Provider</th>')
     expect(html).toContain('<th scope="col">Account</th>')
-    expect(html).toContain('<th scope="col">Model</th>')
+    expect(html).toContain('<th scope="col">Quota</th>')
     expect(html).toContain('<th scope="col">Mode</th>')
     expect((html.match(/class="agent-table-row"/g) ?? [])).toHaveLength(2)
     expect(html).not.toContain('default prompt must stay out of the table')
     expect(html).not.toContain('review prompt must stay out of the table')
   })
 
-  it('exposes labelled icon actions and protects the default Agent', () => {
+  it('allows deleting every agent including bs', () => {
     const html = renderToStaticMarkup(
       <AgentsTab
         agents={agents}
@@ -61,7 +61,7 @@ describe('Agents settings table', () => {
     expect(html).toContain('aria-label="Delete bs"')
     expect(html).toContain('aria-label="Edit system prompt for reviewer"')
     expect(html).toContain('aria-label="Delete reviewer"')
-    expect(html).toMatch(/aria-label="Delete bs"[^>]*disabled=""/)
+    expect(html).not.toMatch(/aria-label="Delete bs"[^>]*disabled=""/)
   })
 
   it('renders the system prompt only inside the dedicated edit modal', () => {

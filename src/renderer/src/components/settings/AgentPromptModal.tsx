@@ -22,7 +22,7 @@ export default function AgentPromptModal({ agent, onClose, onSave }: Props) {
         <label className="label" htmlFor={`agent-prompt-${agent.name}`}>System prompt</label>
         <textarea
           id={`agent-prompt-${agent.name}`}
-          className="input agents-prompt"
+          className="input agents-prompt resize-none"
           value={systemPrompt}
           onChange={event => setSystemPrompt(event.target.value)}
           autoFocus

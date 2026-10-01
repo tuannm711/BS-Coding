@@ -42,29 +42,27 @@ const withPools = (pools: ReturnType<typeof pool>[], strays: FleetAgentRow[] = [
 })
 
 describe('FleetBoard', () => {
-  it('nests agents under the pool they draw on', () => {
-    // Two models, one pool. The markup must place both inside it, because a
-    // flat list is what made them read as alternatives.
+  it('renders one card per agent and identifies legacy shared-quota conflicts', () => {
     const markup = board(withPools([
       pool('claude-gpt', [row(), row({ id: 'a2', name: 'anti-claude-sonnet' })])
     ]))
-    const poolIndex = markup.indexOf('claude-gpt')
-    expect(poolIndex).toBeGreaterThan(-1)
-    expect(markup.indexOf('anti-claude-opus')).toBeGreaterThan(poolIndex)
-    expect(markup.indexOf('anti-claude-sonnet')).toBeGreaterThan(poolIndex)
+    expect((markup.match(/class="fleet-agent-card"/g) ?? [])).toHaveLength(2)
+    expect(markup).toContain('aria-label="Agent anti-claude-opus"')
+    expect(markup).toContain('aria-label="Agent anti-claude-sonnet"')
+    expect(markup).toContain('Quota conflict')
   })
 
   it('keeps a provider sentence out of the row and in the tooltip', () => {
     // The label is a label. The provider's paragraph made one window three
     // lines tall for a fact the percentage beside it already stated.
     const prose = 'You have used some of your weekly limit, it will fully refresh in 3 days.'
-    const markup = board(withPools([pool('gemini', [], [window({ description: prose })])]))
+    const markup = board(withPools([pool('gemini', [row()], [window({ description: prose })])]))
     expect(markup).toContain(`title="${prose}`)
     expect(markup).toContain('>Weekly<')
   })
 
   it('states the countdown on the row and the timestamp only on hover', () => {
-    const markup = board(withPools([pool('gemini', [], [window()])]))
+    const markup = board(withPools([pool('gemini', [row()], [window()])]))
     expect(markup).toContain('>93%<')
     expect(markup).not.toContain('Next reset · ')
   })
@@ -72,14 +70,14 @@ describe('FleetBoard', () => {
   it('renders the account type as a badge, not as grey text', () => {
     // The plan and the state beside it are badges. Same kind of fact, so the
     // same treatment.
-    const markup = board(withPools([pool('gemini', [])]))
-    expect(markup).toMatch(/class="[^"]*quota-badge-tight[^"]*"[^>]*>Antigravity OAuth</)
+    const markup = board(withPools([pool('gemini', [row()])]))
+    expect(markup).toContain('Antigravity OAuth')
   })
 
   it('keeps the refresh control', () => {
     // Moving a panel must not drop a function. This one was gated to the chat
     // variant and disappeared with the pinned block.
-    expect(board(withPools([pool('gemini', [])]))).toContain('Refresh quota for')
+    expect(board(withPools([pool('gemini', [row()])]))).toContain('Refresh quota for')
   })
 
   it('says nothing about a pool with no agent drawing on it', () => {

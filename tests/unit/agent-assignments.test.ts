@@ -2,6 +2,14 @@ import { describe, expect, it } from 'vitest'
 import { AssignmentStore } from '../../src/main/agent/assignments'
 
 describe('assignment store', () => {
+  it('does not change in-memory ownership after a failed persistence write', () => {
+    let fail = false
+    const store = new AssignmentStore({ load: () => null, save: () => { if (fail) throw new Error('disk denied') } })
+    const first = store.set({ agentId: 'a1', providerId: 'openai', accountId: 'one', modelId: 'gpt-a', speed: 'standard' })
+    fail = true
+    expect(() => store.set({ ...first, accountId: 'two' })).toThrow('disk denied')
+    expect(store.get('a1')).toEqual(first)
+  })
   it('persists exact model/account/speed and increments revision', () => {
     const data: Record<string, unknown> = {}
     const store = new AssignmentStore({ load: () => data.value, save: value => { data.value = value } })

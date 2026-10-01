@@ -23,6 +23,26 @@ beforeEach(() => {
 afterEach(() => rmSync(dir, { recursive: true, force: true }))
 
 describe('loadBsConfig', () => {
+  it('does not recreate bs after saving a custom-only or empty agent list', () => {
+    const settings = configToSettings(loadBsConfig(file))
+    for (const agents of [[{ name: 'custom', systemPrompt: 'Custom prompt' }], []]) {
+      writeBsConfig(file, settingsToConfig({ ...settings, agents }))
+      expect(configToSettings(loadBsConfig(file)).agents.map(({ name, systemPrompt }) => ({ name, systemPrompt }))).toEqual(agents)
+    }
+  })
+
+  it('persists quick message buttons across settings conversion and reload', () => {
+    const quickMessages = [{ id: 'continue', name: 'Continue', message: 'Continue with the next task.\nRun tests.' }]
+    const settings = { ...configToSettings(loadBsConfig(file)), quickMessages }
+    writeBsConfig(file, settingsToConfig(settings))
+    expect(configToSettings(loadBsConfig(file))).toMatchObject({ quickMessages })
+  })
+
+  it('resolves a missing profile safely when the agent list is empty', () => {
+    const cfg = { ...loadBsConfig(file), agents: {} }
+    expect(resolveAgentConfig(cfg, 'removed', {}).systemPrompt).toBeTruthy()
+  })
+
   it('returns an isolated default agent map for each load', () => {
     const first = loadBsConfig(path.join(dir, 'first-missing.json'))
     first.agents.bs = {

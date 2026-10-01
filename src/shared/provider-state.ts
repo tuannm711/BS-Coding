@@ -50,6 +50,7 @@ export interface AgentAssignmentSnapshot {
   profileName?: string
   providerId: string
   accountId?: string
+  quotaPoolId?: string
   modelId: string
   speed: 'standard' | 'fast'
   revision: number
@@ -60,6 +61,7 @@ export interface AgentAssignmentSetRequest {
   agentId: string
   providerId: string
   accountId?: string
+  quotaPoolId?: string
   modelId: string
   speed: 'standard' | 'fast'
 }

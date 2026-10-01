@@ -19,8 +19,10 @@ describe('workspace Agent reconciliation', () => {
     expect(current.map(agent => agent.id)).toEqual(['bs-id', 'old-id', 'pty-id'])
   })
 
-  it('always retains bs and rejects duplicate desired names', () => {
-    expect(planNativeAgentReconciliation(current, ['reviewer']).remove).not.toContain('bs-id')
+  it('removes bs like any other profile and rejects duplicate desired names', () => {
+    expect(planNativeAgentReconciliation(current, ['reviewer'])).toEqual({ add: ['reviewer'], remove: ['bs-id', 'old-id'] })
+    expect(planNativeAgentReconciliation(current, [])).toEqual({ add: [], remove: ['bs-id', 'old-id'] })
+    expect(planNativeAgentReconciliation([], [])).toEqual({ add: [], remove: [] })
     expect(() => planNativeAgentReconciliation(current, ['bs', 'reviewer', 'reviewer'])).toThrow('Duplicate Agent profile name: reviewer')
   })
 
