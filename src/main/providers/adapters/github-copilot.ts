@@ -1,11 +1,9 @@
 import type { ProviderAdapter } from '../types'
 import type { ProviderSecrets } from '../../connections/types'
-import type { ProviderConnectRequest } from '../../../shared/providers'
 import { createLlm } from '../../agent/llm'
 import { normalizeProviderImport } from '../auth/import-normalizer'
 import {
-  completeGitHubCopilotAuthorization,
-  githubCopilotAuthorizeUrl,
+  startGitHubCopilotDeviceAuthorization,
   refreshGitHubCopilotCredentials
 } from '../auth/github-copilot-oauth'
 
@@ -34,26 +32,26 @@ export function createGitHubCopilotAdapter(): ProviderAdapter {
       chatTransport: 'openai-compatible'
     },
     authorization: {
+      kind: 'device',
       methodId: 'oauth',
-      callback: { port: 0, path: '/callback', timeoutMs: 300_000 },
-      build({ pkce, callbackUrl }) {
-        const localCallback = new URL(callbackUrl)
-        localCallback.searchParams.set('nonce', pkce.state)
-        const expectedState = localCallback.toString()
-        return { authUrl: githubCopilotAuthorizeUrl(pkce, expectedState), expectedState }
-      },
-      async complete({ code, verifier }) {
-        const result = await completeGitHubCopilotAuthorization(code, verifier)
+      async start({ signal }) {
+        const device = await startGitHubCopilotDeviceAuthorization(signal)
         return {
-          account: {
-            providerId: 'github-copilot',
-            label: result.profile.email ?? result.profile.login,
-            authMode: 'oauth',
-            status: 'active',
-            profile: { email: result.profile.email, name: result.profile.name ?? result.profile.login, planName: result.secrets.planName },
-            oauthExpiresAt: result.secrets.expiresAt
+          ...device,
+          async complete() {
+            const result = await device.complete()
+            return {
+              account: {
+                providerId: 'github-copilot',
+                label: result.profile.email ?? result.profile.login,
+                authMode: 'oauth',
+                status: 'active',
+                profile: { email: result.profile.email, name: result.profile.name ?? result.profile.login, planName: result.secrets.planName },
+                oauthExpiresAt: result.secrets.expiresAt
+              },
+              secrets: result.secrets
+            }
           },
-          secrets: result.secrets
         }
       }
     },

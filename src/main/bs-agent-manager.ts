@@ -443,8 +443,7 @@ export class BsAgentManager {
     const existing = this.coordinator.state(sessionId)
     if (existing) {
       if (existing.queue.length >= this.MAX_QUEUE) {
-        this.emit({ type: 'error', agentId: existing.agentId, message: '[bs] Hàng đợi đã đầy (tối đa 5 tin).' })
-        return
+        throw new Error('[bs] Hàng đợi đã đầy (tối đa 5 tin). Hãy chờ agent tiếp nhận hoặc xóa tin đang chờ.')
       }
       this.coordinator.enqueue(sessionId, { id: randomUUID(), agentId: existing.agentId, text, images, displayText })
       this.emitSessionQueue(sessionId)
@@ -1700,6 +1699,12 @@ export class BsAgentManager {
           : tool)
       },
       takeSteers: () => {
+        const sessionId = this.sessionForWrite(agent.id)
+        if (this.coordinator.state(sessionId)) {
+          const steers = this.coordinator.takeSteers(sessionId)
+          if (steers.length > 0) this.emitSessionQueue(sessionId)
+          return steers.map(message => ({ ...message, text: referenceHints(agent.cwd, message.text), displayText: message.displayText ?? message.text }))
+        }
         const q = this.queues.get(agent.id)
         if (!q || q.length === 0) return []
         const { steers, keep } = partitionSteers(q)

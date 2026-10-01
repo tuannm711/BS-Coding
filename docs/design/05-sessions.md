@@ -10,8 +10,8 @@ produces these records is in `docs/design/02-agent-runtime.md`.
 | [Pieces](#pieces) | 17-28 | `src/main/agent/session.ts`, `SessionStore`, `sessions.json`, `src/main/agent/shared-session-coordinator.ts`, `SharedSessionCoordinator`, `src/main/agent/snapshot.ts` |
 | [Data flow](#data-flow) | 29-49 | `appendMessage`, `appendTool`, `turnId`, `SharedSessionCoordinator`, `SessionExecutionState`, `SnapshotStore.snapshot` |
 | [Types that carry it](#types-that-carry-it) | 50-65 | `StoredSession`, `ChatTranscriptItem[]`, `turnId`, `SnapshotTurn`, `SnapshotFile[]`, `SessionExecutionState` |
-| [Design decisions](#design-decisions) | 66-99 | `undoTurn`, `pushTurn`, `undoCall`, `JsonStore`, `TruncationStore` |
-| [Known limits](#known-limits) | 100-107 | `undoCall`, `ArtifactStore` |
+| [Design decisions](#design-decisions) | 66-101 | `takeSteers(sessionId)`, `undoTurn`, `pushTurn`, `undoCall`, `JsonStore`, `TruncationStore` |
+| [Known limits](#known-limits) | 102-109 | `undoCall`, `ArtifactStore` |
 <!-- /toc -->
 
 ## Pieces
@@ -33,10 +33,10 @@ and `appendTool`. Items carry a `turnId`, which is what makes a turn addressable
 afterwards — for undo, for revert, and for rebuilding the prompt.
 
 **Sharing a session.** `SharedSessionCoordinator` keys a `SessionExecutionState`
-per project: the session and agent currently running, the `turnId`, a `locked`
-flag, and a `queue`. A second agent asked to act on a locked session queues its
-message instead of interleaving. When the turn finishes the lock releases and the
-queue drains.
+per session: the project and agent currently running, the `turnId`, a `locked`
+flag, and a `queue`. Human guidance sent to a locked session targets its current
+executing agent and is accepted at the next step. The agent selector stays
+locked while that execution runs. When the turn finishes the lock releases.
 
 **Undo.** Before a tool writes to a file, `SnapshotStore.snapshot` records the
 original content under the current turn. `undo` restores every file that turn
@@ -70,11 +70,13 @@ coordinator locks per project rather than per agent. Two agents writing into one
 transcript concurrently would produce a record that neither the model nor a human
 could read in order. Queueing preserves the order and loses nothing.
 
-**Queued messages wait at the coordinator, not in the loop.** The turn loop has
-its own steering queue drained at step boundaries. That one carries messages for
-the turn already running; this one carries messages for a turn that has not
-started. Keeping them separate is what lets a steer arrive mid-turn while a
-second agent's request waits its turn.
+**Human messages steer the running session.** The shared-session coordinator owns
+the pending queue and `takeSteers(sessionId)` atomically removes only unassigned
+messages for the bound session, preserving FIFO order. The loop accepts them at
+the next provider-step boundary, including after a final text-only response,
+and continues under the same execution identity. Pending edit/remove and the
+five-message limit remain. A rejected sixth message does not fail the active
+execution. Delegated assignments remain separate turns in the legacy agent queue.
 
 **Snapshots are per turn, not per edit.** A turn is the unit a user thinks in —
 "undo what it just did" — and it is also the unit the transcript is keyed by.

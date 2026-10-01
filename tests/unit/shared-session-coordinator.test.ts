@@ -16,6 +16,22 @@ const agents: AgentConfig[] = [
 ]
 
 describe('SharedSessionCoordinator', () => {
+  it('takes only human steering from the requested session in FIFO order', () => {
+    const store = new SessionStore(memoryStore())
+    const first = store.createProject('C:/project', 'bs-id')
+    const second = store.createProject('C:/project', 'reviewer-id')
+    const coordinator = new SharedSessionCoordinator(store)
+    coordinator.acquire('C:/project', first.id, 'bs-id')
+    coordinator.acquire('C:/project', second.id, 'reviewer-id')
+    coordinator.enqueue(first.id, { id: 'a', agentId: 'bs-id', text: 'first', images: [{ id: 'image', name: 'pic', mimeType: 'image/png', dataUrl: 'data:image/png;base64,abc', size: 3 }] })
+    coordinator.enqueue(first.id, { id: 'b', agentId: 'bs-id', text: 'delegated', assigned: true })
+    coordinator.enqueue(first.id, { id: 'c', agentId: 'bs-id', text: 'last', displayText: '/command' })
+    coordinator.enqueue(second.id, { id: 'd', agentId: 'reviewer-id', text: 'other' })
+    expect(coordinator.takeSteers(first.id).map(message => message.id)).toEqual(['a', 'c'])
+    expect(coordinator.takeSteers(first.id)).toEqual([])
+    expect(coordinator.state(first.id)?.queue.map(m => m.id)).toEqual(['b'])
+    expect(coordinator.state(second.id)?.queue.map(m => m.id)).toEqual(['d'])
+  })
   it('uses deterministic native Agent fallback and persists valid selection', () => {
     const store = new SessionStore(memoryStore())
     const session = store.createProject('C:/project', 'missing')

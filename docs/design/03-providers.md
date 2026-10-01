@@ -9,12 +9,12 @@ presentation.
 | Section | Lines | Names |
 | --- | --- | --- |
 | [Pieces](#pieces) | 20-38 | `src/main/providers/types.ts`, `ProviderAdapter`, `src/main/providers/registry.ts`, `src/main/providers/adapters/openai.ts`, `src/main/providers/adapters/antigravity.ts`, `src/main/providers/adapters/github-copilot.ts` |
-| [Data flow](#data-flow) | 39-61 | `ProviderManager.connect`, `ProviderAuthorizationStrategy`, `MainApp.startUsagePoll`, `ProviderManager.refreshUsage`, `adapter.refreshCredentials`, `adapter.fetchUsage` |
-| [Types that carry it](#types-that-carry-it) | 62-82 | `ProviderAdapter`, `refreshAccount`, `listModels`, `createRuntime`, `refreshCredentials`, `recoverRuntimeContext` |
-| [Design decisions](#design-decisions) | 83-127 | `ProviderUsage.status`, `'near-limit'`, `docs/technical-debt.md`, `primaryUsedPercent`, `providerError`, `hasRemainingQuota` |
-| [Choosing a replacement when a pool is refused](#choosing-a-replacement-when-a-pool-is-refused) | 128-129 |  |
-| &nbsp;&nbsp;[Agent quota reservations](#agent-quota-reservations) | 130-165 | `src/shared/agent-quota-binding.ts`, `quotaPoolId`, `rankFallbackAgents`, `src/shared/agent-fallback.ts`, `poolState`, `SessionRunner` |
-| [Known limits](#known-limits) | 166-176 | `openai.ts`, `antigravity.ts`, `fetchUsage`, `poolErrors` |
+| [Data flow](#data-flow) | 39-67 | `ProviderManager.createAuthorization`, `ProviderAuthorizationStrategy`, `slow_down`, `MainApp.startUsagePoll`, `ProviderManager.refreshUsage`, `adapter.refreshCredentials` |
+| [Types that carry it](#types-that-carry-it) | 68-88 | `ProviderAdapter`, `refreshAccount`, `listModels`, `createRuntime`, `refreshCredentials`, `recoverRuntimeContext` |
+| [Design decisions](#design-decisions) | 89-133 | `ProviderUsage.status`, `'near-limit'`, `docs/technical-debt.md`, `primaryUsedPercent`, `providerError`, `hasRemainingQuota` |
+| [Choosing a replacement when a pool is refused](#choosing-a-replacement-when-a-pool-is-refused) | 134-135 |  |
+| &nbsp;&nbsp;[Agent quota reservations](#agent-quota-reservations) | 136-171 | `src/shared/agent-quota-binding.ts`, `quotaPoolId`, `rankFallbackAgents`, `src/shared/agent-fallback.ts`, `poolState`, `SessionRunner` |
+| [Known limits](#known-limits) | 172-182 | `openai.ts`, `antigravity.ts`, `fetchUsage`, `poolErrors` |
 <!-- /toc -->
 
 ## Pieces
@@ -38,10 +38,16 @@ presentation.
 
 ## Data flow
 
-**Connecting.** `ProviderManager.connect` asks the adapter's
-`ProviderAuthorizationStrategy` to `build` an authorization URL with PKCE,
-listens on the loopback callback port, then `complete`s the exchange. The account
-lands in the store and the secrets in the vault, encrypted.
+**Connecting.** `ProviderManager.createAuthorization` dispatches the adapter's
+`ProviderAuthorizationStrategy`. Callback strategies build an authorization URL
+with PKCE, listen on loopback, and complete the code exchange. GitHub Copilot uses
+the device variant: request a grant, expose its user code and verification URL,
+and poll at the provider's interval. `slow_down` increases that interval. Cancel,
+expiry and app shutdown abort waits/requests and prevent late account persistence.
+Only the user code crosses IPC; the private device grant remains inside the
+completion closure. Profile and Copilot entitlement must succeed before account
+connection. Failed/cancelled reconnect rolls back existing account and secrets.
+The account lands in the store and secrets in the encrypted vault.
 
 **Refreshing usage.** `MainApp.startUsagePoll` runs every five minutes, and a
 debounced refresh fires a few seconds after any agent turn ends.

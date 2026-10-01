@@ -59,7 +59,7 @@ Instrument Sans is the UI face, Bricolage Grotesque is used for display labels, 
 
 ## Layout
 
-The existing stylesheet uses a 4px spacing rhythm. Both rails are 279px. Fleet scrolls inside its rail and displays one card per agent. Settings content owns its scrolling; tables allow horizontal overflow. The chat toolbar wraps at constrained widths, keeping Mode, quick messages and agent/model controls usable.
+The existing stylesheet uses a 4px spacing rhythm. Both rails are 279px. Fleet scrolls inside its rail and displays one card per agent. Settings content owns its scrolling; tables allow horizontal overflow. Mode and agent/model controls share a wrapping row; Quick Messages occupy a separate wrapping row immediately below it and above the composer.
 
 Settings is up to 1120px wide and 88dvh tall, bounded by the window. At 760px and below its section navigation becomes a horizontal scroller. Header, feedback and Save/Cancel stay outside the content scroller. Chat uses compact progress prose and expandable tool activity, with an open text surface for the final response.
 
@@ -81,6 +81,8 @@ Enabled actions use a pointer, hover and focus-visible treatment. Selected toggl
 
 Use shared `btn`, `agent-icon-button` and Fleet toggle classes. Quick messages use neutral small buttons with the configured name and content preview. Delete actions require an app-owned confirmation; routine draft saves do not.
 
+The composer action reads Send while idle, Steer while running, and Save message while editing pending guidance. Enter submits; Shift+Enter inserts a line break; IME composition cannot submit. Pending human guidance is labeled steer pending and remains editable/removable until the next step accepts it. Delegated tasks retain the queued label.
+
 ### Navigation and data display
 
 Fleet identifies agents before their provider/account metadata. Show only quota relevant to the bound pool; time windows are constraints of that pool. Settings agent rows choose provider/account/quota; model selection belongs in chat.
@@ -90,6 +92,8 @@ Fleet identifies agents before their provider/account metadata. Show only quota 
 Settings uses draft/Save/Cancel. Native selects deliberately retain platform keyboard and popup behavior. Modal dialogs own focus, Escape and restoration; unsaved changes use an app-owned discard dialog. Quick-message textareas have sufficient fixed minimum height and no manual resize.
 
 Add and Edit project share the modal form. Editing a name updates the existing project; changing its folder also keeps agent/session IDs and relocates app metadata. The destination must exist and not belong to another registered project. Folder changes require idle sessions/agents and closed project terminals; the app does not move project files.
+
+Copilot uses the existing provider authorization modal with a Device Flow variant. Show the GitHub verification code, Copy code, verification URL, Open browser and expiry. Codes are transient; private device grants and tokens stay in main. Cancel closes the modal and stops polling; denied/expired sessions can generate a new code. Other providers retain callback OAuth.
 
 ### Iconography
 

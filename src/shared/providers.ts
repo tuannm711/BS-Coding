@@ -86,6 +86,7 @@ export interface ProviderAuthorizationSession {
   authUrl: string
   expiresAt: number
   status: ProviderAuthorizationStatus
+  userCode?: string
   accountId?: string
   error?: ProviderAuthorizationError
 }
@@ -110,7 +111,8 @@ export function sanitizeProviderAuthorizationSession(
     status,
     accountId,
     error,
-    reconnectAccountId
+    reconnectAccountId,
+    userCode
   } = session
   return {
     loginId,
@@ -119,6 +121,7 @@ export function sanitizeProviderAuthorizationSession(
     authUrl,
     expiresAt,
     status,
+    ...(userCode ? { userCode } : {}),
     ...(reconnectAccountId ? { reconnectAccountId } : {}),
     ...(accountId ? { accountId } : {}),
     ...(error ? { error } : {})

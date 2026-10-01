@@ -38,7 +38,19 @@ export interface ProviderCallbackAuthorizationStrategy {
   afterPersist?(account: ProviderAccount, secrets: ProviderSecrets): Promise<void> | void
 }
 
-export type ProviderAuthorizationStrategy = ProviderCallbackAuthorizationStrategy
+export interface ProviderDeviceAuthorizationStrategy {
+  kind: 'device'
+  methodId: string
+  start(input: { signal: AbortSignal }): Promise<{
+    authUrl: string
+    userCode: string
+    expiresAt: number
+    complete(): Promise<ProviderAuthorizationCompleteResult>
+  }>
+  afterPersist?(account: ProviderAccount, secrets: ProviderSecrets): Promise<void> | void
+}
+
+export type ProviderAuthorizationStrategy = ProviderCallbackAuthorizationStrategy | ProviderDeviceAuthorizationStrategy
 
 export interface ProviderAdapter {
   capability: ProviderCapability

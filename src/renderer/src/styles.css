@@ -810,7 +810,7 @@ select.input { width: 100%; }
   flex: 0 0 auto; font-size: var(--fs-sm); text-transform: uppercase; letter-spacing: 0.06em;
   color: var(--yellow); border: 1px solid var(--yellow); padding: 0 5px; border-radius: 999px;
 }
-.chat-queue-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; color: var(--text); }
+.chat-queue-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; color: var(--text); border: 0; background: transparent; text-align: left; font: inherit; }
 .chat-queue-text:hover { color: var(--accent); }
 .chat-queue-remove { appearance: none; background: none; border: none; color: var(--text-faint); cursor: pointer; font-size: 14px; padding: 2px; border-radius: var(--radius-sm); }
 .chat-queue-remove:hover { color: var(--red); }
@@ -1179,11 +1179,10 @@ select.input { width: 100%; }
 .diff-sign { flex: 0 0 auto; }
 
 /* Mode bar */
-/* Two buttons now, not three: Coordinate moved to Fleet, where the project's
-   own settings live. No flex-wrap — the row fits, and wrapping would hide the
-   next thing crowded into it rather than showing it. */
+/* Coordinate is in Fleet. Mode/selectors wrap within the pane; quick messages
+   have their own row below them. */
 .chat-mode { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.quick-message-buttons { display: flex; flex: 1; justify-content: center; flex-wrap: wrap; gap: 4px; min-width: 0; }
+.quick-message-buttons { display: flex; flex-shrink: 0; justify-content: flex-start; flex-wrap: wrap; gap: 4px; min-width: 0; }
 .quick-message-button { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .quick-message-button:disabled { opacity: .5; cursor: default; }
 .quick-message-settings-list { display: flex; flex-direction: column; gap: 8px; }
@@ -1197,7 +1196,9 @@ select.input { width: 100%; }
 .chat-mode .btn.active { background: var(--bg-active); border-color: var(--accent-dim); }
 .chat-mode .btn.mode-build.active { background: var(--button-bg); color: var(--button-text); border-color: transparent; }
 .chat-mode .btn.mode-plan.active { background: var(--orange); color: #0b0e13; border-color: transparent; }
-.chat-mode-tools { margin-left: auto; display: flex; align-items: center; gap: 6px; min-width: 0; }
+.chat-mode-tools { margin-left: auto; display: flex; align-items: center; flex-wrap: wrap; gap: 6px; min-width: 0; max-width: 100%; }
+.chat-mode-tools > * { min-width: 0; max-width: 100%; }
+.chat-mode-tools .model-trigger, .chat-mode-tools .agent-picker-trigger, .chat-mode-tools .dropdown-trigger { min-width: 0; max-width: 100%; }
 .model-picker { position: relative; display: inline-flex; }
 .model-trigger {
   display: inline-flex; align-items: center; gap: 6px; max-width: 220px;

@@ -1,12 +1,19 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
-import { get } from 'node:http'
-import { mkdtempSync } from 'node:fs'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { ProviderManager } from '../../src/main/connections/manager'
 import { ProviderRegistry } from '../../src/main/providers/registry'
 import { createGitHubCopilotAdapter } from '../../src/main/providers/adapters/github-copilot'
 import { OPENAI_COMPATIBLE_TEXT_SSE, chunkedResponse } from '../fixtures/provider-chat-fixtures'
+
+const roots: string[] = []
+const managers: ProviderManager[] = []
+function accountFile(prefix: string): string {
+  const root = mkdtempSync(path.join(tmpdir(), prefix))
+  roots.push(root)
+  return path.join(root, 'accounts.json')
+}
 
 function fakeVault() {
   const secrets = new Map<string, string>()
@@ -17,17 +24,14 @@ function fakeVault() {
   }
 }
 
-function issueCallback(authUrl: string): void {
-  const state = new URL(authUrl).searchParams.get('state')!
-  const separator = state.includes('?') ? '&' : '?'
-  get(`${state}${separator}code=oauth-code&state=${encodeURIComponent(state)}`).on('error', () => {})
-}
 
 describe('GitHub Copilot authorization integration', () => {
-  afterEach(() => vi.unstubAllGlobals())
+  beforeEach(() => vi.useFakeTimers())
+  afterEach(() => { managers.splice(0).forEach(manager => manager.close()); vi.unstubAllGlobals(); vi.useRealTimers(); roots.splice(0).forEach(root => rmSync(root, { recursive: true, force: true })) })
 
   it('creates, reconnects and hydrates one Copilot account', async () => {
     vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      if (url.endsWith('/login/device/code')) return Response.json({ device_code: 'private-device', user_code: 'ABCD-EFGH', verification_uri: 'https://github.com/login/device', expires_in: 900, interval: 5 })
       if (url.endsWith('/login/oauth/access_token')) return new Response(JSON.stringify({ access_token: 'github-token' }), { status: 200 })
       if (url === 'https://api.github.com/user') return new Response(JSON.stringify({ id: 7, login: 'octocat', email: 'octo@example.com' }), { status: 200 })
       if (url.endsWith('/copilot_internal/v2/token')) return new Response(JSON.stringify({ token: 'copilot-token', expires_at: 2_000_000_000, chat_enabled: true }), { status: 200 })
@@ -37,20 +41,21 @@ describe('GitHub Copilot authorization integration', () => {
     const registry = new ProviderRegistry()
     registry.register(createGitHubCopilotAdapter())
     const manager = new ProviderManager({
-      accountsFile: path.join(mkdtempSync(path.join(tmpdir(), 'bs-copilot-integration-')), 'accounts.json'),
+      accountsFile: accountFile('bs-copilot-integration-'),
       registry,
       vault: fakeVault() as never
     })
+    managers.push(manager)
 
     const first = await manager.createAuthorization({ providerId: 'github-copilot', methodId: 'oauth' })
-    issueCallback(first.authUrl)
+    await vi.advanceTimersByTimeAsync(5000)
     await vi.waitFor(() => expect(manager.getAuthorization(first.loginId)?.status).toBe('connected'))
     const account = manager.list('github-copilot')[0].accounts[0]
     expect(account.models).toEqual(['gpt-4.1', 'claude-sonnet-4'])
     expect(manager.store.getSecret(account.id)).toMatchObject({ githubAccessToken: 'github-token', accessToken: 'copilot-token' })
 
     const reconnect = await manager.createAuthorization({ providerId: 'github-copilot', methodId: 'oauth', reconnectAccountId: account.id })
-    issueCallback(reconnect.authUrl)
+    await vi.advanceTimersByTimeAsync(5000)
     await vi.waitFor(() => expect(manager.getAuthorization(reconnect.loginId)?.status).toBe('connected'))
     expect(manager.list('github-copilot')[0].accounts).toHaveLength(1)
     expect(manager.list('github-copilot')[0].accounts[0].id).toBe(account.id)
@@ -59,6 +64,7 @@ describe('GitHub Copilot authorization integration', () => {
 
   it('does not create an account when Copilot entitlement is missing', async () => {
     vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      if (url.endsWith('/login/device/code')) return Response.json({ device_code: 'private-device', user_code: 'ABCD-EFGH', verification_uri: 'https://github.com/login/device', expires_in: 900, interval: 5 })
       if (url.endsWith('/login/oauth/access_token')) return new Response(JSON.stringify({ access_token: 'github-token' }), { status: 200 })
       if (url === 'https://api.github.com/user') return new Response(JSON.stringify({ id: 7, login: 'octocat', email: 'octo@example.com' }), { status: 200 })
       if (url.endsWith('/copilot_internal/v2/token')) return new Response('', { status: 403 })
@@ -67,13 +73,14 @@ describe('GitHub Copilot authorization integration', () => {
     const registry = new ProviderRegistry()
     registry.register(createGitHubCopilotAdapter())
     const manager = new ProviderManager({
-      accountsFile: path.join(mkdtempSync(path.join(tmpdir(), 'bs-copilot-no-entitlement-')), 'accounts.json'),
+      accountsFile: accountFile('bs-copilot-no-entitlement-'),
       registry,
       vault: fakeVault() as never
     })
+    managers.push(manager)
 
     const session = await manager.createAuthorization({ providerId: 'github-copilot', methodId: 'oauth' })
-    issueCallback(session.authUrl)
+    await vi.advanceTimersByTimeAsync(5000)
     await vi.waitFor(() => expect(manager.getAuthorization(session.loginId)?.status).toBe('error'))
 
     expect(manager.getAuthorization(session.loginId)?.error?.kind).toBe('entitlement-missing')
@@ -100,10 +107,11 @@ describe('GitHub Copilot authorization integration', () => {
     const registry = new ProviderRegistry()
     registry.register(createGitHubCopilotAdapter())
     const manager = new ProviderManager({
-      accountsFile: path.join(mkdtempSync(path.join(tmpdir(), 'bs-copilot-runtime-')), 'accounts.json'),
+      accountsFile: accountFile('bs-copilot-runtime-'),
       registry,
       vault: fakeVault() as never
     })
+    managers.push(manager)
     manager.store.upsert({
       id: 'copilot-account', providerId: 'github-copilot', label: 'Copilot Pro', authMode: 'oauth', status: 'active', createdAt: 1, lastUsedAt: 1,
       models: ['claude-sonnet-4.6'],

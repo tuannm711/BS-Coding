@@ -1,14 +1,12 @@
 import type { ProviderSecrets } from '../../connections/types'
+import { OAuthCallbackError } from '../../connections/oauth'
 
-const GITHUB_AUTHORIZATION_ENDPOINT = 'https://github.com/login/oauth/authorize'
 const GITHUB_TOKEN_ENDPOINT = 'https://github.com/login/oauth/access_token'
 const GITHUB_USER_ENDPOINT = 'https://api.github.com/user'
 const GITHUB_USER_EMAILS_ENDPOINT = 'https://api.github.com/user/emails'
 const GITHUB_COPILOT_TOKEN_ENDPOINT = 'https://api.github.com/copilot_internal/v2/token'
 const GITHUB_COPILOT_USER_ENDPOINT = 'https://api.github.com/copilot_internal/user'
 const GITHUB_CLIENT_ID = '01ab8ac9400c4e429b23'
-const GITHUB_REDIRECT_URI = 'https://vscode.dev/redirect'
-const GITHUB_SCOPE = 'read:user repo user:email workflow'
 const GITHUB_API_VERSION = '2025-04-01'
 const USER_AGENT = 'bs-coding'
 
@@ -41,33 +39,75 @@ export interface GitHubCopilotAuthorizationResult {
   secrets: ProviderSecrets
 }
 
-export function githubCopilotAuthorizeUrl(pkce: { challenge: string }, callbackUrl: string): string {
-  const params = new URLSearchParams({
-    client_id: GITHUB_CLIENT_ID,
-    redirect_uri: GITHUB_REDIRECT_URI,
-    scope: GITHUB_SCOPE,
-    state: callbackUrl,
-    code_challenge: pkce.challenge,
-    code_challenge_method: 'S256',
-    get_started_with: 'copilot-vscode',
-    prompt: 'select_account'
+// Device Flow can exchange a grant in a desktop app without embedding a client secret.
+export async function startGitHubCopilotDeviceAuthorization(signal: AbortSignal, fetchImpl: typeof fetch = fetch) {
+  const request: typeof fetch = async (input, init) => {
+    signal.throwIfAborted()
+    const response = await fetchImpl(input, { ...init, signal: AbortSignal.any([signal, AbortSignal.timeout(30_000)]) })
+    signal.throwIfAborted()
+    return response
+  }
+  const response = await request('https://github.com/login/device/code', {
+    method: 'POST',
+    headers: { accept: 'application/json', 'content-type': 'application/x-www-form-urlencoded', 'user-agent': USER_AGENT },
+    body: new URLSearchParams({ client_id: GITHUB_CLIENT_ID, scope: 'read:user user:email' }).toString()
   })
-  return `${GITHUB_AUTHORIZATION_ENDPOINT}?${params.toString()}`
+  if (!response.ok) throw new Error(`[bs] GitHub device authorization failed (${response.status})`)
+  const grant = await response.json() as { device_code?: string; user_code?: string; verification_uri?: string; expires_in?: number; interval?: number }
+  if (!grant.device_code || !grant.user_code || grant.verification_uri !== 'https://github.com/login/device'
+    || !Number.isFinite(grant.expires_in) || grant.expires_in! <= 0) {
+    throw new Error('[bs] GitHub device authorization returned an invalid grant')
+  }
+  const expiresAt = Date.now() + grant.expires_in! * 1000
+  let interval = Number.isFinite(grant.interval) && grant.interval! > 0 ? grant.interval! * 1000 : 5000
+  return {
+    authUrl: grant.verification_uri,
+    userCode: grant.user_code,
+    expiresAt,
+    async complete(): Promise<GitHubCopilotAuthorizationResult> {
+      while (Date.now() < expiresAt) {
+        await waitForPoll(Math.min(interval, expiresAt - Date.now()), signal)
+        signal.throwIfAborted()
+        if (Date.now() >= expiresAt) break
+        const tokenResponse = await request(GITHUB_TOKEN_ENDPOINT, {
+          method: 'POST',
+          headers: { accept: 'application/json', 'content-type': 'application/x-www-form-urlencoded', 'user-agent': USER_AGENT },
+          body: new URLSearchParams({ client_id: GITHUB_CLIENT_ID, device_code: grant.device_code!, grant_type: 'urn:ietf:params:oauth:grant-type:device_code' }).toString()
+        })
+        if (!tokenResponse.ok) throw new Error(`[bs] GitHub OAuth token exchange failed (${tokenResponse.status})`)
+        const token = await tokenResponse.json() as { access_token?: string; error?: string; interval?: number }
+        signal.throwIfAborted()
+        if (token.error === 'authorization_pending') continue
+        if (token.error === 'slow_down') {
+          interval = Math.max(interval + 5000, Number.isFinite(token.interval) ? token.interval! * 1000 : 0)
+          continue
+        }
+        if (token.error === 'expired_token') break
+        if (token.error === 'access_denied') throw new OAuthCallbackError('authorization-denied', '[bs] GitHub authorization was denied. Generate a new code to try again.')
+        if (!token.access_token) throw new Error(`[bs] GitHub OAuth token exchange failed (${safeDeviceError(token.error)})`)
+        const githubAccessToken = token.access_token
+        const user = await fetchGitHubUser(githubAccessToken, request)
+        const email = user.email ?? await fetchGitHubEmail(githubAccessToken, request)
+        const copilot = await fetchCopilotCredentials(githubAccessToken, request)
+        signal.throwIfAborted()
+        return { profile: { login: user.login, name: user.name, email }, secrets: { githubAccessToken, ...copilot } }
+      }
+      throw new OAuthCallbackError('authorization-expired', '[bs] GitHub authorization code expired. Generate a new code to try again.')
+    }
+  }
 }
 
-export async function completeGitHubCopilotAuthorization(
-  code: string,
-  verifier: string,
-  fetchImpl: typeof fetch = fetch
-): Promise<GitHubCopilotAuthorizationResult> {
-  const githubAccessToken = await exchangeGitHubCode(code, verifier, fetchImpl)
-  const user = await fetchGitHubUser(githubAccessToken, fetchImpl)
-  const email = user.email ?? await fetchGitHubEmail(githubAccessToken, fetchImpl)
-  const copilot = await fetchCopilotCredentials(githubAccessToken, fetchImpl)
-  return {
-    profile: { login: user.login, name: user.name, email },
-    secrets: { githubAccessToken, ...copilot }
-  }
+function safeDeviceError(error?: string): string {
+  return ['incorrect_device_code', 'incorrect_client_credentials', 'device_flow_disabled', 'unsupported_grant_type'].includes(error ?? '') ? error! : 'invalid response'
+}
+
+function waitForPoll(ms: number, signal: AbortSignal): Promise<void> {
+  signal.throwIfAborted()
+  return new Promise((resolve, reject) => {
+    const abort = () => { clearTimeout(timer); signal.removeEventListener('abort', abort); reject(signal.reason) }
+    const timer = setTimeout(() => { signal.removeEventListener('abort', abort); resolve() }, ms)
+    signal.addEventListener('abort', abort, { once: true })
+  })
 }
 
 export async function refreshGitHubCopilotCredentials(
@@ -75,23 +115,6 @@ export async function refreshGitHubCopilotCredentials(
   fetchImpl: typeof fetch = fetch
 ): Promise<ProviderSecrets> {
   return { githubAccessToken, ...await fetchCopilotCredentials(githubAccessToken, fetchImpl) }
-}
-
-async function exchangeGitHubCode(code: string, verifier: string, fetchImpl: typeof fetch): Promise<string> {
-  const response = await fetchImpl(GITHUB_TOKEN_ENDPOINT, {
-    method: 'POST',
-    headers: { accept: 'application/json', 'content-type': 'application/x-www-form-urlencoded', 'user-agent': USER_AGENT },
-    body: new URLSearchParams({
-      client_id: GITHUB_CLIENT_ID,
-      code,
-      redirect_uri: GITHUB_REDIRECT_URI,
-      code_verifier: verifier
-    }).toString()
-  })
-  if (!response.ok) throw new Error(`[bs] GitHub OAuth token exchange failed (${response.status})`)
-  const body = await response.json() as { access_token?: string; error?: string }
-  if (!body.access_token) throw new Error('[bs] GitHub OAuth token exchange failed')
-  return body.access_token
 }
 
 async function fetchGitHubUser(accessToken: string, fetchImpl: typeof fetch): Promise<GitHubUser> {

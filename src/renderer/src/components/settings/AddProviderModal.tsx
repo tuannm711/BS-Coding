@@ -64,19 +64,37 @@ export default function AddProviderModal({ providers, reconnectAccount, onClose,
   const [session, setSession] = useState<ProviderAuthorizationSession | null>(null)
   const [now, setNow] = useState(Date.now())
   const [copied, setCopied] = useState(false)
+  const [codeCopied, setCodeCopied] = useState(false)
   const connectedNotificationRef = useRef<string | null>(null)
   const callbacksRef = useRef({ onClose, onConnected })
   const capabilitiesRef = useRef(capabilities)
+  const selectionRef = useRef({ providerId, methodId })
+  const sessionRef = useRef(session)
+  const lifecycleRef = useRef({ active: true, dismissed: false })
   callbacksRef.current = { onClose, onConnected }
   capabilitiesRef.current = capabilities
+  selectionRef.current = { providerId, methodId }
+  sessionRef.current = session
+
+  useEffect(() => {
+    const lifecycle = lifecycleRef.current
+    lifecycle.active = true
+    return () => {
+      lifecycle.active = false
+      const pending = sessionRef.current
+      if (pending?.status === 'waiting') void window.api.cancelProviderAuthorization(pending.loginId).catch(() => {})
+    }
+  }, [])
 
   useEffect(() => {
     const apply = (next: ProviderDefinitionSnapshot[]) => {
       setCapabilities(next)
-      const selected = reconnectAccount ? next.find(item => item.id === reconnectAccount.providerId) : next[0]
+      const selected = reconnectAccount ? next.find(item => item.id === reconnectAccount.providerId)
+        : next.find(item => item.id === selectionRef.current.providerId) ?? next[0]
       if (selected) {
         setProviderId(selected.id)
-        setMethodId(reconnectAccount ? reconnectMethodId(selected, reconnectAccount.authMode) : selected.methods[0]?.id ?? '')
+        setMethodId(reconnectAccount ? reconnectMethodId(selected, reconnectAccount.authMode)
+          : selected.methods.some(item => item.id === selectionRef.current.methodId) ? selectionRef.current.methodId : selected.methods[0]?.id ?? '')
       }
     }
     if (providers && providers.length > 0) apply(providers)
@@ -141,13 +159,19 @@ export default function AddProviderModal({ providers, reconnectAccount, onClose,
     setBusy(true)
     setError('')
     setCopied(false)
+    setCodeCopied(false)
     setSession(null)
     try {
+      if (session?.status === 'waiting') await window.api.cancelProviderAuthorization(session.loginId)
       const next = await window.api.createProviderAuthorization({
         providerId,
         methodId,
         reconnectAccountId: reconnectAccount?.id
       })
+      if (!lifecycleRef.current.active || lifecycleRef.current.dismissed) {
+        await window.api.cancelProviderAuthorization(next.loginId)
+        return
+      }
       setSession(next)
       setNow(Date.now())
     } catch (err) {
@@ -166,6 +190,7 @@ export default function AddProviderModal({ providers, reconnectAccount, onClose,
   }
 
   const close = () => {
+    lifecycleRef.current.dismissed = true
     if (session?.status === 'waiting') void cancelAuthorization(true)
     else onClose()
   }
@@ -189,6 +214,14 @@ export default function AddProviderModal({ providers, reconnectAccount, onClose,
     }
   }
 
+  const copyCode = async () => {
+    if (!session?.userCode) return
+    try {
+      await navigator.clipboard.writeText(session.userCode)
+      setCodeCopied(true)
+    } catch { setError('Unable to copy the verification code. Select the code and copy it manually.') }
+  }
+
   const authorizationVisible = method?.kind === 'oauth' && session !== null
   const defaultSubmit = method?.kind === 'oauth' ? () => void createAuthorization() : () => void submitCredentials()
   const submitLabel = method?.kind === 'oauth'
@@ -209,7 +242,7 @@ export default function AddProviderModal({ providers, reconnectAccount, onClose,
         id="provider-select"
         className="input"
         value={providerId}
-        disabled={Boolean(reconnectAccount) || session?.status === 'waiting'}
+        disabled={Boolean(reconnectAccount) || busy || session?.status === 'waiting'}
         onChange={event => {
           const next = capabilities.find(item => item.id === event.target.value)
           setProviderId(event.target.value)
@@ -226,7 +259,7 @@ export default function AddProviderModal({ providers, reconnectAccount, onClose,
         id="provider-method"
         className="input"
         value={methodId}
-        disabled={session?.status === 'waiting'}
+        disabled={busy || session?.status === 'waiting'}
         onChange={event => {
           setMethodId(event.target.value)
           setFields({})
@@ -264,9 +297,15 @@ export default function AddProviderModal({ providers, reconnectAccount, onClose,
             {session.status === 'waiting' && <span className="authorization-countdown">{view.secondsLeft}s</span>}
           </div>
           <input className="input authorization-url" aria-label="Authorization link" readOnly value={session.authUrl} />
+          {session.userCode && session.status === 'waiting' && <>
+            <label className="settings-field-label" htmlFor="provider-device-code">GitHub verification code</label>
+            <input id="provider-device-code" className="input" readOnly value={session.userCode} />
+            <p className="settings-hint">Open GitHub and enter this code to connect your Copilot account.</p>
+          </>}
           {view.showWaitingActions && (
             <div className="authorization-actions">
               <button className="btn" onClick={() => void copyLink()}>{copied ? 'Copied' : 'Copy link'}</button>
+              {session.userCode && <button className="btn" onClick={() => void copyCode()}>{codeCopied ? 'Code copied' : 'Copy code'}</button>}
               <button className="btn primary" onClick={() => void openBrowser()}>Open browser</button>
               <button className="btn" onClick={() => void cancelAuthorization(true)}>Cancel</button>
             </div>

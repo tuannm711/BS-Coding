@@ -57,6 +57,14 @@ export class SharedSessionCoordinator {
     return this.executions.get(sessionId)?.queue.shift()
   }
 
+  takeSteers(sessionId: string): SessionQueuedMessage[] {
+    const state = this.executions.get(sessionId)
+    if (!state) return []
+    const steers = state.queue.filter(message => !message.assigned)
+    state.queue = state.queue.filter(message => message.assigned)
+    return steers
+  }
+
   removeQueued(sessionId: string, messageId: string): boolean {
     const state = this.requireState(sessionId)
     const next = state.queue.filter(message => message.id !== messageId)

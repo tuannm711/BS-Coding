@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
-import { mkdtempSync, rmSync, writeFileSync, readFileSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { BsAgentManager } from '../../src/main/bs-agent-manager'
@@ -41,9 +41,11 @@ const OTHER_PROJECT_AGENT: AgentConfig = {
 interface StubLlmOptions {
   hangUntilAbort?: boolean
   partsQueue?: LlmStreamPart[][]
+  beforeStream?: (request: LlmStreamOptions) => Promise<void>
 }
 
 async function makeManager(opts: StubLlmOptions & {
+  cwd?: string
   configPath?: string
   catalog?: ModelsCatalog
   providerAccounts?: ProviderConnection[]
@@ -81,6 +83,7 @@ async function makeManager(opts: StubLlmOptions & {
   const llmSystems: string[] = []
   const llmVariants: Array<Record<string, unknown> | undefined> = []
   const llmModels: string[] = []
+  const llmRequests: LlmStreamOptions[] = []
   let llmClient: LlmClient
   // Declaring the parameters is the point: a mock whose signature does not
   // match what it replaces cannot catch a caller passing the wrong thing,
@@ -101,6 +104,8 @@ async function makeManager(opts: StubLlmOptions & {
         llmSystems.push(request.system)
         llmVariants.push(request.variantOptions)
         llmModels.push(request.model)
+        llmRequests.push(request)
+        await opts.beforeStream?.(request)
         if (opts.hangUntilAbort) {
           await new Promise<void>(resolve => {
             if (request.signal?.aborted) return resolve()
@@ -134,15 +139,100 @@ async function makeManager(opts: StubLlmOptions & {
   })
   manager.setOnEvent(e => events.push(e))
   await manager.init([
-    { ...BS_AGENT },
+    { ...BS_AGENT, cwd: opts.cwd ?? BS_AGENT.cwd },
     ...(opts.secondAgent ? [{ ...SECOND_AGENT }] : []),
     ...(opts.secondProject ? [{ ...OTHER_PROJECT_AGENT }] : []),
     { ...PTY_AGENT }
   ])
-  return { manager, store, events, assignmentEvents, createLlm, savedPermissions, llmCalls, llmSystems, llmVariants, llmModels }
+  return { manager, store, events, assignmentEvents, createLlm, savedPermissions, llmCalls, llmSystems, llmVariants, llmModels, llmRequests }
 }
 
 describe('BsAgentManager', () => {
+  it('resolves parent-file reference hints for a shared-session steer while preserving its display text', async () => {
+    const root = mkdtempSync(path.join(tmpdir(), 'bs-steer-ref-'))
+    const cwd = path.join(root, 'child')
+    mkdirSync(cwd)
+    writeFileSync(path.join(root, 'AGENTS.md'), 'Use the project conventions.')
+    let release!: () => void
+    const gate = new Promise<void>(resolve => { release = resolve })
+    let calls = 0
+    const { manager, store, llmRequests } = await makeManager({ cwd, beforeStream: async () => { if (++calls === 1) await gate } })
+    try {
+      const session = manager.createProjectSession(cwd, 'a1')
+      const turn = manager.sendInSession(cwd, session.id, 'a1', 'first')
+      await vi.waitFor(() => expect(calls).toBe(1))
+      await manager.sendInSession(cwd, session.id, 'a1', 'Read @AGENTS.md')
+      release()
+      await turn
+      expect(JSON.stringify(llmRequests[1].messages)).toContain(JSON.stringify(path.join(root, 'AGENTS.md')).slice(1, -1))
+      const users = store.transcript(session.id).flatMap(i => i.kind === 'message' && i.message.role === 'user' ? [i.message] : [])
+      expect(users[1].text).toContain('Read these referenced files with the read tool:')
+      expect(users[1].displayText).toBe('Read @AGENTS.md')
+    } finally { release(); await manager.dispose(); rmSync(root, { recursive: true, force: true }) }
+  })
+  it('steers shared-session messages during final streaming within the same execution', async () => {
+    let release!: () => void
+    const gate = new Promise<void>(resolve => { release = resolve })
+    let calls = 0
+    const { manager, store, events, llmRequests } = await makeManager({ beforeStream: async () => { if (++calls === 1) await gate } })
+    try {
+      const session = manager.createProjectSession('/proj', 'a1')
+      const turn = manager.sendInSession('/proj', session.id, 'a1', 'first')
+      await vi.waitFor(() => expect(calls).toBe(1))
+      await manager.sendInSession('/proj', session.id, 'a1', 'change direction')
+      expect(manager.listSessionQueued(session.id)).toHaveLength(1)
+      release()
+      await turn
+      expect(llmRequests).toHaveLength(2)
+      expect(JSON.stringify(llmRequests[1].messages)).toContain('change direction')
+      expect(events.filter(e => e.type === 'turn-started')).toHaveLength(1)
+      const users = store.transcript(session.id).flatMap(i => i.kind === 'message' && i.message.role === 'user' ? [i.message] : [])
+      expect(users.map(m => m.text)).toEqual(['first', 'change direction'])
+      expect(users[1].execution?.turnId).toBe(users[0].execution?.turnId)
+      expect(users[1].execution).toBeDefined()
+      expect(manager.listSessionQueued(session.id)).toEqual([])
+    } finally { release(); await manager.dispose() }
+  })
+  it('keeps edited steering in its bound session after switching sessions and removes deleted steering', async () => {
+    let release!: () => void
+    const gate = new Promise<void>(resolve => { release = resolve })
+    let calls = 0
+    const { manager, store, events } = await makeManager({ beforeStream: async () => { if (++calls === 1) await gate } })
+    try {
+      const session = manager.createProjectSession('/proj', 'a1')
+      const turn = manager.sendInSession('/proj', session.id, 'a1', 'first')
+      await vi.waitFor(() => expect(calls).toBe(1))
+      await manager.sendInSession('/proj', session.id, 'a1', 'original')
+      await manager.sendInSession('/proj', session.id, 'a1', 'remove me')
+      const [edit, remove] = manager.listSessionQueued(session.id)
+      manager.editSessionQueued('/proj', session.id, edit.id, 'revised guidance')
+      manager.removeSessionQueued('/proj', session.id, remove.id)
+      const other = manager.createProjectSession('/proj', 'a1')
+      manager.switchProjectSession('/proj', other.id)
+      release()
+      await turn
+      expect(store.transcript(other.id)).toEqual([])
+      const users = store.transcript(session.id).flatMap(i => i.kind === 'message' && i.message.role === 'user' ? [i.message] : [])
+      expect(users.map(m => m.text)).toEqual(['first', 'revised guidance'])
+      expect(users[1].id).toBe(edit.id)
+      expect(events.filter(e => e.type === 'user-message').at(-1)).toMatchObject({ sessionId: session.id, message: { id: edit.id } })
+    } finally { release(); await manager.dispose() }
+  })
+
+  it('rejects a sixth pending steer without marking the running execution failed', async () => {
+    const { manager, events } = await makeManager({ hangUntilAbort: true })
+    try {
+      const session = manager.createProjectSession('/proj', 'a1')
+      const turn = manager.sendInSession('/proj', session.id, 'a1', 'first')
+      await vi.waitFor(() => expect(manager.isSessionChatRunning('/proj', session.id)).toBe(true))
+      for (let index = 0; index < 5; index++) await manager.sendInSession('/proj', session.id, 'a1', `steer ${index}`)
+      await expect(manager.sendInSession('/proj', session.id, 'a1', 'sixth')).rejects.toThrow(/5/)
+      expect(manager.listSessionQueued(session.id)).toHaveLength(5)
+      expect(events.some(e => e.type === 'error')).toBe(false)
+      manager.stopSessionChat('/proj', session.id)
+      await turn
+    } finally { await manager.dispose() }
+  })
   it('does not restore the old cwd when initialization completes after a relocation', async () => {
     const catalog = new ModelsCatalog('/unused')
     vi.spyOn(catalog, 'fetch').mockResolvedValue({})

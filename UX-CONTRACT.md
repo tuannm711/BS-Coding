@@ -10,7 +10,9 @@
 
 Settings changes remain drafts until Save. Every agent is removable. A new agent selects provider/account/quota and receives an initial model from that pool; the user may change it in chat. A quota reservation is keyed by provider/account/pool. Agent profiles are global; the same profile may be materialized in multiple projects, while distinct profiles cannot reserve the same quota.
 
-Quick Messages send the saved content to the selected agent in the active project session. They can queue during a running turn. They are unavailable while a permission/question answer is required and briefly while the send is being accepted. Pending text in the composer remains independent.
+Quick Messages send the saved content to the selected agent in the active project session. Their own row is below Mode/Agent and above the composer. During a running turn, guidance waits for the next step and steers that same session/execution, including a final text-only response. Pending guidance can be edited/removed. They are unavailable while a permission/question answer is required and briefly while the send is being accepted. Pending text in the composer remains independent.
+
+Provider authorization uses AddProviderModal and AuthSessionCoordinator for loading, waiting, terminal errors and regeneration. Copilot's device variant exposes a user verification code with Copy code, the GitHub URL, Open browser, expiry and Cancel. The private device grant never crosses IPC. Cancellation or expiry prevents late requests from committing accounts; a failed reconnect restores the existing account and secrets.
 
 Zero agents is a valid state. Config reload and background initialization must not recreate a deleted profile or discard retained session history. Legacy quota conflicts are kept for review and cannot be saved as new conflicting reservations.
 
