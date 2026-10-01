@@ -101,20 +101,7 @@ export class SessionRunner {
         this.deps.onEvent({ type: 'done', agentId, reason: 'stopped' })
         return
       }
-      const steers = this.deps.takeSteers?.() ?? []
-      if (steers.length > 0) {
-        for (const s of steers) {
-          const msg: ChatMessage = {
-            id: s.id,
-            role: 'user',
-            text: s.text,
-            displayText: s.displayText ?? s.text,
-            images: s.images,
-            createdAt: Date.now()
-          }
-          this.deps.appendMessage(msg)
-          this.deps.onEvent({ type: 'user-message', agentId, message: msg })
-        }
+      if (this.promoteSteers()) {
         // Fresh step budget for the continued work, like opencode's
         // currentStep reset after promoting steers.
         steps = 0
@@ -265,6 +252,11 @@ export class SessionRunner {
       await Promise.all(autoCalls.map(call => this.executeCall(call, signal)))
       for (const call of askCalls) await this.executeCall(call, signal)
 
+      if (!signal?.aborted && this.promoteSteers()) {
+        steps = 0
+        continue
+      }
+
       if (!hasToolCall) {
         this.deps.onEvent({ type: 'done', agentId, reason: 'complete', tokens, cost: this.deps.computeCost?.(runUsage) })
         return
@@ -274,6 +266,16 @@ export class SessionRunner {
         return
       }
     }
+  }
+
+  private promoteSteers(): boolean {
+    const steers = this.deps.takeSteers?.() ?? []
+    for (const s of steers) {
+      const message: ChatMessage = { id: s.id, role: 'user', text: s.text, displayText: s.displayText ?? s.text, images: s.images, createdAt: Date.now() }
+      this.deps.appendMessage(message)
+      this.deps.onEvent({ type: 'user-message', agentId: this.deps.agentId, message })
+    }
+    return steers.length > 0
   }
 
   private async executeCall(call: ToolCallData, signal?: AbortSignal): Promise<void> {

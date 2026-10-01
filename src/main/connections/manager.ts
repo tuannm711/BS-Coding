@@ -12,7 +12,7 @@ import { createPkce, listenForCallback, OAuthCallbackError } from './oauth'
 import { ProviderAccountStore } from './store'
 import type { Vault } from '../vault'
 import { ProviderRegistry } from '../providers/registry'
-import type { ProviderAuthorizationStrategy } from '../providers/types'
+import type { ProviderAuthorizationStrategy, ProviderAuthorizationCompleteResult } from '../providers/types'
 import type { LlmClient } from '../agent/llm'
 import { buildProviderSnapshot } from './snapshot'
 import { classifyRuntimeError, classifyProviderError, type ProviderSnapshot } from '../../shared/provider-state'
@@ -47,6 +47,8 @@ export class ProviderManager {
   readonly registry: ProviderRegistry
   private readonly authorizations: AuthSessionCoordinator
   private snapshotRevision = 1
+  private closed = false
+  private readonly authorizationStarts = new Set<AbortController>()
 
   constructor(private readonly deps: ProviderManagerDeps) {
     this.store = new ProviderAccountStore(deps.accountsFile, deps.vault)
@@ -329,6 +331,7 @@ export class ProviderManager {
   }
 
   async createAuthorization(request: ProviderAuthorizationRequest): Promise<ProviderAuthorizationSession> {
+    if (this.closed) throw new Error('[bs] Provider manager is closed')
     const adapter = this.registry.resolveRequest({ ...request, fields: {} })
     const method = adapter.capability.methods.find(candidate => candidate.id === request.methodId)
     const strategy = findAuthorizationStrategy(adapter, request.methodId)
@@ -342,40 +345,51 @@ export class ProviderManager {
     const reconnectSecret = reconnectAccount ? this.store.getSecret(reconnectAccount.id) ?? undefined : undefined
     const previousActiveAccountId = this.store.list(request.providerId)[0]?.activeAccountId ?? null
 
-    const pkce = createPkce()
-    const callback = await listenForCallback(strategy.callback)
-    let built: ReturnType<typeof strategy['build']>
-    try {
-      built = strategy.build({ pkce, callbackUrl: callback.callbackUrl })
-    } catch (error) {
-      callback.close()
-      throw error
+    let input: Parameters<AuthSessionCoordinator['start']>[0]
+    let complete: () => Promise<ProviderAuthorizationCompleteResult>
+    if (strategy.kind === 'device') {
+      const controller = new AbortController()
+      this.authorizationStarts.add(controller)
+      let device: Awaited<ReturnType<typeof strategy.start>>
+      try {
+        device = await strategy.start({ signal: controller.signal })
+        controller.signal.throwIfAborted()
+      } finally { this.authorizationStarts.delete(controller) }
+      input = { ...request, authUrl: device.authUrl, userCode: device.userCode, expiresAt: device.expiresAt, close: () => controller.abort() }
+      complete = () => device.complete()
+    } else {
+      const pkce = createPkce()
+      const callback = await listenForCallback(strategy.callback)
+      let built: ReturnType<typeof strategy['build']>
+      try {
+        built = strategy.build({ pkce, callbackUrl: callback.callbackUrl })
+      } catch (error) {
+        callback.close()
+        throw error
+      }
+      input = {
+        providerId: request.providerId,
+        methodId: request.methodId,
+        reconnectAccountId: request.reconnectAccountId,
+        authUrl: built.authUrl,
+        expiresAt: Date.now() + strategy.callback.timeoutMs,
+        verifier: pkce.verifier,
+        expectedState: built.expectedState,
+        callbackUrl: callback.callbackUrl,
+        close: callback.close
+      }
+      complete = async () => {
+        const result = await callback.result
+        if (result.state !== built.expectedState) throw new OAuthCallbackError('oauth-state-mismatch', '[bs] OAuth callback state does not match the pending session')
+        return strategy.complete({ code: result.code, verifier: pkce.verifier, callbackUrl: callback.callbackUrl, reconnectAccount })
+      }
     }
-    const session = this.authorizations.start({
-      providerId: request.providerId,
-      methodId: request.methodId,
-      reconnectAccountId: request.reconnectAccountId,
-      authUrl: built.authUrl,
-      expiresAt: Date.now() + strategy.callback.timeoutMs,
-      verifier: pkce.verifier,
-      expectedState: built.expectedState,
-      callbackUrl: callback.callbackUrl,
-      close: callback.close
-    })
+    const session = this.authorizations.start(input)
     this.emitAuthorization(session)
 
-    void callback.result.then(async result => {
+    void complete().then(async completed => {
       const pending = this.authorizations.pending(session.loginId)
       if (!pending) return
-      if (result.state !== pending.expectedState) {
-        throw new OAuthCallbackError('oauth-state-mismatch', '[bs] OAuth callback state does not match the pending session')
-      }
-      const completed = await strategy.complete({
-        code: result.code,
-        verifier: pending.verifier ?? '',
-        callbackUrl: pending.callbackUrl ?? '',
-        reconnectAccount
-      })
       let saved: ProviderAccount | undefined
       let hydrated: ProviderAccount
       try {
@@ -386,12 +400,14 @@ export class ProviderManager {
             : {})
         }, completed.secrets)
         const models = await adapter.listModels(saved, completed.secrets)
+        if (!this.authorizations.pending(session.loginId)) throw new Error('[bs] OAuth authorization was cancelled or expired')
         hydrated = this.store.upsert({
           ...saved,
           models: models.map(model => model.id),
           modelCatalog: models
         }, completed.secrets)
         await strategy.afterPersist?.(hydrated, completed.secrets)
+        if (!this.authorizations.pending(session.loginId)) throw new Error('[bs] OAuth authorization was cancelled or expired')
       } catch (error) {
         if (saved) {
           if (reconnectAccount) this.store.upsert(reconnectAccount, reconnectSecret)
@@ -552,6 +568,9 @@ export class ProviderManager {
   }
 
   close(): void {
+    this.closed = true
+    for (const controller of this.authorizationStarts) controller.abort()
+    this.authorizationStarts.clear()
     this.authorizations.closeAll()
   }
 

@@ -11,12 +11,12 @@ this document assumes an `LlmClient` already exists.
 | [Pieces](#pieces) | 22-41 | `src/main/bs-agent-manager.ts`, `BsAgentManager`, `src/main/agent/loop.ts`, `SessionRunner`, `src/main/agent/llm.ts`, `LlmClient` |
 | [Data flow](#data-flow) | 42-70 | `BsAgentManager`, `SessionRunner`, `LoopDeps`, `toLlmMessages(getItems())`, `LlmClient`, `text-delta` |
 | [Types that carry it](#types-that-carry-it) | 71-85 | `LoopDeps`, `src/main/agent/loop.ts`, `getItems`, `appendMessage`, `appendTool`, `tests/unit/agent-loop.test.ts` |
-| [Design decisions](#design-decisions) | 86-119 | `LoopDeps`, `createLlm`, `LlmClient`, `src/main/agent/AGENTS.md`, `takeSteers`, `tools/` |
-| [Two ways to hand work off](#two-ways-to-hand-work-off) | 120-145 | `SessionRunner`, `SUBAGENT_CONFIGS`, `COORDINATE_RULES`, `visibleToolDefs`, `decidePermission`, `runAssignment` |
-| [One conversation format](#one-conversation-format) | 146-163 | `tool-call`, `tool-result`, `toLlmMessages`, `compileNeutralContext`, `thoughtSignature`, `sendInSession` |
-| [What a handoff borrows](#what-a-handoff-borrows) | 164-193 | `systemSuffix` |
-| [What a coordinator is told, and what it can reach](#what-a-coordinator-is-told-and-what-it-can-reach) | 194-225 | `coordinatorNote`, `BsAgentManager`, `systemSuffix`, `modeNote`, `decidePermission`, `--output` |
-| [Known limits](#known-limits) | 226-238 | `MAX_COMPACT_PER_RUN`, `compactIfOverThreshold`, `undoTurn`, `pushTurn`, `turnId` |
+| [Design decisions](#design-decisions) | 86-123 | `LoopDeps`, `createLlm`, `LlmClient`, `src/main/agent/AGENTS.md`, `takeSteers`, `tools/` |
+| [Two ways to hand work off](#two-ways-to-hand-work-off) | 124-149 | `SessionRunner`, `SUBAGENT_CONFIGS`, `COORDINATE_RULES`, `visibleToolDefs`, `decidePermission`, `runAssignment` |
+| [One conversation format](#one-conversation-format) | 150-167 | `tool-call`, `tool-result`, `toLlmMessages`, `compileNeutralContext`, `thoughtSignature`, `sendInSession` |
+| [What a handoff borrows](#what-a-handoff-borrows) | 168-197 | `systemSuffix` |
+| [What a coordinator is told, and what it can reach](#what-a-coordinator-is-told-and-what-it-can-reach) | 198-229 | `coordinatorNote`, `BsAgentManager`, `systemSuffix`, `modeNote`, `decidePermission`, `--output` |
+| [Known limits](#known-limits) | 230-242 | `MAX_COMPACT_PER_RUN`, `compactIfOverThreshold`, `undoTurn`, `pushTurn`, `turnId` |
 <!-- /toc -->
 
 ## Pieces
@@ -97,6 +97,10 @@ single test that forgets it turns the suite slow and flaky.
 
 **Steering is injected at step boundaries, not mid-stream.** A message typed
 while the agent is working is queued and drained by `takeSteers` between steps.
+Shared sessions read their coordinator queue by bound session ID. The loop also
+checks after streaming/tool completion so guidance received during a final
+text-only response continues within the same execution. Active tools and
+permission prompts finish before guidance is injected.
 Injecting mid-stream would corrupt the message the model is still producing.
 
 **Adding a tool touches three places.** Implement in `tools/`, register in

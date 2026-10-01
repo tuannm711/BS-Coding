@@ -11,6 +11,7 @@ export interface PendingAuthorizationInput {
   methodId: string
   reconnectAccountId?: string
   authUrl: string
+  userCode?: string
   expiresAt: number
   verifier?: string
   expectedState?: string
@@ -63,6 +64,7 @@ export class AuthSessionCoordinator {
       methodId: input.methodId,
       reconnectAccountId: input.reconnectAccountId,
       authUrl: input.authUrl,
+      ...(input.userCode ? { userCode: input.userCode } : {}),
       expiresAt: input.expiresAt,
       status: 'waiting'
     }

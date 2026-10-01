@@ -305,7 +305,7 @@ export default memo(function ChatInput({
         <textarea
           ref={fieldRef}
           className={`chat-input-field resize-none mode-${mode}`}
-          placeholder="Message Bs...  ( / for commands )"
+          placeholder={running ? 'Steer the agent...  (Enter to send)' : 'Message Bs...  ( / for commands )'}
           rows={2}
           onInput={e => onInput((e.target as HTMLTextAreaElement).value)}
           onPaste={e => {
@@ -325,6 +325,7 @@ export default memo(function ChatInput({
             }
           }}
           onKeyDown={e => {
+            if (e.nativeEvent.isComposing) return
             if (menu.open && filtered.length > 0) {
               if (e.key === 'ArrowDown') { e.preventDefault(); move(1); return }
               if (e.key === 'ArrowUp') { e.preventDefault(); move(-1); return }
@@ -375,6 +376,10 @@ export default memo(function ChatInput({
           Upload file
         </button>
         <span className="chat-input-toolbar-spacer" />
+        <button className="btn small" type="button" onClick={submit}
+          title={running ? 'Send guidance at the next step without stopping the agent' : 'Send message'}>
+          {editTarget ? 'Save message' : running ? 'Steer' : 'Send'}
+        </button>
         {running && (
           <button className="chat-input-stop" onClick={onStop}>
             Stop

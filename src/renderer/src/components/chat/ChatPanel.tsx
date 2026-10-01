@@ -491,8 +491,7 @@ if (e.type === 'usage') {
     if (!trimmed && (!images || images.length === 0)) return Promise.resolve()
     setSendError('')
     let optimisticId: string | undefined
-    // When a turn is already running the message is queued in main; the
-    // user message row appears only once the queue drains and the turn starts.
+    // Running messages wait in the session queue until the next step accepts them.
     if (!running) {
       optimisticId = 'u-' + Date.now()
       const messageId = optimisticId
@@ -765,8 +764,8 @@ if (e.type === 'usage') {
           <div className="chat-queue">
             {queue.map(q => (
               <div key={q.id} className="chat-queue-item">
-                <span className="chat-queue-badge">queued</span>
-                <span className="chat-queue-text" onClick={() => setEditTarget({ ...q, text: q.displayText ?? q.text })} title="Edit">{q.displayText ?? q.text}</span>
+                <span className="chat-queue-badge">{q.assigned ? 'queued' : 'steer pending'}</span>
+                <button type="button" className="chat-queue-text" onClick={() => setEditTarget({ ...q, text: q.displayText ?? q.text })} title="Edit pending message">{q.displayText ?? q.text}</button>
                 <button
                   className="chat-queue-remove"
                   aria-label={`remove queued ${q.displayText ?? q.text}`}
@@ -917,7 +916,6 @@ if (e.type === 'usage') {
               row is what let a project end up with two coordinators. */}
           {currentMode === 'plan' && <span className="chat-mode-hint">read-only — edits denied</span>}
           {currentMode === 'coordinate' && <span className="chat-mode-hint">coordinating — set in Fleet</span>}
-          <QuickMessageButtons messages={quickMessages} onSend={sendQuickMessage} disabled={pendingPrompt !== null || quickSending} />
           <div className="chat-mode-tools">
             <AgentPicker
               agents={agents}
@@ -939,6 +937,7 @@ if (e.type === 'usage') {
             )}
           </div>
         </div>
+        <QuickMessageButtons messages={quickMessages} onSend={sendQuickMessage} disabled={pendingPrompt !== null || quickSending} />
         <ChatInput
           agentId={agentId}
           running={running}
