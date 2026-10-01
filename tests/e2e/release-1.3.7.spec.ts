@@ -113,6 +113,7 @@ test('Copilot device code supports copy, cancel, denied recovery and successful 
       state.copilotDecision = 'pending'; state.copilotGrants = 0
       globalThis.fetch = async (input, init) => {
         const url = String(input)
+        if (url.startsWith('https://api.github.com/') && new Headers(init?.headers).get('x-github-api-version') !== '2022-11-28') return Response.json({ message: 'Bad Request' }, { status: 400 })
         if (url === 'https://github.com/login/device/code') return Response.json({ device_code: 'fixture-private-device', user_code: `CODE-000${++state.copilotGrants}`, verification_uri: 'https://github.com/login/device', expires_in: 900, interval: 0.1 })
         if (url === 'https://github.com/login/oauth/access_token') return Response.json(state.copilotDecision === 'approved' ? { access_token: 'fixture-github' } : { error: state.copilotDecision === 'denied' ? 'access_denied' : 'authorization_pending' })
         if (url === 'https://api.github.com/user') return Response.json({ id: 7, login: 'fixture-octocat', email: 'fixture@example.com' })

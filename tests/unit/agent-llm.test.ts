@@ -34,6 +34,40 @@ beforeEach(() => {
   createOpenAICompatibleMock.mockReset()
 })
 
+describe('stream usage contract', () => {
+  it('subtracts known cache categories when the SDK omits noCacheTokens', () => {
+    expect(toMessageTokens({ inputTokens: 100, outputTokens: 25, totalTokens: 125, cachedInputTokens: 40, cacheCreationInputTokens: 10, reasoningTokens: 5 })).toEqual({ input: 50, output: 25, total: 125, cacheRead: 40, cacheWrite: 10, reasoning: 5 })
+    expect(toMessageTokens({ inputTokens: undefined, outputTokens: undefined, totalTokens: undefined })).toBeUndefined()
+    expect(toMessageTokens({ inputTokens: Number.NaN, outputTokens: 1 })).toBeUndefined()
+  })
+
+  it('requests usage for compatible providers and applies the supplied output budget', async () => {
+    streamTextMock.mockReturnValue({ fullStream: fakeFullStream([{ type: 'finish', finishReason: 'stop', totalUsage: { inputTokens: 2, outputTokens: 3, totalTokens: 5 } }]) })
+    const parts: LlmStreamPart[] = []
+    for await (const part of createLlm('github-copilot', 'fixture', 'https://fixture.invalid/v1').stream({ model: 'fixture', system: '', messages: [], tools: [], maxOutputTokens: 32768 } as any)) parts.push(part)
+    expect(createOpenAICompatibleMock.mock.calls[0][0].includeUsage).toBe(true)
+    expect(streamTextMock.mock.calls[0][0].maxOutputTokens).toBe(32768)
+    expect(parts.at(-1)?.tokens).toEqual({ input: 2, output: 3, total: 5 })
+  })
+
+  it('falls back without usage only when a compatible endpoint rejects stream_options before output', async () => {
+    streamTextMock.mockReturnValueOnce({ fullStream: fakeFullStream([{ type: 'error', error: { statusCode: 400, message: 'Unsupported field stream_options.include_usage' } }]) })
+      .mockReturnValueOnce({ fullStream: fakeFullStream([{ type: 'text-delta', text: 'ok' }, { type: 'finish', finishReason: 'stop' }]) })
+    const parts: LlmStreamPart[] = []
+    for await (const part of createLlm('compatible', 'fixture', 'https://fixture.invalid/v1').stream({ model: 'fixture', system: '', messages: [], tools: [] })) parts.push(part)
+    expect(parts).toEqual([{ kind: 'text', text: 'ok' }, { kind: 'finish', finishReason: 'stop' }])
+    expect(createOpenAICompatibleMock.mock.calls.map(call => call[0].includeUsage)).toEqual([true, false])
+  })
+
+  it('does not replay visible text when a compatible stream fails after output', async () => {
+    streamTextMock.mockReturnValue({ fullStream: fakeFullStream([{ type: 'text-delta', text: 'partial' }, { type: 'error', error: { statusCode: 400, message: 'Unsupported field stream_options.include_usage' } }]) })
+    const parts: LlmStreamPart[] = []
+    for await (const part of createLlm('compatible', 'fixture', 'https://fixture.invalid/v1').stream({ model: 'fixture', system: '', messages: [], tools: [] })) parts.push(part)
+    expect(parts.map(part => part.kind)).toEqual(['text', 'error'])
+    expect(createOpenAICompatibleMock.mock.calls).toHaveLength(1)
+  })
+})
+
 describe('createAnthropicLlm', () => {
   it('maps text-delta and finish parts into LlmStreamPart', async () => {
     streamTextMock.mockReturnValue({
@@ -236,7 +270,7 @@ describe('createOpenAICompatibleLlm', () => {
     const opts = createOpenAICompatibleMock.mock.calls[0][0]
     expect(opts.baseURL).toBe('http://localhost:11434/v1')
     expect(opts.apiKey).toBe('k')
-    expect(opts.includeUsage).toBeUndefined()
+    expect(opts.includeUsage).toBe(true)
   })
 })
 
@@ -268,12 +302,12 @@ describe('DeepSeek usage capture', () => {
     expect(opts.includeUsage).toBe(true)
   })
 
-  it('does not enable stream usage for other OpenAI-compatible endpoints', async () => {
+  it('requests stream usage for other OpenAI-compatible endpoints', async () => {
     streamTextMock.mockReturnValue({
       fullStream: fakeFullStream([{ type: 'finish', finishReason: 'stop' }])
     })
     await streamOnce(createLlm('ollama', 'k', 'http://localhost:11434/v1'))
-    expect(createOpenAICompatibleMock.mock.calls[0][0].includeUsage).toBeUndefined()
+    expect(createOpenAICompatibleMock.mock.calls[0][0].includeUsage).toBe(true)
   })
 
   it('maps prompt_cache_hit_tokens into cacheRead and reasoning tokens', async () => {
@@ -315,21 +349,21 @@ describe('DeepSeek usage capture', () => {
 describe('toMessageTokens', () => {
   it('maps the full AI SDK usage breakdown', () => {
     expect(toMessageTokens({
-      inputTokens: 100, outputTokens: 20, totalTokens: 130,
+      inputTokens: 600, outputTokens: 20, totalTokens: 620,
       reasoningTokens: 8, cachedInputTokens: 500
-    })).toEqual({ input: 100, output: 20, total: 130, reasoning: 8, cacheRead: 500, cacheWrite: undefined })
+    })).toEqual({ input: 100, output: 20, total: 620, reasoning: 8, cacheRead: 500, cacheWrite: undefined })
   })
 
   it('maps SDK v6 inputTokenDetails (noCache/cacheRead/cacheWrite) and cache creation', () => {
     expect(toMessageTokens({
-      inputTokens: 130, outputTokens: 20, totalTokens: 150,
+      inputTokens: 630, outputTokens: 20, totalTokens: 650,
       cacheCreationInputTokens: 30,
       inputTokenDetails: { noCacheTokens: 100, cacheReadTokens: 500, cacheWriteTokens: 30 }
-    })).toEqual({ input: 100, output: 20, total: 150, reasoning: undefined, cacheRead: 500, cacheWrite: 30 })
+    })).toEqual({ input: 100, output: 20, total: 650, reasoning: undefined, cacheRead: 500, cacheWrite: 30 })
   })
 
-  it('defaults missing counters to 0 and leaves optional fields undefined', () => {
-    expect(toMessageTokens({})).toEqual({ input: 0, output: 0, total: 0, reasoning: undefined, cacheRead: undefined, cacheWrite: undefined })
+  it('leaves missing counters unknown', () => {
+    expect(toMessageTokens({})).toBeUndefined()
   })
 
   it('returns undefined when the provider reports no usage', () => {

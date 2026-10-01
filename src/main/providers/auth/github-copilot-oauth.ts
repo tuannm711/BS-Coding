@@ -7,7 +7,8 @@ const GITHUB_USER_EMAILS_ENDPOINT = 'https://api.github.com/user/emails'
 const GITHUB_COPILOT_TOKEN_ENDPOINT = 'https://api.github.com/copilot_internal/v2/token'
 const GITHUB_COPILOT_USER_ENDPOINT = 'https://api.github.com/copilot_internal/user'
 const GITHUB_CLIENT_ID = '01ab8ac9400c4e429b23'
-const GITHUB_API_VERSION = '2025-04-01'
+// GitHub rejects unsupported REST version dates with HTTP 400, even with a valid OAuth token.
+const GITHUB_API_VERSION = '2022-11-28'
 const USER_AGENT = 'bs-coding'
 
 interface GitHubUser {
@@ -119,7 +120,7 @@ export async function refreshGitHubCopilotCredentials(
 
 async function fetchGitHubUser(accessToken: string, fetchImpl: typeof fetch): Promise<GitHubUser> {
   const response = await fetchImpl(GITHUB_USER_ENDPOINT, { headers: githubHeaders(accessToken, 'Bearer') })
-  if (!response.ok) throw new Error(`[bs] GitHub profile fetch failed (${response.status})`)
+  if (!response.ok) throw new OAuthCallbackError('profile-fetch-failed', `[bs] GitHub profile could not be loaded (HTTP ${response.status}). Generate a new link to try again.`)
   return response.json() as Promise<GitHubUser>
 }
 

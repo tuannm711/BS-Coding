@@ -175,7 +175,7 @@ describe('Antigravity Cloud Code runtime', () => {
     }
   })
 
-  it('reports malformed Cloud Code frames and continues parsing later valid frames', async () => {
+  it('terminates malformed Cloud Code streams before later output is dispatched', async () => {
     const stream = [
       'event: result\ndata: {broken\n\n',
       'event: result\ndata: {"response":{"candidates":[{"content":{"parts":[{"text":"valid-after-error"}]},"finishReason":"STOP"}]}}\n\n'
@@ -184,6 +184,6 @@ describe('Antigravity Cloud Code runtime', () => {
     const parts = []
     for await (const part of createAntigravityLlm('token').stream({ model: 'gemini-3.1-pro-high', system: '', messages: [], tools: [] })) parts.push(part)
     expect(parts).toContainEqual(expect.objectContaining({ kind: 'error', error: expect.stringContaining('stream-invalid') }))
-    expect(parts).toContainEqual({ kind: 'text', text: 'valid-after-error' })
+    expect(parts).toHaveLength(1)
   })
 })

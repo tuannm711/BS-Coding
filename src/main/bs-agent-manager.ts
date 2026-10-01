@@ -140,7 +140,6 @@ export class BsAgentManager {
     projectPath: string
     sessionId: string
     execution: ResolvedTurnExecutionSnapshot
-    usage: UsageSummary
   }>()
 
   constructor(private deps: BsAgentManagerDeps) {
@@ -477,7 +476,7 @@ export class BsAgentManager {
     }
     this.activeSessions.set(agentId, sessionId)
     this.activeProjectSessions.set(projectPath, sessionId)
-    this.sessionExecutions.set(sessionId, { projectPath, sessionId, execution, usage: { ...EMPTY_USAGE } })
+    this.sessionExecutions.set(sessionId, { projectPath, sessionId, execution })
     for (const message of pendingMessages) this.coordinator.enqueue(sessionId, message)
     try {
       await this.runTurn(agentId, text, images, displayText)
@@ -486,8 +485,6 @@ export class BsAgentManager {
       const completedAt = Date.now()
       this.deps.store.finishExecution(execution.turnId, finalStatus, completedAt)
       this.emit({ type: 'turn-finished', agentId, execution: { ...execution, status: finalStatus, completedAt } })
-      const context = this.sessionExecutions.get(sessionId)
-      if (finalStatus === 'completed' && context) this.deps.store.addUsage(sessionId, context.usage)
       const next = finalStatus === 'completed' ? this.coordinator.dequeue(sessionId) : undefined
       const remaining = next ? this.coordinator.state(sessionId)?.queue ?? [] : []
       if (finalStatus === 'completed') this.coordinator.complete(sessionId)
@@ -1201,13 +1198,12 @@ export class BsAgentManager {
     if (!agent) return { limit: null, compactThreshold: null, sessionCost: 0 }
     const cfg = loadBsConfig(this.deps.configPath)
     const resolved = this.resolveAgentConfig(cfg, agent.name, agent.model)
-    const modelLimit = resolved.provider && resolved.model
-      ? this.modelLimits.get(`${resolved.provider}/${resolved.model}`)
-      : undefined
+    const modelLimit = this.modelLimitFor(resolved)
     const limit = modelLimit?.context ?? cfg.maxContextTokens ?? null
     const compactThreshold = cfg.compaction.auto && limit ? limit - cfg.compaction.buffer : null
     return {
       limit,
+      limitSource: modelLimit?.contextSource ?? 'configured',
       compactThreshold,
       sessionCost: this.deps.store.getUsage(this.activeSessionId(agentId)).cost
     }
@@ -1475,7 +1471,7 @@ export class BsAgentManager {
       if (now - lastAttempt < 60_000) continue
       const resolved = this.resolved.get(agentId)
       if (!resolved?.provider || !resolved.model) continue
-      const modelLimit = this.modelLimits.get(`${resolved.provider}/${resolved.model}`)
+      const modelLimit = this.modelLimitFor(resolved)
       const limit = modelLimit?.context ?? cfg.maxContextTokens ?? null
       const compaction = cfg.compaction
       if (!compaction?.auto || !limit || limit <= 0) continue
@@ -1522,6 +1518,26 @@ export class BsAgentManager {
     }
   }
 
+  private modelLimitFor(resolved: { provider?: string; model?: string; accountId?: string }): {
+    context?: number; output?: number; contextSource?: 'provider' | 'catalog'
+  } | undefined {
+    if (!resolved.provider || !resolved.model) return undefined
+    const capabilities = this.deps.providerAccounts?.()
+      .find(connection => connection.providerId === resolved.provider)?.accounts
+      .find(account => account.id === resolved.accountId)?.modelCatalog
+      ?.find(model => model.id === resolved.model)?.capabilities
+    const catalog = this.modelLimits.get(`${resolved.provider}/${resolved.model}`)
+    const positive = (value: number | undefined): number | undefined =>
+      value !== undefined && Number.isFinite(value) && value > 0 ? value : undefined
+    const providerContext = positive(capabilities?.contextWindow)
+    const context = providerContext ?? positive(catalog?.context)
+    return {
+      context,
+      output: positive(capabilities?.maxOutputTokens) ?? positive(catalog?.output),
+      contextSource: context === undefined ? undefined : providerContext === undefined ? 'catalog' : 'provider'
+    }
+  }
+
   private async syncTools(): Promise<void> {
     const cfg = loadBsConfig(this.deps.configPath)
     await this.mcp.connect(cfg.mcp ?? {}, this.deps.projectPath)
@@ -1548,9 +1564,7 @@ export class BsAgentManager {
     const cfg = loadBsConfig(this.deps.configPath)
     const resolved = this.resolveAgentConfig(cfg, agent.name, agent.model)
     this.resolved.set(agent.id, resolved)
-    const modelLimit = resolved.provider && resolved.model
-      ? this.modelLimits.get(`${resolved.provider}/${resolved.model}`)
-      : undefined
+    const modelLimit = this.modelLimitFor(resolved)
     const contextTokens = modelLimit?.context ?? cfg.maxContextTokens
     const skills = collectSkills(agent.cwd, this.deps.userSkillsDir, this.deps.builtinSkillsDir)
     // AGENTS.md/CLAUDE.md walking up from cwd are inlined into the system
@@ -1650,6 +1664,7 @@ export class BsAgentManager {
       ask: (promptId, tool) => this.awaitPrompt(agent.id, promptId, tool),
       maxSteps: cfg.maxSteps,
       maxContextTokens: contextTokens,
+      maxOutputTokens: modelLimit?.output,
       compaction: cfg.compaction,
       toolOutput: cfg.toolOutput,
       truncation: this.deps.truncation,
@@ -1744,30 +1759,20 @@ export class BsAgentManager {
           }, price)
         }
         this.lastUsageByAgent.set(agent.id, tokens)
-        const executionContext = this.executionForAgent(agent.id)
-        if (executionContext) {
-          executionContext.usage = {
-            input: executionContext.usage.input + usage.input,
-            output: executionContext.usage.output + usage.output,
-            cacheRead: executionContext.usage.cacheRead + usage.cacheRead,
-            cacheWrite: executionContext.usage.cacheWrite + usage.cacheWrite,
-            cost: executionContext.usage.cost + usage.cost
-          }
-        } else {
-          this.deps.store.addUsage(sessionId, usage)
-        }
+        // The provider has already spent these tokens. Persist each measured
+        // request even when this turn is later stopped, failed or removed.
+        this.deps.store.addUsage(sessionId, usage)
         const sessionUsage = this.deps.store.getUsage(sessionId)
-        const pendingUsage = executionContext?.usage ?? EMPTY_USAGE
         this.emit({
           type: 'usage',
           agentId: agent.id,
           tokens,
-          sessionCost: sessionUsage.cost + pendingUsage.cost,
+          sessionCost: sessionUsage.cost,
           // "in" counts cached tokens too, matching provider dashboards (e.g.
           // DeepSeek's prompt_tokens = cache hit + miss).
           sessionTokens: {
-            input: sessionUsage.input + sessionUsage.cacheRead + sessionUsage.cacheWrite + pendingUsage.input + pendingUsage.cacheRead + pendingUsage.cacheWrite,
-            output: sessionUsage.output + pendingUsage.output
+            input: sessionUsage.input + sessionUsage.cacheRead + sessionUsage.cacheWrite,
+            output: sessionUsage.output
           }
         })
       }

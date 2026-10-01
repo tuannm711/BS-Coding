@@ -46,6 +46,7 @@ const config: Configuration = {
   extraResources: [
     { from: 'resources/skills', to: 'skills' },
     { from: 'out/browser-extension', to: 'browser-extension' },
+    { from: 'out/browser-native-host', to: 'browser-native-host' },
     { from: 'resources/tray-icon.png', to: 'tray-icon.png' }
   ],
   asar: true,

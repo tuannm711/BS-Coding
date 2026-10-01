@@ -8,10 +8,10 @@ produces these records is in `docs/design/02-agent-runtime.md`.
 | Section | Lines | Names |
 | --- | --- | --- |
 | [Pieces](#pieces) | 17-28 | `src/main/agent/session.ts`, `SessionStore`, `sessions.json`, `src/main/agent/shared-session-coordinator.ts`, `SharedSessionCoordinator`, `src/main/agent/snapshot.ts` |
-| [Data flow](#data-flow) | 29-49 | `appendMessage`, `appendTool`, `turnId`, `SharedSessionCoordinator`, `SessionExecutionState`, `SnapshotStore.snapshot` |
-| [Types that carry it](#types-that-carry-it) | 50-65 | `StoredSession`, `ChatTranscriptItem[]`, `turnId`, `SnapshotTurn`, `SnapshotFile[]`, `SessionExecutionState` |
-| [Design decisions](#design-decisions) | 66-101 | `takeSteers(sessionId)`, `undoTurn`, `pushTurn`, `undoCall`, `JsonStore`, `TruncationStore` |
-| [Known limits](#known-limits) | 102-109 | `undoCall`, `ArtifactStore` |
+| [Data flow](#data-flow) | 29-56 | `appendMessage`, `appendTool`, `turnId`, `SharedSessionCoordinator`, `SessionExecutionState`, `SnapshotStore.snapshot` |
+| [Types that carry it](#types-that-carry-it) | 57-72 | `StoredSession`, `ChatTranscriptItem[]`, `turnId`, `SnapshotTurn`, `SnapshotFile[]`, `SessionExecutionState` |
+| [Design decisions](#design-decisions) | 73-108 | `takeSteers(sessionId)`, `undoTurn`, `pushTurn`, `undoCall`, `JsonStore`, `TruncationStore` |
+| [Known limits](#known-limits) | 109-116 | `undoCall`, `ArtifactStore` |
 <!-- /toc -->
 
 ## Pieces
@@ -37,6 +37,13 @@ per session: the project and agent currently running, the `turnId`, a `locked`
 flag, and a `queue`. Human guidance sent to a locked session targets its current
 executing agent and is accepted at the next step. The agent selector stays
 locked while that execution runs. When the turn finishes the lock releases.
+
+Measured provider usage is persisted per request rather than only at successful
+turn completion. Stop, failure and final-prose continuation retain recorded
+spending. An input-only response has a usage-bearing transcript marker so the
+footer restores the latest count after restart; empty assistant markers are
+omitted from model replay and visual rows. Unmeasured newer requests do not
+reuse an older context measurement.
 
 **Undo.** Before a tool writes to a file, `SnapshotStore.snapshot` records the
 original content under the current turn. `undo` restores every file that turn

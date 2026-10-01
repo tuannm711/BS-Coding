@@ -10,9 +10,9 @@ touch, how a message crosses, and how the build keeps the split honest. What run
 | --- | --- | --- |
 | [Pieces](#pieces) | 18-32 | `src/main/index.ts`, `MainApp`, `src/preload/index.ts`, `AgentApi`, `window.api`, `contextBridge` |
 | [Data flow](#data-flow) | 33-53 | `window.api`, `registerIpcHandlers`, `ipcRenderer.on`, `onX`, `AgentApi`, `Event*` |
-| [Types that carry it](#types-that-carry-it) | 54-69 | `src/shared/ipc.ts`, `Channels`, `AgentApi`, `window.api`, `PtyDataEvent`, `AgentStateEvent` |
-| [Design decisions](#design-decisions) | 70-98 | `src/shared`, `src/shared/AGENTS.md`, `Channels`, `AgentApi`, `registerIpcHandlers`, `tests/unit/ipc-contract.test.ts` |
-| [Known limits](#known-limits) | 99-107 | `tests/`, `tsconfig.test.json`, `tests/unit/design-docs.test.ts` |
+| [Types that carry it](#types-that-carry-it) | 54-76 | `src/browser-native-host/host.ts`, `src/main/browser/service.ts`, `src/shared/ipc.ts`, `Channels`, `AgentApi`, `window.api` |
+| [Design decisions](#design-decisions) | 77-105 | `src/shared`, `src/shared/AGENTS.md`, `Channels`, `AgentApi`, `registerIpcHandlers`, `tests/unit/ipc-contract.test.ts` |
+| [Known limits](#known-limits) | 106-114 | `tests/`, `tsconfig.test.json`, `tests/unit/design-docs.test.ts` |
 <!-- /toc -->
 
 ## Pieces
@@ -52,6 +52,13 @@ There are 147 channels. They are grouped by prefix — `workspace:`, `agent:`,
 named `Event*` in the `Channels` object regardless of their string value.
 
 ## Types that carry it
+
+The browser bridge uses an additional small stdio helper launched by Chrome
+Native Messaging. `src/browser-native-host/host.ts` validates the extension
+origin, authenticates per-install OS IPC, and proxies framed JSON to
+`src/main/browser/service.ts`. Renderer setup/profile/tab actions remain behind
+the central IPC contract and preload. Shared protocol contains only serializable
+types and constants; framing, process launch and host registration remain in main/helper.
 
 `src/shared/ipc.ts` declares three things:
 

@@ -9,12 +9,12 @@ presentation.
 | Section | Lines | Names |
 | --- | --- | --- |
 | [Pieces](#pieces) | 20-38 | `src/main/providers/types.ts`, `ProviderAdapter`, `src/main/providers/registry.ts`, `src/main/providers/adapters/openai.ts`, `src/main/providers/adapters/antigravity.ts`, `src/main/providers/adapters/github-copilot.ts` |
-| [Data flow](#data-flow) | 39-67 | `ProviderManager.createAuthorization`, `ProviderAuthorizationStrategy`, `slow_down`, `MainApp.startUsagePoll`, `ProviderManager.refreshUsage`, `adapter.refreshCredentials` |
-| [Types that carry it](#types-that-carry-it) | 68-88 | `ProviderAdapter`, `refreshAccount`, `listModels`, `createRuntime`, `refreshCredentials`, `recoverRuntimeContext` |
-| [Design decisions](#design-decisions) | 89-133 | `ProviderUsage.status`, `'near-limit'`, `docs/technical-debt.md`, `primaryUsedPercent`, `providerError`, `hasRemainingQuota` |
-| [Choosing a replacement when a pool is refused](#choosing-a-replacement-when-a-pool-is-refused) | 134-135 |  |
-| &nbsp;&nbsp;[Agent quota reservations](#agent-quota-reservations) | 136-171 | `src/shared/agent-quota-binding.ts`, `quotaPoolId`, `rankFallbackAgents`, `src/shared/agent-fallback.ts`, `poolState`, `SessionRunner` |
-| [Known limits](#known-limits) | 172-182 | `openai.ts`, `antigravity.ts`, `fetchUsage`, `poolErrors` |
+| [Data flow](#data-flow) | 39-81 | `ProviderManager.createAuthorization`, `ProviderAuthorizationStrategy`, `slow_down`, `usageMetadata`, `stream_options.include_usage`, `MainApp.startUsagePoll` |
+| [Types that carry it](#types-that-carry-it) | 82-102 | `ProviderAdapter`, `refreshAccount`, `listModels`, `createRuntime`, `refreshCredentials`, `recoverRuntimeContext` |
+| [Design decisions](#design-decisions) | 103-147 | `ProviderUsage.status`, `'near-limit'`, `docs/technical-debt.md`, `primaryUsedPercent`, `providerError`, `hasRemainingQuota` |
+| [Choosing a replacement when a pool is refused](#choosing-a-replacement-when-a-pool-is-refused) | 148-149 |  |
+| &nbsp;&nbsp;[Agent quota reservations](#agent-quota-reservations) | 150-185 | `src/shared/agent-quota-binding.ts`, `quotaPoolId`, `rankFallbackAgents`, `src/shared/agent-fallback.ts`, `poolState`, `SessionRunner` |
+| [Known limits](#known-limits) | 186-196 | `openai.ts`, `antigravity.ts`, `fetchUsage`, `poolErrors` |
 <!-- /toc -->
 
 ## Pieces
@@ -48,6 +48,20 @@ Only the user code crosses IPC; the private device grant remains inside the
 completion closure. Profile and Copilot entitlement must succeed before account
 connection. Failed/cancelled reconnect rolls back existing account and secrets.
 The account lands in the store and secrets in the encrypted vault.
+
+GitHub REST requests use the supported `2022-11-28` API version for profile,
+private email and Copilot credentials. An unsupported date produces HTTP 400
+even after OAuth succeeds. Profile failures preserve their HTTP status in the
+public authorization error, with no token or response body exposed.
+
+**Stream usage.** Antigravity's Cloud Code transport reads response-level
+`usageMetadata`, including a final usage-only frame after the candidate stops.
+Prompt counts include cached tokens, while candidate output and thinking are
+combined for output; cache remains a separate cost counter. Generic compatible
+streams request `stream_options.include_usage`. Endpoints rejecting that option
+explicitly can be retried without it before output; missing usage is unknown.
+Exact assigned-account model capabilities take priority over catalog limits,
+with no inference from another provider's similarly named model.
 
 **Refreshing usage.** `MainApp.startUsagePoll` runs every five minutes, and a
 debounced refresh fires a few seconds after any agent turn ends.

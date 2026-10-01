@@ -59,7 +59,7 @@ Instrument Sans is the UI face, Bricolage Grotesque is used for display labels, 
 
 ## Layout
 
-The existing stylesheet uses a 4px spacing rhythm. Both rails are 279px. Fleet scrolls inside its rail and displays one card per agent. Settings content owns its scrolling; tables allow horizontal overflow. Mode and agent/model controls share a wrapping row; Quick Messages occupy a separate wrapping row immediately below it and above the composer.
+The existing stylesheet uses a 4px spacing rhythm. Both rails are 279px. Fleet scrolls inside its rail and displays one card per agent. Settings content owns its scrolling; tables allow horizontal overflow. Mode and agent/model controls share a wrapping row; Quick Messages occupy a separate wrapping row immediately below it and above the composer, centered within each row at every pane width.
 
 Settings is up to 1120px wide and 88dvh tall, bounded by the window. At 760px and below its section navigation becomes a horizontal scroller. Header, feedback and Save/Cancel stay outside the content scroller. Chat uses compact progress prose and expandable tool activity, with an open text surface for the final response.
 
@@ -95,6 +95,8 @@ Add and Edit project share the modal form. Editing a name updates the existing p
 
 Copilot uses the existing provider authorization modal with a Device Flow variant. Show the GitHub verification code, Copy code, verification URL, Open browser and expiry. Codes are transient; private device grants and tokens stay in main. Cancel closes the modal and stops polling; denied/expired sessions can generate a new code. Other providers retain callback OAuth.
 
+Browser connection and install-guide dialogs reuse Modal with English setup/status/error copy, native profile/tab selects and keyboard focus restoration. Setup uses an explicit Install / Repair helper action. Existing tabs are assigned to the current chat only through this workflow. Profiles may be disabled/re-enabled; offline selection remains visible rather than silently switching to another profile. Native mode has no port/code fields.
+
 ### Iconography
 
 Use lucide-react with accessible labels and tooltip descriptions for icon actions. Preserve text for important primary actions and agent identities.
@@ -105,9 +107,13 @@ Streaming updates remain immediate. Avoid decorative animation in chat hot paths
 
 Thinking is displayed only for provider-supplied reasoning. Working, Responding and input-wait states follow real events. Flush batched prose before a tool boundary so activity stays chronological. A persisted `turn-finished` event identifies successful completion. Only the final text after the last tool of a completed turn receives Response, elapsed turn time and Copy; stopped/failed turns never receive a success label. Copy preserves Markdown and reports clipboard failures inline. Completion does not take scroll ownership from a user reading earlier messages.
 
+Final prose that reaches its output budget may continue within the same turn, with tools disabled and at most two automatic continuation requests. Streamed deltas append verbatim; repeated letters, whitespace and Markdown are not deduplicated by content. The final response and Copy retain the joined prose. Missing completion markers, provider failure or exhausted continuation budget preserve partial text and show an error.
+
 ### Content and data visualization
 
 Use short English action labels. Quota bars reuse `QuotaWindow`, with explicit unknown values rather than inventing measurements. Bound and shared quota facts come from the shared binding contract.
+
+The chat footer's context count is the latest provider-reported request size (including cache and generated tokens), while Tokens is the cumulative usage recorded for the session. Provider measurements survive reload and measured spending persists after Stop/error. Missing usage remains unknown. Percentage uses the exact account/catalog model limit where available; a fallback is identified as a configured context budget in its tooltip. Tooltip copy explains both measurements and unreported requests.
 
 ## Do's and Don'ts
 

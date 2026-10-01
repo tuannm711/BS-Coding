@@ -29,6 +29,28 @@ describe('GitHub Copilot authorization integration', () => {
   beforeEach(() => vi.useFakeTimers())
   afterEach(() => { managers.splice(0).forEach(manager => manager.close()); vi.unstubAllGlobals(); vi.useRealTimers(); roots.splice(0).forEach(root => rmSync(root, { recursive: true, force: true })) })
 
+  it('preserves the profile HTTP failure in the public authorization error without creating an account', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => {
+      const url = String(input)
+      if (url.endsWith('/login/device/code')) return Response.json({ device_code: 'private-device', user_code: 'ABCD-EFGH', verification_uri: 'https://github.com/login/device', expires_in: 900, interval: 5 })
+      if (url.endsWith('/login/oauth/access_token')) return Response.json({ access_token: 'private-github-token' })
+      if (url === 'https://api.github.com/user') return Response.json({ message: 'Server error' }, { status: 503 })
+      throw new Error(`Unexpected URL ${url}`)
+    }))
+    const registry = new ProviderRegistry()
+    registry.register(createGitHubCopilotAdapter())
+    const manager = new ProviderManager({ accountsFile: accountFile('bs-copilot-profile-error-'), registry, vault: fakeVault() as never })
+    managers.push(manager)
+    const session = await manager.createAuthorization({ providerId: 'github-copilot', methodId: 'oauth' })
+    await vi.advanceTimersByTimeAsync(5000)
+    const failed = manager.getAuthorization(session.loginId)
+    expect(failed?.status).toBe('error')
+    expect(failed?.error?.kind).toBe('profile-fetch-failed')
+    expect(failed?.error?.message).toContain('503')
+    expect(JSON.stringify(failed)).not.toContain('private-github-token')
+    expect(manager.list()).toEqual([])
+  })
+
   it('creates, reconnects and hydrates one Copilot account', async () => {
     vi.stubGlobal('fetch', vi.fn(async (url: string) => {
       if (url.endsWith('/login/device/code')) return Response.json({ device_code: 'private-device', user_code: 'ABCD-EFGH', verification_uri: 'https://github.com/login/device', expires_in: 900, interval: 5 })

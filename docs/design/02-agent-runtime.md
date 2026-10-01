@@ -9,14 +9,14 @@ this document assumes an `LlmClient` already exists.
 | Section | Lines | Names |
 | --- | --- | --- |
 | [Pieces](#pieces) | 22-41 | `src/main/bs-agent-manager.ts`, `BsAgentManager`, `src/main/agent/loop.ts`, `SessionRunner`, `src/main/agent/llm.ts`, `LlmClient` |
-| [Data flow](#data-flow) | 42-70 | `BsAgentManager`, `SessionRunner`, `LoopDeps`, `toLlmMessages(getItems())`, `LlmClient`, `text-delta` |
-| [Types that carry it](#types-that-carry-it) | 71-85 | `LoopDeps`, `src/main/agent/loop.ts`, `getItems`, `appendMessage`, `appendTool`, `tests/unit/agent-loop.test.ts` |
-| [Design decisions](#design-decisions) | 86-123 | `LoopDeps`, `createLlm`, `LlmClient`, `src/main/agent/AGENTS.md`, `takeSteers`, `tools/` |
-| [Two ways to hand work off](#two-ways-to-hand-work-off) | 124-149 | `SessionRunner`, `SUBAGENT_CONFIGS`, `COORDINATE_RULES`, `visibleToolDefs`, `decidePermission`, `runAssignment` |
-| [One conversation format](#one-conversation-format) | 150-167 | `tool-call`, `tool-result`, `toLlmMessages`, `compileNeutralContext`, `thoughtSignature`, `sendInSession` |
-| [What a handoff borrows](#what-a-handoff-borrows) | 168-197 | `systemSuffix` |
-| [What a coordinator is told, and what it can reach](#what-a-coordinator-is-told-and-what-it-can-reach) | 198-229 | `coordinatorNote`, `BsAgentManager`, `systemSuffix`, `modeNote`, `decidePermission`, `--output` |
-| [Known limits](#known-limits) | 230-242 | `MAX_COMPACT_PER_RUN`, `compactIfOverThreshold`, `undoTurn`, `pushTurn`, `turnId` |
+| [Data flow](#data-flow) | 42-92 | `BsAgentManager`, `SessionRunner`, `LoopDeps`, `toLlmMessages(getItems())`, `LlmClient`, `text-delta` |
+| [Types that carry it](#types-that-carry-it) | 93-107 | `LoopDeps`, `src/main/agent/loop.ts`, `getItems`, `appendMessage`, `appendTool`, `tests/unit/agent-loop.test.ts` |
+| [Design decisions](#design-decisions) | 108-145 | `LoopDeps`, `createLlm`, `LlmClient`, `src/main/agent/AGENTS.md`, `takeSteers`, `tools/` |
+| [Two ways to hand work off](#two-ways-to-hand-work-off) | 146-171 | `SessionRunner`, `SUBAGENT_CONFIGS`, `COORDINATE_RULES`, `visibleToolDefs`, `decidePermission`, `runAssignment` |
+| [One conversation format](#one-conversation-format) | 172-189 | `tool-call`, `tool-result`, `toLlmMessages`, `compileNeutralContext`, `thoughtSignature`, `sendInSession` |
+| [What a handoff borrows](#what-a-handoff-borrows) | 190-219 | `systemSuffix` |
+| [What a coordinator is told, and what it can reach](#what-a-coordinator-is-told-and-what-it-can-reach) | 220-251 | `coordinatorNote`, `BsAgentManager`, `systemSuffix`, `modeNote`, `decidePermission`, `--output` |
+| [Known limits](#known-limits) | 252-264 | `MAX_COMPACT_PER_RUN`, `compactIfOverThreshold`, `undoTurn`, `pushTurn`, `turnId` |
 <!-- /toc -->
 
 ## Pieces
@@ -62,6 +62,28 @@ A turn is a loop over model steps, not a single request.
 8. The loop ends on a step with no tool calls, on `maxSteps` (default 50, with a
    final wrap-up prompt and tools disabled), on abort, or on error — emitting
    `done` or `error`.
+
+Final prose with an explicit output-budget finish (`length`/`max_tokens`) can
+continue within the same turn up to twice, with tools disabled. The continuation
+request includes preceding prose but is not saved as a user message. One joined
+assistant message preserves the full final response and Copy content. Missing
+completion markers or terminal provider errors save partial prose and emit an
+error. Stop never triggers continuation. An output limit comes from the exact
+account model capabilities or catalog; Antigravity no longer imposes an
+arbitrary 8,192-token cap.
+
+Text deltas append verbatim. Protocol sequence/item identifiers handle repeated
+Responses events, rather than deleting overlapping text. SSE decoder limits
+bound an individual frame/unparsed buffer, not the cumulative response length.
+Compatible streams request usage and retry without that option only for an
+explicit unsupported-option rejection before any response output.
+
+Usage is recorded per provider request as soon as reported, including stopped
+or failed turns. Antigravity reads response-level usage and trailing usage-only
+frames; cached input and thinking tokens are counted once. The renderer shows
+latest measured request size as context and cumulative measured session tokens.
+Unknown measurements stay unknown; a configured fallback context budget is
+identified separately from an exact provider/catalog model capacity.
 
 The renderer sees only the `ChatEvent` stream. The eleven kinds are
 `text-delta`, `reasoning-delta`, `tool-start`, `tool-result`, `prompt-request`,

@@ -15,14 +15,60 @@ afterEach(() => {
 })
 
 describe('createDebugSession', () => {
-  it('attaches once and enables the four CDP domains', async () => {
+  it('closes a hung attachment and prevents its late completion from claiming new session state', async () => {
+    vi.useFakeTimers()
+    const dbg = fakeDbg()
+    let release!: () => void
+    dbg.attach.mockImplementationOnce(() => new Promise<void>(resolve => { release = resolve }))
+    const session = createDebugSession(dbg)
+    const first = session.ensure(10)
+    const rejected = expect(first).rejects.toThrow(/DETACHED|cancelled/)
+    await Promise.resolve(); await Promise.resolve()
+    await session.close()
+    await rejected
+    await session.ensure(20)
+    release()
+    for (let i = 0; i < 10; i++) await Promise.resolve()
+    expect(session.attachedTabId()).toBe(20)
+    expect(dbg.detach).toHaveBeenCalledWith({ tabId: 10 })
+  })
+
+  it('bounds hung detach and permits subsequent attachment after quarantine', async () => {
+    vi.useFakeTimers()
+    const dbg = fakeDbg()
+    const session = createDebugSession(dbg)
+    await session.ensure(10)
+    dbg.detach.mockImplementationOnce(() => new Promise(() => {}))
+    const closing = session.close()
+    await vi.advanceTimersByTimeAsync(1001)
+    await closing
+    await session.ensure(20)
+    expect(session.attachedTabId()).toBe(20)
+  })
+
+  it.each(['attach', 'enable'] as const)('bounds hung %s setup without waiting for a command cancellation', async stage => {
+    vi.useFakeTimers()
+    const dbg = fakeDbg()
+    if (stage === 'attach') dbg.attach.mockImplementationOnce(() => new Promise(() => {}))
+    else dbg.sendCommand.mockImplementationOnce(() => new Promise(() => {}))
+    const session = createDebugSession(dbg)
+    const pending = session.ensure(10)
+    const rejected = expect(pending).rejects.toThrow('DEBUGGER_TIMEOUT')
+    await vi.advanceTimersByTimeAsync(5001)
+    await rejected
+    expect(session.attachedTabId()).toBeNull()
+    await session.ensure(20)
+    expect(session.attachedTabId()).toBe(20)
+  })
+
+  it('attaches once and enables scoped CDP observation domains', async () => {
     const dbg = fakeDbg()
     const session = createDebugSession(dbg)
     await session.ensure(10)
     expect(dbg.attach).toHaveBeenCalledTimes(1)
     expect(dbg.attach).toHaveBeenCalledWith({ tabId: 10 }, '1.3')
     expect(dbg.sendCommand.mock.calls.map(c => c[1])).toEqual([
-      'DOM.enable', 'Page.enable', 'Runtime.enable', 'Accessibility.enable'
+      'DOM.enable', 'Page.enable', 'Runtime.enable', 'Accessibility.enable', 'Network.enable'
     ])
     expect(session.attachedTabId()).toBe(10)
   })

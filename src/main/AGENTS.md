@@ -32,7 +32,7 @@ handlers và vòng đời app.
 - `artifact-store.ts` — artifact theo project, phát sự kiện ra renderer.
 - `file-viewer.ts` / `dir-lister.ts` — đọc file và liệt kê thư mục cho right panel.
 - `connections/` + `providers/` — tài khoản provider, quota, OAuth — xem `docs/design/03-providers.md`.
-- `browser/` — BrowserBridge (WS server local + pairing) + Chrome launcher + snapshot format.
+- `browser/` — BrowserService (Native Messaging + OS IPC), native host installer, session/profile routing, Chrome launcher and snapshot format. The legacy WS bridge is retained for reference/tests and is not started by MainApp.
 
 ## Quy ước
 

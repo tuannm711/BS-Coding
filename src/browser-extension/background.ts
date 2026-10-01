@@ -1,555 +1,294 @@
-import type { BridgeToExtension, ExtensionToBridge } from '../../src/shared/browser-types'
+import type { BrowserCommandResult } from '../shared/browser-types'
+import type { NativeCommand } from '../shared/browser-native'
+import { NATIVE_HOST_NAME } from '../shared/browser-native'
+import { NativeExtensionTransport, type NativeActionContext, type NativeConnectionStatus } from './native-transport'
+import { SessionTabs } from './session-tabs'
+import { SessionSnapshots } from './session-snapshots'
+import { SessionCdpEvents } from './cdp-events'
 import { createDebugSession } from './debug-session'
-import { axTreeToSnapshot, mergeFrameAxTrees } from './ax-snapshot'
-import type { AxFrameBundle, AxNodeLike } from './ax-snapshot'
+import { axTreeToSnapshot, mergeFrameAxTrees, type AxFrameBundle, type AxNodeLike } from './ax-snapshot'
 
-const DEFAULT_PORT = 3927
-const STORAGE_KEY = 'bsBridge'
-const HEARTBEAT_MS = 20_000
-const ALARM_NAME = 'bs-bridge-keepalive'
-
-interface StoredState {
-  port?: number
-  code?: string
-  connected?: boolean
-}
-
-let ws: WebSocket | null = null
+const STORAGE_KEY = 'bsNativeBrowser'
+const ALARM_NAME = 'bs-native-reconnect'
+const debugSession = createDebugSession(chrome.debugger)
+const snapshots = new SessionSnapshots()
+const logs = new SessionCdpEvents()
+let sessions = new SessionTabs()
+let transport: NativeExtensionTransport | null = null
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null
 let reconnectDelay = 1000
-let paired = false
-let pendingCode: string | null = null
+let nativeConnected = false
+let debuggerTeardown: Promise<void> = Promise.resolve()
+let initialized: Promise<void> | null = null
+let clientId = ''
+let browserEpoch = ''
+let label = 'Chrome'
 
-const GROUP_TITLE = 'Bs'
-const GROUP_COLOR = 'blue' as chrome.tabGroups.ColorEnum
-
-let workingTabId: number | null = null
-let groupLock: Promise<unknown> = Promise.resolve()
-
-const debugSession = createDebugSession(chrome.debugger)
-
-let snapshot: { tabId: number; refs: Map<string, number> } | null = null
-
-function persistWorkingTab(id: number | null): void {
-  workingTabId = id
-  void chrome.storage.session.set({ workingTabId: id }).catch(() => {})
-}
-
-function saveState(patch: Partial<StoredState>): void {
-  void chrome.storage.local.get(STORAGE_KEY).then((res: Record<string, StoredState | undefined>) => {
-    const cur = res[STORAGE_KEY] ?? {}
-    void chrome.storage.local.set({ [STORAGE_KEY]: { ...cur, ...patch } }).catch(() => {})
-  }).catch(() => {})
-}
-
-async function loadState(): Promise<StoredState> {
-  const res = await chrome.storage.local.get(STORAGE_KEY)
-  return (res[STORAGE_KEY] as StoredState | undefined) ?? {}
-}
-
-function broadcastStatus(): void {
-  void chrome.runtime.sendMessage({ kind: 'status', paired, connected: ws?.readyState === WebSocket.OPEN }).catch(() => {})
-}
-
-function sendHeartbeat(): void {
-  if (!ws || ws.readyState !== WebSocket.OPEN) return
-  ws.send(JSON.stringify({ type: 'ping' } satisfies ExtensionToBridge))
-}
-
-async function detectPort(): Promise<number> {
-  const state = await loadState()
-  if (state.port) return state.port
-  try {
-    const res = await fetch(`http://127.0.0.1:${DEFAULT_PORT}/api/status`)
-    if (res.ok) {
-      const body = await res.json() as { port?: number }
-      if (typeof body.port === 'number') return body.port
-    }
-  } catch {
-    // Bs chưa chạy hoặc port khác — dùng default
-  }
-  return DEFAULT_PORT
-}
-
-function connect(): void {
-  if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return
-  if (reconnectTimer) {
-    clearTimeout(reconnectTimer)
-    reconnectTimer = null
-  }
-  void chrome.storage.session.get('workingTabId').then(async (res) => {
-    const id = (res as { workingTabId?: number | null }).workingTabId
-    if (id == null) return
-    try {
-      const t = await chrome.tabs.get(id)
-      workingTabId = t.id ?? null
-    } catch {
-      workingTabId = null
-    }
-  })
-  void (async () => {
-    const port = await detectPort()
-    const state = await loadState()
-    let socket: WebSocket
-    try {
-      socket = new WebSocket(`ws://127.0.0.1:${port}`)
-    } catch {
-      scheduleReconnect()
-      return
-    }
-    if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
-      socket.close()
-      return
-    }
-    ws = socket
-    const code = pendingCode ?? state.code ?? null
-    socket.onopen = () => {
-      if (ws !== socket) return
-      paired = false
-      broadcastStatus()
-      if (code) socket.send(JSON.stringify({ type: 'pair', code } satisfies ExtensionToBridge))
-    }
-    socket.onmessage = (ev) => {
-      const msg = JSON.parse(String(ev.data)) as BridgeToExtension
-      if (msg.type === 'pair_result') {
-        if (ws !== socket) return
-        paired = msg.ok
-        if (msg.ok) {
-          pendingCode = null
-          saveState({ connected: true })
-          reconnectDelay = 1000
-        } else {
-          saveState({ connected: false })
-          snapshot = null
-          void debugSession.close()
-        }
-        broadcastStatus()
-        return
-      }
-      if (msg.type === 'cmd') {
-        void handleCommand(msg)
-        return
-      }
-    }
-    socket.onclose = () => {
-      if (ws !== socket) return
-      paired = false
-      saveState({ connected: false })
-      broadcastStatus()
-      ws = null
-      snapshot = null
-      void debugSession.close()
-      scheduleReconnect()
-    }
-    socket.onerror = () => {
-      socket.close()
-    }
+async function initialize(): Promise<void> {
+  if (initialized) return initialized
+  initialized = (async () => {
+    const [local, session] = await Promise.all([chrome.storage.local.get(STORAGE_KEY), chrome.storage.session.get(['browserEpoch', 'sessionTabs'])])
+    const saved = local[STORAGE_KEY] as { clientId?: string; label?: string } | undefined
+    clientId = typeof saved?.clientId === 'string' && saved.clientId ? saved.clientId : crypto.randomUUID()
+    label = typeof saved?.label === 'string' && saved.label.trim() ? saved.label.slice(0, 80) : 'Chrome'
+    browserEpoch = typeof session.browserEpoch === 'string' && session.browserEpoch ? session.browserEpoch : crypto.randomUUID()
+    sessions = new SessionTabs(session.sessionTabs && typeof session.sessionTabs === 'object' ? session.sessionTabs : {})
+    await Promise.all([chrome.storage.local.set({ [STORAGE_KEY]: { clientId, label } }), chrome.storage.session.set({ browserEpoch, sessionTabs: sessions.serialize() })])
   })()
+  return initialized
 }
 
+function status(): NativeConnectionStatus & { label: string } {
+  return { ...(transport?.connectionStatus() ?? { connected: false, status: 'connecting' as const }), label }
+}
+function broadcastStatus(): void { void chrome.runtime.sendMessage({ kind: 'status-update', ...status() }).catch(() => {}) }
 function scheduleReconnect(): void {
   if (reconnectTimer) return
-  reconnectTimer = setTimeout(() => {
-    reconnectTimer = null
-    connect()
-  }, reconnectDelay)
-  reconnectDelay = Math.min(reconnectDelay * 2, 30000)
+  reconnectTimer = setTimeout(() => { reconnectTimer = null; void connect() }, reconnectDelay)
+  reconnectDelay = Math.min(30_000, reconnectDelay * 2)
 }
-
-async function activeTabId(): Promise<number | undefined> {
-  try {
-    const win = await chrome.windows.getLastFocused()
-    if (win?.id != null) {
-      const [tab] = await chrome.tabs.query({ active: true, windowId: win.id })
-      if (tab?.id != null) return tab.id
+async function connect(): Promise<void> {
+  await initialize()
+  // A timed-out Chrome operation is abandoned only after its epoch closes.
+  // Wait for the old debugger attachment to detach before accepting new work.
+  await debuggerTeardown
+  if (nativeConnected) return
+  if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null }
+  const next = new NativeExtensionTransport({
+    hello: { clientId, browserEpoch, extensionVersion: chrome.runtime.getManifest().version, label },
+    execute: executeCommand,
+    disconnectError: () => chrome.runtime.lastError?.message,
+    onStatus: info => { if (info.connected) reconnectDelay = 1000; broadcastStatus() },
+    onDisconnect: () => {
+      nativeConnected = false; snapshots.clear()
+      debuggerTeardown = debugSession.close().catch(() => {})
+      scheduleReconnect()
     }
-  } catch {
-    /* fall through to currentWindow query */
-  }
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
-  return tab?.id
-}
-
-async function lastFocusedWindowId(): Promise<number | undefined> {
-  const wins = await chrome.windows.getAll({})
-  if (wins.length === 0) return undefined
-  const focused = wins.find(w => w.focused)
-  if (focused?.id != null) return focused.id
-  try {
-    const last = await chrome.windows.getLastFocused()
-    return last?.id
-  } catch {
-    return wins[0]?.id
-  }
-}
-
-async function bsGroupId(): Promise<number | undefined> {
-  const groups = await chrome.tabGroups.query({})
-  return groups.find(g => g.title === GROUP_TITLE)?.id
-}
-
-function addToBsGroup(tabId: number): Promise<{ groupId?: number; groupTitle?: string }> {
-  const run = groupLock.then(async () => {
-    const existing = await bsGroupId()
-    const groupId = await chrome.tabs.group({ tabIds: [tabId], ...(existing != null ? { groupId: existing } : {}) })
-    await chrome.tabGroups.update(groupId, { title: GROUP_TITLE, color: GROUP_COLOR })
-    return { groupId, groupTitle: GROUP_TITLE }
   })
-  groupLock = run.catch(() => {})
-  return run
-}
-
-async function defaultTabId(): Promise<number | undefined> {
-  // Prefer the agent's working tab so default actions never hijack the tab the
-  // user is looking at; fall back to the active tab only when no working tab.
-  if (workingTabId != null) {
-    try {
-      const t = await chrome.tabs.get(workingTabId)
-      return t.id
-    } catch {
-      workingTabId = null
-    }
-  }
-  return activeTabId()
-}
-
-async function sendToTab(tabId: number, name: string, params: Record<string, unknown>): Promise<{ ok: boolean; data?: unknown; error?: string }> {
+  transport = next
   try {
-    const res = await chrome.tabs.sendMessage(tabId, { kind: 'cmd', name, params })
-    return res as { ok: boolean; data?: unknown; error?: string }
-  } catch {
-    // Tabs opened before the extension reloaded have no content script; inject then retry.
-    try {
-      await chrome.scripting.executeScript({ target: { tabId }, files: ['content.js'] })
-      const res = await chrome.tabs.sendMessage(tabId, { kind: 'cmd', name, params })
-      return res as { ok: boolean; data?: unknown; error?: string }
-    } catch (err) {
-      return { ok: false, error: `content script unavailable: ${String(err)}` }
-    }
+    nativeConnected = true
+    next.attach(chrome.runtime.connectNative(NATIVE_HOST_NAME))
+  } catch (error) { nativeConnected = false; next.fail(String(error)) }
+}
+async function saveTabs(): Promise<void> { await chrome.storage.session.set({ sessionTabs: sessions.serialize() }) }
+
+async function ownedTab(ownerId: string, params: Record<string, unknown>, context: NativeActionContext): Promise<number> {
+  context.assertActive()
+  const tabId = params.tabId === undefined ? sessions.tabFor(ownerId) : Number(params.tabId)
+  if (tabId === undefined) throw new Error('TAB_UNASSIGNED: assign a tab to this chat in BS Coding Browser settings')
+  sessions.assertOwned(ownerId, tabId)
+  try { await chrome.tabs.get(tabId) } catch {
+    sessions.closed(tabId); snapshots.invalidateTab(tabId); void saveTabs()
+    throw new Error('TAB_CLOSED: the assigned tab is closed; assign a tab or navigate again')
   }
+  context.assertActive()
+  return tabId
 }
-
-async function waitForPageSettle(tabId: number, timeoutMs = 5000): Promise<void> {
-  await chrome.debugger.sendCommand({ tabId }, 'Runtime.evaluate', {
-    expression: `
-      new Promise((resolve) => {
-        const deadline = Date.now() + ${timeoutMs};
-        let lastChange = Date.now();
-        let obs;
-        try {
-          obs = new MutationObserver(() => { lastChange = Date.now(); });
-          obs.observe(document.documentElement, { childList: true, subtree: true, attributes: true, characterData: true });
-        } catch {}
-        const tick = () => {
-          const settled = document.readyState === 'complete' && (Date.now() - lastChange) > 300;
-          if (settled || Date.now() >= deadline) {
-            try { if (obs) obs.disconnect(); } catch {}
-            resolve(true);
-            return;
-          }
-          setTimeout(tick, 150);
-        };
-        tick();
-      })
-    `,
-    awaitPromise: true,
-    returnByValue: true
-  })
+async function cdp(tabId: number, method: string, params: object | undefined, context: NativeActionContext): Promise<unknown> {
+  context.assertActive()
+  const response = await chrome.debugger.sendCommand({ tabId }, method, params)
+  context.assertActive()
+  return response
 }
-
-interface FrameTreeLike {
-  frame: { id: string }
-  childFrames?: FrameTreeLike[]
+async function ensureDebug(tabId: number, context: NativeActionContext): Promise<void> {
+  context.assertActive()
+  const previous = debugSession.attachedTabId()
+  if (previous !== null && previous !== tabId) snapshots.invalidateTab(previous)
+  await debugSession.ensure(tabId)
+  context.assertActive()
 }
-
-async function collectFrameAx(tabId: number): Promise<AxFrameBundle[]> {
-  const { frameTree } = await chrome.debugger.sendCommand({ tabId }, 'Page.getFrameTree') as { frameTree: FrameTreeLike }
+async function groupTab(tabId: number, context: NativeActionContext): Promise<{ groupId?: number; groupTitle?: string }> {
+  try {
+    context.assertActive()
+    const groups = await chrome.tabGroups.query({})
+    context.assertActive()
+    const groupId = await chrome.tabs.group({ tabIds: [tabId], ...(groups.find(group => group.title === 'Bs') ? { groupId: groups.find(group => group.title === 'Bs')!.id } : {}) })
+    context.assertActive()
+    await chrome.tabGroups.update(groupId, { title: 'Bs', color: 'blue' })
+    return { groupId, groupTitle: 'Bs' }
+  } catch (error) { context.assertActive(); return {} }
+}
+async function sendToTab(tabId: number, name: string, params: Record<string, unknown>, context: NativeActionContext): Promise<BrowserCommandResult> {
+  context.assertActive()
+  let available = true
+  try { await chrome.tabs.sendMessage(tabId, { kind: 'probe' }) } catch { available = false }
+  context.assertActive()
+  if (!available) { await chrome.scripting.executeScript({ target: { tabId }, files: ['content.js'] }); context.assertActive() }
+  // Only the readiness probe is retried. An action with an unknown result is never replayed.
+  const result = await chrome.tabs.sendMessage(tabId, { kind: 'cmd', name, params, deadline: Date.now() + context.remainingMs() })
+  context.assertActive()
+  return result as BrowserCommandResult
+}
+async function waitForPageSettle(tabId: number, context: NativeActionContext): Promise<void> {
+  const timeout = Math.max(0, Math.min(5000, context.remainingMs() - 100))
+  await cdp(tabId, 'Runtime.evaluate', { expression: `new Promise(resolve => {const deadline=Date.now()+${timeout};let changed=Date.now();const observer=new MutationObserver(()=>changed=Date.now());observer.observe(document.documentElement,{childList:true,subtree:true,attributes:true});const tick=()=>{if(Date.now()>=deadline||(document.readyState==='complete'&&Date.now()-changed>300)){observer.disconnect();resolve(true)}else setTimeout(tick,100)};tick()})`, awaitPromise: true, returnByValue: true }, context)
+}
+interface FrameTreeLike { frame: { id: string }; childFrames?: FrameTreeLike[] }
+async function collectFrameAx(tabId: number, context: NativeActionContext): Promise<AxFrameBundle[]> {
+  const result = await cdp(tabId, 'Page.getFrameTree', undefined, context) as { frameTree: FrameTreeLike }
   const bundles: AxFrameBundle[] = []
   const visit = async (node: FrameTreeLike, ownerBackendNodeId?: number): Promise<void> => {
     const frameId = node.frame.id
-    let nodes: unknown[] = []
-    try {
-      const res = await chrome.debugger.sendCommand({ tabId }, 'Accessibility.getFullAXTree', { frameId }) as { nodes?: unknown[] }
-      nodes = res.nodes ?? []
-    } catch {
-      nodes = []
-    }
-    bundles.push({ frameId, ownerBackendNodeId, nodes: nodes as AxNodeLike[] })
+    const result = await cdp(tabId, 'Accessibility.getFullAXTree', { frameId }, context) as { nodes?: AxNodeLike[] }
+    if (!Array.isArray(result.nodes)) throw new Error('SNAPSHOT_INCOMPLETE: an accessibility frame could not be read')
+    bundles.push({ frameId, ownerBackendNodeId, nodes: result.nodes })
     for (const child of node.childFrames ?? []) {
-      let childOwner: number | undefined
-      try {
-        const owner = await chrome.debugger.sendCommand({ tabId }, 'DOM.getFrameOwner', { frameId: child.frame.id }) as { backendNodeId: number }
-        childOwner = owner.backendNodeId
-      } catch {
-        childOwner = undefined
-      }
-      await visit(child, childOwner)
+      const owner = await cdp(tabId, 'DOM.getFrameOwner', { frameId: child.frame.id }, context) as { backendNodeId: number }
+      await visit(child, owner.backendNodeId)
     }
   }
-  await visit(frameTree)
+  await visit(result.frameTree)
   return bundles
 }
-
-async function callOnNode(tabId: number, backendNodeId: number, functionDeclaration: string, args: unknown[] = []): Promise<void> {
-  const { object } = await chrome.debugger.sendCommand({ tabId }, 'DOM.resolveNode', { backendNodeId }) as { object: { objectId: string } }
-  const res = await chrome.debugger.sendCommand({ tabId }, 'Runtime.callFunctionOn', {
-    objectId: object.objectId,
-    functionDeclaration,
-    arguments: args.map(a => ({ value: a })),
-    returnByValue: true
-  }) as { exceptionDetails?: { text?: string; exception?: { description?: string } } }
-  if (res.exceptionDetails) {
-    throw new Error(`call failed: ${res.exceptionDetails.exception?.description ?? res.exceptionDetails.text ?? 'unknown'}`)
-  }
-}
-
-async function refAction(tabId: number, name: string, params: Record<string, unknown>): Promise<{ ok: boolean; data?: unknown; error?: string }> {
+async function refAction(ownerId: string, tabId: number, name: string, params: Record<string, unknown>, context: NativeActionContext): Promise<BrowserCommandResult> {
   const ref = String(params.ref)
-  const backendNodeId = snapshot?.tabId === tabId ? snapshot.refs.get(ref) : undefined
-  if (backendNodeId == null) {
-    return { ok: false, error: `snapshot stale: re-read the page (ref ${ref} no longer valid)` }
+  // Resolve before attaching: a detached generation must not become valid by reattaching.
+  const backendNodeId = snapshots.resolve(ownerId, tabId, ref, typeof params.snapshotId === 'string' ? params.snapshotId : undefined)
+  await ensureDebug(tabId, context)
+  snapshots.resolve(ownerId, tabId, ref, typeof params.snapshotId === 'string' ? params.snapshotId : undefined)
+  const resolved = await cdp(tabId, 'DOM.resolveNode', { backendNodeId }, context) as { object?: { objectId?: string } }
+  if (!resolved.object?.objectId) throw new Error('STALE_SNAPSHOT: the referenced element no longer exists')
+  snapshots.resolve(ownerId, tabId, ref)
+  const functionDeclaration = name === 'click'
+    ? `function(){if(!this.isConnected)throw Error('STALE_SNAPSHOT');this.scrollIntoView({block:'center',inline:'center'});this.click();return true}`
+    : name === 'type'
+      ? `function(text){if(!this.isConnected)throw Error('STALE_SNAPSHOT');this.focus();const proto=this instanceof HTMLTextAreaElement?HTMLTextAreaElement.prototype:this instanceof HTMLSelectElement?HTMLSelectElement.prototype:HTMLInputElement.prototype;const setter=Object.getOwnPropertyDescriptor(proto,'value')?.set;if(setter)setter.call(this,text);else this.textContent=text;this.dispatchEvent(new Event('input',{bubbles:true}));this.dispatchEvent(new Event('change',{bubbles:true}));return true}`
+      : `function(value){if(!this.isConnected)throw Error('STALE_SNAPSHOT');this.value=value;this.dispatchEvent(new Event('change',{bubbles:true}));return true}`
+  const result = await cdp(tabId, 'Runtime.callFunctionOn', { objectId: resolved.object.objectId, functionDeclaration, arguments: name === 'click' ? [] : [{ value: String(params.text ?? params.value ?? '') }], returnByValue: true }, context) as { exceptionDetails?: { text?: string; exception?: { description?: string } } }
+  if (result.exceptionDetails) throw new Error(result.exceptionDetails.exception?.description ?? result.exceptionDetails.text ?? 'Action failed')
+  return { ok: true, data: { ref, tabId } }
+}
+async function executeCommand(command: NativeCommand, context: NativeActionContext): Promise<BrowserCommandResult> {
+  const { ownerId, name } = command
+  const params = command.params ?? {}
+  context.assertActive()
+  if (name === 'listTabs') {
+    const tabs = await chrome.tabs.query({})
+    context.assertActive()
+    return { ok: true, data: tabs.map(tab => ({ id: tab.id, tabId: tab.id, title: tab.title, url: tab.url, active: tab.active, windowId: tab.windowId, groupId: tab.groupId, ownerId: tab.id === undefined ? undefined : sessions.ownerFor(tab.id) })) }
   }
-  if (name === 'click') {
-    await callOnNode(tabId, backendNodeId, `function(){ const el = this; el.scrollIntoView({block:'center',inline:'center'}); el.click(); return true; }`)
-    return { ok: true, data: { ref } }
+  if (name === 'claimTab') {
+    const tabId = Number(params.tabId)
+    const tab = await chrome.tabs.get(tabId)
+    context.assertActive()
+    sessions.bind(ownerId, tabId)
+    snapshots.invalidateOwner(ownerId)
+    await saveTabs()
+    return { ok: true, data: { tabId, id: tabId, url: tab.url } }
   }
-  if (name === 'type') {
-    await callOnNode(tabId, backendNodeId,
-      `function(text){ const el = this; el.focus(); if (el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement || el instanceof HTMLInputElement) { const proto = el instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : el instanceof HTMLSelectElement ? HTMLSelectElement.prototype : HTMLInputElement.prototype; const setter = Object.getOwnPropertyDescriptor(proto, 'value').set; if (setter) setter.call(el, text); else el.value = text; el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); } else { el.textContent = text; el.dispatchEvent(new Event('input', { bubbles: true })); } return true; }`,
-      [String(params.text ?? '')])
-    return { ok: true, data: { ref } }
+  if (name === 'navigate' || name === 'openTab') {
+    if (params.tabId !== undefined) {
+      if (name === 'openTab') throw new Error('openTab creates a new session tab; omit tabId')
+      const tabId = await ownedTab(ownerId, params, context)
+      snapshots.invalidateTab(tabId)
+      context.assertActive()
+      const tab = await chrome.tabs.update(tabId, { url: String(params.url ?? '') })
+      context.assertActive()
+      return { ok: true, data: { tabId, id: tabId, url: tab?.url } }
+    }
+    context.assertActive()
+    const tab = await chrome.tabs.create({ url: String(params.url ?? ''), active: false })
+    // Record the lease even if the connection disappears after Chrome creates the tab.
+    if (tab.id === undefined) throw new Error('TAB_CREATE_FAILED: Chrome did not return a tab id')
+    sessions.bind(ownerId, tab.id)
+    snapshots.invalidateOwner(ownerId)
+    await saveTabs()
+    context.assertActive()
+    const group = await groupTab(tab.id, context)
+    return { ok: true, data: { id: tab.id, tabId: tab.id, url: tab.url, ...group } }
   }
-  await callOnNode(tabId, backendNodeId,
-    `function(value){ const el = this; el.value = value; el.dispatchEvent(new Event('change', { bubbles: true })); return true; }`,
-    [String(params.value ?? '')])
-  return { ok: true, data: { ref } }
+  if (name === 'getConsoleLogs') return { ok: true, data: logs.console(ownerId) }
+  if (name === 'getNetworkLogs') return { ok: true, data: logs.network(ownerId) }
+  const tabId = await ownedTab(ownerId, params, context)
+  if (name === 'switchTab') {
+    context.assertActive()
+    const tab = await chrome.tabs.update(tabId, { active: true })
+    context.assertActive()
+    sessions.bind(ownerId, tabId)
+    await saveTabs()
+    return { ok: true, data: { id: tabId, tabId, url: tab?.url } }
+  }
+  if (name === 'closeTab') {
+    snapshots.invalidateTab(tabId)
+    context.assertActive()
+    await chrome.tabs.remove(tabId)
+    sessions.closed(tabId)
+    await saveTabs()
+    return { ok: true }
+  }
+  if (name === 'reload') {
+    snapshots.invalidateTab(tabId)
+    context.assertActive()
+    await chrome.tabs.reload(tabId)
+    return { ok: true }
+  }
+  if (name === 'screenshot') {
+    await ensureDebug(tabId, context)
+    const result = await cdp(tabId, 'Page.captureScreenshot', { format: 'png', captureBeyondViewport: true, fromSurface: true }, context) as { data?: string }
+    if (!result.data) throw new Error('SCREENSHOT_FAILED: Chrome produced no image')
+    return { ok: true, data: { tabId, base64: result.data } }
+  }
+  if (name === 'read') {
+    await ensureDebug(tabId, context)
+    await waitForPageSettle(tabId, context)
+    const generation = snapshots.generation(tabId)
+    const frames = await collectFrameAx(tabId, context)
+    const tab = await chrome.tabs.get(tabId)
+    context.assertActive()
+    if (snapshots.generation(tabId) !== generation) throw new Error('STALE_SNAPSHOT: the tab navigated while reading; read again')
+    const { tree, refs } = axTreeToSnapshot(mergeFrameAxTrees(frames), { mode: params.mode === 'full' ? 'full' : 'interactive', maxNodes: 0 })
+    const snapshot = snapshots.save(ownerId, tabId, tree, refs)
+    return { ok: true, data: { ...snapshot, url: tab.url, title: tab.title } }
+  }
+  if ((name === 'click' || name === 'type' || name === 'select') && params.ref !== undefined) return refAction(ownerId, tabId, name, params, context)
+  return sendToTab(tabId, name, params, context)
 }
 
-async function handleCommand(msg: Extract<BridgeToExtension, { type: 'cmd' }>): Promise<void> {
-  const { id, name, params = {} } = msg
-  const send = (result: { ok: boolean; data?: unknown; error?: string }): void => {
-    if (!ws || ws.readyState !== WebSocket.OPEN) return
-    const out: ExtensionToBridge = result.ok
-      ? { type: 'result', id, ok: true, data: result.data }
-      : { type: 'result', id, ok: false, error: result.error ?? 'command failed' }
-    ws.send(JSON.stringify(out))
+chrome.runtime.onMessage.addListener((message, sender, respond) => {
+  if (message?.kind === 'status') { respond(status()); return false }
+  if (message?.kind === 'connect') {
+    void initialize().then(async () => {
+      label = typeof message.label === 'string' && message.label.trim() ? message.label.trim().slice(0, 80) : label
+      await chrome.storage.local.set({ [STORAGE_KEY]: { clientId, label } })
+      transport?.close(); nativeConnected = false; snapshots.clear(); await debugSession.close()
+      await connect(); respond({ ok: true, ...status() })
+    }).catch(error => respond({ ok: false, error: String(error) }))
+    return true
   }
-
-  try {
-    switch (name) {
-      case 'listTabs': {
-        const tabs = await chrome.tabs.query({})
-        const groupIds = [...new Set(tabs.map(t => t.groupId).filter((id): id is number => id != null && id >= 0))]
-        const groupTitles = new Map<number, string>()
-        for (const id of groupIds) {
-          try {
-            const g = await chrome.tabGroups.get(id)
-            groupTitles.set(id, g.title ?? '')
-          } catch {
-            /* group closed between query and get */
-          }
-        }
-        send({
-          ok: true,
-          data: tabs.map(t => ({
-            id: t.id, title: t.title, url: t.url, active: t.active, windowId: t.windowId,
-            groupId: t.groupId,
-            groupTitle: t.groupId != null && t.groupId >= 0 ? groupTitles.get(t.groupId) : undefined
-          }))
-        })
-        return
-      }
-      case 'openTab': {
-        const url = String(params.url ?? '')
-        const windowId = await lastFocusedWindowId()
-        const tab = windowId != null
-          ? await chrome.tabs.create({ url, windowId, active: false })
-          : await chrome.tabs.create({ url })
-        persistWorkingTab(tab.id ?? null)
-        let group: { groupId?: number; groupTitle?: string } = {}
-        if (tab.id != null) {
-          try {
-            group = await addToBsGroup(tab.id)
-          } catch {
-            /* group creation failed; the tab itself is still open */
-          }
-        }
-        send({ ok: true, data: { id: tab.id, tabId: tab.id, url: tab.url, ...group } })
-        return
-      }
-      case 'switchTab': {
-        const tabId = Number(params.tabId)
-        const tab = await chrome.tabs.update(tabId, { active: true })
-        persistWorkingTab(tab?.id ?? null)
-        send({ ok: true, data: { id: tab?.id, url: tab?.url } })
-        return
-      }
-      case 'closeTab': {
-        await chrome.tabs.remove(Number(params.tabId))
-        send({ ok: true })
-        return
-      }
-      case 'reload': {
-        const tabId = params.tabId != null ? Number(params.tabId) : (await defaultTabId())
-        if (tabId == null) { send({ ok: false, error: 'no target tab' }); return }
-        await chrome.tabs.reload(tabId)
-        persistWorkingTab(tabId)
-        send({ ok: true })
-        return
-      }
-      case 'navigate': {
-        const url = String(params.url ?? '')
-        const windowId = await lastFocusedWindowId()
-        const tab = windowId != null
-          ? await chrome.tabs.create({ url, windowId, active: false })
-          : await chrome.tabs.create({ url })
-        persistWorkingTab(tab.id ?? null)
-        let group: { groupId?: number; groupTitle?: string } = {}
-        if (tab.id != null) {
-          try {
-            group = await addToBsGroup(tab.id)
-          } catch {
-            /* group creation failed; the tab itself is still open */
-          }
-        }
-        send({ ok: true, data: { id: tab.id, tabId: tab.id, url: tab.url, ...group } })
-        return
-      }
-      case 'screenshot': {
-        const tabId = params.tabId != null ? Number(params.tabId) : (await defaultTabId())
-        if (tabId == null) { send({ ok: false, error: 'no target tab' }); return }
-        try {
-          await debugSession.ensure(tabId)
-          const res = await chrome.debugger.sendCommand({ tabId }, 'Page.captureScreenshot', {
-            format: 'png', captureBeyondViewport: true, fromSurface: true
-          })
-          const data = (res as { data: string }).data
-          if (!data) {
-            send({ ok: false, error: 'screenshot failed: page produced no image (is the tab fully occluded?)' })
-            return
-          }
-          persistWorkingTab(tabId)
-          send({ ok: true, data: { base64: data } })
-        } catch (err) {
-          send({ ok: false, error: `screenshot failed (tab not capturable?): ${String(err)}` })
-        }
-        return
-      }
-      case 'read': {
-        const tabId = params.tabId != null ? Number(params.tabId) : (await defaultTabId())
-        if (tabId == null) { send({ ok: false, error: 'no target tab' }); return }
-        try {
-          await debugSession.ensure(tabId)
-        } catch (err) {
-          send({ ok: false, error: `browser_read: page not CDP-accessible (${String(err)})` })
-          return
-        }
-        try {
-          await waitForPageSettle(tabId)
-          const mode = params.mode === 'full' ? 'full' : 'interactive'
-          const frames = await collectFrameAx(tabId)
-          const merged = mergeFrameAxTrees(frames)
-          const { tree, refs } = axTreeToSnapshot(merged, { mode, maxNodes: 0 })
-          snapshot = { tabId, refs: new Map(refs.map(r => [r.ref, r.backendDOMNodeId])) }
-          const tab = await chrome.tabs.get(tabId)
-          persistWorkingTab(tabId)
-          send({ ok: true, data: { url: tab.url, title: tab.title, tree } })
-        } catch (err) {
-          send({ ok: false, error: `browser_read: ${String(err)}` })
-        }
-        return
-      }
-      case 'click':
-      case 'type':
-      case 'select': {
-        if (params.ref != null) {
-          const tabId = params.tabId != null ? Number(params.tabId) : (await defaultTabId())
-          if (tabId == null) { send({ ok: false, error: 'no target tab' }); return }
-          try {
-            await debugSession.ensure(tabId)
-            const res = await refAction(tabId, name, params)
-            if (res.ok) persistWorkingTab(tabId)
-            send(res)
-          } catch (err) {
-            const ref = String(params.ref)
-            send({ ok: false, error: `snapshot stale or page not CDP-accessible (ref ${ref}): ${String(err)}` })
-          }
-          return
-        }
-        const tabId = params.tabId != null ? Number(params.tabId) : (await defaultTabId())
-        if (tabId == null) { send({ ok: false, error: 'no target tab' }); return }
-        const res = await sendToTab(tabId, name, params)
-        if (res.ok) persistWorkingTab(tabId)
-        send(res)
-        return
-      }
-      default: {
-        const tabId = params.tabId != null ? Number(params.tabId) : (await defaultTabId())
-        if (tabId == null) { send({ ok: false, error: 'no target tab' }); return }
-        const res = await sendToTab(tabId, name, params)
-        if (res.ok) persistWorkingTab(tabId)
-        send(res)
-      }
-    }
-  } catch (err) {
-    send({ ok: false, error: String(err) })
-  }
-}
-
-chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
-  if (msg?.kind === 'pair') {
-    pendingCode = String(msg.code)
-    saveState({ code: pendingCode })
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ type: 'pair', code: pendingCode } satisfies ExtensionToBridge))
-    } else {
-      connect()
-    }
-    sendResponse({ ok: true })
-    return false
-  }
-  if (msg?.kind === 'status') {
-    sendResponse({ paired, connected: ws?.readyState === WebSocket.OPEN })
-    return false
-  }
-  if (msg?.kind === 'event') {
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ type: 'event', name: msg.name, data: msg.data } satisfies ExtensionToBridge))
-    }
-    sendResponse({ ok: true })
-    return false
+  if (message?.kind === 'event' && sender.tab?.id !== undefined) {
+    const ownerId = sessions.ownerFor(sender.tab.id)
+    if (ownerId && (message.name === 'domChanged' || message.name === 'tabUpdated')) transport?.event(ownerId, message.name, message.data)
+    respond({ ok: Boolean(ownerId) }); return false
   }
   return false
 })
-
-chrome.runtime.onInstalled.addListener(() => {
-  void loadState().then(s => {
-    if (s.code) connect()
-  })
+chrome.tabs.onRemoved.addListener(tabId => {
+  snapshots.invalidateTab(tabId); logs.closed(tabId); sessions.closed(tabId); void saveTabs()
+  if (debugSession.attachedTabId() === tabId) void debugSession.close()
 })
-
-chrome.tabs.onRemoved.addListener((tabId) => {
-  if (debugSession.attachedTabId() === tabId) {
-    snapshot = null
-    void debugSession.close()
-  }
+chrome.tabs.onUpdated.addListener((tabId, change) => {
+  if (!sessions.ownerFor(tabId)) return
+  if (change.status === 'loading' || change.url) snapshots.invalidateTab(tabId)
+  const ownerId = sessions.ownerFor(tabId)!
+  transport?.event(ownerId, 'tabUpdated', { tabId, status: change.status, url: change.url, ts: Date.now() })
 })
-
-chrome.debugger.onDetach.addListener((source) => {
-  if (source.tabId != null && debugSession.attachedTabId() === source.tabId) {
-    snapshot = null
-    void debugSession.close()
-  }
+chrome.debugger.onDetach.addListener(source => {
+  if (source.tabId === undefined) return
+  snapshots.invalidateTab(source.tabId); logs.closed(source.tabId)
+  if (debugSession.attachedTabId() === source.tabId) void debugSession.close()
 })
-
-// Chrome terminates an idle MV3 service worker after ~30s, which also drops the WS.
-// The heartbeat resets the idle timer (Chrome 116+ resets it on WS message traffic);
-// the alarm is a guaranteed wake-up that auto-reconnects even after SW termination.
-setInterval(sendHeartbeat, HEARTBEAT_MS)
+chrome.debugger.onEvent.addListener((source, method, params) => {
+  if (source.tabId === undefined) return
+  const ownerId = sessions.ownerFor(source.tabId)
+  if (!ownerId || debugSession.attachedTabId() !== source.tabId) return
+  if ((method === 'Page.frameNavigated' && !(params as { frame?: { parentId?: string } } | undefined)?.frame?.parentId) || method === 'Page.navigatedWithinDocument') snapshots.invalidateTab(source.tabId)
+  const event = logs.record(ownerId, source.tabId, debugSession.attachedTabId(), method, params as Record<string, unknown> ?? {})
+  if (event) transport?.event(ownerId, event.name, event.data)
+})
+chrome.runtime.onInstalled.addListener(() => { void connect() })
+chrome.runtime.onStartup.addListener(() => { void connect() })
+setInterval(() => transport?.heartbeat(), 20_000)
 void chrome.alarms.create(ALARM_NAME, { periodInMinutes: 0.5 }).catch(() => {})
-chrome.alarms.onAlarm.addListener((alarm) => {
-  if (alarm.name !== ALARM_NAME) return
-  if (ws?.readyState !== WebSocket.OPEN) connect()
-})
-
-connect()
+chrome.alarms.onAlarm.addListener(alarm => { if (alarm.name === ALARM_NAME && !nativeConnected) void connect() })
+void connect()

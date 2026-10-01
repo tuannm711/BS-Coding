@@ -32,6 +32,14 @@ function fakeLauncher(overrides: Partial<BrowserLauncherLike> = {}): BrowserLaun
 }
 
 describe('browser tools', () => {
+  it('passes the active session owner and cancellation signal to the bridge', async () => {
+    const bridge = fakeBridge()
+    const execute = vi.spyOn(bridge, 'execute')
+    const controller = new AbortController()
+    const tools = createBrowserTools(bridge, fakeLauncher())
+    await tools.find(tool => tool.name === 'browser_read')!.run({}, { ...ctx, agentId: 'agent', snapshotScopeId: 'session-123', signal: controller.signal })
+    expect(execute.mock.calls[0][3]).toMatchObject({ ownerId: 'session-123', signal: controller.signal })
+  })
   it('registers all 14 tools with names', () => {
     const tools = createBrowserTools(fakeBridge(), fakeLauncher())
     expect(tools.map(t => t.name)).toEqual([

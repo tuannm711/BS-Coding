@@ -5,7 +5,7 @@ import type { CoordinationAssignment,
   ProjectSessionSummary, ProviderAccount, ProviderConnection, ProviderUsage, SessionSummary, StatsSummary, Template, TerminalInfo, TodoItem, TraceEvent, TraceSummary, UpdaterStatusEvent, UsageSummary, WorkspaceRuntime, WorkspaceSummary
 } from './types'
 import type { ConsumeResetCreditResult } from './reset-credit'
-import type { BrowserStatusInfo, PairingInfo } from './browser-types'
+import type { BrowserStatusInfo, BrowserTabInfo, PairingInfo } from './browser-types'
 import type { AgentAssignmentSetRequest, AgentAssignmentSnapshot } from './provider-state'
 import type { ProviderSnapshot } from './provider-state'
 import type {
@@ -136,6 +136,11 @@ export const Channels = {
   EventAgentBackground: 'agent:background',
   EventAgentConfig: 'agent:config-changed',
   BrowserGetStatus: 'browser:get-status',
+  BrowserNativeSetup: 'browser:native-setup',
+  BrowserSelectConnection: 'browser:select-connection',
+  BrowserSetConnectionEnabled: 'browser:set-connection-enabled',
+  BrowserListTabs: 'browser:list-tabs',
+  BrowserAssignTab: 'browser:assign-tab',
   BrowserPair: 'browser:pair',
   BrowserOpenInstallGuide: 'browser:open-install-guide',
   BrowserOpenExtensionFolder: 'browser:open-extension-folder',
@@ -321,6 +326,11 @@ export interface AgentApi {
   onContextChanged(cb: (e: ContextChangedEvent) => void): () => void
   onChatEvent(cb: (e: ChatEvent) => void): () => void
   getBrowserStatus(): Promise<BrowserStatusInfo>
+  setupNativeBrowser(): Promise<BrowserStatusInfo>
+  selectBrowserConnection(connectionId: string): Promise<void>
+  setBrowserConnectionEnabled(connectionId: string, enabled: boolean): Promise<void>
+  listBrowserTabs(connectionId: string): Promise<BrowserTabInfo[]>
+  assignBrowserTab(projectPath: string, sessionId: string, connectionId: string, tabId: number): Promise<void>
   pairBrowser(): Promise<PairingInfo>
   openBrowserInstallGuide(): Promise<void>
   openBrowserExtensionFolder(): Promise<void>

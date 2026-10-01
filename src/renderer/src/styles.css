@@ -1182,7 +1182,7 @@ select.input { width: 100%; }
 /* Coordinate is in Fleet. Mode/selectors wrap within the pane; quick messages
    have their own row below them. */
 .chat-mode { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.quick-message-buttons { display: flex; flex-shrink: 0; justify-content: flex-start; flex-wrap: wrap; gap: 4px; min-width: 0; }
+.quick-message-buttons { display: flex; flex-shrink: 0; justify-content: center; flex-wrap: wrap; gap: 4px; min-width: 0; }
 .quick-message-button { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .quick-message-button:disabled { opacity: .5; cursor: default; }
 .quick-message-settings-list { display: flex; flex-direction: column; gap: 8px; }

@@ -7,11 +7,11 @@ v1.1.4.
 <!-- toc -->
 | Section | Lines | Names |
 | --- | --- | --- |
-| [Pieces](#pieces) | 17-28 | `electron.vite.config.ts`, `out/`, `electron-builder.ts`, `.github/workflows/build.yml`, `scripts/build-windows-icon.mjs`, `icon.ico` |
-| [Data flow](#data-flow) | 29-45 | `.ico`, `resources/tray-icon.png`, `out/`, `electron-builder`, `release/`, `.github/workflows/build.yml` |
-| [Types that carry it](#types-that-carry-it) | 46-57 | `Configuration`, `electron-builder.ts`, `appId`, `com.bs.coding`, `productName`, `release/` |
-| [Design decisions](#design-decisions) | 58-109 | `action-gh-release`, `latest.yml`, `artifacts/`, `latest*.yml`, `electron-updater`, `scripts/build-windows-icon.mjs` |
-| [Known limits](#known-limits) | 110-120 |  |
+| [Pieces](#pieces) | 17-29 | `electron.vite.config.ts`, `out/`, `electron-builder.ts`, `.github/workflows/build.yml`, `scripts/build-windows-icon.mjs`, `icon.ico` |
+| [Data flow](#data-flow) | 30-46 | `.ico`, `resources/tray-icon.png`, `out/`, `electron-builder`, `release/`, `.github/workflows/build.yml` |
+| [Types that carry it](#types-that-carry-it) | 47-63 | `Configuration`, `electron-builder.ts`, `appId`, `com.bs.coding`, `productName`, `release/` |
+| [Design decisions](#design-decisions) | 64-115 | `action-gh-release`, `latest.yml`, `artifacts/`, `latest*.yml`, `electron-updater`, `scripts/build-windows-icon.mjs` |
+| [Known limits](#known-limits) | 116-126 |  |
 <!-- /toc -->
 
 ## Pieces
@@ -23,6 +23,7 @@ v1.1.4.
 | `.github/workflows/build.yml` | CI: test, then build on all three runners, then publish |
 | `scripts/build-windows-icon.mjs` | Assembles `icon.ico` and regenerates the tray asset |
 | `scripts/build-extension.mjs` | Bundles the Chrome extension into `out/browser-extension` |
+| `scripts/build-native-host.mjs` | Bundles stdio helper and compiles Windows launcher into `out/browser-native-host` |
 | `scripts/sign-windows.ps1` | Azure Trusted Signing, with a deliberate skip path |
 | `src/main/updater.ts` | electron-updater wrapper, emits `UpdaterStatusEvent` |
 
@@ -49,8 +50,13 @@ dialog.
 `com.bs.coding`, `productName` `BS Coding`, output to `release/`.
 
 `files` is `out/**/*` plus `package.json` — nothing else is packaged.
-`extraResources` adds three things beside the asar: `resources/skills`,
-`out/browser-extension`, and `resources/tray-icon.png`.
+`extraResources` ships `resources/skills`, `out/browser-extension`,
+`out/browser-native-host` and `resources/tray-icon.png` beside the asar. The native
+helper runs with the bundled Electron runtime in Node mode, without external
+Node installation. Windows builds compile a small .NET Framework launcher;
+macOS/Linux use a generated shell wrapper. User-scoped native registration is
+an explicit Browser setup action; opted-in installations refresh helper/runtime
+paths on app startup (including portable extraction changes).
 
 `UpdaterStatusEvent` in `src/shared/ipc.ts` carries update progress to the
 renderer.

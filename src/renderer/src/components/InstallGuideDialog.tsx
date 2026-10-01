@@ -1,47 +1,32 @@
-import { useEffect, useState } from 'react'
+import { useRef, useEffect, useState } from 'react'
 import type { BrowserInstallGuideEvent } from '@shared/ipc'
-
-interface Props {
-  guide: BrowserInstallGuideEvent | null
-  onClose: () => void
-}
-
+import Modal from './settings/Modal'
+interface Props { guide: BrowserInstallGuideEvent | null; onClose(): void }
 export default function InstallGuideDialog({ guide, onClose }: Props) {
-  const [extensionDir, setExtensionDir] = useState<string | null>(guide?.extensionDir ?? null)
-
-  useEffect(() => {
-    if (guide) setExtensionDir(guide.extensionDir)
-  }, [guide])
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
-
-  return (
-    <div className="dialog-backdrop">
-      <div className="dialog browser-dialog">
-        <h3>Install Bs Browser Bridge</h3>
-        <button className="dialog-close" aria-label="Close" onClick={onClose}>✕</button>
-        <ol className="browser-guide">
-          <li>Click <strong>Open chrome://extensions</strong> — Chrome opens the extensions page.</li>
-          <li>Enable <strong>Developer mode</strong> (top-right corner).</li>
-          <li>Click <strong>Load unpacked</strong> and select the folder:
-            <code className="browser-guide-dir">{extensionDir}</code>
-          </li>
-          <li>Back in Bs, open the Browser dialog and click <strong>Pair With Code</strong>, then enter the code in the extension popup.</li>
-        </ol>
-        <p className="browser-hint">
-          The extension only connects to Bs on this machine (127.0.0.1) and requires a pairing code.
-        </p>
-        <div className="dialog-actions">
-          <button className="btn" onClick={() => void window.api.openBrowserChromeExtensions()}>Open chrome://extensions</button>
-          <button className="btn" onClick={() => void window.api.openBrowserExtensionFolder()}>Extension Folder</button>
-        </div>
-      </div>
+  const [busy, setBusy] = useState(false)
+  const [feedback, setFeedback] = useState('')
+  const [error, setError] = useState('')
+  const mounted = useRef(true)
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
+  return <Modal title="Install BS Coding browser extension" onClose={onClose} showDefaultActions={false}>
+    <ol className="browser-guide">
+      <li>Install the native helper for your OS user using the button below.</li>
+      <li>Open <strong>chrome://extensions</strong> in the Chrome profile you want to use and enable <strong>Developer mode</strong>.</li>
+      <li>Click <strong>Load unpacked</strong> and select:<code className="browser-guide-dir">{guide?.extensionDir}</code></li>
+      <li>If the old extension is loaded, remove it and load this updated folder once. The new extension keeps a stable identity for future updates.</li>
+      <li>Open the extension popup, name this profile, then click <strong>Connect</strong>. Choose the connection and assign a tab in Browser settings.</li>
+    </ol>
+    <p className="browser-hint">The helper connects using OS IPC on this machine. It uses no network port and does not copy your browser credentials. After an app update, use Install / Repair and reload the extension.</p>
+    <button className="btn primary" disabled={busy} onClick={() => {
+      setBusy(true); setError(''); setFeedback('')
+      void window.api.setupNativeBrowser().then(status => { if (!mounted.current) return; if (status.nativeHostInstalled) setFeedback('Helper installed. Continue with the extension setup.'); else setError(status.error ?? 'Helper installation failed.') }).catch(e => { if (mounted.current) setError(String(e)) }).finally(() => { if (mounted.current) setBusy(false) })
+    }}>{busy ? 'Installing…' : 'Install / Repair helper'}</button>
+    {feedback && <p className="settings-status" role="status">{feedback}</p>}
+    {error && <p className="settings-error" role="alert">{error}</p>}
+    <div className="dialog-actions">
+      <button className="btn" onClick={() => void window.api.openBrowserChromeExtensions()}>Open chrome://extensions</button>
+      <button className="btn" onClick={() => void window.api.openBrowserExtensionFolder()}>Extension folder</button>
+      <button className="btn" onClick={onClose}>Close</button>
     </div>
-  )
+  </Modal>
 }

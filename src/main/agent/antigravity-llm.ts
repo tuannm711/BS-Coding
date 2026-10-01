@@ -55,18 +55,30 @@ function toCloudSchema(value: unknown): unknown {
 }
 
 function parseChunk(value: unknown): LlmStreamPart[] {
-  const envelope = value as { response?: { candidates?: Array<{ content?: { parts?: Array<{ text?: string; thoughtSignature?: string; functionCall?: { id?: string; name?: string; args?: Record<string, unknown> } }> }; finishReason?: string; usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number; totalTokenCount?: number } }> } }
-  const response = (envelope.response ?? envelope) as { candidates?: Array<{ content?: { parts?: Array<{ text?: string; thoughtSignature?: string; functionCall?: { id?: string; name?: string; args?: Record<string, unknown> } }> }; finishReason?: string; usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number; totalTokenCount?: number } }> }
+  type CloudUsage = { promptTokenCount?: number; candidatesTokenCount?: number; totalTokenCount?: number; cachedContentTokenCount?: number; thoughtsTokenCount?: number }
+  type CloudResponse = { candidates?: Array<{ content?: { parts?: Array<{ text?: string; thought?: boolean; thoughtSignature?: string; functionCall?: { id?: string; name?: string; args?: Record<string, unknown> } }> }; finishReason?: string; usageMetadata?: CloudUsage }>; usageMetadata?: CloudUsage; error?: { message?: string } }
+  const envelope = value as CloudResponse & { response?: CloudResponse }
+  const response = envelope.response ?? envelope
   const candidate = response.candidates?.[0]
-  if (!candidate) return []
   const parts: LlmStreamPart[] = []
-  for (const part of candidate.content?.parts ?? []) {
-    if (part.text) parts.push({ kind: 'text', text: part.text })
+  for (const part of candidate?.content?.parts ?? []) {
+    if (part.text) parts.push({ kind: part.thought ? 'reasoning' : 'text', text: part.text })
     if (part.functionCall?.name) parts.push({ kind: 'tool-call', toolName: part.functionCall.name, toolCallId: part.functionCall.id ?? randomUUID(), toolInput: part.functionCall.args ?? {}, thoughtSignature: part.thoughtSignature })
   }
-  if (candidate.finishReason) {
-    const usage = candidate.usageMetadata
-    parts.push({ kind: 'finish', finishReason: candidate.finishReason, tokens: usage ? { input: usage.promptTokenCount ?? 0, output: usage.candidatesTokenCount ?? 0, total: usage.totalTokenCount ?? 0 } : undefined })
+  const usage = response.usageMetadata ?? candidate?.usageMetadata
+  const count = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value) && value >= 0
+  const tokens = usage && count(usage.promptTokenCount) && count(usage.candidatesTokenCount)
+    ? {
+        input: Math.max(0, usage.promptTokenCount - (count(usage.cachedContentTokenCount) ? usage.cachedContentTokenCount : 0)),
+        output: usage.candidatesTokenCount + (count(usage.thoughtsTokenCount) ? usage.thoughtsTokenCount : 0),
+        total: count(usage.totalTokenCount) ? usage.totalTokenCount : usage.promptTokenCount + usage.candidatesTokenCount + (usage.thoughtsTokenCount ?? 0),
+        ...(count(usage.cachedContentTokenCount) ? { cacheRead: usage.cachedContentTokenCount } : {}),
+        ...(count(usage.thoughtsTokenCount) ? { reasoning: usage.thoughtsTokenCount } : {})
+      }
+    : undefined
+  if (response.error) return [{ kind: 'error', error: response.error.message ?? 'Antigravity stream failed', ...(tokens ? { tokens } : {}) }]
+  if (candidate?.finishReason || tokens) {
+    parts.push({ kind: 'finish', finishReason: candidate?.finishReason, tokens })
   }
   return parts
 }
@@ -84,7 +96,7 @@ export function createAntigravityLlm(apiKey: string, context: string | Antigravi
         request: {
           contents: toContents(opts.messages, resolved.isGemini3 ?? /^gemini-3(?:\.|-|$)/i.test(opts.model)),
           systemInstruction: opts.system ? { parts: [{ text: opts.system }] } : undefined,
-          generationConfig: { maxOutputTokens: 8192 },
+          ...(opts.maxOutputTokens ? { generationConfig: { maxOutputTokens: opts.maxOutputTokens } } : {}),
           tools: opts.tools.length > 0 ? [{ functionDeclarations: opts.tools.map(tool => {
             const raw = typeof (tool.schema as { toJSONSchema?: () => unknown }).toJSONSchema === 'function'
               ? (tool.schema as { toJSONSchema: () => unknown }).toJSONSchema()
@@ -113,14 +125,33 @@ export function createAntigravityLlm(apiKey: string, context: string | Antigravi
         yield { kind: 'error', error: `[bs] [${code}] Antigravity request failed (${response.status}): ${detail.slice(0, 500)}${retryAfter ? `; retry-after=${retryAfter}` : ''}` }
         return
       }
-      for await (const decoded of decodeProviderResponse(response, { maxBytes: 16 * 1024 * 1024 })) {
-        if (decoded.kind === 'parse-error') {
-          yield { kind: 'error', error: `[bs] [stream-invalid] ${decoded.message}` }
-          continue
+      let finishReason: string | undefined
+      let tokens: LlmStreamPart['tokens']
+      try {
+        for await (const decoded of decodeProviderResponse(response, { maxBytes: 16 * 1024 * 1024 })) {
+          if (decoded.kind === 'parse-error') {
+            yield { kind: 'error', error: `[bs] [stream-invalid] ${decoded.message}`, ...(tokens ? { tokens } : {}) }
+            return
+          }
+          const value = decoded.kind === 'event' ? decoded.event : decoded.value
+          for (const part of parseChunk(value)) {
+            if (part.kind === 'finish') {
+              finishReason = part.finishReason ?? finishReason
+              tokens = part.tokens ?? tokens
+            } else if (part.kind === 'error') {
+              yield { ...part, ...((part.tokens ?? tokens) ? { tokens: part.tokens ?? tokens } : {}) }
+              return
+            } else yield part
+          }
         }
-        const value = decoded.kind === 'event' ? decoded.event : decoded.value
-        for (const part of parseChunk(value)) yield part
+      } catch (error) {
+        yield { kind: 'error', error: `[bs] [stream-interrupted] ${String(error)}`, ...(tokens ? { tokens } : {}) }
+        return
       }
+      // Cloud Code can send usage after the candidate's finish frame. Emit one
+      // terminal part with the final counters, including usage-only frames.
+      if (finishReason) yield { kind: 'finish', finishReason, tokens }
+      else if (tokens) yield { kind: 'error', error: '[bs] Antigravity stream ended before a completion marker. The partial response was saved.', tokens }
     }
   }
 }

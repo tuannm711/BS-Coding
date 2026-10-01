@@ -55,7 +55,9 @@ export function toLlmMessages(items: TranscriptItem[], opts?: ToLlmOptions): Mod
           ...(call.thoughtSignature ? { providerOptions: { google: { thoughtSignature: call.thoughtSignature } } } : {})
         })
       }
-      result.push({ role: 'assistant', content })
+      // Usage-only transcript markers retain measurements without replaying
+      // an empty assistant message to providers on the next request.
+      if (content.length > 0) result.push({ role: 'assistant', content })
       pendingAssistant = null
     }
     result.push(...pendingResults)

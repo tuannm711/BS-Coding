@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { contextTokens, contextPercent, contextLevel } from '../../src/shared/usage'
+import { contextTokens, contextPercent, contextLevel, latestContextTokens } from '../../src/shared/usage'
+import type { ChatTranscriptItem } from '../../src/shared/types'
 
 describe('contextTokens', () => {
   it('uses total when the provider reports it', () => {
@@ -10,9 +11,39 @@ describe('contextTokens', () => {
     expect(contextTokens({ input: 100, output: 20, total: 0 })).toBe(120)
   })
 
+  it('counts each cached prompt token once when the provider omits total', () => {
+    expect(contextTokens({ input: 60, output: 20, total: 0, cacheRead: 30, cacheWrite: 10, reasoning: 5 })).toBe(120)
+  })
+
   it('ignores the breakdown fields in the sum', () => {
     // reasoning/cacheRead được lưu để sau này chỉnh công thức, không cộng thêm ở đây
     expect(contextTokens({ input: 100, output: 20, total: 130, reasoning: 8, cacheRead: 500 })).toBe(130)
+  })
+})
+
+describe('latestContextTokens', () => {
+  const assistant = (tokens?: { input: number; output: number; total: number }): ChatTranscriptItem => ({
+    kind: 'message', message: { id: 'assistant', role: 'assistant', text: '', createdAt: 1, tokens }
+  })
+
+  it('restores reported context from an input-only assistant response', () => {
+    expect(latestContextTokens([assistant({ input: 100, output: 0, total: 100 })])).toBe(100)
+  })
+
+  it('does not reuse an older request measurement when the newest user request has no measured response', () => {
+    expect(latestContextTokens([assistant({ input: 100, output: 20, total: 120 }), { kind: 'message', message: { id: 'latest-user', role: 'user', text: 'new request', createdAt: 2 } }])).toBeNull()
+  })
+
+  it('keeps the latest response unknown instead of reusing earlier measured context', () => {
+    expect(latestContextTokens([assistant({ input: 100, output: 20, total: 120 }), assistant()])).toBeNull()
+  })
+
+  it('restores the selected session independently of another session', () => {
+    const first = [assistant({ input: 100, output: 20, total: 120 })]
+    const second = [assistant({ input: 200, output: 30, total: 230 })]
+    expect(latestContextTokens(first)).toBe(120)
+    expect(latestContextTokens(second)).toBe(230)
+    expect(latestContextTokens([])).toBeNull()
   })
 })
 

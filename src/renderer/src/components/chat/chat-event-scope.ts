@@ -10,3 +10,13 @@ export function acceptChatEvent(active: ActiveChatScope, event: ChatEvent): bool
   if (event.projectPath !== active.projectPath || event.sessionId !== active.sessionId) return false
   return !active.turnId || !event.turnId || event.turnId === active.turnId
 }
+
+interface UsageSnapshotScope extends ActiveChatScope {
+  agentId?: string
+  revision: number
+}
+
+export function acceptUsageSnapshot(active: UsageSnapshotScope, snapshot: UsageSnapshotScope): boolean {
+  return active.projectPath === snapshot.projectPath && active.sessionId === snapshot.sessionId
+    && active.agentId === snapshot.agentId && active.revision === snapshot.revision
+}

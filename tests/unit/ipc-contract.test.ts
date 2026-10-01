@@ -159,6 +159,11 @@ describe('IPC contract', () => {
       saveSettings: async (s) => s,
       getMcpStatus: async () => [],
       getBrowserStatus: async () => ({ status: 'idle', port: 0, paired: false }),
+      setupNativeBrowser: async () => ({ status: 'idle', port: 0, paired: false }),
+      selectBrowserConnection: async () => {},
+      setBrowserConnectionEnabled: async () => {},
+      listBrowserTabs: async () => [],
+      assignBrowserTab: async () => {},
       pairBrowser: async () => ({ code: '000000', expiresAt: 0 }),
       openBrowserInstallGuide: async () => {},
       openBrowserExtensionFolder: async () => {},
@@ -250,6 +255,11 @@ describe('IPC contract', () => {
     expect(Channels.WindowIsMaximized).toBe('window:is-maximized')
     expect(Channels.EventWindowMaximizedChange).toBe('window:maximized-change')
     expect(Channels.BrowserGetStatus).toBe('browser:get-status')
+    expect(Channels.BrowserNativeSetup).toBe('browser:native-setup')
+    expect(Channels.BrowserSelectConnection).toBe('browser:select-connection')
+    expect(Channels.BrowserSetConnectionEnabled).toBe('browser:set-connection-enabled')
+    expect(Channels.BrowserListTabs).toBe('browser:list-tabs')
+    expect(Channels.BrowserAssignTab).toBe('browser:assign-tab')
     expect(Channels.BrowserPair).toBe('browser:pair')
     expect(Channels.BrowserOpenInstallGuide).toBe('browser:open-install-guide')
     expect(Channels.BrowserOpenExtensionFolder).toBe('browser:open-extension-folder')

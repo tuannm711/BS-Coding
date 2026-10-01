@@ -1,13 +1,13 @@
 import { z } from 'zod'
-import type { ToolDefinition, ToolRunResult } from './types'
+import type { ToolDefinition, ToolRunResult, ToolContext } from './types'
 import type { BrowserCommandName, BrowserCommandResult, BrowserStatusInfo } from '../../../shared/browser-types'
 
 export interface BrowserBridgeLike {
   getStatus(): BrowserStatusInfo
-  execute(name: BrowserCommandName, params?: Record<string, unknown>, timeoutMs?: number): Promise<BrowserCommandResult>
+  execute(name: BrowserCommandName, params?: Record<string, unknown>, timeoutMs?: number, scope?: { ownerId: string; signal?: AbortSignal }): Promise<BrowserCommandResult>
   waitForPaired(timeoutMs: number): Promise<boolean>
-  getConsoleLogs(limit?: number): unknown[]
-  getNetworkLogs(limit?: number): unknown[]
+  getConsoleLogs(limit?: number, ownerId?: string): unknown[]
+  getNetworkLogs(limit?: number, ownerId?: string): unknown[]
 }
 
 export interface BrowserLauncherLike {
@@ -23,12 +23,15 @@ export function createBrowserTools(
   const fmt = (r: BrowserCommandResult): ToolRunResult =>
     r.ok ? { output: JSON.stringify(r.data ?? {}, null, 2) } : { error: r.error }
 
+  const owner = (ctx: ToolContext) => ctx.snapshotScopeId ?? ctx.taskId ?? ctx.agentId ?? 'legacy'
+  const execute = (ctx: ToolContext, name: BrowserCommandName, params?: Record<string, unknown>, timeoutMs?: number) => bridge.execute(name, params, timeoutMs, { ownerId: owner(ctx), signal: ctx.signal })
+
   return [
     {
       name: 'browser_start',
       description:
-        'Ensure the Chrome bridge is connected. If not paired, opens Chrome, shows install steps, ' +
-        'and waits for the user to pair the extension. Returns the bridge status.',
+        'Ensure the Chrome bridge is connected. If not connected, opens Chrome, shows Native Messaging install steps, ' +
+        'and waits for the extension to connect. Returns the bridge status.',
       schema: z.object({}),
       async run(): Promise<ToolRunResult> {
         const status = bridge.getStatus()
@@ -38,7 +41,7 @@ export function createBrowserTools(
         await launcher.openChrome()
         await launcher.showInstallGuide()
         const paired = await bridge.waitForPaired(60_000)
-        if (!paired) return { error: 'browser not paired after 60s — check the pairing code in the extension popup' }
+        if (!paired) return { error: 'browser not paired after 60s — install/repair the native helper and click Connect in the extension popup' }
         return { output: `browser paired (port ${bridge.getStatus().port})` }
       }
     },
@@ -50,10 +53,10 @@ export function createBrowserTools(
       schema: z.object({
         url: z.string().describe('The http(s) URL to open.')
       }),
-      async run(input): Promise<ToolRunResult> {
+      async run(input, ctx): Promise<ToolRunResult> {
         const { url } = input as unknown as { url: string }
         if (!/^https?:\/\//i.test(url)) return { error: `browser_navigate: invalid url: ${url}` }
-        return fmt(await bridge.execute('navigate', { url }))
+        return fmt(await execute(ctx, 'navigate', { url }))
       }
     },
     {
@@ -65,10 +68,10 @@ export function createBrowserTools(
       schema: z.object({
         url: z.string().describe('The http(s) URL to open.')
       }),
-      async run(input): Promise<ToolRunResult> {
+      async run(input, ctx): Promise<ToolRunResult> {
         const { url } = input as unknown as { url: string }
         if (!/^https?:\/\//i.test(url)) return { error: `browser_open_tab: invalid url: ${url}` }
-        return fmt(await bridge.execute('openTab', { url }))
+        return fmt(await execute(ctx, 'openTab', { url }))
       }
     },
     {
@@ -79,14 +82,14 @@ export function createBrowserTools(
         selector: z.string().optional().describe('CSS selector of the element to click.'),
         x: z.number().optional().describe('Viewport x coordinate (requires y).'),
         y: z.number().optional().describe('Viewport y coordinate (requires x).'),
-        tabId: z.number().int().optional().describe('Optional tab id to act on; defaults to the active/visible tab.')
+        tabId: z.number().int().optional().describe('Optional tab id to act on; defaults to the tab assigned to this session.')
       }),
-      async run(input): Promise<ToolRunResult> {
+      async run(input, ctx): Promise<ToolRunResult> {
         const { ref, selector, x, y, tabId } = input as unknown as { ref?: string; selector?: string; x?: number; y?: number; tabId?: number }
         const base: Record<string, unknown> = {}
         if (tabId != null) base.tabId = tabId
-        if (ref != null) return fmt(await bridge.execute('click', { ...base, ref }))
-        return fmt(await bridge.execute('click', selector ? { ...base, selector } : { ...base, x, y }))
+        if (ref != null) return fmt(await execute(ctx, 'click', { ...base, ref }))
+        return fmt(await execute(ctx, 'click', selector ? { ...base, selector } : { ...base, x, y }))
       }
     },
     {
@@ -96,13 +99,13 @@ export function createBrowserTools(
         ref: z.string().optional().describe('Snapshot ref from browser_read (preferred).'),
         selector: z.string().optional().describe('CSS selector of the input element.'),
         text: z.string().describe('Text to type.'),
-        tabId: z.number().int().optional().describe('Optional tab id to act on; defaults to the active/visible tab.')
+        tabId: z.number().int().optional().describe('Optional tab id to act on; defaults to the tab assigned to this session.')
       }),
-      async run(input): Promise<ToolRunResult> {
+      async run(input, ctx): Promise<ToolRunResult> {
         const { ref, selector, text, tabId } = input as unknown as { ref?: string; selector?: string; text: string; tabId?: number }
         const base: Record<string, unknown> = {}
         if (tabId != null) base.tabId = tabId
-        return fmt(await bridge.execute('type', { ...base, ...(ref != null ? { ref, text } : { selector, text }) }))
+        return fmt(await execute(ctx, 'type', { ...base, ...(ref != null ? { ref, text } : { selector, text }) }))
       }
     },
     {
@@ -112,13 +115,13 @@ export function createBrowserTools(
         ref: z.string().optional().describe('Snapshot ref from browser_read (preferred).'),
         selector: z.string().optional().describe('CSS selector of the select element.'),
         value: z.string().describe('Option value to select.'),
-        tabId: z.number().int().optional().describe('Optional tab id to act on; defaults to the active/visible tab.')
+        tabId: z.number().int().optional().describe('Optional tab id to act on; defaults to the tab assigned to this session.')
       }),
-      async run(input): Promise<ToolRunResult> {
+      async run(input, ctx): Promise<ToolRunResult> {
         const { ref, selector, value, tabId } = input as unknown as { ref?: string; selector?: string; value: string; tabId?: number }
         const base: Record<string, unknown> = {}
         if (tabId != null) base.tabId = tabId
-        return fmt(await bridge.execute('select', { ...base, ...(ref != null ? { ref, value } : { selector, value }) }))
+        return fmt(await execute(ctx, 'select', { ...base, ...(ref != null ? { ref, value } : { selector, value }) }))
       }
     },
     {
@@ -127,13 +130,13 @@ export function createBrowserTools(
       schema: z.object({
         direction: z.enum(['up', 'down', 'top', 'bottom']).optional(),
         selector: z.string().optional().describe('CSS selector to scroll into view.'),
-        tabId: z.number().int().optional().describe('Optional tab id to act on; defaults to the active/visible tab.')
+        tabId: z.number().int().optional().describe('Optional tab id to act on; defaults to the tab assigned to this session.')
       }),
-      async run(input): Promise<ToolRunResult> {
+      async run(input, ctx): Promise<ToolRunResult> {
         const { direction, selector, tabId } = input as unknown as { direction?: 'up' | 'down' | 'top' | 'bottom'; selector?: string; tabId?: number }
         const base: Record<string, unknown> = {}
         if (tabId != null) base.tabId = tabId
-        return fmt(await bridge.execute('scroll', selector ? { ...base, selector } : { ...base, direction: direction ?? 'down' }))
+        return fmt(await execute(ctx, 'scroll', selector ? { ...base, selector } : { ...base, direction: direction ?? 'down' }))
       }
     },
     {
@@ -146,22 +149,22 @@ export function createBrowserTools(
         'chunks if large) to see every element, then click/type/select using the [ref] shown.',
       schema: z.object({
         mode: z.enum(['interactive', 'full']).optional().describe('interactive (default) refs interactive elements; full refs every element.'),
-        tabId: z.number().int().optional().describe('Optional tab id to snapshot; defaults to the active/visible tab.')
+        tabId: z.number().int().optional().describe('Optional tab id to snapshot; defaults to the tab assigned to this session.')
       }),
-      async run(input): Promise<ToolRunResult> {
+      async run(input, ctx): Promise<ToolRunResult> {
         const { mode, tabId } = input as unknown as { mode?: 'interactive' | 'full'; tabId?: number }
         const params: Record<string, unknown> = {}
         if (mode != null) params.mode = mode
         if (tabId != null) params.tabId = tabId
-        return fmt(await bridge.execute('read', params))
+        return fmt(await execute(ctx, 'read', params))
       }
     },
     {
       name: 'browser_list_tabs',
       description: 'List open tabs with id, title, url, active, window and tab-group info.',
       schema: z.object({}),
-      async run(): Promise<ToolRunResult> {
-        return fmt(await bridge.execute('listTabs'))
+      async run(_input, ctx): Promise<ToolRunResult> {
+        return fmt(await execute(ctx, 'listTabs'))
       }
     },
     {
@@ -170,9 +173,9 @@ export function createBrowserTools(
       schema: z.object({
         tabId: z.number().describe('Tab id to activate.')
       }),
-      async run(input): Promise<ToolRunResult> {
+      async run(input, ctx): Promise<ToolRunResult> {
         const { tabId } = input as unknown as { tabId: number }
-        return fmt(await bridge.execute('switchTab', { tabId }))
+        return fmt(await execute(ctx, 'switchTab', { tabId }))
       }
     },
     {
@@ -181,9 +184,9 @@ export function createBrowserTools(
       schema: z.object({
         tabId: z.number().describe('Tab id to close.')
       }),
-      async run(input): Promise<ToolRunResult> {
+      async run(input, ctx): Promise<ToolRunResult> {
         const { tabId } = input as unknown as { tabId: number }
-        return fmt(await bridge.execute('closeTab', { tabId }))
+        return fmt(await execute(ctx, 'closeTab', { tabId }))
       }
     },
     {
@@ -192,9 +195,9 @@ export function createBrowserTools(
       schema: z.object({
         limit: z.number().int().positive().max(200).optional()
       }),
-      async run(input): Promise<ToolRunResult> {
+      async run(input, ctx): Promise<ToolRunResult> {
         const { limit } = input as unknown as { limit?: number }
-        return { output: JSON.stringify(bridge.getConsoleLogs(limit), null, 2) }
+        return { output: JSON.stringify(bridge.getConsoleLogs(limit, owner(ctx)), null, 2) }
       }
     },
     {
@@ -203,9 +206,9 @@ export function createBrowserTools(
       schema: z.object({
         limit: z.number().int().positive().max(200).optional()
       }),
-      async run(input): Promise<ToolRunResult> {
+      async run(input, ctx): Promise<ToolRunResult> {
         const { limit } = input as unknown as { limit?: number }
-        return { output: JSON.stringify(bridge.getNetworkLogs(limit), null, 2) }
+        return { output: JSON.stringify(bridge.getNetworkLogs(limit, owner(ctx)), null, 2) }
       }
     },
     {
@@ -214,13 +217,13 @@ export function createBrowserTools(
       schema: z.object({
         selector: z.string().describe('CSS selector to wait for.'),
         timeoutMs: z.number().int().positive().max(60_000).optional(),
-        tabId: z.number().int().optional().describe('Optional tab id to act on; defaults to the active/visible tab.')
+        tabId: z.number().int().optional().describe('Optional tab id to act on; defaults to the tab assigned to this session.')
       }),
-      async run(input): Promise<ToolRunResult> {
+      async run(input, ctx): Promise<ToolRunResult> {
         const { selector, timeoutMs, tabId } = input as unknown as { selector: string; timeoutMs?: number; tabId?: number }
         const params: Record<string, unknown> = { selector, timeoutMs: timeoutMs ?? 10_000 }
         if (tabId != null) params.tabId = tabId
-        return fmt(await bridge.execute('waitFor', params, (timeoutMs ?? 10_000) + 5000))
+        return fmt(await execute(ctx, 'waitFor', params, (timeoutMs ?? 10_000) + 5000))
       }
     }
   ]

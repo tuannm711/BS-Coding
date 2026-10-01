@@ -1,10 +1,20 @@
 {
   "manifest_version": 3,
   "name": "Bs Browser Bridge",
-  "version": "0.3.4",
+  "version": "1.0.0",
   "description": "Bridge giữa BS Coding và Chrome: cho phép agent đọc/thao tác trang trên profile Chrome thật.",
-  "permissions": ["tabs", "scripting", "storage", "debugger", "tabGroups", "alarms"],
-  "host_permissions": ["<all_urls>"],
+  "permissions": [
+    "tabs",
+    "scripting",
+    "storage",
+    "debugger",
+    "tabGroups",
+    "alarms",
+    "nativeMessaging"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
   "background": {
     "service_worker": "background.js"
   },
@@ -26,10 +36,15 @@
   },
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
-      "js": ["content.js"],
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "content.js"
+      ],
       "run_at": "document_idle",
       "all_frames": false
     }
-  ]
+  ],
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAuZq2K7x/Q9BVPaIme8qG9uJOFLk44qi1xvik/Hi83Qa5OWHuZjUbvt+C8IFc/tBKoPsrEOVlEwzlSSsKz+mHE6jn8TjoFeYmRxbNuF32lLwIXNUOnULUKFGrqB6WLUc7a/fY5bLqoGYV/wj2h0kCPt1EYDdtTxchi2QzllGfa5zLUbsbiuYn/YWd1ggSJ2B/bEjUTUs8mh0SxE1nJYT9aS2MxHO+wv8fn8xoyHOsBSTIlDanYLhk2lDkwjypAc5CyNGQMlQ8dkM+QzQe0QvVUponnQ/oWPXwb8KLEtPOW+MxZ0NNtQlg/s3kKJ2rJ1lHOvbeKZtrWLGb6DpHwvDRXwIDAQAB"
 }

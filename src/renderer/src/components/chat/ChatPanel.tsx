@@ -1,8 +1,8 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { ChevronDown } from 'lucide-react'
-import type { AgentConfig, AgentMode, BsSettings, ChatEvent, ChatMessage, Command, ImageAttachment, QuestionOption, QueuedMessage, QuickMessage, TodoItem, TodoStatus, ToolCallData, TurnExecutionSnapshot } from '@shared/types'
+import type { AgentConfig, AgentMode, BsSettings, ChatEvent, ChatMessage, Command, ContextInfo, ImageAttachment, QuestionOption, QueuedMessage, QuickMessage, TodoItem, TodoStatus, ToolCallData, TurnExecutionSnapshot } from '@shared/types'
 import { appendStreamDelta } from '@shared/text'
-import { contextTokens } from '@shared/usage'
+import { contextTokens, latestContextTokens } from '@shared/usage'
 import ChatInput from './ChatInput'
 import { buildQuestionAnswer } from './questionAnswer'
 import ModelPicker from './ModelPicker'
@@ -12,7 +12,7 @@ import VariantPicker from './VariantPicker'
 import ContextFooter from './ContextFooter'
 import { FeedRow, feedItemKey, type FeedItem } from './FeedRow'
 import { withNarrationNotices } from './transcript-notices'
-import { acceptChatEvent } from './chat-event-scope'
+import { acceptChatEvent, acceptUsageSnapshot } from './chat-event-scope'
 import { useChatScroll } from './useChatScroll'
 import { finalResponseIds, mergeTranscriptSnapshot } from './chat-presentation'
 
@@ -74,6 +74,7 @@ function ChatPanel({ agentId, agents, onAgentChange, projectPath, sessionId, onS
   const [sessionCost, setSessionCost] = useState(0)
   const [sessionTokens, setSessionTokens] = useState<{ input: number; output: number } | null>(null)
   const [contextLimit, setContextLimit] = useState<number | null>(null)
+  const [contextLimitSource, setContextLimitSource] = useState<ContextInfo['limitSource']>()
   const [compactThreshold, setCompactThreshold] = useState<number | null>(null)
   const [commands, setCommands] = useState<Command[]>([])
   const [todos, setTodos] = useState<TodoItem[]>([])
@@ -94,6 +95,11 @@ function ChatPanel({ agentId, agents, onAgentChange, projectPath, sessionId, onS
   const streamRowSequence = useRef(0)
   const activeTurnIdRef = useRef<string | undefined>(undefined)
   const viewRevisionRef = useRef(0)
+  const usageRequestRef = useRef(0)
+  const contextInfoRequestRef = useRef(0)
+  const contextUsageRevisionRef = useRef(0)
+  const usageScopeRef = useRef({ projectPath, sessionId, agentId })
+  usageScopeRef.current = { projectPath, sessionId, agentId }
   const historyRequestRef = useRef(0)
   const initialTranscriptRef = useRef(true)
   const viewScopeRef = useRef({ projectPath, sessionId })
@@ -113,24 +119,42 @@ function ChatPanel({ agentId, agents, onAgentChange, projectPath, sessionId, onS
   }, [agentId, onVariantChange])
 
   const loadContextInfo = useCallback(() => {
+    const scope = { projectPath, sessionId, agentId, revision: ++contextInfoRequestRef.current }
     void window.api.getContextInfo(agentId).then(info => {
+      if (!acceptUsageSnapshot({ ...usageScopeRef.current, revision: contextInfoRequestRef.current }, scope)) return
       setContextLimit(info.limit)
+      setContextLimitSource(info.limitSource)
       setCompactThreshold(info.compactThreshold)
+    }).catch(() => {
+      if (!acceptUsageSnapshot({ ...usageScopeRef.current, revision: contextInfoRequestRef.current }, scope)) return
+      setContextLimit(null)
+      setContextLimitSource(undefined)
+      setCompactThreshold(null)
     })
-  }, [agentId])
+  }, [agentId, projectPath, sessionId])
 
   const loadSessionUsage = useCallback(() => {
+    const scope = { projectPath, sessionId, revision: ++usageRequestRef.current }
     void window.api.getSessionUsage(projectPath, sessionId).then(usage => {
+      if (!acceptUsageSnapshot({ projectPath: usageScopeRef.current.projectPath, sessionId: usageScopeRef.current.sessionId, revision: usageRequestRef.current }, scope)) return
       setSessionCost(usage.cost)
       setSessionTokens({
         input: usage.input + usage.cacheRead + usage.cacheWrite,
         output: usage.output
       })
+    }).catch(() => {
+      if (!acceptUsageSnapshot({ projectPath: usageScopeRef.current.projectPath, sessionId: usageScopeRef.current.sessionId, revision: usageRequestRef.current }, scope)) return
+      setSessionTokens(null)
     })
   }, [projectPath, sessionId])
 
   useEffect(() => { refreshVariants(); loadContextInfo() }, [refreshVariants, loadContextInfo])
-  useEffect(() => { loadSessionUsage() }, [loadSessionUsage])
+  useEffect(() => {
+    setContextUsed(null)
+    setSessionCost(0)
+    setSessionTokens(null)
+    loadSessionUsage()
+  }, [loadSessionUsage])
 
   useEffect(() => {
     const onModelChanged = (e: Event) => {
@@ -150,6 +174,7 @@ function ChatPanel({ agentId, agents, onAgentChange, projectPath, sessionId, onS
   const loadTranscript = useCallback((merge = false) => {
     const request = ++historyRequestRef.current
     const revision = viewRevisionRef.current
+    const usageRevision = contextUsageRevisionRef.current
     const initial = initialTranscriptRef.current
     void window.api.listSessionTranscript(projectPath, sessionId).then(items => {
       if (request !== historyRequestRef.current || viewScopeRef.current.projectPath !== projectPath || viewScopeRef.current.sessionId !== sessionId) return
@@ -167,16 +192,7 @@ function ChatPanel({ agentId, agents, onAgentChange, projectPath, sessionId, onS
         const active = [...items].reverse().find(item => (item.kind === 'message' ? item.message.execution : item.tool.execution)?.status === 'running')
         if (active) activeTurnIdRef.current = active.kind === 'message' ? active.message.turnId : active.tool.turnId
       }
-      // Mức chiếm dụng context = token của assistant message cuối cùng có output,
-      // giống cách opencode chọn (subagent-footer.tsx:35).
-      let used: number | null = null
-      for (let i = items.length - 1; i >= 0; i--) {
-        const it = items[i]
-        if (it.kind !== 'message') continue
-        const t = it.message.tokens
-        if (it.message.role === 'assistant' && t && t.output > 0) { used = contextTokens(t); break }
-      }
-      setContextUsed(used)
+      if (contextUsageRevisionRef.current === usageRevision) setContextUsed(latestContextTokens(items))
       if (initialTranscriptRef.current) { pinSessionToEnd(); initialTranscriptRef.current = false }
     })
   }, [projectPath, sessionId, pinSessionToEnd])
@@ -378,7 +394,9 @@ function ChatPanel({ agentId, agents, onAgentChange, projectPath, sessionId, onS
       })
       return
     }
-if (e.type === 'usage') {
+    if (e.type === 'usage') {
+      usageRequestRef.current++
+      contextUsageRevisionRef.current++
       setContextUsed(contextTokens(e.tokens))
       setSessionCost(e.sessionCost)
       setSessionTokens(e.sessionTokens)
@@ -425,7 +443,16 @@ if (e.type === 'usage') {
       if (e.type === 'error') {
         setItems(prev => [...prev, { kind: 'error', id: 'err-' + Date.now(), text: e.message }])
       }
-      if (e.type === 'done') loadSessionUsage()
+      if (e.type === 'done' && e.reason !== 'stopped') {
+        contextUsageRevisionRef.current++
+        setContextUsed(e.tokens ? contextTokens(e.tokens) : null)
+      }
+      if (e.type === 'error' || (e.type === 'done' && e.reason === 'stopped')) {
+        contextUsageRevisionRef.current++
+        setContextUsed(null)
+        loadTranscript(true)
+      }
+      loadSessionUsage()
       return
     }
     if (e.type === 'session-created') {
@@ -436,6 +463,8 @@ if (e.type === 'usage') {
       activeTurnIdRef.current = (e as ChatEvent & { turnId?: string }).turnId
       setRunning(true)
       setWorkingAgentId(e.agentId)
+      contextUsageRevisionRef.current++
+      setContextUsed(null)
       setActivity('Working')
       return
     }
@@ -955,6 +984,7 @@ if (e.type === 'usage') {
         <ContextFooter
           tokens={contextUsed}
           limit={contextLimit}
+          limitSource={contextLimitSource}
           compactThreshold={compactThreshold}
           cost={sessionCost}
           sessionTokens={sessionTokens}
