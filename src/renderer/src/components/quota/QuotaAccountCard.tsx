@@ -250,6 +250,11 @@ export default function QuotaAccountCard({
         </section>)}
       </div> : <div className="quota-empty">Quota not reported by provider</div>}
 
+      {account.providerId === 'github-copilot' && usage?.creditsUsed !== undefined && <div className="quota-metrics" aria-label="Copilot credits">
+        <Metric label="AI credits used" value={formatCount(usage.creditsUsed)} />
+        <span className="quota-empty">Credit allowance / remaining not reported by GitHub</span>
+      </div>}
+
       {/* Same margin as an agent under a pool. The dashed box these used to
           sit in inset them a second time, which is why the card holding them
           looked narrower than its neighbours. */}
@@ -306,9 +311,10 @@ export function QuotaWindow({ window }: { window: ProviderQuotaGroup['windows'][
     <div className="quota-window-label">
       <span>{window.label}</span>
       <em>{window.resetAt ? formatCountdown(window.resetAt) : '—'}</em>
-      <strong>{known ? formatPercent(window.remainingPercent) : '—'}</strong>
+      <strong>{window.unlimited ? 'Unlimited' : known ? formatPercent(window.remainingPercent) : '—'}</strong>
     </div>
-    {known ? <div className="quota-progress" role="progressbar" aria-label={`${window.label} remaining`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={window.remainingPercent}><span style={{ width: `${window.remainingPercent}%` }} /></div> : null}
+    {!window.unlimited && window.remainingCount !== undefined && <span className="quota-window-count">{formatCount(window.remainingCount)}{window.limitCount === undefined ? '' : ` / ${formatCount(window.limitCount)}`} remaining</span>}
+    {!window.unlimited && known ? <div className="quota-progress" role="progressbar" aria-label={`${window.label} remaining`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={window.remainingPercent}><span style={{ width: `${window.remainingPercent}%` }} /></div> : null}
   </div>
 }
 

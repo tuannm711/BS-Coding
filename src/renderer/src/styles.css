@@ -1786,6 +1786,7 @@ select.input { width: 100%; }
 .quota-speed-control button:hover, .quota-speed-control button:focus-visible { border-color: var(--accent-border); color: var(--text-strong); }
 .quota-speed-control button.active { border-color: var(--accent-border); background: var(--accent-dim); color: var(--accent); }
 .quota-window { display: grid; gap: 4px; }
+.quota-window-count { font-size: var(--fs-sm); color: var(--text-dim); font-variant-numeric: tabular-nums; }
 /* Name on the left, countdown and remaining right-aligned and tabular so the
    numbers line up down the card. One row, because the percentage, the bar and
    the countdown are one fact stated three ways. */

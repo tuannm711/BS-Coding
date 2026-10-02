@@ -14,7 +14,7 @@ Last reviewed: 2026-08-27 (at the v1.3.0 release)
 | # | Item | Area | Severity |
 |---|---|---|---|
 | 1 | [No designed quota-health signal for routing](#1-no-designed-quota-health-signal-for-routing) | Providers | Medium |
-| 2 | [Only two providers report usage](#2-only-two-providers-report-usage) | Providers | Medium |
+| 2 | [Arbitrary compatible endpoints do not report account quota](#2-arbitrary-compatible-endpoints-do-not-report-account-quota) | Providers | Medium |
 | 3 | [Antigravity reports no subscription term](#3-antigravity-reports-no-subscription-term) | Providers | Won't fix |
 | 4 | [Google OAuth client secret is public](#4-google-oauth-client-secret-is-public) | Security | Accepted |
 | 5 | [Tray artwork is not platform-specific](#5-tray-artwork-is-not-platform-specific) | Desktop | Low |
@@ -56,23 +56,24 @@ for what was removed and why.
 
 
 
-## 2. Only two providers report usage
+## 2. Arbitrary compatible endpoints do not report account quota
 
 **Found:** 2026-08-25, while answering whether subscription expiry could be shown
 for providers other than Antigravity.
 
-`fetchUsage` is implemented by `antigravity.ts` and `openai.ts` only.
-`github-copilot.ts` and `openai-compatible.ts` implement none, so those accounts
-have no quota, no reset window and no subscription term to display — the cards
-show nothing because there is nothing.
+Copilot account quota support was implemented after v1.3.8: `fetchUsage` now
+reads premium/chat/completion snapshots with the GitHub identity token. Counts,
+percentages, Unlimited and reported reset dates are shown, with credit usage when
+returned. GitHub's absent credit allowance/balance remains unreported.
+`openai-compatible.ts` still covers arbitrary endpoints and cannot assume a quota
+API, so generic connections may have no provider quota/reset data to display.
 
 This is a design limit, not a bug, but it caps the multi-account routing goal:
 the router cannot balance across providers whose remaining capacity it cannot
 see.
 
-**To close:** implement `fetchUsage` for GitHub Copilot, which does expose quota
-through its own API. `openai-compatible` covers arbitrary endpoints and likely
-cannot report usage in general.
+**Remaining:** support a provider-specific quota adapter only where that endpoint
+publishes a known account API; do not infer quota from locally counted tokens.
 
 
 

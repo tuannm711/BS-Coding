@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { copilotRuntimeCredential, createGitHubCopilotAdapter } from '../../src/main/providers/adapters/github-copilot'
 import type { ProviderDeviceAuthorizationStrategy } from '../../src/main/providers/types'
+import { copilotModelCatalog } from '../fixtures/copilot-model-catalog'
 
 describe('GitHub Copilot adapter', () => {
   beforeEach(() => vi.useFakeTimers())
@@ -13,6 +14,7 @@ describe('GitHub Copilot adapter', () => {
   })
 
   it('imports a Copilot token and exposes coding models', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json(copilotModelCatalog)))
     const adapter = createGitHubCopilotAdapter()
     const result = await adapter.connect({ providerId: 'github-copilot', methodId: 'imported', fields: { credentialJson: JSON.stringify({ accessToken: 'token' }) } }, {
       saveAccount: (account, secret) => ({ ...account, id: 'copilot-1', createdAt: 1, lastUsedAt: 1, models: ['gpt-4.1'], keyRef: secret?.accessToken })

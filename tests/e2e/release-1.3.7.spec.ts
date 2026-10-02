@@ -113,6 +113,9 @@ test('Copilot device code supports copy, cancel, denied recovery and successful 
       state.copilotDecision = 'pending'; state.copilotGrants = 0
       globalThis.fetch = async (input, init) => {
         const url = String(input)
+        if (url === 'https://api.githubcopilot.com/models') return Response.json({ data: [
+          { id: 'gpt-4.1', name: 'GPT fixture', model_picker_enabled: true, policy: { state: 'enabled' }, capabilities: { type: 'chat', supports: { streaming: true, tool_calls: true } } }
+        ] })
         if (url.startsWith('https://api.github.com/') && new Headers(init?.headers).get('x-github-api-version') !== '2022-11-28') return Response.json({ message: 'Bad Request' }, { status: 400 })
         if (url === 'https://github.com/login/device/code') return Response.json({ device_code: 'fixture-private-device', user_code: `CODE-000${++state.copilotGrants}`, verification_uri: 'https://github.com/login/device', expires_in: 900, interval: 0.1 })
         if (url === 'https://github.com/login/oauth/access_token') return Response.json(state.copilotDecision === 'approved' ? { access_token: 'fixture-github' } : { error: state.copilotDecision === 'denied' ? 'access_denied' : 'authorization_pending' })

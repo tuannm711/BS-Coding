@@ -380,6 +380,12 @@ export interface ProviderQuotaWindow {
   description?: string
   kind: 'session' | 'weekly' | 'monthly' | 'additional' | 'unknown'
   remainingPercent?: number
+  remainingCount?: number
+  limitCount?: number
+  usedCount?: number
+  unlimited?: boolean
+  /** Account entitlement telemetry that cannot safely infer a model's routing pool. */
+  informational?: boolean
   resetAt?: number
   windowMinutes?: number
   usageKnown: boolean
@@ -415,6 +421,8 @@ export interface ProviderUsage {
   secondaryResetAt?: number
   requestsUsed?: number
   requestLimit?: number
+  /** Provider-reported AI credits consumed; not a remaining allowance/balance. */
+  creditsUsed?: number
   tokensUsed?: number
   tokenLimit?: number
   /**

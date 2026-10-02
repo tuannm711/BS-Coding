@@ -20,6 +20,7 @@ export function normalizeProviderImport(_providerId: string, raw: string): Provi
   const apiKey = typeof parsed.apiKey === 'string' ? parsed.apiKey : undefined
   if (!accessToken && !apiKey) throw new ProviderAuthError('invalid-import', 'Credential JSON phải có apiKey or accessToken')
   const secret: ProviderSecrets = { apiKey, accessToken }
+  if (_providerId === 'github-copilot' && typeof parsed.githubAccessToken === 'string' && parsed.githubAccessToken) secret.githubAccessToken = parsed.githubAccessToken
   for (const key of ['refreshToken', 'idToken', 'accountId', 'baseUrl']) {
     const value = parsed[key]
     if (typeof value === 'string') secret[key as keyof ProviderSecrets] = value as never

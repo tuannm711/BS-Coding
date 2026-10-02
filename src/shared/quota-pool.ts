@@ -18,6 +18,6 @@ export function poolState(
   if (recorded?.kind === 'quota-exhausted') return 'quota-exhausted'
   // Unknown is not empty. Claiming exhaustion without a number would invent a
   // fact, which is how the false "Quota exhausted" badge happened in v1.1.2.
-  const spent = group.windows.some(window => window.usageKnown && window.remainingPercent === 0)
+  const spent = group.windows.some(window => !window.informational && !window.unlimited && window.usageKnown && window.remainingPercent === 0)
   return spent ? 'quota-exhausted' : 'ok'
 }
