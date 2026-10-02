@@ -41,7 +41,7 @@ export function formatInstant(timestamp?: number): string {
 // exhaustion warning must not speak for groups that still have quota.
 export function hasRemainingQuota(usage?: ProviderUsage): boolean {
   const windows = usage?.quotaGroups?.flatMap(group => group.windows) ?? []
-  return windows.some(window => window.usageKnown && (window.remainingPercent ?? 0) > 0)
+  return windows.some(window => window.usageKnown && (window.unlimited || (window.remainingPercent ?? 0) > 0 || (window.remainingCount ?? 0) > 0))
 }
 
 export function accountWarning(usage?: ProviderUsage): string | undefined {
@@ -129,8 +129,9 @@ export function chatQuotaGroups(usage: ProviderUsage | undefined, modelIds: stri
 }
 
 export function quotaWindowState(window: ProviderQuotaWindow, now = Date.now()): 'ready' | 'exhausted' | 'cooldown' | 'unknown' {
-  if (!window.usageKnown || window.remainingPercent === undefined) return 'unknown'
-  if (window.remainingPercent > 0) return 'ready'
+  if (window.unlimited) return 'ready'
+  if (!window.usageKnown || (window.remainingPercent === undefined && window.remainingCount === undefined)) return 'unknown'
+  if ((window.remainingPercent ?? window.remainingCount ?? 0) > 0) return 'ready'
   return window.resetAt !== undefined && window.resetAt > now ? 'cooldown' : 'exhausted'
 }
 

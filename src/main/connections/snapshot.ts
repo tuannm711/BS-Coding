@@ -18,7 +18,7 @@ export function buildProviderSnapshot(revision: number, capabilities: ProviderCa
     description: capability.description ?? '',
     methods: capability.methods.map(method => ({ id: method.id, label: method.label, description: method.description, kind: method.kind, fields: method.fields, opensBrowser: method.opensBrowser, supportsMultipleAccounts: method.supportsMultipleAccounts })),
     capabilities: {
-      modelDiscovery: capability.id === 'antigravity' ? 'remote' : 'static',
+      modelDiscovery: capability.id === 'antigravity' || capability.id === 'github-copilot' ? 'remote' : 'static',
       runtime: capability.methods.some(method => method.kind === 'oauth') ? 'oauth' : 'api-key',
       usage: usageSupported.has(capability.id) ? 'supported' : 'unavailable'
     }

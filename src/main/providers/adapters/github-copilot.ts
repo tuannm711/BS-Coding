@@ -2,12 +2,14 @@ import type { ProviderAdapter } from '../types'
 import type { ProviderSecrets } from '../../connections/types'
 import { createLlm } from '../../agent/llm'
 import { normalizeProviderImport } from '../auth/import-normalizer'
+import { normalizeGitHubCopilotUsage } from '../github-copilot-usage'
+import { copilotApiBaseUrl, parseGitHubCopilotModels, COPILOT_RUNTIME_HEADERS } from '../github-copilot-models'
+import { OpenAIResponsesClient } from '../../agent/openai-responses'
 import {
   startGitHubCopilotDeviceAuthorization,
-  refreshGitHubCopilotCredentials
+  refreshGitHubCopilotCredentials,
+  fetchGitHubCopilotQuota
 } from '../auth/github-copilot-oauth'
-
-const COPILOT_BASE_URL = 'https://api.githubcopilot.com'
 
 // Takes the whole secret, which is what createRuntime hands it. Naming only the
 // two fields it reads made a caller passing a full ProviderSecrets a type error
@@ -60,21 +62,41 @@ export function createGitHubCopilotAdapter(): ProviderAdapter {
       if (request.methodId === 'oauth') throw new Error('[bs] GitHub Copilot OAuth session chưa được bật trong runtime này')
       const secret = normalizeProviderImport('github-copilot', request.fields.credentialJson ?? '')
       const label = request.fields.label?.trim() || 'GitHub Copilot account'
-      const models = ['gpt-4.1', 'claude-sonnet-4']
-      const account = context.saveAccount({ providerId: 'github-copilot', label, authMode: 'imported', status: 'active', models, profile: { name: label } }, secret)
+      if (secret.githubAccessToken) {
+        try {
+          const raw = await fetchGitHubCopilotQuota(secret.githubAccessToken) as { copilot_plan?: unknown }
+          if (typeof raw?.copilot_plan === 'string') secret.planName = raw.copilot_plan
+        } catch { /* Catalog itself must still validate; missing plan metadata is not guessed. */ }
+      }
+      const modelCatalog = await this.listModels({ id: 'pending', providerId: 'github-copilot', label, authMode: 'imported', status: 'active', createdAt: 0, lastUsedAt: 0 }, secret)
+      const account = context.saveAccount({ providerId: 'github-copilot', label, authMode: 'imported', status: 'active', models: modelCatalog.map(model => model.id), modelCatalog, profile: { name: label, planName: secret.planName } }, secret)
       return { account }
     },
     async refreshAccount(account) { return account },
+    async fetchUsage(account, secret) {
+      if (!secret.githubAccessToken) return { accountId: account.id, refreshedAt: Date.now(), source: 'unavailable', status: 'unavailable', statusReason: 'Reconnect with GitHub OAuth to read account quota; a Copilot runtime token cannot read GitHub identity quota' }
+      return normalizeGitHubCopilotUsage(account, await fetchGitHubCopilotQuota(secret.githubAccessToken))
+    },
     async refreshCredentials(account, secret, options) {
       if (account.authMode !== 'oauth' || !secret.githubAccessToken) return secret
       if (!options?.force && secret.expiresAt && secret.expiresAt > Date.now() + 60_000) return secret
       return { ...secret, ...await refreshGitHubCopilotCredentials(secret.githubAccessToken) }
     },
-    async listModels(account) {
-      return (account.models ?? ['gpt-4.1', 'claude-sonnet-4']).map(id => ({ id, name: id, capabilities: { isCodeModel: true, supportsStreaming: true, supportsTools: true } }))
+    async listModels(account, secret) {
+      const response = await fetch(`${copilotApiBaseUrl(secret.baseUrl)}/models`, {
+        headers: { ...COPILOT_RUNTIME_HEADERS, accept: 'application/json', authorization: `Bearer ${copilotRuntimeCredential(secret)}` },
+        signal: AbortSignal.timeout(15_000)
+      })
+      if (!response.ok) throw new Error(`[bs] GitHub Copilot model discovery failed (HTTP ${response.status}). Refresh or reconnect this account.`)
+      const models = parseGitHubCopilotModels(await response.json(), secret.planName ?? account.usage?.planName ?? account.profile?.planName)
+      if (!models.length) throw new Error('[bs] GitHub Copilot catalog has no compatible enabled agent models. Check model access and account plan, then Refresh.')
+      return models
     },
-    createRuntime(_account, secret, _model) {
-      return createLlm('openai-compatible', copilotRuntimeCredential(secret), COPILOT_BASE_URL, { 'editor-version': 'vscode/1.95.0', 'copilot-integration-id': 'vscode-chat' })
+    createRuntime(_account, secret, model) {
+      const key = copilotRuntimeCredential(secret)
+      const baseUrl = copilotApiBaseUrl(secret.baseUrl)
+      return model.transport === 'openai-responses' ? new OpenAIResponsesClient({ apiKey: key, baseUrl, headers: COPILOT_RUNTIME_HEADERS })
+        : createLlm('openai-compatible', key, baseUrl, COPILOT_RUNTIME_HEADERS)
     }
   }
 }

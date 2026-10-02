@@ -113,6 +113,8 @@ Final prose that reaches its output budget may continue within the same turn, wi
 
 Use short English action labels. Quota bars reuse `QuotaWindow`, with explicit unknown values rather than inventing measurements. Bound and shared quota facts come from the shared binding contract.
 
+Copilot quota windows add provider-reported remaining/limit counts beneath the label and percentage. Unlimited has a text marker and no fake progress bar. AI credits consumed is separate from request quota; a missing allowance/remaining balance is explicitly unreported. Settings and chat/Fleet reuse the same quota components and stale feedback.
+
 The chat footer's context count is the latest provider-reported request size (including cache and generated tokens), while Tokens is the cumulative usage recorded for the session. Provider measurements survive reload and measured spending persists after Stop/error. Missing usage remains unknown. Percentage uses the exact account/catalog model limit where available; a fallback is identified as a configured context budget in its tooltip. Tooltip copy explains both measurements and unreported requests.
 
 ## Do's and Don'ts

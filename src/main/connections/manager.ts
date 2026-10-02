@@ -421,6 +421,11 @@ export class ProviderManager {
       this.emitAccountsChanged()
       const next = this.authorizations.complete(session.loginId, hydrated.id)
       if (next) this.emitAuthorization(next)
+      // Copilot quota is independent of sign-in success; populate the new
+      // account immediately rather than waiting for the five-minute poll.
+      if (adapter.capability.id === 'github-copilot' && adapter.fetchUsage) {
+        void this.refreshUsage(hydrated.providerId, hydrated.id).catch(() => {})
+      }
     }).catch(error => {
       const classified = authorizationError(error)
       const next = classified.kind === 'authorization-expired'
@@ -485,7 +490,10 @@ export class ProviderManager {
     })
     const secret = this.store.getSecret(result.account.id)
     if (secret) {
-      const models = await adapter.listModels(result.account, secret)
+      // Copilot import validates its remote catalog before save. A duplicate
+      // request here could fail after the new credentials already persisted.
+      const models = adapter.capability.id === 'github-copilot' && result.account.modelCatalog?.length
+        ? result.account.modelCatalog : await adapter.listModels(result.account, secret)
       this.store.upsert({ ...result.account, models: models.map(model => model.id), modelCatalog: models }, secret)
     }
     this.emitAccountsChanged()

@@ -9,12 +9,12 @@ presentation.
 | Section | Lines | Names |
 | --- | --- | --- |
 | [Pieces](#pieces) | 20-38 | `src/main/providers/types.ts`, `ProviderAdapter`, `src/main/providers/registry.ts`, `src/main/providers/adapters/openai.ts`, `src/main/providers/adapters/antigravity.ts`, `src/main/providers/adapters/github-copilot.ts` |
-| [Data flow](#data-flow) | 39-81 | `ProviderManager.createAuthorization`, `ProviderAuthorizationStrategy`, `slow_down`, `usageMetadata`, `stream_options.include_usage`, `MainApp.startUsagePoll` |
-| [Types that carry it](#types-that-carry-it) | 82-102 | `ProviderAdapter`, `refreshAccount`, `listModels`, `createRuntime`, `refreshCredentials`, `recoverRuntimeContext` |
-| [Design decisions](#design-decisions) | 103-147 | `ProviderUsage.status`, `'near-limit'`, `docs/technical-debt.md`, `primaryUsedPercent`, `providerError`, `hasRemainingQuota` |
-| [Choosing a replacement when a pool is refused](#choosing-a-replacement-when-a-pool-is-refused) | 148-149 |  |
-| &nbsp;&nbsp;[Agent quota reservations](#agent-quota-reservations) | 150-185 | `src/shared/agent-quota-binding.ts`, `quotaPoolId`, `rankFallbackAgents`, `src/shared/agent-fallback.ts`, `poolState`, `SessionRunner` |
-| [Known limits](#known-limits) | 186-196 | `openai.ts`, `antigravity.ts`, `fetchUsage`, `poolErrors` |
+| [Data flow](#data-flow) | 39-110 | `ProviderManager.createAuthorization`, `ProviderAuthorizationStrategy`, `slow_down`, `usageMetadata`, `stream_options.include_usage`, `https://api.github.com/copilot_internal/user` |
+| [Types that carry it](#types-that-carry-it) | 111-131 | `ProviderAdapter`, `refreshAccount`, `listModels`, `createRuntime`, `refreshCredentials`, `recoverRuntimeContext` |
+| [Design decisions](#design-decisions) | 132-176 | `ProviderUsage.status`, `'near-limit'`, `docs/technical-debt.md`, `primaryUsedPercent`, `providerError`, `hasRemainingQuota` |
+| [Choosing a replacement when a pool is refused](#choosing-a-replacement-when-a-pool-is-refused) | 177-178 |  |
+| &nbsp;&nbsp;[Agent quota reservations](#agent-quota-reservations) | 179-214 | `src/shared/agent-quota-binding.ts`, `quotaPoolId`, `rankFallbackAgents`, `src/shared/agent-fallback.ts`, `poolState`, `SessionRunner` |
+| [Known limits](#known-limits) | 215-225 | `openai.ts`, `antigravity.ts`, `github-copilot.ts`, `fetchUsage`, `poolErrors` |
 <!-- /toc -->
 
 ## Pieces
@@ -62,6 +62,35 @@ streams request `stream_options.include_usage`. Endpoints rejecting that option
 explicitly can be retried without it before output; missing usage is unknown.
 Exact assigned-account model capabilities take priority over catalog limits,
 with no inference from another provider's similarly named model.
+
+**Copilot account entitlement.** The adapter reads
+`https://api.github.com/copilot_internal/user` with the GitHub identity token,
+never its short-lived Copilot runtime token. Premium requests, Chat and
+Completions use reported counts, percentages, Unlimited markers and reset dates.
+AI credits used is shown when returned; a credit allowance/remaining balance is
+not inferred from the plan. New OAuth connections request quota immediately;
+account Refresh and polling preserve stale prior data on API failure. Runtime-only
+imports expose an OAuth reconnect hint; explicitly imported identity tokens are
+retained. These account windows are informational for routing because the payload
+does not establish individual model premium multipliers/eligibility.
+
+**Copilot model discovery.** The adapter fetches `/models` on the account's
+trusted Copilot API endpoint with a runtime credential. Exact IDs, labels,
+streaming/tool capabilities and context/output limits replace the old static
+two-model list. Picker must explicitly be enabled and policy state must be
+`enabled`; missing permission metadata is excluded. Plan restrictions and
+explicit supported endpoints also filter the catalog. Chat Completions and Responses are supported; Messages-only
+models and unsupported capability shapes are not offered. If endpoint metadata
+is absent, a known tool-capable streaming chat model uses the legacy compatible
+transport. Missing context capacity is not inferred from prompt-only limits.
+
+Token issuance may advertise an account-specific API base URL. HTTPS and a
+Copilot-owned API hostname are validated before either catalog or inference
+credentials are sent. Imports fetch catalog before persistence, OAuth hydration
+fetches after identity/token issuance, and Refresh uses the same discovery path.
+Errors/empty compatible catalogs retain prior persisted models with refresh
+failure state; selected assignments/history are not silently changed. Snapshot
+capability marks Copilot model discovery as remote.
 
 **Refreshing usage.** `MainApp.startUsagePoll` runs every five minutes, and a
 debounced refresh fires a few seconds after any agent turn ends.
@@ -185,7 +214,7 @@ learns what an agent is, and the turn keeps one id and one snapshot.
 
 ## Known limits
 
-Only `openai.ts` and `antigravity.ts` implement `fetchUsage`. GitHub Copilot and
+`openai.ts`, `antigravity.ts` and `github-copilot.ts` implement `fetchUsage`. Generic
 openai-compatible accounts report no quota, no reset window and no term, which
 caps how well work can be balanced across providers — debt item 2.
 

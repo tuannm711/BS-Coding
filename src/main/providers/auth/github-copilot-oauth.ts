@@ -1,5 +1,6 @@
 import type { ProviderSecrets } from '../../connections/types'
 import { OAuthCallbackError } from '../../connections/oauth'
+import { copilotApiBaseUrl } from '../github-copilot-models'
 
 const GITHUB_TOKEN_ENDPOINT = 'https://github.com/login/oauth/access_token'
 const GITHUB_USER_ENDPOINT = 'https://api.github.com/user'
@@ -29,6 +30,7 @@ interface CopilotToken {
   expires_at?: number
   sku?: string
   chat_enabled?: boolean
+  endpoints?: { api?: string }
 }
 
 interface CopilotUserInfo {
@@ -118,6 +120,15 @@ export async function refreshGitHubCopilotCredentials(
   return { githubAccessToken, ...await fetchCopilotCredentials(githubAccessToken, fetchImpl) }
 }
 
+export async function fetchGitHubCopilotQuota(githubAccessToken: string, fetchImpl: typeof fetch = fetch): Promise<unknown> {
+  const response = await fetchImpl(GITHUB_COPILOT_USER_ENDPOINT, {
+    headers: { ...githubHeaders(githubAccessToken, 'token'), 'editor-version': 'vscode/1.95.0', 'copilot-integration-id': 'vscode-chat' },
+    signal: AbortSignal.timeout(15_000)
+  })
+  if (!response.ok) throw new Error(`[bs] GitHub Copilot quota ${response.status === 401 || response.status === 403 ? 'authentication failed; reconnect with GitHub OAuth' : 'request failed'} (HTTP ${response.status})`)
+  return response.json()
+}
+
 async function fetchGitHubUser(accessToken: string, fetchImpl: typeof fetch): Promise<GitHubUser> {
   const response = await fetchImpl(GITHUB_USER_ENDPOINT, { headers: githubHeaders(accessToken, 'Bearer') })
   if (!response.ok) throw new OAuthCallbackError('profile-fetch-failed', `[bs] GitHub profile could not be loaded (HTTP ${response.status}). Generate a new link to try again.`)
@@ -146,7 +157,8 @@ async function fetchCopilotCredentials(accessToken: string, fetchImpl: typeof fe
   return {
     accessToken: token.token,
     expiresAt: token.expires_at ? token.expires_at * 1000 : undefined,
-    planName: userInfo.copilot_plan ?? token.sku
+    planName: userInfo.copilot_plan ?? token.sku,
+    ...(typeof token.endpoints?.api === 'string' ? { baseUrl: copilotApiBaseUrl(token.endpoints.api) } : {})
   }
 }
 

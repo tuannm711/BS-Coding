@@ -6,6 +6,7 @@ import { ProviderManager } from '../../src/main/connections/manager'
 import { ProviderRegistry } from '../../src/main/providers/registry'
 import { createGitHubCopilotAdapter } from '../../src/main/providers/adapters/github-copilot'
 import { OPENAI_COMPATIBLE_TEXT_SSE, chunkedResponse } from '../fixtures/provider-chat-fixtures'
+import { copilotModelCatalog } from '../fixtures/copilot-model-catalog'
 
 const roots: string[] = []
 const managers: ProviderManager[] = []
@@ -28,6 +29,24 @@ function fakeVault() {
 describe('GitHub Copilot authorization integration', () => {
   beforeEach(() => vi.useFakeTimers())
   afterEach(() => { managers.splice(0).forEach(manager => manager.close()); vi.unstubAllGlobals(); vi.useRealTimers(); roots.splice(0).forEach(root => rmSync(root, { recursive: true, force: true })) })
+
+  it('validates one remote catalog before import persistence instead of failing on a second catalog fetch', async () => {
+    let catalogRequests = 0
+    vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => {
+      if (String(input).endsWith('/models')) {
+        catalogRequests++
+        return catalogRequests === 1 ? Response.json(copilotModelCatalog) : new Response('', { status: 503 })
+      }
+      throw new Error('Unexpected fixture request')
+    }))
+    const registry = new ProviderRegistry(); registry.register(createGitHubCopilotAdapter())
+    const manager = new ProviderManager({ accountsFile: accountFile('bs-copilot-import-'), registry, vault: fakeVault() as never }); managers.push(manager)
+    const result = await manager.connectMethod({ providerId: 'github-copilot', methodId: 'imported', fields: { credentialJson: JSON.stringify({ accessToken: 'runtime' }) } })
+    expect(result.accountId).toBeTruthy()
+    expect(catalogRequests).toBe(1)
+    expect(manager.list('github-copilot')[0].accounts).toHaveLength(1)
+    expect(manager.list('github-copilot')[0].accounts[0].models).toEqual(['gpt-4.1', 'claude-sonnet-4'])
+  })
 
   it('preserves the profile HTTP failure in the public authorization error without creating an account', async () => {
     vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => {
@@ -53,11 +72,12 @@ describe('GitHub Copilot authorization integration', () => {
 
   it('creates, reconnects and hydrates one Copilot account', async () => {
     vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      if (url.endsWith('/models')) return Response.json(copilotModelCatalog)
       if (url.endsWith('/login/device/code')) return Response.json({ device_code: 'private-device', user_code: 'ABCD-EFGH', verification_uri: 'https://github.com/login/device', expires_in: 900, interval: 5 })
       if (url.endsWith('/login/oauth/access_token')) return new Response(JSON.stringify({ access_token: 'github-token' }), { status: 200 })
       if (url === 'https://api.github.com/user') return new Response(JSON.stringify({ id: 7, login: 'octocat', email: 'octo@example.com' }), { status: 200 })
       if (url.endsWith('/copilot_internal/v2/token')) return new Response(JSON.stringify({ token: 'copilot-token', expires_at: 2_000_000_000, chat_enabled: true }), { status: 200 })
-      if (url.endsWith('/copilot_internal/user')) return new Response(JSON.stringify({ copilot_plan: 'pro' }), { status: 200 })
+      if (url.endsWith('/copilot_internal/user')) return new Response(JSON.stringify({ copilot_plan: 'pro', quota_snapshots: { premium_interactions: { entitlement: 300, quota_remaining: 240, percent_remaining: 80 } } }), { status: 200 })
       throw new Error(`Unexpected URL ${url}`)
     }))
     const registry = new ProviderRegistry()
@@ -72,6 +92,7 @@ describe('GitHub Copilot authorization integration', () => {
     const first = await manager.createAuthorization({ providerId: 'github-copilot', methodId: 'oauth' })
     await vi.advanceTimersByTimeAsync(5000)
     await vi.waitFor(() => expect(manager.getAuthorization(first.loginId)?.status).toBe('connected'))
+    await vi.waitFor(() => expect(manager.store.get(manager.list('github-copilot')[0].accounts[0].id)?.usage?.quotaGroups?.[0].windows[0].remainingCount).toBe(240))
     const account = manager.list('github-copilot')[0].accounts[0]
     expect(account.models).toEqual(['gpt-4.1', 'claude-sonnet-4'])
     expect(manager.store.getSecret(account.id)).toMatchObject({ githubAccessToken: 'github-token', accessToken: 'copilot-token' })

@@ -5,7 +5,7 @@ import { buildQuotaRows, quotaSelectedAgentLabel } from '../../src/renderer/src/
 import { quotaAccountState } from '../../src/renderer/src/components/quota/quota-view'
 import * as quotaModule from '../../src/renderer/src/components/RightPanelQuota'
 import { renderToStaticMarkup } from 'react-dom/server'
-import QuotaAccountCard from '../../src/renderer/src/components/quota/QuotaAccountCard'
+import QuotaAccountCard, { QuotaWindow } from '../../src/renderer/src/components/quota/QuotaAccountCard'
 
 function account(patch: Partial<ProviderAccountSnapshot> = {}): ProviderAccountSnapshot {
   return { id: 'account-1', providerId: 'antigravity', label: 'Pro', authMode: 'oauth', status: 'active', models: [], updatedAt: 1, ...patch }
@@ -19,6 +19,17 @@ function snapshot(modelId: string): ProviderSnapshot {
 }
 
 describe('snapshot-driven quota cards', () => {
+  it('renders remaining counts, unlimited entitlements and provider credit usage without inventing balance', () => {
+    const counts = renderToStaticMarkup(<QuotaWindow window={{ id: 'premium', label: 'Premium requests', kind: 'monthly', remainingPercent: 80, remainingCount: 240, limitCount: 300, usageKnown: true, source: 'provider' }} />)
+    expect(counts).toContain('240 / 300 remaining')
+    const unlimited = renderToStaticMarkup(<QuotaWindow window={{ id: 'chat', label: 'Chat', kind: 'monthly', unlimited: true, usageKnown: true, source: 'provider' }} />)
+    expect(unlimited).toContain('Unlimited')
+    expect(unlimited).not.toContain('role="progressbar"')
+    const html = renderToStaticMarkup(<QuotaAccountCard account={account({ providerId: 'github-copilot', usage: { accountId: 'account-1', refreshedAt: 1, source: 'provider', status: 'ok', creditsUsed: 12.5 } })} groups={[]} variant="provider" />)
+    expect(html).toContain('AI credits used')
+    expect(html).toContain('12.5')
+    expect(html).toContain('Credit allowance / remaining not reported by GitHub')
+  })
   it('renders a compact provider card with every reported window and only BS lifecycle actions', () => {
     const providerAccount = account({
       profile: { email: 'pro@example.com', planName: 'PRO' },

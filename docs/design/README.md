@@ -15,11 +15,11 @@ should be checked against.
 | --- | --- | --- |
 | [How the domains relate](#how-the-domains-relate) | 25-41 | `LlmClient` |
 | [The documents](#the-documents) | 42-59 |  |
-| [Finding a name](#finding-a-name) | 60-265 | `--output`, `.cmd`, `.exe`, `.github/workflows/build.yml`, `.ico`, `'near-limit'` |
-| [What is here and what is history](#what-is-here-and-what-is-history) | 266-275 | `docs/design/`, `docs/superpowers/`, `docs/evidence/` |
-| [Current work](#current-work) | 276-287 | `tests/`, `statusReason`, `docs/superpowers/specs/2026-08-25-narrated-tool-calls-design.md` |
-| [Next work](#next-work) | 288-302 | `docs/technical-debt.md` |
-| [Debt](#debt) | 303-309 | `docs/technical-debt.md` |
+| [Finding a name](#finding-a-name) | 60-266 | `--output`, `.cmd`, `.exe`, `.github/workflows/build.yml`, `.ico`, `'near-limit'` |
+| [What is here and what is history](#what-is-here-and-what-is-history) | 267-276 | `docs/design/`, `docs/superpowers/`, `docs/evidence/` |
+| [Current work](#current-work) | 277-288 | `tests/`, `statusReason`, `docs/superpowers/specs/2026-08-25-narrated-tool-calls-design.md` |
+| [Next work](#next-work) | 289-303 | `docs/technical-debt.md` |
+| [Debt](#debt) | 304-310 | `docs/technical-debt.md` |
 <!-- /toc -->
 
 ## How the domains relate
@@ -69,14 +69,14 @@ Generated from every domain document: which one introduces a name, and where.
 | `.exe` | [04-terminal-panes.md#design-decisions](04-terminal-panes.md#design-decisions) | 59 |
 | `.github/workflows/build.yml` | [07-build-release.md#pieces](07-build-release.md#pieces) | 17 |
 | `.ico` | [07-build-release.md#data-flow](07-build-release.md#data-flow) | 30 |
-| `'near-limit'` | [03-providers.md#design-decisions](03-providers.md#design-decisions) | 103 |
+| `'near-limit'` | [03-providers.md#design-decisions](03-providers.md#design-decisions) | 132 |
 | `/bin/bash` | [04-terminal-panes.md#known-limits](04-terminal-panes.md#known-limits) | 91 |
 | `$SHELL` | [04-terminal-panes.md#known-limits](04-terminal-panes.md#known-limits) | 91 |
 | `0N-*.md` | [00-goals.md#what-this-document-is-not](00-goals.md#what-this-document-is-not) | 179 |
 | `action-gh-release` | [07-build-release.md#design-decisions](07-build-release.md#design-decisions) | 64 |
 | `activeSessionId` | [06-ui-shell.md#sessions-live-in-the-sidebar](06-ui-shell.md#sessions-live-in-the-sidebar) | 271 |
 | `AgentApi` | [01-process-model.md#pieces](01-process-model.md#pieces) | 18 |
-| `antigravity.ts` | [03-providers.md#known-limits](03-providers.md#known-limits) | 186 |
+| `antigravity.ts` | [03-providers.md#known-limits](03-providers.md#known-limits) | 215 |
 | `App.tsx` | [06-ui-shell.md#data-flow](06-ui-shell.md#data-flow) | 36 |
 | `appendMessage` | [02-agent-runtime.md#types-that-carry-it](02-agent-runtime.md#types-that-carry-it) | 93 |
 | `appendTool` | [02-agent-runtime.md#types-that-carry-it](02-agent-runtime.md#types-that-carry-it) | 93 |
@@ -106,7 +106,7 @@ Generated from every domain document: which one introduces a name, and where.
 | `COORDINATE_RULES` | [02-agent-runtime.md#two-ways-to-hand-work-off](02-agent-runtime.md#two-ways-to-hand-work-off) | 146 |
 | `coordinatorNote` | [02-agent-runtime.md#what-a-coordinator-is-told-and-what-it-can-reach](02-agent-runtime.md#what-a-coordinator-is-told-and-what-it-can-reach) | 220 |
 | `createLlm` | [02-agent-runtime.md#design-decisions](02-agent-runtime.md#design-decisions) | 108 |
-| `createRuntime` | [03-providers.md#types-that-carry-it](03-providers.md#types-that-carry-it) | 82 |
+| `createRuntime` | [03-providers.md#types-that-carry-it](03-providers.md#types-that-carry-it) | 111 |
 | `credits.balance` | [00-goals.md#group-c-quota-models](00-goals.md#group-c-quota-models) | 170 |
 | `credits.has_credits` | [00-goals.md#group-c-quota-models](00-goals.md#group-c-quota-models) | 170 |
 | `decidePermission` | [02-agent-runtime.md#two-ways-to-hand-work-off](02-agent-runtime.md#two-ways-to-hand-work-off) | 146 |
@@ -116,56 +116,57 @@ Generated from every domain document: which one introduces a name, and where.
 | `electron-updater` | [07-build-release.md#design-decisions](07-build-release.md#design-decisions) | 64 |
 | `electron.vite.config.ts` | [07-build-release.md#pieces](07-build-release.md#pieces) | 17 |
 | `Event*` | [01-process-model.md#data-flow](01-process-model.md#data-flow) | 33 |
-| `fetchUsage` | [03-providers.md#known-limits](03-providers.md#known-limits) | 186 |
+| `fetchUsage` | [03-providers.md#known-limits](03-providers.md#known-limits) | 215 |
 | `FleetAgentRow` | [06-ui-shell.md#the-fleet-panel](06-ui-shell.md#the-fleet-panel) | 198 |
 | `FleetBoard` | [06-ui-shell.md#the-fleet-panel](06-ui-shell.md#the-fleet-panel) | 198 |
 | `getItems` | [02-agent-runtime.md#types-that-carry-it](02-agent-runtime.md#types-that-carry-it) | 93 |
 | `getWindowChromeOptions` | [06-ui-shell.md#design-decisions](06-ui-shell.md#design-decisions) | 65 |
+| `github-copilot.ts` | [03-providers.md#known-limits](03-providers.md#known-limits) | 215 |
 | `groupSessions` | [06-ui-shell.md#sessions-live-in-the-sidebar](06-ui-shell.md#sessions-live-in-the-sidebar) | 271 |
-| `hasRemainingQuota` | [03-providers.md#design-decisions](03-providers.md#design-decisions) | 103 |
+| `hasRemainingQuota` | [03-providers.md#design-decisions](03-providers.md#design-decisions) | 132 |
+| `https://api.github.com/copilot_internal/user` | [03-providers.md#data-flow](03-providers.md#data-flow) | 39 |
 | `icon.ico` | [07-build-release.md#pieces](07-build-release.md#pieces) | 17 |
 | `ipcRenderer.on` | [01-process-model.md#data-flow](01-process-model.md#data-flow) | 33 |
 | `JsonStore` | [05-sessions.md#design-decisions](05-sessions.md#design-decisions) | 73 |
 | `latest.yml` | [07-build-release.md#design-decisions](07-build-release.md#design-decisions) | 64 |
 | `latest*.yml` | [07-build-release.md#design-decisions](07-build-release.md#design-decisions) | 64 |
-| `listModels` | [03-providers.md#types-that-carry-it](03-providers.md#types-that-carry-it) | 82 |
+| `listModels` | [03-providers.md#types-that-carry-it](03-providers.md#types-that-carry-it) | 111 |
 | `listSessionTranscript` | [06-ui-shell.md#the-coordination-view](06-ui-shell.md#the-coordination-view) | 145 |
 | `LlmClient` | [02-agent-runtime.md#pieces](02-agent-runtime.md#pieces) | 22 |
 | `LoopDeps` | [02-agent-runtime.md#data-flow](02-agent-runtime.md#data-flow) | 42 |
-| `MainApp.startUsagePoll` | [03-providers.md#data-flow](03-providers.md#data-flow) | 39 |
 | `MainApp` | [01-process-model.md#pieces](01-process-model.md#pieces) | 18 |
 | `MAX_COMPACT_PER_RUN` | [02-agent-runtime.md#known-limits](02-agent-runtime.md#known-limits) | 252 |
 | `modeNote` | [02-agent-runtime.md#what-a-coordinator-is-told-and-what-it-can-reach](02-agent-runtime.md#what-a-coordinator-is-told-and-what-it-can-reach) | 220 |
 | `onExit` | [04-terminal-panes.md#design-decisions](04-terminal-panes.md#design-decisions) | 59 |
 | `onX` | [01-process-model.md#data-flow](01-process-model.md#data-flow) | 33 |
-| `openai.ts` | [03-providers.md#known-limits](03-providers.md#known-limits) | 186 |
+| `openai.ts` | [03-providers.md#known-limits](03-providers.md#known-limits) | 215 |
 | `out/` | [07-build-release.md#pieces](07-build-release.md#pieces) | 17 |
 | `PaneModel` | [06-ui-shell.md#pieces](06-ui-shell.md#pieces) | 21 |
-| `poolErrors` | [03-providers.md#known-limits](03-providers.md#known-limits) | 186 |
-| `poolState` | [03-providers.md#agent-quota-reservations](03-providers.md#agent-quota-reservations) | 150 |
-| `primaryUsedPercent` | [03-providers.md#design-decisions](03-providers.md#design-decisions) | 103 |
+| `poolErrors` | [03-providers.md#known-limits](03-providers.md#known-limits) | 215 |
+| `poolState` | [03-providers.md#agent-quota-reservations](03-providers.md#agent-quota-reservations) | 179 |
+| `primaryUsedPercent` | [03-providers.md#design-decisions](03-providers.md#design-decisions) | 132 |
 | `proc.onData` | [04-terminal-panes.md#data-flow](04-terminal-panes.md#data-flow) | 29 |
 | `productName` | [07-build-release.md#types-that-carry-it](07-build-release.md#types-that-carry-it) | 47 |
 | `provider/account/quotaPoolId` | [06-ui-shell.md#the-fleet-panel](06-ui-shell.md#the-fleet-panel) | 198 |
 | `ProviderAdapter` | [03-providers.md#pieces](03-providers.md#pieces) | 20 |
 | `ProviderAuthorizationStrategy` | [03-providers.md#data-flow](03-providers.md#data-flow) | 39 |
-| `providerError` | [03-providers.md#design-decisions](03-providers.md#design-decisions) | 103 |
+| `providerError` | [03-providers.md#design-decisions](03-providers.md#design-decisions) | 132 |
 | `ProviderManager.createAuthorization` | [03-providers.md#data-flow](03-providers.md#data-flow) | 39 |
 | `ProviderQuotaGroup` | [06-ui-shell.md#the-fleet-panel](06-ui-shell.md#the-fleet-panel) | 198 |
 | `ProviderQuotaWindow` | [00-goals.md#the-three-quota-models](00-goals.md#the-three-quota-models) | 117 |
 | `ProviderUsage.resetCredits` | [00-goals.md#group-b-the-quota-surface-landed-v119](00-goals.md#group-b-the-quota-surface-landed-v119) | 137 |
-| `ProviderUsage.status` | [03-providers.md#design-decisions](03-providers.md#design-decisions) | 103 |
+| `ProviderUsage.status` | [03-providers.md#design-decisions](03-providers.md#design-decisions) | 132 |
 | `ProviderUsageLedger` | [00-goals.md#the-three-quota-models](00-goals.md#the-three-quota-models) | 117 |
 | `PtyDataEvent` | [04-terminal-panes.md#data-flow](04-terminal-panes.md#data-flow) | 29 |
 | `PtyManager` | [04-terminal-panes.md#pieces](04-terminal-panes.md#pieces) | 18 |
 | `PtySession` | [04-terminal-panes.md#types-that-carry-it](04-terminal-panes.md#types-that-carry-it) | 47 |
 | `pushTurn` | [02-agent-runtime.md#known-limits](02-agent-runtime.md#known-limits) | 252 |
 | `QuotaAccountUiState` | [06-ui-shell.md#types-that-carry-it](06-ui-shell.md#types-that-carry-it) | 55 |
-| `quotaPoolId` | [03-providers.md#agent-quota-reservations](03-providers.md#agent-quota-reservations) | 150 |
-| `rankFallbackAgents` | [03-providers.md#agent-quota-reservations](03-providers.md#agent-quota-reservations) | 150 |
-| `recoverRuntimeContext` | [03-providers.md#types-that-carry-it](03-providers.md#types-that-carry-it) | 82 |
-| `refreshAccount` | [03-providers.md#types-that-carry-it](03-providers.md#types-that-carry-it) | 82 |
-| `refreshCredentials` | [03-providers.md#types-that-carry-it](03-providers.md#types-that-carry-it) | 82 |
+| `quotaPoolId` | [03-providers.md#agent-quota-reservations](03-providers.md#agent-quota-reservations) | 179 |
+| `rankFallbackAgents` | [03-providers.md#agent-quota-reservations](03-providers.md#agent-quota-reservations) | 179 |
+| `recoverRuntimeContext` | [03-providers.md#types-that-carry-it](03-providers.md#types-that-carry-it) | 111 |
+| `refreshAccount` | [03-providers.md#types-that-carry-it](03-providers.md#types-that-carry-it) | 111 |
+| `refreshCredentials` | [03-providers.md#types-that-carry-it](03-providers.md#types-that-carry-it) | 111 |
 | `registerIpcHandlers` | [01-process-model.md#data-flow](01-process-model.md#data-flow) | 33 |
 | `registerTerminal` | [06-ui-shell.md#data-flow](06-ui-shell.md#data-flow) | 36 |
 | `release/` | [07-build-release.md#data-flow](07-build-release.md#data-flow) | 30 |
@@ -222,8 +223,8 @@ Generated from every domain document: which one introduces a name, and where.
 | `src/renderer/src/components/TitleBar.tsx` | [06-ui-shell.md#pieces](06-ui-shell.md#pieces) | 21 |
 | `src/renderer/src/components/XtermHost.tsx` | [04-terminal-panes.md#pieces](04-terminal-panes.md#pieces) | 18 |
 | `src/renderer/src/useAppearance.ts` | [06-ui-shell.md#design-decisions](06-ui-shell.md#design-decisions) | 65 |
-| `src/shared/agent-fallback.ts` | [03-providers.md#agent-quota-reservations](03-providers.md#agent-quota-reservations) | 150 |
-| `src/shared/agent-quota-binding.ts` | [03-providers.md#agent-quota-reservations](03-providers.md#agent-quota-reservations) | 150 |
+| `src/shared/agent-fallback.ts` | [03-providers.md#agent-quota-reservations](03-providers.md#agent-quota-reservations) | 179 |
+| `src/shared/agent-quota-binding.ts` | [03-providers.md#agent-quota-reservations](03-providers.md#agent-quota-reservations) | 179 |
 | `src/shared/AGENTS.md` | [01-process-model.md#design-decisions](01-process-model.md#design-decisions) | 77 |
 | `src/shared/appearance.ts` | [06-ui-shell.md#design-decisions](06-ui-shell.md#design-decisions) | 65 |
 | `src/shared/browser-native.ts` | [08-browser.md#pieces](08-browser.md#pieces) | 3 |

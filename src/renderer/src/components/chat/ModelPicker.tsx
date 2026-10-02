@@ -54,7 +54,7 @@ export default function ModelPicker({ agentId, disabled = false }: Props) {
           .catch(err => setError(String(err)))
           .finally(() => setBusy(false))
       }}>
-      {!models.some(model => model.id === assignment?.modelId) && <option value={assignment?.modelId ?? ''}>{assignment?.modelId || 'Select quota in Settings'}</option>}
+      {!models.some(model => model.id === assignment?.modelId) && <option value={assignment?.modelId ?? ''} disabled>{assignment?.modelId ? `${assignment.modelId} (unavailable)` : 'Select quota in Settings'}</option>}
       {models.map(model => <option key={model.id} value={model.id}>{model.name}</option>)}
     </select>
     {error && <span className="model-picker-error" role="alert">{error}</span>}

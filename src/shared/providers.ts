@@ -23,6 +23,7 @@ export interface ProviderModel {
   id: string
   name: string
   runtimeId?: string
+  transport?: 'openai-compatible' | 'openai-responses'
   capabilities?: ProviderModelCapabilities
 }
 
