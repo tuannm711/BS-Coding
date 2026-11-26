@@ -5,6 +5,7 @@ import { createOpenAiAdapter } from '../../src/main/providers/adapters/openai'
 import { createGoogleAdapter } from '../../src/main/providers/adapters/google'
 import { createAntigravityAdapter } from '../../src/main/providers/adapters/antigravity'
 import { createGitHubCopilotAdapter } from '../../src/main/providers/adapters/github-copilot'
+import { createClaudeAdapter } from '../../src/main/providers/adapters/claude'
 import { createOpenAiCompatibleAdapter } from '../../src/main/providers/adapters/openai-compatible'
 import type { ProviderAdapter } from '../../src/main/providers/types'
 
@@ -48,5 +49,6 @@ describe('ProviderRegistry', () => {
     expect((createAntigravityAdapter().capability as any).chatTransport).toBe('cloud-code')
     expect((createGitHubCopilotAdapter().capability as any).chatTransport).toBe('openai-compatible')
     expect((createOpenAiCompatibleAdapter('cursor', 'Cursor').capability as any).chatTransport).toBe('openai-compatible')
+    expect((createClaudeAdapter().capability as any).chatTransport).toBe('anthropic')
   })
 })

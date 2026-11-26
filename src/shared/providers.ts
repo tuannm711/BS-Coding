@@ -37,7 +37,7 @@ export interface ProviderCapability {
   logo?: string
 }
 
-export type ProviderChatTransport = 'openai-responses' | 'openai-compatible' | 'cloud-code' | 'google'
+export type ProviderChatTransport = 'openai-responses' | 'openai-compatible' | 'cloud-code' | 'google' | 'anthropic'
 
 export interface ProviderConnectRequest {
   providerId: string

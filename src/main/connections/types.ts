@@ -16,6 +16,7 @@ export interface ProviderSecrets {
   projectId?: string
   planName?: string
   cloudCodeBaseUrl?: string
+  authSchema?: string
 }
 
 export interface StoredProviderAccounts {
