@@ -161,4 +161,19 @@ describe('ModelsCatalog', () => {
     })
     expect(await catalog.getVariantOptions('deepseek', 'deepseek-v4-flash', 'nope')).toBeUndefined()
   })
+
+  it('populates claude provider with default models, limits, and variants', async () => {
+    const catalog = new ModelsCatalog(path.join(dir, 'models.json'), async () => jsonResponse({}))
+    const providers = await catalog.fetch()
+    expect(providers.claude).toBeDefined()
+    expect(providers.claude.models).toContain('claude-3-7-sonnet-20250219')
+    expect(providers.claude.models).toContain('claude-3-5-sonnet-20241022')
+    expect(providers.claude.limits?.['claude-3-7-sonnet-20250219']).toEqual({ context: 200000, output: 64000 })
+    expect(Object.keys(providers.claude.variants?.['claude-3-7-sonnet-20250219'] ?? {})).toEqual([
+      'low', 'medium', 'high', 'xhigh', 'max'
+    ])
+    expect(await catalog.getVariants('claude', 'claude-3-7-sonnet-20250219')).toEqual([
+      'low', 'medium', 'high', 'xhigh', 'max'
+    ])
+  })
 })

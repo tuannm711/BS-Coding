@@ -92,7 +92,7 @@ function anthropicUsesModernAdaptiveThinking(apiId: string): boolean {
   if (!version) return true
   const major = Number(version[1])
   const minor = Number(version[2] ?? 0)
-  return major > 4 || (major === 4 && minor >= 7)
+  return major > 4 || (major === 4 && minor >= 7) || (major === 3 && minor >= 7)
 }
 
 function anthropicAdaptiveEfforts(apiId: string): string[] | null {
@@ -151,7 +151,7 @@ function googleThinkingBudgetMax(apiId: string): number {
 }
 
 function sdkKeyForProvider(providerId: string): string {
-  if (providerId === 'anthropic') return 'anthropic'
+  if (providerId === 'anthropic' || providerId === 'claude') return 'anthropic'
   if (providerId === 'google') return 'google'
   return 'openaiCompatible'
 }

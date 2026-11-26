@@ -3,7 +3,7 @@ import type { ProviderAccountSnapshot } from '@shared/provider-state'
 import type { FleetAgentRow, FleetPool } from '../fleet/fleet-model'
 import { resetCreditGate } from '@shared/reset-credit'
 import { poolState } from '@shared/quota-pool'
-import { ChevronDown, Gauge, Hammer, Link2, Network, Power, RefreshCw, Trash2, Zap } from 'lucide-react'
+import { ChevronDown, ExternalLink, Gauge, Hammer, Link2, Network, Power, RefreshCw, Trash2, Zap } from 'lucide-react'
 import { accountWarning, formatAge, formatCountdown, formatCount, formatExpiry, formatInstant, formatMoney, formatPercent, formatProviderAccountType, quotaWindowState } from './quota-view'
 
 export interface QuotaCardAgent {
@@ -250,6 +250,21 @@ export default function QuotaAccountCard({
         </section>)}
       </div> : <div className="quota-empty">Quota not reported by provider</div>}
 
+      {usage?.checkUsageUrl && (
+        <div className="quota-external-link" style={{ margin: '8px 0' }}>
+          <a
+            href={usage.checkUsageUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="btn small"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, textDecoration: 'none' }}
+          >
+            <ExternalLink size={13} aria-hidden="true" />
+            Trang check quota
+          </a>
+        </div>
+      )}
+
       {account.providerId === 'github-copilot' && usage?.creditsUsed !== undefined && <div className="quota-metrics" aria-label="Copilot credits">
         <Metric label="AI credits used" value={formatCount(usage.creditsUsed)} />
         <span className="quota-empty">Credit allowance / remaining not reported by GitHub</span>
@@ -277,15 +292,27 @@ export default function QuotaAccountCard({
 
       {variant === 'provider' ? <footer className="quota-card-actions">
         <button className="btn small" type="button" disabled={refreshing} onClick={onRefresh}><RefreshCw size={13} aria-hidden="true" />{refreshing ? 'Refreshing…' : 'Refresh'}</button>
+        {usage?.checkUsageUrl && (
+          <a href={usage.checkUsageUrl} target="_blank" rel="noreferrer" className="btn small" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, textDecoration: 'none' }}>
+            <ExternalLink size={13} aria-hidden="true" />Check quota
+          </a>
+        )}
         <button className="btn small" type="button" disabled={refreshing} onClick={onReconnect}><Link2 size={13} aria-hidden="true" />Reconnect</button>
         <button className={`btn small ${active ? 'danger' : ''}`} type="button" disabled={refreshing} onClick={onAccountToggle}><Power size={13} aria-hidden="true" />{active ? 'Deactivate' : 'Activate'}</button>
         <button className="btn small danger" type="button" disabled={refreshing} onClick={onRemove}><Trash2 size={13} aria-hidden="true" />Remove</button>
       </footer> : null}
 
-      {variant === 'chat' && onRefresh ? <footer className="quota-card-actions">
-        <button className="btn small" type="button" disabled={refreshing} onClick={onRefresh}>
-          <RefreshCw size={13} aria-hidden="true" />{refreshing ? 'Refreshing…' : 'Refresh'}
-        </button>
+      {variant === 'chat' && (onRefresh || usage?.checkUsageUrl) ? <footer className="quota-card-actions">
+        {onRefresh && (
+          <button className="btn small" type="button" disabled={refreshing} onClick={onRefresh}>
+            <RefreshCw size={13} aria-hidden="true" />{refreshing ? 'Refreshing…' : 'Refresh'}
+          </button>
+        )}
+        {usage?.checkUsageUrl && (
+          <a href={usage.checkUsageUrl} target="_blank" rel="noreferrer" className="btn small" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, textDecoration: 'none' }}>
+            <ExternalLink size={13} aria-hidden="true" />Check quota
+          </a>
+        )}
       </footer> : null}
     </section>
   )

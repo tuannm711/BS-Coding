@@ -121,4 +121,20 @@ describe('computeVariants (port of opencode variants())', () => {
     }))
     expect(v).toEqual({})
   })
+
+  it('claude claude-3-7-sonnet-20250219 adaptive efforts → low..max with anthropic key', () => {
+    const v = computeVariants(info({
+      id: 'claude-3-7-sonnet-20250219',
+      providerId: 'claude',
+      npm: '@ai-sdk/anthropic',
+      reasoningOptions: undefined
+    }))
+    expect(Object.keys(v ?? {})).toEqual(['low', 'medium', 'high', 'xhigh', 'max'])
+    expect(v?.high).toEqual({
+      anthropic: { thinking: { type: 'adaptive', display: 'summarized' }, effort: 'high' }
+    })
+    expect(v?.low).toEqual({
+      anthropic: { thinking: { type: 'adaptive', display: 'summarized' }, effort: 'low' }
+    })
+  })
 })
