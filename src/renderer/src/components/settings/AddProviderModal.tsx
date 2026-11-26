@@ -54,6 +54,38 @@ export function reconnectMethodId(provider: ProviderDefinitionSnapshot, authMode
   return provider.methods.find(method => method.kind === kind)?.id ?? provider.methods[0]?.id ?? ''
 }
 
+export function getInitialFields(providerId: string, methodId: string): Record<string, string> {
+  if (providerId === 'claude' && methodId === 'gateway') {
+    return {
+      baseUrl: 'https://api.agentshop247.com/api/claude',
+      authSchema: 'x-api-key'
+    }
+  }
+  return {}
+}
+
+export function fieldLabel(providerId: string, methodId: string, field: string): string {
+  if (providerId === 'claude') {
+    if (field === 'baseUrl') return 'base_url Claude API'
+    if (field === 'apiKey') return methodId === 'gateway' ? 'Gateway API key' : 'Claude API key'
+    if (field === 'authSchema') return 'Gateway auth schema'
+  }
+  if (field === 'apiKey') return 'API key'
+  if (field === 'baseUrl') return 'Base URL'
+  if (field === 'credentialJson') return 'Credential JSON'
+  return field
+}
+
+export function fieldPlaceholder(providerId: string, methodId: string, field: string): string {
+  if (providerId === 'claude') {
+    if (field === 'baseUrl') return 'https://api.agentshop247.com/api/claude'
+    if (field === 'apiKey') return methodId === 'gateway' ? 'Gateway API key' : 'Claude API key'
+    if (field === 'authSchema') return 'x-api-key'
+  }
+  if (field === 'credentialJson') return 'Paste credential JSON'
+  return field
+}
+
 export default function AddProviderModal({ providers, reconnectAccount, onClose, onConnected }: Props) {
   const [capabilities, setCapabilities] = useState<ProviderDefinitionSnapshot[]>(providers ?? [])
   const [providerId, setProviderId] = useState('')
@@ -92,9 +124,11 @@ export default function AddProviderModal({ providers, reconnectAccount, onClose,
       const selected = reconnectAccount ? next.find(item => item.id === reconnectAccount.providerId)
         : next.find(item => item.id === selectionRef.current.providerId) ?? next[0]
       if (selected) {
+        const nextMethodId = reconnectAccount ? reconnectMethodId(selected, reconnectAccount.authMode)
+          : selected.methods.some(item => item.id === selectionRef.current.methodId) ? selectionRef.current.methodId : selected.methods[0]?.id ?? ''
         setProviderId(selected.id)
-        setMethodId(reconnectAccount ? reconnectMethodId(selected, reconnectAccount.authMode)
-          : selected.methods.some(item => item.id === selectionRef.current.methodId) ? selectionRef.current.methodId : selected.methods[0]?.id ?? '')
+        setMethodId(nextMethodId)
+        setFields(getInitialFields(selected.id, nextMethodId))
       }
     }
     if (providers && providers.length > 0) apply(providers)
@@ -126,7 +160,7 @@ export default function AddProviderModal({ providers, reconnectAccount, onClose,
   const provider = capabilities.find(item => item.id === providerId)
   const method = provider?.methods.find(item => item.id === methodId)
   const requiredFields = method?.fields ?? []
-  const canSubmit = Boolean(provider && method && requiredFields.every(field => field === 'baseUrl' || fields[field]?.trim()))
+  const canSubmit = Boolean(provider && method && requiredFields.every(field => field === 'baseUrl' || field === 'authSchema' || fields[field]?.trim()))
   const title = useMemo(
     () => provider ? `${reconnectAccount ? 'Reconnect' : 'Add'} ${provider.displayName}` : 'Add provider',
     [provider, reconnectAccount]
@@ -245,9 +279,10 @@ export default function AddProviderModal({ providers, reconnectAccount, onClose,
         disabled={Boolean(reconnectAccount) || busy || session?.status === 'waiting'}
         onChange={event => {
           const next = capabilities.find(item => item.id === event.target.value)
+          const nextMethodId = next?.methods[0]?.id ?? ''
           setProviderId(event.target.value)
-          setMethodId(next?.methods[0]?.id ?? '')
-          setFields({})
+          setMethodId(nextMethodId)
+          setFields(getInitialFields(event.target.value, nextMethodId))
           setSession(null)
         }}
       >
@@ -262,7 +297,7 @@ export default function AddProviderModal({ providers, reconnectAccount, onClose,
         disabled={busy || session?.status === 'waiting'}
         onChange={event => {
           setMethodId(event.target.value)
-          setFields({})
+          setFields(getInitialFields(providerId, event.target.value))
           setSession(null)
           setError('')
         }}
@@ -272,23 +307,37 @@ export default function AddProviderModal({ providers, reconnectAccount, onClose,
       {method?.kind === 'oauth' && !session && (
         <p className="settings-hint">Create a secure link, then copy it or open it when you are ready.</p>
       )}
+      {providerId === 'claude' && methodId === 'gateway' && (
+        <p className="settings-hint" style={{ color: '#d97706', fontWeight: 600, marginTop: '8px', marginBottom: '8px' }}>
+          Credential Kind: Static Api Key
+        </p>
+      )}
       {method && method.kind !== 'oauth' && requiredFields.map(field => (
-        <input
-          key={field}
-          className="input"
-          type={field.toLowerCase().includes('key') ? 'password' : 'text'}
-          placeholder={field === 'credentialJson' ? 'Paste credential JSON' : field}
-          value={fields[field] ?? ''}
-          onChange={event => setFields(previous => ({ ...previous, [field]: event.target.value }))}
-        />
+        <div key={field} style={{ marginBottom: '8px' }}>
+          <label className="settings-field-label" htmlFor={`field-${field}`}>
+            {fieldLabel(providerId, methodId, field)}
+          </label>
+          <input
+            id={`field-${field}`}
+            className="input"
+            type={field.toLowerCase().includes('key') ? 'password' : 'text'}
+            placeholder={fieldPlaceholder(providerId, methodId, field)}
+            value={fields[field] ?? ''}
+            onChange={event => setFields(previous => ({ ...previous, [field]: event.target.value }))}
+          />
+        </div>
       ))}
       {method && method.kind !== 'oauth' && (
-        <input
-          className="input"
-          placeholder="account label (optional)"
-          value={fields.label ?? ''}
-          onChange={event => setFields(previous => ({ ...previous, label: event.target.value }))}
-        />
+        <div style={{ marginBottom: '8px' }}>
+          <label className="settings-field-label" htmlFor="field-account-label">Account label (optional)</label>
+          <input
+            id="field-account-label"
+            className="input"
+            placeholder={providerId === 'claude' && methodId === 'gateway' ? 'Claude Gateway' : 'account label (optional)'}
+            value={fields.label ?? ''}
+            onChange={event => setFields(previous => ({ ...previous, label: event.target.value }))}
+          />
+        </div>
       )}
       {session && (
         <section className={`authorization-session ${session.status}`} aria-live="polite">

@@ -125,7 +125,7 @@ const ANTHROPIC_CACHE_BREAKPOINT = { anthropic: { cacheControl: { type: 'ephemer
 // opencode's applyCaching. Other providers cache automatically or reject unknown
 // cache_control fields, so they are left untouched.
 export function withCacheBreakpoints(messages: ModelMessage[], provider: string): ModelMessage[] {
-  if (provider !== 'anthropic' || messages.length === 0) return messages
+  if ((provider !== 'anthropic' && provider !== 'claude') || messages.length === 0) return messages
   const tagged = messages.map(m => ({ ...m }))
   tagged[0] = { ...tagged[0], providerOptions: { ...tagged[0].providerOptions, ...ANTHROPIC_CACHE_BREAKPOINT } }
   const last = tagged.length - 1
@@ -152,10 +152,11 @@ export function createLlm(provider: string, apiKey: string, baseUrl?: string, he
   }
   const isDeepSeek = provider === 'deepseek' || isDeepSeekEndpoint(baseUrl)
   const model = (modelId: string, includeUsage: boolean) => {
-    if (provider === 'anthropic') {
+    if (provider === 'anthropic' || provider === 'claude') {
       const anthropicClient = createAnthropic({
         apiKey,
-        ...(baseUrl ? { baseURL: baseUrl } : {})
+        ...(baseUrl ? { baseURL: baseUrl } : {}),
+        ...(headers ? { headers } : {})
       })
       return anthropicClient(modelId)
     }
@@ -184,7 +185,7 @@ export function createLlm(provider: string, apiKey: string, baseUrl?: string, he
       // every request); message breakpoints cache the growing history prefix.
       const variant = opts.variantOptions as StreamProviderOptions | undefined
       let providerOptions: StreamProviderOptions | undefined
-      if (provider === 'anthropic') {
+      if (provider === 'anthropic' || provider === 'claude') {
         providerOptions = {
           anthropic: {
             cacheControl: { type: 'ephemeral' },
@@ -194,7 +195,7 @@ export function createLlm(provider: string, apiKey: string, baseUrl?: string, he
       } else {
         providerOptions = variant
       }
-      const compatible = provider !== 'anthropic' && provider !== 'google'
+      const compatible = provider !== 'anthropic' && provider !== 'claude' && provider !== 'google'
       let includeUsage = compatible
       let emitted = false
       const unsupportedUsage = (error: unknown) => {

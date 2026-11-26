@@ -45,6 +45,7 @@ import { createOpenAiAdapter } from './providers/adapters/openai'
 import { createGoogleAdapter } from './providers/adapters/google'
 import { createOpenAiCompatibleAdapter } from './providers/adapters/openai-compatible'
 import { createGitHubCopilotAdapter } from './providers/adapters/github-copilot'
+import { createClaudeAdapter } from './providers/adapters/claude'
 import { createAntigravityAdapter } from './providers/adapters/antigravity'
 import { planNativeAgentReconciliation } from './agent/workspace-reconcile'
 import { TrayManager } from './tray-manager'
@@ -242,6 +243,7 @@ class MainApp {
     const antigravityAdapter = createAntigravityAdapter()
     this.providerRegistry.register(openaiAdapter)
     this.providerRegistry.register(createGoogleAdapter())
+    this.providerRegistry.register(createClaudeAdapter())
     this.providerRegistry.register(createGitHubCopilotAdapter())
     this.providerRegistry.register(antigravityAdapter)
     // Subscription methods surface only once installed-client detection resolves;
