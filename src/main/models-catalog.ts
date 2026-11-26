@@ -89,11 +89,50 @@ interface CacheEntry {
   providers: Record<string, CatalogProvider>
 }
 
+const DEFAULT_CLAUDE_MODELS_DATA: Record<string, RawModel> = {
+  'claude-3-7-sonnet-20250219': {
+    reasoning: true,
+    release_date: '2025-02-24',
+    limit: { context: 200000, output: 64000 },
+    reasoning_options: [{ type: 'effort', values: ['low', 'medium', 'high', 'xhigh', 'max'] }]
+  },
+  'claude-3-7-sonnet': {
+    reasoning: true,
+    release_date: '2025-02-24',
+    limit: { context: 200000, output: 64000 },
+    reasoning_options: [{ type: 'effort', values: ['low', 'medium', 'high', 'xhigh', 'max'] }]
+  },
+  'claude-3-5-sonnet-20241022': {
+    reasoning: false,
+    release_date: '2024-10-22',
+    limit: { context: 200000, output: 8192 }
+  },
+  'claude-3-5-sonnet': {
+    reasoning: false,
+    release_date: '2024-10-22',
+    limit: { context: 200000, output: 8192 }
+  },
+  'claude-3-5-haiku-20241022': {
+    reasoning: false,
+    release_date: '2024-10-22',
+    limit: { context: 200000, output: 8192 }
+  },
+  'claude-3-opus-20240229': {
+    reasoning: false,
+    release_date: '2024-02-29',
+    limit: { context: 200000, output: 4096 }
+  }
+}
+
 function mapProviders(json: Record<string, unknown>): Record<string, CatalogProvider> {
   const providers: Record<string, CatalogProvider> = {}
   for (const [id, rawP] of Object.entries(json)) {
     const p = toRawProvider(rawP)
     if (!p) continue
+    if (id === 'anthropic' || id === 'claude') {
+      p.models = { ...DEFAULT_CLAUDE_MODELS_DATA, ...p.models }
+      p.npm = p.npm ?? '@ai-sdk/anthropic'
+    }
     const variants: Record<string, Record<string, VariantBody>> = {}
     for (const [modelId, m] of Object.entries(p.models ?? {})) {
       const info = {
@@ -115,6 +154,19 @@ function mapProviders(json: Record<string, unknown>): Record<string, CatalogProv
       models: Object.keys(p.models ?? {}),
       limits: modelLimits(p.models as Record<string, unknown>),
       ...(Object.keys(variants).length > 0 ? { variants } : {})
+    }
+  }
+  if (!providers['claude'] && providers['anthropic']) {
+    providers['claude'] = {
+      ...providers['anthropic'],
+      name: 'Claude'
+    }
+  } else if (providers['claude'] && providers['anthropic']) {
+    providers['claude'] = {
+      ...providers['claude'],
+      models: [...new Set([...providers['claude'].models, ...providers['anthropic'].models])],
+      limits: { ...providers['anthropic'].limits, ...providers['claude'].limits },
+      variants: { ...providers['anthropic'].variants, ...providers['claude'].variants }
     }
   }
   return providers

@@ -1,5 +1,5 @@
 import type { AuthMethodDescriptor, ProviderCapability, ProviderConnectRequest, ProviderModel } from '../../../shared/providers'
-import type { ProviderAccount } from '../../../shared/types'
+import type { ProviderAccount, ProviderQuotaGroup, ProviderQuotaWindow, ProviderUsage } from '../../../shared/types'
 import type { ProviderAdapter } from '../types'
 import type { ProviderSecrets } from '../../connections/types'
 import { createLlm } from '../../agent/llm'
@@ -146,6 +146,167 @@ export function createClaudeAdapter(): ProviderAdapter {
         headers['x-api-key'] = secret.apiKey ?? ''
       }
       return createLlm('claude', secret.apiKey ?? '', secret.baseUrl, headers)
+    },
+
+    async fetchUsage(account: ProviderAccount, secret: ProviderSecrets): Promise<ProviderUsage> {
+      const apiKey = secret?.apiKey?.trim()
+      const isGateway = !secret.baseUrl || secret.baseUrl.includes('agentshop247') || !secret.baseUrl.includes('anthropic.com')
+      const checkUsageUrl = isGateway && apiKey ? `https://agentshop247.com/docs/check-usage?key=${encodeURIComponent(apiKey)}` : undefined
+
+      if (!apiKey) {
+        return {
+          accountId: account.id,
+          accountLabel: account.label,
+          accountType: 'api-key',
+          refreshedAt: Date.now(),
+          source: 'unavailable',
+          status: 'unavailable',
+          statusReason: 'API key is missing',
+          checkUsageUrl
+        }
+      }
+
+      if (isGateway) {
+        try {
+          const quotaApiUrl = `https://api.agentshop247.com/api/proxy/check-usage?key=${encodeURIComponent(apiKey)}`
+          const res = await fetch(quotaApiUrl, {
+            headers: { 'Accept': 'application/json' },
+            signal: AbortSignal.timeout(8000)
+          })
+
+          if (res.ok) {
+            const rawJson = await res.json() as {
+              success?: boolean
+              message?: string
+              data?: Record<string, unknown>
+              tokenBudget?: number
+              tokensUsed?: number
+              windowEnd?: string
+              sessionsUsed?: number
+              maxSessions?: number
+              weeklyLimitResetAt?: string
+            }
+
+            const data = (rawJson.data && typeof rawJson.data === 'object' ? rawJson.data : rawJson) as {
+              tokenBudget?: number
+              tokensUsed?: number
+              windowEnd?: string
+              sessionsUsed?: number
+              maxSessions?: number
+              weeklyLimitResetAt?: string
+              message?: string
+            }
+
+            if (rawJson.success === false) {
+              return {
+                accountId: account.id,
+                accountLabel: account.label,
+                accountType: 'api-key',
+                refreshedAt: Date.now(),
+                source: 'unavailable',
+                status: 'unavailable',
+                statusReason: rawJson.message || 'API key not found or unassigned',
+                checkUsageUrl
+              }
+            }
+
+            const tokenBudget = typeof data.tokenBudget === 'number' ? data.tokenBudget : undefined
+            const tokensUsed = typeof data.tokensUsed === 'number' ? data.tokensUsed : 0
+            const windowEnd = typeof data.windowEnd === 'string' ? data.windowEnd : undefined
+            const sessionsUsed = typeof data.sessionsUsed === 'number' ? data.sessionsUsed : 0
+            const maxSessions = typeof data.maxSessions === 'number' ? data.maxSessions : undefined
+            const weeklyLimitResetAt = typeof data.weeklyLimitResetAt === 'string' ? data.weeklyLimitResetAt : undefined
+
+            if (tokenBudget !== undefined && tokenBudget > 0) {
+              const remainingTokens = Math.max(0, tokenBudget - tokensUsed)
+              const remainingPercent = Math.min(100, Math.max(0, Math.round((remainingTokens / tokenBudget) * 100)))
+              const resetAt = windowEnd ? Date.parse(windowEnd) || undefined : undefined
+              const weeklyResetAt = weeklyLimitResetAt ? Date.parse(weeklyLimitResetAt) || undefined : undefined
+
+              const windows: ProviderQuotaWindow[] = [
+                {
+                  id: 'token-quota',
+                  label: 'Token Quota',
+                  kind: 'session',
+                  usageKnown: true,
+                  limitCount: tokenBudget,
+                  usedCount: tokensUsed,
+                  remainingCount: remainingTokens,
+                  remainingPercent,
+                  resetAt,
+                  source: 'provider'
+                }
+              ]
+
+              if (maxSessions !== undefined && maxSessions > 0) {
+                const remainingSessions = Math.max(0, maxSessions - sessionsUsed)
+                windows.push({
+                  id: 'active-sessions',
+                  label: 'Active Sessions',
+                  kind: 'additional',
+                  usageKnown: true,
+                  limitCount: maxSessions,
+                  usedCount: sessionsUsed,
+                  remainingCount: remainingSessions,
+                  remainingPercent: Math.min(100, Math.max(0, Math.round((remainingSessions / maxSessions) * 100))),
+                  resetAt: weeklyResetAt,
+                  source: 'provider'
+                })
+              }
+
+              const quotaGroups: ProviderQuotaGroup[] = [
+                {
+                  id: 'claude-gateway-quota',
+                  label: 'Claude Gateway Quota',
+                  modelIds: account.models ?? [],
+                  windows
+                }
+              ]
+
+              return {
+                accountId: account.id,
+                accountLabel: account.label,
+                accountType: 'api-key',
+                tokenLimit: tokenBudget,
+                tokensUsed,
+                quotaGroups,
+                primaryUsedPercent: 100 - remainingPercent,
+                resetAt,
+                refreshedAt: Date.now(),
+                source: 'provider',
+                status: 'ok',
+                checkUsageUrl
+              }
+            }
+          }
+        } catch (err) {
+          return {
+            accountId: account.id,
+            accountLabel: account.label,
+            accountType: 'api-key',
+            refreshedAt: Date.now(),
+            source: 'unavailable',
+            status: 'unavailable',
+            statusReason: err instanceof Error ? err.message : 'Failed to query quota',
+            checkUsageUrl
+          }
+        }
+      }
+
+      return {
+        accountId: account.id,
+        accountLabel: account.label,
+        accountType: 'api-key',
+        refreshedAt: Date.now(),
+        source: 'unavailable',
+        status: 'unavailable',
+        statusReason: 'Quota endpoint is not supported for direct Anthropic API keys',
+        checkUsageUrl
+      }
+    },
+
+    quotaGroupForModel(_modelId: string): string | undefined {
+      return 'claude-gateway-quota'
     }
   }
 }

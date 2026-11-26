@@ -1245,7 +1245,10 @@ export class BsAgentManager {
     const cfg = loadBsConfig(this.deps.configPath)
     const resolved = this.resolveAgentConfig(cfg, agent.name, agent.model)
     if (!resolved.provider || !resolved.model) return []
-    return Object.keys(this.modelVariants.get(`${resolved.provider}/${resolved.model}`) ?? {})
+    const modelKey = `${resolved.provider}/${resolved.model}`
+    const variants = this.modelVariants.get(modelKey)
+      ?? (resolved.provider === 'claude' ? this.modelVariants.get(`anthropic/${resolved.model}`) : undefined)
+    return Object.keys(variants ?? {})
   }
 
   async fetchProviderModels(providerId: string): Promise<string[]> {
@@ -1527,6 +1530,7 @@ export class BsAgentManager {
       .find(account => account.id === resolved.accountId)?.modelCatalog
       ?.find(model => model.id === resolved.model)?.capabilities
     const catalog = this.modelLimits.get(`${resolved.provider}/${resolved.model}`)
+      ?? (resolved.provider === 'claude' ? this.modelLimits.get(`anthropic/${resolved.model}`) : undefined)
     const positive = (value: number | undefined): number | undefined =>
       value !== undefined && Number.isFinite(value) && value > 0 ? value : undefined
     const providerContext = positive(capabilities?.contextWindow)
@@ -1629,7 +1633,9 @@ export class BsAgentManager {
       this.agents.set(agent.id, agent)
     }
     const modelKey = `${resolved.provider}/${resolved.model}`
-    const variantOptions = validVariant ? this.modelVariants.get(modelKey)?.[validVariant] : undefined
+    const variants = this.modelVariants.get(modelKey)
+      ?? (resolved.provider === 'claude' ? this.modelVariants.get(`anthropic/${resolved.model}`) : undefined)
+    const variantOptions = validVariant ? variants?.[validVariant] : undefined
     const runner = new SessionRunner({
       agentId: agent.id,
       turn: 1,

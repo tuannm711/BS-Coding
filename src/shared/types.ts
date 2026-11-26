@@ -450,6 +450,8 @@ export interface ProviderUsage {
   status: 'ok' | 'unavailable'
   /** Why the last refresh degraded — not why usage is unavailable. */
   statusReason?: string
+  /** External URL for viewing account quota/usage on the provider's web portal. */
+  checkUsageUrl?: string
 }
 
 export interface ProviderConnection {

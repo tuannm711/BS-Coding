@@ -184,13 +184,43 @@ export function createLlm(provider: string, apiKey: string, baseUrl?: string, he
       // Anthropic: top-level cacheControl caches the system prompt (sent on
       // every request); message breakpoints cache the growing history prefix.
       const variant = opts.variantOptions as StreamProviderOptions | undefined
+      let maxOutputTokens = opts.maxOutputTokens
       let providerOptions: StreamProviderOptions | undefined
       if (provider === 'anthropic' || provider === 'claude') {
-        providerOptions = {
-          anthropic: {
-            cacheControl: { type: 'ephemeral' },
-            ...(variant?.anthropic as Record<string, unknown> | undefined)
+        const rawAnthropic = (variant?.anthropic as Record<string, unknown> | undefined)
+        let anthropicOpts: Record<string, unknown> = {
+          cacheControl: { type: 'ephemeral' },
+          ...rawAnthropic
+        }
+        const thinking = anthropicOpts.thinking as { type?: string; budgetTokens?: number; display?: string } | undefined
+        const effort = anthropicOpts.effort as string | undefined
+        const ANTHROPIC_EFFORT_BUDGETS: Record<string, number> = {
+          low: 2048,
+          medium: 8192,
+          high: 16000,
+          xhigh: 24000,
+          max: 32000
+        }
+        if (thinking?.type === 'adaptive' || (effort && thinking?.type !== 'enabled')) {
+          const budget = (effort && ANTHROPIC_EFFORT_BUDGETS[effort]) ? ANTHROPIC_EFFORT_BUDGETS[effort] : 16000
+          anthropicOpts = {
+            ...anthropicOpts,
+            thinking: {
+              type: 'enabled',
+              budgetTokens: budget
+            }
           }
+          delete anthropicOpts.effort
+        }
+        const activeBudget = (anthropicOpts.thinking as { type?: string; budgetTokens?: number } | undefined)?.budgetTokens
+        if (opts.maxOutputTokens) {
+          maxOutputTokens = activeBudget ? Math.max(1024, opts.maxOutputTokens - activeBudget) : opts.maxOutputTokens
+        } else {
+          maxOutputTokens = undefined
+        }
+
+        providerOptions = {
+          anthropic: anthropicOpts as unknown as StreamProviderOptions['anthropic']
         }
       } else {
         providerOptions = variant
@@ -213,7 +243,7 @@ export function createLlm(provider: string, apiKey: string, baseUrl?: string, he
             messages: withCacheBreakpoints(opts.messages, provider),
             tools,
             abortSignal: opts.signal,
-            ...(opts.maxOutputTokens ? { maxOutputTokens: opts.maxOutputTokens } : {}),
+            ...(maxOutputTokens ? { maxOutputTokens } : {}),
             ...(providerOptions ? { providerOptions } : {})
           })
           for await (const part of result.fullStream) {

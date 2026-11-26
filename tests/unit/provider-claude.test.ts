@@ -184,6 +184,116 @@ describe('createClaudeAdapter', () => {
     expect(runtime).toBeDefined()
     expect(typeof runtime.stream).toBe('function')
   })
+
+  it('fetchUsage successfully queries gateway quota endpoint and returns quota groups', async () => {
+    const adapter = createClaudeAdapter()
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          success: true,
+          data: {
+            tokenBudget: 1000000,
+            tokensUsed: 250000,
+            windowEnd: '2026-12-01T00:00:00.000Z',
+            sessionsUsed: 2,
+            maxSessions: 5,
+            weeklyLimitResetAt: '2026-11-30T00:00:00.000Z'
+          }
+        })
+      })
+    )
+
+    const account = {
+      id: 'acc-1',
+      providerId: 'claude',
+      label: 'Claude Gateway',
+      authMode: 'api-key' as const,
+      status: 'active' as const,
+      models: ['claude-3-7-sonnet-20250219'],
+      createdAt: 1,
+      lastUsedAt: 1
+    }
+
+    const usage = await adapter.fetchUsage!(account, {
+      apiKey: 'my-gateway-key',
+      baseUrl: DEFAULT_CLAUDE_GATEWAY_URL
+    })
+
+    expect(usage.status).toBe('ok')
+    expect(usage.tokenLimit).toBe(1000000)
+    expect(usage.tokensUsed).toBe(250000)
+    expect(usage.primaryUsedPercent).toBe(25)
+    expect(usage.checkUsageUrl).toBe('https://agentshop247.com/docs/check-usage?key=my-gateway-key')
+    expect(usage.quotaGroups).toHaveLength(1)
+    expect(usage.quotaGroups![0].windows).toHaveLength(2)
+
+    const tokenWindow = usage.quotaGroups![0].windows.find(w => w.id === 'token-quota')
+    expect(tokenWindow).toBeDefined()
+    expect(tokenWindow?.remainingCount).toBe(750000)
+    expect(tokenWindow?.remainingPercent).toBe(75)
+
+    const sessionWindow = usage.quotaGroups![0].windows.find(w => w.id === 'active-sessions')
+    expect(sessionWindow).toBeDefined()
+    expect(sessionWindow?.remainingCount).toBe(3)
+    expect(sessionWindow?.remainingPercent).toBe(60)
+  })
+
+  it('fetchUsage handles API key error response from proxy', async () => {
+    const adapter = createClaudeAdapter()
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          success: false,
+          message: 'API key not found or unassigned.',
+          data: null
+        })
+      })
+    )
+
+    const account = {
+      id: 'acc-1',
+      providerId: 'claude',
+      label: 'Claude Gateway',
+      authMode: 'api-key' as const,
+      status: 'active' as const,
+      createdAt: 1,
+      lastUsedAt: 1
+    }
+
+    const usage = await adapter.fetchUsage!(account, {
+      apiKey: 'invalid-key',
+      baseUrl: DEFAULT_CLAUDE_GATEWAY_URL
+    })
+
+    expect(usage.status).toBe('unavailable')
+    expect(usage.statusReason).toBe('API key not found or unassigned.')
+    expect(usage.checkUsageUrl).toBe('https://agentshop247.com/docs/check-usage?key=invalid-key')
+  })
+
+  it('fetchUsage returns unavailable for direct official Anthropic api-key', async () => {
+    const adapter = createClaudeAdapter()
+    const account = {
+      id: 'acc-2',
+      providerId: 'claude',
+      label: 'Claude Official',
+      authMode: 'api-key' as const,
+      status: 'active' as const,
+      createdAt: 1,
+      lastUsedAt: 1
+    }
+
+    const usage = await adapter.fetchUsage!(account, {
+      apiKey: 'sk-ant-test',
+      baseUrl: 'https://api.anthropic.com/v1'
+    })
+
+    expect(usage.status).toBe('unavailable')
+    expect(usage.checkUsageUrl).toBeUndefined()
+  })
 })
 
 describe('AddProviderModal field helpers for Claude', () => {
